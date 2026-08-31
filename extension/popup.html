@@ -2,411 +2,724 @@
 <html>
 <head>
 <meta charset="utf-8"/>
-<title>Privacy Vision Agent</title>
+<title>VisionVault</title>
 <style>
-:root {
-  --bg: #0f1117;
-  --surface: #1a1d27;
-  --surface2: #22263a;
-  --border: #2e3250;
-  --accent: #6c63ff;
-  --accent2: #4ade80;
-  --danger: #f87171;
-  --warn: #fbbf24;
-  --text: #e2e8f0;
-  --text2: #94a3b8;
-  --text3: #64748b;
-  --radius: 8px;
-}
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body {
-  width: 420px;
-  min-height: 500px;
-  background: var(--bg);
-  color: var(--text);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  font-size: 13px;
-}
+  :root {
+    --bg: #090d18;
+    --bg-2: #111827;
+    --panel: rgba(9, 13, 24, 0.88);
+    --panel-soft: rgba(17, 24, 39, 0.72);
+    --surface: rgba(15, 23, 42, 0.96);
+    --surface-strong: rgba(26, 38, 56, 0.98);
+    --surface-faint: rgba(148, 163, 184, 0.08);
+    --border: rgba(148, 163, 184, 0.18);
+    --accent: #8b5cf6;
+    --accent-2: #22d3ee;
+    --accent-3: #34d399;
+    --warning: #fbbf24;
+    --danger: #f87171;
+    --text: #edf3ff;
+    --text-muted: #94a3b8;
+    --text-soft: #d9e6ff;
+    --shadow: 0 25px 65px rgba(10, 15, 30, 0.62);
+    --radius-xl: 22px;
+    --radius-lg: 16px;
+    --radius-md: 12px;
+  }
 
-/* ── Header ── */
-.header {
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-  padding: 12px 16px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.header-left { display: flex; align-items: center; gap: 8px; }
-.logo { font-size: 18px; }
-.title { font-size: 14px; font-weight: 700; color: var(--text); }
-.subtitle { font-size: 10px; color: var(--text3); margin-top: 1px; }
-.status-dot {
-  width: 8px; height: 8px; border-radius: 50%;
-  background: var(--text3); flex-shrink: 0;
-}
-.status-dot.online { background: var(--accent2); box-shadow: 0 0 6px var(--accent2); }
-.status-dot.error  { background: var(--danger); }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
 
-/* ── Tabs ── */
-.tabs {
-  display: flex;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-  padding: 0 8px;
-}
-.tab {
-  flex: 1; padding: 10px 4px; background: none; border: none;
-  color: var(--text3); font-size: 11px; font-weight: 500;
-  cursor: pointer; border-bottom: 2px solid transparent;
-  transition: color .15s, border-color .15s;
-}
-.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
-.tab:hover:not(.active) { color: var(--text2); }
+  html, body {
+    width: 420px;
+    min-height: 560px;
+    background:
+      radial-gradient(circle at top left, rgba(139, 92, 246, 0.42), transparent 32%),
+      radial-gradient(circle at bottom right, rgba(34, 211, 238, 0.24), transparent 26%),
+      linear-gradient(160deg, #0a1120 0%, #121a2b 35%, #090d18 100%);
+    color: var(--text);
+    font-family: Inter, "Segoe UI", sans-serif;
+    font-size: 13px;
+  }
 
-/* ── Panels ── */
-.panel { display: none; padding: 14px 16px; }
-.panel.active { display: block; }
+  body {
+    padding: 12px;
+    overflow: hidden;
+  }
 
-/* ── Task input ── */
-.task-wrap { position: relative; }
-.task-input {
-  width: 100%; background: var(--surface2); border: 1px solid var(--border);
-  border-radius: var(--radius); color: var(--text); font-size: 13px;
-  padding: 10px 12px; resize: none; height: 72px;
-  transition: border-color .15s;
-}
-.task-input:focus { outline: none; border-color: var(--accent); }
-.task-input::placeholder { color: var(--text3); }
-.char-count { position: absolute; bottom: 8px; right: 10px; font-size: 10px; color: var(--text3); }
+  .app-shell {
+    position: relative;
+    background: linear-gradient(180deg, rgba(10, 15, 28, 0.98), rgba(12, 18, 30, 0.9));
+    border: 1px solid rgba(148,163,184,0.14);
+    border-radius: var(--radius-xl);
+    box-shadow: 0 28px 80px rgba(8, 12, 24, 0.72), inset 0 1px 0 rgba(255,255,255,0.05);
+    overflow: hidden;
+    backdrop-filter: blur(18px);
+    animation: slideIn 0.35s ease;
+  }
 
-/* ── Buttons ── */
-.btn {
-  width: 100%; padding: 10px; border: none; border-radius: var(--radius);
-  font-size: 13px; font-weight: 600; cursor: pointer;
-  transition: opacity .15s, transform .1s;
-  display: flex; align-items: center; justify-content: center; gap: 6px;
-}
-.btn:active { transform: scale(.98); }
-.btn:disabled { opacity: .45; cursor: not-allowed; transform: none; }
-.btn-primary { background: var(--accent); color: #fff; margin-top: 10px; }
-.btn-primary:hover:not(:disabled) { opacity: .9; }
-.btn-run { background: linear-gradient(135deg, #4ade80, #22c55e); color: #000; margin-top: 8px; }
-.btn-run:hover:not(:disabled) { opacity: .9; }
-.btn-sm {
-  width: auto; padding: 6px 14px; font-size: 12px;
-  border-radius: 6px; border: none; cursor: pointer; font-weight: 600;
-}
-.btn-confirm { background: var(--accent2); color: #000; }
-.btn-reject  { background: var(--surface2); color: var(--text2); border: 1px solid var(--border); }
+  .app-shell::before {
+    content: "";
+    position: absolute;
+    inset: -25% 50% auto -18%;
+    height: 180px;
+    background: radial-gradient(circle, rgba(139, 92, 246, 0.38), rgba(139, 92, 246, 0.02) 60%, transparent 76%);
+    pointer-events: none;
+    filter: blur(14px);
+  }
 
-/* ── Preview ── */
-.preview-wrap {
-  margin-top: 12px; border-radius: var(--radius);
-  overflow: hidden; border: 1px solid var(--border); display: none;
-  position: relative;
-}
-.preview-wrap img { width: 100%; display: block; }
-.preview-label {
-  position: absolute; bottom: 0; left: 0; right: 0;
-  background: rgba(0,0,0,.7); color: #fff; font-size: 10px;
-  padding: 4px 8px; text-align: center;
-}
+  .app-shell::after {
+    content: "";
+    position: absolute;
+    inset: auto -10% -30% 50%;
+    height: 180px;
+    background: radial-gradient(circle, rgba(34, 211, 238, 0.28), rgba(34, 211, 238, 0.02) 55%, transparent 75%);
+    pointer-events: none;
+    filter: blur(18px);
+  }
 
-/* ── Stats grid ── */
-.stats-grid {
-  display: grid; grid-template-columns: repeat(4, 1fr);
-  gap: 6px; margin-top: 12px;
-}
-.stat-card {
-  background: var(--surface2); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: 8px 6px; text-align: center;
-}
-.stat-val { font-size: 18px; font-weight: 700; color: var(--accent); }
-.stat-lbl { font-size: 9px; color: var(--text3); margin-top: 2px; line-height: 1.3; }
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
 
-/* ── Timing bar ── */
-.timing-row {
-  display: flex; gap: 4px; margin-top: 8px; align-items: center;
-}
-.timing-seg {
-  height: 4px; border-radius: 2px; min-width: 4px;
-  transition: width .3s;
-}
-.t-scan { background: #818cf8; }
-.t-shot { background: #38bdf8; }
-.t-redact { background: #fb923c; }
-.timing-labels { display: flex; gap: 10px; margin-top: 4px; flex-wrap: wrap; }
-.timing-lbl { font-size: 10px; color: var(--text3); }
-.timing-lbl span { color: var(--text2); font-weight: 600; }
+  .header {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px 12px;
+    background: linear-gradient(135deg, rgba(124,58,237,0.2), rgba(34,211,238,0.08) 50%, rgba(15,23,42,0.3));
+    border-bottom: 1px solid rgba(148,163,184,0.12);
+  }
 
-/* ── Action log ── */
-.log-wrap { margin-top: 10px; }
-.log-title { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px; }
-.log-entry {
-  display: flex; align-items: center; gap: 8px;
-  padding: 6px 8px; background: var(--surface2);
-  border-radius: 6px; margin-bottom: 4px;
-  border-left: 3px solid var(--accent2);
-}
-.log-entry.error { border-left-color: var(--danger); }
-.log-icon { font-size: 12px; }
-.log-text { flex: 1; font-size: 11px; color: var(--text2); }
-.log-ms { font-size: 10px; color: var(--text3); }
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
 
-/* ── Confirm box ── */
-.confirm-wrap {
-  margin-top: 10px; background: var(--surface2);
-  border: 1px solid var(--warn); border-radius: var(--radius);
-  padding: 12px; display: none;
-}
-.confirm-title { font-size: 11px; font-weight: 600; color: var(--warn); margin-bottom: 6px; }
-.confirm-text { font-size: 12px; color: var(--text2); margin-bottom: 10px; line-height: 1.5; }
-.confirm-btns { display: flex; gap: 8px; }
+  .logo-wrap {
+    width: 38px;
+    height: 38px;
+    border-radius: 13px;
+    display: grid;
+    place-items: center;
+    background: linear-gradient(135deg, rgba(139,92,246,0.95), rgba(34,211,238,0.9));
+    box-shadow: 0 12px 28px rgba(139, 92, 246, 0.45), inset 0 1px 0 rgba(255,255,255,0.4);
+    transform: translateZ(0);
+  }
 
-/* ── Status message ── */
-.status-msg {
-  margin-top: 10px; padding: 8px 10px; border-radius: 6px;
-  font-size: 12px; display: none;
-}
-.status-msg.info    { background: #1e3a5f; color: #93c5fd; border: 1px solid #2563eb44; }
-.status-msg.success { background: #14532d; color: #86efac; border: 1px solid #16a34a44; }
-.status-msg.error   { background: #450a0a; color: #fca5a5; border: 1px solid #dc262644; }
-.status-msg.warn    { background: #451a03; color: #fcd34d; border: 1px solid #d9770644; }
+  .logo-wrap svg { width: 22px; height: 22px; }
 
-/* ── Vault ── */
-.vault-note {
-  font-size: 11px; color: var(--text3); background: var(--surface2);
-  border: 1px solid var(--border); border-radius: 6px;
-  padding: 8px 10px; margin-bottom: 12px; line-height: 1.5;
-}
-.field-group { margin-bottom: 10px; }
-.field-label { font-size: 11px; color: var(--text3); margin-bottom: 4px; display: block; }
-.field-input {
-  width: 100%; background: var(--surface2); border: 1px solid var(--border);
-  border-radius: 6px; color: var(--text); font-size: 12px; padding: 8px 10px;
-}
-.field-input:focus { outline: none; border-color: var(--accent); }
-.field-input::placeholder { color: var(--text3); }
-.vault-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .title { font-size: 14px; font-weight: 700; }
+  .subtitle { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
 
-/* ── Settings ── */
-.setting-item {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 10px 0; border-bottom: 1px solid var(--border);
-}
-.setting-item:last-of-type { border-bottom: none; }
-.setting-label { font-size: 12px; color: var(--text2); }
-.setting-desc  { font-size: 10px; color: var(--text3); margin-top: 2px; }
-.setting-select {
-  background: var(--surface2); border: 1px solid var(--border);
-  color: var(--text); border-radius: 6px; padding: 5px 8px; font-size: 11px;
-}
-.toggle {
-  position: relative; width: 36px; height: 20px; cursor: pointer;
-}
-.toggle input { opacity: 0; width: 0; height: 0; }
-.toggle-slider {
-  position: absolute; inset: 0; background: var(--border);
-  border-radius: 20px; transition: .2s;
-}
-.toggle-slider:before {
-  content: ""; position: absolute; width: 14px; height: 14px;
-  left: 3px; top: 3px; background: white; border-radius: 50%; transition: .2s;
-}
-.toggle input:checked + .toggle-slider { background: var(--accent); }
-.toggle input:checked + .toggle-slider:before { transform: translateX(16px); }
+  .status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 6px 9px;
+    border-radius: 999px;
+    background: linear-gradient(180deg, rgba(17,24,39,0.9), rgba(10,15,28,0.94));
+    border: 1px solid rgba(148,163,184,0.18);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 0 0 1px rgba(139,92,246,0.08);
+  }
 
-.server-input {
-  width: 100%; background: var(--surface2); border: 1px solid var(--border);
-  border-radius: 6px; color: var(--text); font-size: 12px; padding: 8px 10px;
-  margin-top: 8px;
-}
-.server-input:focus { outline: none; border-color: var(--accent); }
+  .status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--text-muted);
+    box-shadow: 0 0 0 4px rgba(148,163,184,0.12);
+  }
 
-.backend-badge {
-  display: inline-flex; align-items: center; gap: 4px;
-  padding: 3px 8px; border-radius: 20px; font-size: 10px; font-weight: 600;
-}
-.backend-badge.groq   { background: #1e1b4b; color: #a5b4fc; border: 1px solid #4338ca44; }
-.backend-badge.openai { background: #052e16; color: #86efac; border: 1px solid #16a34a44; }
-.backend-badge.mock   { background: #1c1917; color: #a8a29e; border: 1px solid #57534e44; }
-.backend-badge.ollama { background: #1a1a2e; color: #c084fc; border: 1px solid #7c3aed44; }
+  .status-dot.online { background: var(--accent-3); box-shadow: 0 0 0 4px rgba(52,211,153,.14); }
+  .status-dot.error { background: var(--danger); box-shadow: 0 0 0 4px rgba(248,113,113,.14); }
 
-/* ── Spinner ── */
-@keyframes spin { to { transform: rotate(360deg); } }
-.spinner {
-  width: 14px; height: 14px; border: 2px solid transparent;
-  border-top-color: currentColor; border-radius: 50%;
-  animation: spin .6s linear infinite; display: inline-block;
-}
+  .backend-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 52px;
+    padding: 4px 8px;
+    border-radius: 999px;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-weight: 700;
+    border: 1px solid transparent;
+  }
 
-/* ── Scrollbar ── */
-::-webkit-scrollbar { width: 4px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  .backend-badge.groq   { background: rgba(79,70,229,.14); color: #c4b5fd; border-color: rgba(129,140,248,.28); }
+  .backend-badge.openai { background: rgba(16,185,129,.12); color: #a7f3d0; border-color: rgba(52,211,153,.30); }
+  .backend-badge.mock   { background: rgba(148,163,184,.08); color: #dbeafe; border-color: rgba(148,163,184,.18); }
+  .backend-badge.ollama { background: rgba(168,85,247,.12); color: #e9d5ff; border-color: rgba(196,181,253,.28); }
+
+  .tabs {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    padding: 10px 12px 0;
+    gap: 8px;
+    background: rgba(10, 18, 27, 0.8);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .tab {
+    background: rgba(148,163,184,0.04);
+    border: 1px solid transparent;
+    border-bottom: 2px solid transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-weight: 600;
+    padding: 9px 10px;
+    border-radius: 12px 12px 0 0;
+    transition: all 0.2s ease;
+  }
+
+  .tab:hover {
+    color: var(--text-soft);
+    border-color: rgba(148,163,184,0.12);
+  }
+
+  .tab.active {
+    color: var(--text);
+    background: linear-gradient(180deg, rgba(139,92,246,0.12), rgba(34,211,238,0.05));
+    border-color: rgba(139,92,246,0.24);
+    border-bottom-color: rgba(139,92,246,0.85);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
+  }
+
+  .panel { display: none; padding: 14px 14px 16px; }
+  .panel.active { display: block; }
+
+  .task-wrap { position: relative; }
+  .task-input {
+    width: 100%;
+    min-height: 84px;
+    resize: vertical;
+    background: linear-gradient(180deg, rgba(15, 23, 42, 0.92), rgba(11, 17, 28, 0.8));
+    border: 1px solid rgba(148,163,184,0.18);
+    border-radius: var(--radius-lg);
+    color: var(--text);
+    padding: 12px 40px 12px 12px;
+    font-size: 13px;
+    line-height: 1.5;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.03), 0 0 0 1px rgba(139,92,246,0.04);
+  }
+
+  .task-input:focus {
+    outline: none;
+    border-color: rgba(124,58,237,0.8);
+    box-shadow: 0 0 0 3px rgba(124,58,237,0.13), inset 0 1px 0 rgba(255,255,255,0.03);
+  }
+
+  .task-input::placeholder { color: var(--text-muted); }
+  .char-count {
+    position: absolute;
+    right: 12px;
+    bottom: 9px;
+    font-size: 10px;
+    color: var(--text-muted);
+    background: rgba(15,23,42,0.6);
+    border-radius: 999px;
+    padding: 2px 6px;
+  }
+
+  .quick-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+  }
+
+  .quick-chip {
+    background: linear-gradient(180deg, rgba(15,23,42,0.82), rgba(15,23,42,0.62));
+    border: 1px solid rgba(148,163,184,0.15);
+    border-radius: 999px;
+    color: var(--text-soft);
+    padding: 7px 10px;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
+  }
+
+  .quick-chip:hover {
+    border-color: rgba(124,58,237,0.7);
+    color: var(--text);
+    transform: translateY(-1px);
+    box-shadow: 0 8px 18px rgba(124,58,237,0.14);
+  }
+
+  .primary-btn,
+  .secondary-btn,
+  .small-btn {
+    border: 0;
+    border-radius: var(--radius-md);
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform 0.15s ease, opacity 0.15s ease, box-shadow 0.15s ease;
+    letter-spacing: 0.01em;
+  }
+
+  .primary-btn:active,
+  .secondary-btn:active,
+  .small-btn:active { transform: scale(0.98); }
+
+  .primary-btn {
+    width: 100%;
+    margin-top: 12px;
+    padding: 11px 12px;
+    color: #fff;
+    background: linear-gradient(135deg, #8b5cf6 0%, #5b7cff 52%, #22d3ee 100%);
+    box-shadow: 0 16px 28px rgba(91, 124, 255, 0.28), inset 0 1px 0 rgba(255,255,255,0.22);
+  }
+
+  .primary-btn:hover {
+    box-shadow: 0 18px 30px rgba(91, 124, 255, 0.34);
+    transform: translateY(-1px);
+  }
+
+  .secondary-btn {
+    width: 100%;
+    margin-top: 10px;
+    padding: 11px 12px;
+    color: #eaf2ff;
+    background: linear-gradient(135deg, rgba(34,211,238,0.16), rgba(52,211,153,0.18));
+    border: 1px solid rgba(34,211,238,0.28);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 12px 20px rgba(34,211,238,0.08);
+  }
+
+  .small-btn {
+    padding: 7px 12px;
+    font-size: 12px;
+  }
+
+  .confirm-btn { background: linear-gradient(135deg, #34d399, #10b981); color: #04140e; }
+  .reject-btn { background: rgba(15,23,42,0.9); color: var(--text-soft); border: 1px solid var(--border); }
+
+  .preview-wrap {
+    margin-top: 12px;
+    overflow: hidden;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+    background: rgba(11, 17, 28, 0.7);
+    display: none;
+    position: relative;
+  }
+
+  .preview-wrap img {
+    display: block;
+    width: 100%;
+    max-height: 180px;
+    object-fit: cover;
+  }
+
+  .preview-label {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    padding: 6px 10px;
+    text-align: center;
+    background: rgba(8, 13, 22, 0.7);
+    color: #eef5ff;
+    font-size: 10px;
+    letter-spacing: 0.04em;
+  }
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-top: 12px;
+  }
+
+  .stat-card {
+    background: rgba(15, 23, 42, 0.65);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 10px 6px;
+    text-align: center;
+  }
+
+  .stat-val {
+    font-size: 18px;
+    font-weight: 800;
+    color: #bdb7ff;
+  }
+
+  .stat-lbl {
+    font-size: 9px;
+    color: var(--text-muted);
+    line-height: 1.2;
+    margin-top: 4px;
+  }
+
+  .timing-wrap { margin-top: 12px; }
+  .timing-row {
+    display: flex;
+    gap: 5px;
+    height: 8px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: rgba(148,163,184,0.08);
+  }
+  .timing-seg { height: 100%; border-radius: inherit; }
+  .t-scan { background: linear-gradient(90deg, #7c3aed, #8b5cf6); }
+  .t-shot { background: linear-gradient(90deg, #22d3ee, #38bdf8); }
+  .t-redact { background: linear-gradient(90deg, #34d399, #10b981); }
+
+  .timing-labels {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 12px;
+    margin-top: 8px;
+    color: var(--text-muted);
+    font-size: 10px;
+  }
+
+  .status-msg {
+    margin-top: 12px;
+    display: none;
+    border-radius: 12px;
+    padding: 9px 10px;
+    font-size: 12px;
+    line-height: 1.4;
+  }
+
+  .status-msg.info { background: rgba(59,130,246,0.12); color: #bfdbfe; border: 1px solid rgba(96,165,250,0.2); }
+  .status-msg.success { background: rgba(16,185,129,0.12); color: #bbf7d0; border: 1px solid rgba(52,211,153,0.22); }
+  .status-msg.warn { background: rgba(251,191,36,0.12); color: #fde68a; border: 1px solid rgba(251,191,36,0.22); }
+  .status-msg.error { background: rgba(239,68,68,0.12); color: #fecaca; border: 1px solid rgba(248,113,113,0.22); }
+
+  .log-wrap {
+    margin-top: 12px;
+    display: none;
+  }
+
+  .log-title {
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+  }
+
+  .log-entry {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    background: rgba(15,23,42,0.62);
+    border: 1px solid var(--border);
+    border-left: 3px solid rgba(52,211,153,0.9);
+    border-radius: 11px;
+    padding: 8px 9px;
+    margin-bottom: 6px;
+  }
+
+  .log-entry.error { border-left-color: rgba(248,113,113,0.9); }
+  .log-icon { font-size: 12px; }
+  .log-text { flex: 1; color: var(--text-soft); font-size: 11px; }
+  .log-ms { color: var(--text-muted); font-size: 10px; }
+
+  .confirm-wrap {
+    display: none;
+    margin-top: 12px;
+    padding: 12px;
+    background: rgba(251,191,36,0.08);
+    border: 1px solid rgba(251,191,36,0.25);
+    border-radius: var(--radius-lg);
+  }
+
+  .confirm-title {
+    color: #fef3c7;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  .confirm-text {
+    color: var(--text-soft);
+    font-size: 12px;
+    line-height: 1.5;
+    margin-bottom: 10px;
+  }
+
+  .confirm-btns {
+    display: flex;
+    gap: 8px;
+  }
+
+  .vault-note {
+    background: rgba(15,23,42,0.68);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 9px 10px;
+    color: var(--text-muted);
+    line-height: 1.5;
+    font-size: 11px;
+  }
+
+  .field-group { margin-top: 12px; }
+  .field-label {
+    display: block;
+    margin-bottom: 6px;
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+  .field-input, .server-input, .setting-select {
+    width: 100%;
+    padding: 9px 10px;
+    background: rgba(15,23,42,0.7);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text);
+    font-size: 12px;
+  }
+
+  .field-input:focus, .server-input:focus, .setting-select:focus {
+    outline: none;
+    border-color: rgba(124,58,237,0.75);
+    box-shadow: 0 0 0 3px rgba(124,58,237,0.1);
+  }
+
+  .vault-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .setting-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .setting-label {
+    font-size: 12px;
+    color: var(--text-soft);
+    font-weight: 600;
+  }
+
+  .setting-desc {
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-top: 3px;
+  }
+
+  .spinner {
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: currentColor;
+    border-radius: 50%;
+    display: inline-block;
+    animation: spin 0.7s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-thumb { background: rgba(148,163,184,0.25); border-radius: 999px; }
 </style>
 </head>
 <body>
+  <div class="app-shell">
+    <div class="header">
+      <div class="header-left">
+        <div class="logo-wrap" aria-label="VisionVault logo">
+          <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M18 18L30 12L46 18V31C46 42 39 49.5 30 53C21 49.5 14 42 14 31V18L18 18Z" fill="rgba(255,255,255,0.12)" stroke="white" stroke-width="2.5" stroke-linejoin="round"/>
+            <path d="M20 26L28 34L44 18" stroke="white" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="47" cy="18" r="5" fill="#A7F3D0"/>
+          </svg>
+        </div>
+        <div>
+          <div class="title">VisionVault</div>
+          <div class="subtitle">Private automation assistant</div>
+        </div>
+      </div>
+      <div class="status-pill">
+        <span class="status-dot" id="serverDot" title="server health"></span>
+        <span id="backendBadge" class="backend-badge mock">mock</span>
+      </div>
+    </div>
 
-<div class="header">
-  <div class="header-left">
-    <span class="logo">🔒</span>
-    <div>
-      <div class="title">Privacy Vision Agent</div>
-      <div class="subtitle">On-device redaction · Cloud AI planning</div>
+    <div class="tabs">
+      <button class="tab active" data-tab="run">Run</button>
+      <button class="tab" data-tab="vault">Vault</button>
+      <button class="tab" data-tab="settings">Settings</button>
+    </div>
+
+    <div id="panel-run" class="panel active">
+      <div class="task-wrap">
+        <textarea class="task-input" id="task" placeholder="Tell the agent what to do... e.g. fill this form, search for a product, or open a page"></textarea>
+        <span class="char-count" id="charCount">0</span>
+      </div>
+
+      <div class="quick-actions">
+        <button class="quick-chip" data-template="fill this signup form">Fill form</button>
+        <button class="quick-chip" data-template="search for wireless headphones">Search</button>
+        <button class="quick-chip" data-template="open GitHub and create a new repo">GitHub</button>
+        <button class="quick-chip" data-template="message +1 555 123 4567 hello there">Message</button>
+      </div>
+
+      <button class="primary-btn" id="scanBtn">
+        <span style="display:inline-flex; align-items:center; justify-content:center; margin-right:8px; vertical-align:middle;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <circle cx="11" cy="11" r="5.8" stroke="currentColor" stroke-width="2"/>
+            <path d="M16 16L21 21" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+          </svg>
+        </span>
+        Scan &amp; redact page
+      </button>
+
+      <div class="preview-wrap" id="previewWrap">
+        <img id="preview" alt="Redacted preview"/>
+        <div class="preview-label">Protected preview</div>
+      </div>
+
+      <div class="stats-grid" id="statsGrid" style="display:none">
+        <div class="stat-card">
+          <div class="stat-val" id="s-pii">0</div>
+          <div class="stat-lbl">PII<br>found</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-val" id="s-marks">0</div>
+          <div class="stat-lbl">Fields<br>marked</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-val" id="s-total">0ms</div>
+          <div class="stat-lbl">Scan<br>time</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-val" id="s-actions">0</div>
+          <div class="stat-lbl">Actions<br>done</div>
+        </div>
+      </div>
+
+      <div class="timing-wrap" id="timingWrap" style="display:none">
+        <div class="timing-row" id="timingBar"></div>
+        <div class="timing-labels" id="timingLabels"></div>
+      </div>
+
+      <button class="secondary-btn" id="runBtn" style="display:none">
+        <span style="display:inline-flex; align-items:center; justify-content:center; margin-right:8px; vertical-align:middle;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path d="M13 2L4 13H10L9 22L20 11H14L13 2Z" fill="currentColor"/>
+          </svg>
+        </span>
+        Run automation
+      </button>
+
+      <div class="confirm-wrap" id="confirmWrap">
+        <div class="confirm-title">Action requires approval</div>
+        <div class="confirm-text" id="confirmText"></div>
+        <div class="confirm-btns">
+          <button class="small-btn confirm-btn" id="confirmYes">Allow</button>
+          <button class="small-btn reject-btn" id="confirmNo">Reject</button>
+        </div>
+      </div>
+
+      <div class="log-wrap" id="logWrap">
+        <div class="log-title">Automation log</div>
+        <div id="logEntries"></div>
+      </div>
+
+      <div class="status-msg" id="statusMsg"></div>
+    </div>
+
+    <div id="panel-vault" class="panel">
+      <div class="vault-note">
+        Your vault stays in this browser. The server only sees field types like “email”, and the real value is filled locally before the action executes.
+      </div>
+
+      <div class="vault-grid">
+        <div class="field-group">
+          <label class="field-label">Full name</label>
+          <input class="field-input" id="v-name" placeholder="Jane Doe" type="text"/>
+        </div>
+        <div class="field-group">
+          <label class="field-label">Email</label>
+          <input class="field-input" id="v-email" placeholder="jane@example.com" type="text"/>
+        </div>
+        <div class="field-group">
+          <label class="field-label">Phone</label>
+          <input class="field-input" id="v-phone" placeholder="+1 555 000 0000" type="text"/>
+        </div>
+        <div class="field-group">
+          <label class="field-label">Username</label>
+          <input class="field-input" id="v-username" placeholder="janedoe" type="text"/>
+        </div>
+        <div class="field-group">
+          <label class="field-label">Company</label>
+          <input class="field-input" id="v-company" placeholder="Acme" type="text"/>
+        </div>
+        <div class="field-group">
+          <label class="field-label">ZIP</label>
+          <input class="field-input" id="v-zip" placeholder="10001" type="text"/>
+        </div>
+      </div>
+
+      <div class="field-group">
+        <label class="field-label">Address</label>
+        <input class="field-input" id="v-address" placeholder="123 Main St, City, State" type="text"/>
+      </div>
+
+      <button class="primary-btn" id="saveVault">
+        <span style="display:inline-flex; align-items:center; justify-content:center; margin-right:8px; vertical-align:middle;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path d="M7 12.5L10.5 16L17 9.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+            <rect x="3.5" y="3.5" width="17" height="17" rx="4" stroke="currentColor" stroke-width="1.8"/>
+          </svg>
+        </span>
+        Save vault
+      </button>
+      <div class="status-msg" id="vaultStatus"></div>
+    </div>
+
+    <div id="panel-settings" class="panel">
+      <div class="setting-item">
+        <div>
+          <div class="setting-label">Redaction style</div>
+          <div class="setting-desc">How sensitive regions are masked</div>
+        </div>
+        <select class="setting-select" id="s-redactMode">
+          <option value="black">Black box</option>
+          <option value="blur">Pixelate</option>
+        </select>
+      </div>
+
+      <div class="setting-item" style="display:block; padding-bottom:0; border-bottom:none;">
+        <div class="setting-label">Server URL</div>
+      </div>
+      <input class="server-input" id="s-serverUrl" value="http://localhost:8000/plan-action"/>
+
+      <button class="primary-btn" id="saveSettings">
+        <span style="display:inline-flex; align-items:center; justify-content:center; margin-right:8px; vertical-align:middle;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path d="M12 3V14M12 14L8 10M12 14L16 10" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M5 18.5C5 17.12 6.12 16 7.5 16H16.5C17.88 16 19 17.12 19 18.5V19.5H5V18.5Z" fill="currentColor" opacity="0.9"/>
+          </svg>
+        </span>
+        Save settings
+      </button>
+      <div class="status-msg" id="settingsStatus"></div>
+
+      <div style="margin-top:16px; padding-top:12px; border-top:1px solid var(--border);">
+        <div style="font-size:11px; color: var(--text-muted); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom:8px;">Server status</div>
+        <div id="serverInfo" style="font-size:12px; color: var(--text-soft);">Checking…</div>
+        <button class="secondary-btn" id="checkServer" style="margin-top:10px; background: rgba(148,163,184,0.05); border:1px solid var(--border); color: var(--text-soft);">Check connection</button>
+      </div>
     </div>
   </div>
-  <div style="display:flex;align-items:center;gap:6px;">
-    <div class="status-dot" id="serverDot" title="Server status"></div>
-    <span id="backendBadge" class="backend-badge mock">mock</span>
-  </div>
-</div>
 
-<div class="tabs">
-  <button class="tab active" data-tab="run">▶ Run</button>
-  <button class="tab" data-tab="vault">🔑 Vault</button>
-  <button class="tab" data-tab="settings">⚙ Settings</button>
-</div>
-
-<!-- ── RUN PANEL ── -->
-<div id="panel-run" class="panel active">
-
-  <div class="task-wrap">
-    <textarea class="task-input" id="task"
-      placeholder="What should the agent do?&#10;e.g. fill this signup form&#10;     search for wireless headphones&#10;     click the login button"></textarea>
-    <span class="char-count" id="charCount">0</span>
-  </div>
-
-  <button class="btn btn-primary" id="scanBtn">
-    <span>🔍</span> Scan &amp; Redact Page
-  </button>
-
-  <div class="preview-wrap" id="previewWrap">
-    <img id="preview" alt="Redacted preview"/>
-    <div class="preview-label">🔒 Redacted — this is what leaves your device</div>
-  </div>
-
-  <div class="stats-grid" id="statsGrid" style="display:none">
-    <div class="stat-card">
-      <div class="stat-val" id="s-pii">0</div>
-      <div class="stat-lbl">PII<br>Redacted</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-val" id="s-marks">0</div>
-      <div class="stat-lbl">Interactive<br>Marks</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-val" id="s-total">0ms</div>
-      <div class="stat-lbl">Scan<br>Time</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-val" id="s-actions">0</div>
-      <div class="stat-lbl">Actions<br>Done</div>
-    </div>
-  </div>
-
-  <div id="timingWrap" style="display:none">
-    <div class="timing-row" id="timingBar"></div>
-    <div class="timing-labels" id="timingLabels"></div>
-  </div>
-
-  <button class="btn btn-run" id="runBtn" style="display:none">
-    <span>⚡</span> Send to AI &amp; Execute
-  </button>
-
-  <div class="confirm-wrap" id="confirmWrap">
-    <div class="confirm-title">⚠ Agent wants to perform an action</div>
-    <div class="confirm-text" id="confirmText"></div>
-    <div class="confirm-btns">
-      <button class="btn-sm btn-confirm" id="confirmYes">✓ Allow</button>
-      <button class="btn-sm btn-reject"  id="confirmNo">✗ Reject</button>
-    </div>
-  </div>
-
-  <div class="log-wrap" id="logWrap" style="display:none">
-    <div class="log-title">Action Log</div>
-    <div id="logEntries"></div>
-  </div>
-
-  <div class="status-msg" id="statusMsg"></div>
-
-</div>
-
-<!-- ── VAULT PANEL ── -->
-<div id="panel-vault" class="panel">
-  <div class="vault-note">
-    🔐 Stored only in this browser. Never sent to the server — the AI only requests a field <em>type</em> (e.g. "email"), and the real value is filled locally from here.
-  </div>
-  <div class="vault-grid">
-    <div class="field-group">
-      <label class="field-label">Full Name</label>
-      <input class="field-input" id="v-name" placeholder="John Doe" type="text"/>
-    </div>
-    <div class="field-group">
-      <label class="field-label">Email</label>
-      <input class="field-input" id="v-email" placeholder="john@example.com" type="text"/>
-    </div>
-    <div class="field-group">
-      <label class="field-label">Phone</label>
-      <input class="field-input" id="v-phone" placeholder="+1 555-000-0000" type="text"/>
-    </div>
-    <div class="field-group">
-      <label class="field-label">Username</label>
-      <input class="field-input" id="v-username" placeholder="johndoe" type="text"/>
-    </div>
-    <div class="field-group">
-      <label class="field-label">Company</label>
-      <input class="field-input" id="v-company" placeholder="Acme Corp" type="text"/>
-    </div>
-    <div class="field-group">
-      <label class="field-label">Postal Code</label>
-      <input class="field-input" id="v-zip" placeholder="10001" type="text"/>
-    </div>
-  </div>
-  <div class="field-group" style="margin-top:4px">
-    <label class="field-label">Address</label>
-    <input class="field-input" id="v-address" placeholder="123 Main St, City, State" type="text"/>
-  </div>
-  <button class="btn btn-primary" id="saveVault" style="margin-top:12px">Save Vault</button>
-  <div class="status-msg" id="vaultStatus"></div>
-</div>
-
-<!-- ── SETTINGS PANEL ── -->
-<div id="panel-settings" class="panel">
-
-  <div class="setting-item">
-    <div>
-      <div class="setting-label">Redaction Style</div>
-      <div class="setting-desc">How PII regions are hidden in the screenshot</div>
-    </div>
-    <select class="setting-select" id="s-redactMode">
-      <option value="black">■ Black box</option>
-      <option value="blur">⬛ Pixelate</option>
-    </select>
-  </div>
-
-  <div class="setting-item">
-    <div>
-      <div class="setting-label">Server URL</div>
-      <div class="setting-desc">FastAPI backend endpoint</div>
-    </div>
-  </div>
-  <input class="server-input" id="s-serverUrl" value="http://localhost:8000/plan-action"/>
-
-  <button class="btn btn-primary" id="saveSettings" style="margin-top:12px">Save Settings</button>
-  <div class="status-msg" id="settingsStatus"></div>
-
-  <div style="margin-top:16px; padding-top:12px; border-top:1px solid var(--border)">
-    <div style="font-size:11px; color:var(--text3); margin-bottom:8px; text-transform:uppercase; letter-spacing:.5px;">Server Status</div>
-    <div id="serverInfo" style="font-size:12px; color:var(--text2);">Checking…</div>
-    <button class="btn btn-primary" id="checkServer" style="margin-top:8px; background:var(--surface2); border:1px solid var(--border); color:var(--text2);">
-      Check Connection
-    </button>
-  </div>
-
-</div>
-
-<script src="popup.js"></script>
+  <script src="popup.js"></script>
 </body>
 </html>

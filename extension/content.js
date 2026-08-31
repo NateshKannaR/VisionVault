@@ -112,6 +112,11 @@ function inferRole(el) {
   const tag = el.tagName.toLowerCase();
   const type = (el.type || "").toLowerCase();
   const role = (el.getAttribute("role") || "").toLowerCase();
+  const aria = (el.getAttribute("aria-label") || "").toLowerCase();
+  const placeholder = (el.getAttribute("placeholder") || "").toLowerCase();
+  const dataTestId = (el.getAttribute("data-testid") || "").toLowerCase();
+  const dataQa = (el.getAttribute("data-qa") || "").toLowerCase();
+
   if (tag === "input") {
     if (type === "submit" || type === "button") return "button";
     if (type === "search" || role === "searchbox" || role === "combobox") return "input:search";
@@ -121,43 +126,227 @@ function inferRole(el) {
   if (tag === "a") return "link";
   if (tag === "select") return "select";
   if (tag === "textarea") return "textarea";
+  if (role === "textbox" || role === "searchbox" || role === "combobox") return "editable";
   if (el.getAttribute("contenteditable") === "true" || el.getAttribute("contenteditable") === "plaintext-only") return "editable";
+  if (aria.includes("message") || placeholder.includes("message") || dataTestId.includes("compose") || dataQa.includes("message")) return "editable";
   return "element";
+}
+
+function walkDom(root, visitor) {
+  const stack = [root];
+  const seen = new WeakSet();
+
+  while (stack.length) {
+    const node = stack.pop();
+    if (!node || seen.has(node)) continue;
+    seen.add(node);
+
+    if (node.nodeType === 1) {
+      visitor(node);
+      if (node.shadowRoot) stack.push(node.shadowRoot);
+      const children = Array.from(node.children || []);
+      for (let i = children.length - 1; i >= 0; i--) stack.push(children[i]);
+    }
+  }
+}
+
+function findWhatsAppComposer() {
+  if (!/web\.whatsapp\.com/.test(location.href)) return null;
+  const selectors = [
+    '[data-testid="conversation-compose-box"]',
+    '[data-testid="message-input"]',
+    '[data-qa="message-input"]',
+    '[data-qa="composer"]',
+    'div.selectable-text.copyable-text',
+    'div.selectable-text.copyable-text[contenteditable="true"]',
+    'div[contenteditable="true"]',
+    'div[contenteditable="plaintext-only"]',
+    'div[role="textbox"]',
+    'div[aria-label*="Type a message" i]',
+    'div[aria-label*="message" i]'
+  ];
+
+  for (const sel of selectors) {
+    const el = document.querySelector(sel);
+    if (el) {
+      const r = rectOf(el);
+      if (r.w >= 60 && r.h >= 20) return el;
+    }
+  }
+
+  const candidates = document.querySelectorAll('div[contenteditable="true"], div[contenteditable="plaintext-only"], div[role="textbox"]');
+  for (const el of candidates) {
+    const r = rectOf(el);
+    if (r.w >= 60 && r.h >= 20) return el;
+  }
+
+  return null;
+}
+
+function findWhatsAppSendButton() {
+  if (!/web\.whatsapp\.com/.test(location.href)) return null;
+  const selectors = [
+    '[data-testid="send"]',
+    'button[aria-label*="Send" i]',
+    'span[data-icon="send"]',
+    'div[role="button"][aria-label*="Send" i]',
+    'button[title="Send" i]',
+    'span[title="Send" i]',
+    'div[title="Send" i]'
+  ];
+
+  for (const sel of selectors) {
+    const el = document.querySelector(sel);
+    if (el) {
+      const r = rectOf(el);
+      if (r.w >= 12 && r.h >= 12) return el;
+    }
+  }
+
+  return null;
 }
 
 function tagInteractiveElements() {
   markMap.clear();
   const marks = [];
   let id = 1;
+  const seen = new WeakSet();
 
-  const interactive = document.querySelectorAll(
-    'button, a[href], input:not([type="hidden"]):not([type="file"]), select, textarea, [role="button"], [role="link"], [role="searchbox"], [role="combobox"], [onclick], [contenteditable="true"], [contenteditable="plaintext-only"]'
+  const directCandidates = document.querySelectorAll(
+    'input:not([type="hidden"]):not([type="file"]), textarea, select, button, [role="button"], [role="link"], [role="searchbox"], [role="combobox"], [role="textbox"], [contenteditable="true"], [contenteditable="plaintext-only"], [contenteditable=""], [aria-label*="message" i], [placeholder*="message" i], [data-testid*="compose" i], [data-testid*="chat" i], [data-qa*="message" i], [data-qa*="chat" i]'
   );
 
-  interactive.forEach(el => {
-    // offsetParent is null for fixed/sticky elements too — use a rect check instead
+  directCandidates.forEach((el) => {
+    if (!(el instanceof Element) || seen.has(el)) return;
+    seen.add(el);
+
     const r = rectOf(el);
     if (r.w < 4 || r.h < 4) return;
+    const role = inferRole(el);
+    if (!role || role === 'element') return;
 
-    el.setAttribute("data-vagent-mark", String(id));
+    el.setAttribute('data-vagent-mark', String(id));
     markMap.set(id, el);
-
-    marks.push({
-      id,
-      role: inferRole(el),
-      box: r,
-      label: safeLabel(el),
-      // NOT sent: el.value, el.name, el.id, el.textContent (unfiltered)
-    });
+    marks.push({ id, role, box: r, label: safeLabel(el) });
     id++;
   });
+
+  walkDom(document, (el) => {
+    if (!(el instanceof Element) || seen.has(el)) return;
+    seen.add(el);
+
+    const isCandidate =
+      el.matches('button, a[href], input:not([type="hidden"]):not([type="file"]), select, textarea') ||
+      el.matches('[role="button"], [role="link"], [role="searchbox"], [role="combobox"], [role="textbox"]') ||
+      el.matches('[contenteditable="true"], [contenteditable="plaintext-only"], [contenteditable=""], [aria-label*="message" i], [placeholder*="message" i], [data-testid*="compose" i], [data-testid*="chat" i], [data-qa*="message" i], [data-qa*="chat" i]') ||
+      (el.tagName === 'DIV' && (el.getAttribute('contenteditable') === 'true' || el.getAttribute('contenteditable') === 'plaintext-only')) ||
+      (el.tagName === 'DIV' && (el.getAttribute('aria-label') || '').toLowerCase().includes('message'));
+
+    if (!isCandidate) return;
+
+    const r = rectOf(el);
+    if (r.w < 4 || r.h < 4) return;
+    const role = inferRole(el);
+    if (!role || role === 'element') return;
+
+    if (marks.some((m) => m.role === role && Math.abs(m.box.x - r.x) < 2 && Math.abs(m.box.y - r.y) < 2 && Math.abs(m.box.w - r.w) < 2 && Math.abs(m.box.h - r.h) < 2)) return;
+
+    el.setAttribute('data-vagent-mark', String(id));
+    markMap.set(id, el);
+    marks.push({ id, role, box: r, label: safeLabel(el) });
+    id++;
+  });
+
+  if (/web\.whatsapp\.com/.test(location.href)) {
+    const waComposer = findWhatsAppComposer();
+    if (waComposer) {
+      const r = rectOf(waComposer);
+      const composerId = id;
+      waComposer.setAttribute('data-vagent-mark', String(composerId));
+      markMap.set(composerId, waComposer);
+      marks.push({ id: composerId, role: 'editable', box: r, label: 'message' });
+      id++;
+    }
+
+    const waSend = findWhatsAppSendButton();
+    if (waSend) {
+      const r = rectOf(waSend);
+      const sendId = id;
+      waSend.setAttribute('data-vagent-mark', String(sendId));
+      markMap.set(sendId, waSend);
+      marks.push({ id: sendId, role: 'button', box: r, label: 'send' });
+      id++;
+    }
+  }
 
   return marks;
 }
 
 // ── Phase 2: execute actions ──────────────────────────────────────────────────
+async function setEditableText(el, value) {
+  const delay = (ms) => new Promise(r => setTimeout(r, ms));
+  const humanDelay = () => delay(18 + Math.random() * 17);
+
+  el.focus();
+  await delay(60);
+
+  if (el.isContentEditable) {
+    const sel = window.getSelection();
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    sel.removeAllRanges();
+    sel.addRange(range);
+    document.execCommand('delete', false, null);
+    await delay(40);
+
+    for (const char of (value ?? '')) {
+      document.execCommand('insertText', false, char);
+      await humanDelay();
+    }
+
+    el.dispatchEvent(new InputEvent('input', {
+      bubbles: true,
+      cancelable: true,
+      inputType: 'insertText',
+      data: value
+    }));
+    return;
+  }
+
+  const proto = el.tagName === "TEXTAREA" ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+  const nativeSetter = Object.getOwnPropertyDescriptor(proto, "value")?.set;
+  let current = "";
+  for (const char of (value ?? "")) {
+    current += char;
+    if (nativeSetter) nativeSetter.call(el, current);
+    else el.value = current;
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+    el.dispatchEvent(new KeyboardEvent("keyup", { key: char, bubbles: true }));
+    await humanDelay();
+  }
+  el.dispatchEvent(new Event("change", { bubbles: true }));
+}
+
 async function executeAction(action, mark_id, value) {
-  const el = markMap.get(mark_id);
+  let el = markMap.get(mark_id);
+
+  if (!el && /web\.whatsapp\.com/.test(location.href)) {
+    if (action === 'type') {
+      el = findWhatsAppComposer();
+      if (el) {
+        await setEditableText(el, value || '');
+        return { ok: true };
+      }
+    }
+    if (action === 'click') {
+      el = findWhatsAppSendButton();
+      if (el) {
+        el.click();
+        return { ok: true };
+      }
+    }
+  }
+
   if (!el) return { ok: false, error: `mark_id ${mark_id} not found` };
 
   try {
@@ -189,45 +378,7 @@ async function executeAction(action, mark_id, value) {
         break;
 
       case "type": {
-        const delay = (ms) => new Promise(r => setTimeout(r, ms));
-        const humanDelay = () => delay(18 + Math.random() * 17); // 18-35ms per char
-        el.focus();
-        await delay(60); // focus settle
-        if (el.isContentEditable) {
-          el.focus();
-          await delay(150);
-          // Select all existing content and delete it
-          const sel = window.getSelection();
-          const range = document.createRange();
-          range.selectNodeContents(el);
-          sel.removeAllRanges();
-          sel.addRange(range);
-          document.execCommand('delete', false, null);
-          await delay(50);
-          // Insert text character by character so React state updates
-          for (const char of (value ?? '')) {
-            document.execCommand('insertText', false, char);
-            await humanDelay();
-          }
-          // Fire input event so framework picks up the change
-          el.dispatchEvent(new InputEvent('input', {
-            bubbles: true, cancelable: true,
-            inputType: 'insertText', data: value
-          }));
-        } else {
-          const proto = el.tagName === "TEXTAREA" ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
-          const nativeSetter = Object.getOwnPropertyDescriptor(proto, "value")?.set;
-          let current = "";
-          for (const char of (value ?? "")) {
-            current += char;
-            if (nativeSetter) nativeSetter.call(el, current);
-            else el.value = current;
-            el.dispatchEvent(new Event("input",  { bubbles: true }));
-            el.dispatchEvent(new KeyboardEvent("keyup", { key: char, bubbles: true }));
-            await humanDelay();
-          }
-          el.dispatchEvent(new Event("change", { bubbles: true }));
-        }
+        await setEditableText(el, value ?? '');
         break;
       }
 

@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Privacy Vision Agent",
+  "name": "VisionVault",
   "version": "1.0.0",
   "description": "Local PII redaction + vault + cloud VLM automation on sanitized screens.",
   "permissions": ["activeTab", "scripting", "tabs", "storage", "sidePanel"],
@@ -11,8 +11,20 @@
   "side_panel": {
     "default_path": "popup.html"
   },
+  "icons": {
+    "16": "icon16.png",
+    "32": "icon32.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  },
   "action": {
-    "default_title": "Privacy Vision Agent"
+    "default_title": "VisionVault",
+    "default_icon": {
+      "16": "icon16.png",
+      "32": "icon32.png",
+      "48": "icon48.png",
+      "128": "icon128.png"
+    }
   },
   "content_scripts": [
     {

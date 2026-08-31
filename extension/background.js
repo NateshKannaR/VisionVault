@@ -125,18 +125,26 @@ async function openTab(url) {
 }
 
 // ── Scan a tab and return redacted image + safe marks ─────────────────────────
-async function scanTab(tabId, windowId, settings) {
-  await ensureContent(tabId);
-  await new Promise(r => setTimeout(r, 800)); // let content.js settle
+async function scanTab(tabId, windowId, settings, retries = 3) {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    await ensureContent(tabId);
+    await new Promise(r => setTimeout(r, 800));
 
-  const tab = await new Promise(r => chrome.tabs.get(tabId, r));
-  const scan = await msgTab(tabId, { type: "SCAN_PAGE" }) || { piiRegions: [], marks: [] };
-  const raw = await captureScreenshot(windowId || tab.windowId);
-  const redacted = await redactImage(raw, scan.piiRegions, tab.width, tab.height, settings.redactMode);
-  const safeMarks = (scan.marks || []).map(m => ({ id: m.id, role: m.role, box: m.box, label: m.label }));
-  const pageInfo = await msgTab(tabId, { type: "GET_PAGE_INFO" }) || {};
+    const tab = await new Promise(r => chrome.tabs.get(tabId, r));
+    const scan = await msgTab(tabId, { type: "SCAN_PAGE" }) || { piiRegions: [], marks: [] };
+    const safeMarks = (scan.marks || []).map(m => ({ id: m.id, role: m.role, box: m.box, label: m.label }));
+    const pageInfo = await msgTab(tabId, { type: "GET_PAGE_INFO" }) || {};
 
-  return { redacted, safeMarks, piiCount: scan.piiRegions.length, pageInfo, tab };
+    if (safeMarks.length > 0 || attempt >= retries || (pageInfo.url || "").includes("whatsapp.com") === false) {
+      const raw = await captureScreenshot(windowId || tab.windowId);
+      const redacted = await redactImage(raw, scan.piiRegions, tab.width, tab.height, settings.redactMode);
+      return { redacted, safeMarks, piiCount: scan.piiRegions.length, pageInfo, tab };
+    }
+
+    await new Promise(r => setTimeout(r, 1500));
+  }
+
+  return { redacted: "", safeMarks: [], piiCount: 0, pageInfo: {}, tab: null };
 }
 
 // ── Server call ───────────────────────────────────────────────────────────────
@@ -155,6 +163,78 @@ async function callServer(payload, serverUrl) {
   } finally {
     clearTimeout(tid);
   }
+}
+
+function localMockPlan(session) {
+  const task = (session.task || "").toLowerCase();
+  const marks = session.marks || [];
+  const allDone = new Set(session.filledIds || []);
+
+  const first = (predicate, pool = marks) => (pool.find((m) => predicate(m)) || null);
+
+  const typeField = (fieldRole, vaultKey, label) => {
+    const field = first((m) => m.role === fieldRole && !allDone.has(m.id));
+    if (field) {
+      return { action: "type", mark_id: field.id, use_vault_field: vaultKey, reasoning: label || `Fill ${vaultKey} field` };
+    }
+    return null;
+  };
+
+  if (/fill|register|signup|sign up|form/.test(task)) {
+    const direct =
+      typeField("input:email", "email", "Email field") ||
+      typeField("input:tel", "phone", "Phone field") ||
+      typeField("input:text", "name", "Name field") ||
+      typeField("textarea", "address", "Address field") ||
+      typeField("input:password", null, "Password field");
+
+    if (direct) return direct;
+
+    const genericText = first((m) => m.role === "input:text" && !allDone.has(m.id));
+    if (genericText) {
+      return { action: "type", mark_id: genericText.id, use_vault_field: "name", reasoning: "Fill first text field" };
+    }
+  }
+
+  if (/search|find|look for|buy|watch/.test(task)) {
+    const searchBox = first((m) => (m.role === "input:search" || m.role === "input:text" || m.role === "editable") && !allDone.has(m.id));
+    if (searchBox) {
+      const query = task.replace(/(search|find|look for|buy|watch|for|on|the|a|an)/g, "").trim();
+      return { action: "type", mark_id: searchBox.id, value: query || "wireless headphones", reasoning: "Type search query" };
+    }
+  }
+
+  if (/whatsapp|send.*message|message.*whatsapp|hi/.test(task)) {
+    const composer = first((m) => (m.role === "editable" || m.role === "textarea" || m.role === "input:text") && !allDone.has(m.id));
+    if (composer) {
+      const msg = "hi";
+      return { action: "type", mark_id: composer.id, value: msg, reasoning: "Type WhatsApp message" };
+    }
+    const sendButton = first((m) => m.role === "button" && !!m.label && !allDone.has(m.id));
+    if (sendButton) {
+      return { action: "click", mark_id: sendButton.id, reasoning: "Click send button" };
+    }
+    if ((session && session.pageInfo && /web\.whatsapp\.com/.test((session.pageInfo.url || "").toLowerCase())) || /whatsapp/.test(task)) {
+      return { action: "none", reasoning: "WhatsApp composer not detected yet; waiting for chat UI to render." };
+    }
+  }
+
+  if (/github/.test(task)) {
+    if (!(session.pageInfo && /github/.test((session.pageInfo.url || "").toLowerCase()))) {
+      return { action: "navigate", value: "https://github.com", reasoning: "Open GitHub" };
+    }
+    const repoInput = first((m) => m.role === "input:text" && !allDone.has(m.id));
+    if (repoInput) {
+      return { action: "type", mark_id: repoInput.id, value: "visionvault-demo", reasoning: "Fill repo name" };
+    }
+  }
+
+  const submit = first((m) => (m.role === "button" || m.role === "input:submit") && !!m.label && !allDone.has(m.id));
+  if (submit) {
+    return { action: "click", mark_id: submit.id, reasoning: "Submit the form" };
+  }
+
+  return { action: "none", reasoning: "Local mock found no matching action." };
 }
 
 // ── PHASE 1: Initial scan (just preview, nothing sent) ────────────────────────
@@ -204,15 +284,28 @@ async function phaseRun() {
     session.stepCount++;
     notifyPopup({ type: "step", step: session.stepCount, status: "Asking AI..." });
 
+    if (!session.marks || session.marks.length === 0) {
+      await rescanCurrentTab(false);
+      if (!session.marks || session.marks.length === 0) {
+        return { done: true, needsConfirm: false, actionLog: [{ action: "none", reasoning: "No form fields detected on this page." }] };
+      }
+    }
+
+    let resp;
     const t0 = performance.now();
-    const resp = await callServer({
-      task: session.task,
-      image: session.redacted,
-      marks: session.marks,
-      filled_mark_ids: session.filledIds,
-      page_info: session.pageInfo || {},
-      step: session.stepCount,
-    }, session.serverUrl);
+    try {
+      resp = await callServer({
+        task: session.task,
+        image: session.redacted,
+        marks: session.marks,
+        filled_mark_ids: session.filledIds,
+        page_info: session.pageInfo || {},
+        step: session.stepCount,
+      }, session.serverUrl);
+    } catch (e) {
+      console.warn("[agent] server call failed, using local mock fallback:", e);
+      resp = localMockPlan(session);
+    }
     const serverMs = Math.round(performance.now() - t0);
 
     session.lastAction = resp;

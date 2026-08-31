@@ -84,7 +84,8 @@ def build_prompt(req: PlanRequest) -> str:
                       "box": {k: round(v) for k, v in m.box.items()}} for m in rem]
     pi = req.page_info
     page_ctx = f"URL: {pi.url or pi.url_path}  Title: {pi.title}" if pi else ""
-    return f"""You are an autonomous browser agent. Blacked-out regions = redacted PII, ignore them.
+    return f"""You are an autonomous browser agent for form automation and web navigation.
+Blacked-out regions are redacted PII: ignore them and never reveal personal data.
 
 {page_ctx}
 Task: {req.task}
@@ -94,15 +95,25 @@ Already acted on mark IDs: {req.filled_mark_ids}
 Interactive elements:
 {json.dumps(marks_summary, indent=2)}
 
-ACTIONS: navigate(value=URL) | type(mark_id, value or use_vault_field) | click(mark_id) | press_key(mark_id, value=Enter) | select(mark_id, value) | scroll_page(value=px) | none
-RULES:
-1. Return ONLY JSON, no markdown.
-2. One action per response.
-3. Personal data → use_vault_field (name/email/phone/address/username), never put real PII in value.
-4. To search: type query THEN press_key Enter on same mark_id.
-5. If task is complete, return none.
+ACTIONS:
+- navigate(value=URL)
+- type(mark_id, value or use_vault_field)
+- click(mark_id)
+- press_key(mark_id, value=Enter)
+- select(mark_id, value)
+- scroll_page(value=px)
+- none
 
-JSON: {{"action":"...","mark_id":null,"value":null,"use_vault_field":null,"reasoning":"brief"}}"""
+RULES:
+1. Return ONLY valid JSON with no markdown fences.
+2. Choose exactly one action per response.
+3. For personal data, prefer use_vault_field in [name, email, phone, address, username, company, zip]. Never put actual PII in value.
+4. For search flows: type query on the search field, then press Enter on the same field.
+5. For sign-up or contact forms: prefer filling the right field with vault data when a matching field exists.
+6. If the task is already complete, return none.
+7. Do not over-click. Prefer the most direct action that moves the task forward.
+
+JSON shape: {{"action":"...","mark_id":null,"value":null,"use_vault_field":null,"reasoning":"brief explanation"}}"""
 
 def parse_vlm(raw: str) -> PlanResponse:
     raw = re.sub(r"^```(?:json)?\s*", "", raw.strip())
@@ -224,146 +235,117 @@ def extract_contact(task: str) -> str:
 
 def mock_plan(req: PlanRequest) -> PlanResponse:
     done = set(req.filled_mark_ids)
-    rem  = [m for m in req.marks if m.id not in done]
+    rem = [m for m in req.marks if m.id not in done]
     all_marks = req.marks
     task_l = req.task.lower().strip()
     pi = req.page_info
-    cur_url   = (pi.url   if pi else "") or ""
+    cur_url = (pi.url if pi else "") or ""
     cur_title = (pi.title if pi else "") or ""
 
     def first(fn, pool=None):
         return next((m for m in (pool or rem) if fn(m)), None)
 
-    # ── Loop detection: if same action repeated 3+ times, stop ────────────────
-    # (step count is a proxy — if we're past step 15 with no progress, bail)
     if (req.step or 0) > 20:
         return PlanResponse(action="none", reasoning="Max steps reached.")
 
-    # ── Step 1: Navigate to target site ───────────────────────────────────────
     for site, url in SITE_URLS.items():
-        if site in task_l:
-            if site not in cur_url.lower() and site not in cur_title.lower():
-                return PlanResponse(action="navigate", value=url, reasoning=f"Navigate to {site}")
+        if site in task_l and site not in cur_url.lower() and site not in cur_title.lower():
+            return PlanResponse(action="navigate", value=url, reasoning=f"Navigate to {site}")
 
     cur_site = next((s for s in SITE_URLS if s in cur_url.lower()), None)
 
-    # ── GitHub flows ───────────────────────────────────────────────────────────
     if "github" in cur_url.lower():
         is_new_repo = any(w in task_l for w in ["new repo", "create repo", "new repository", "create repository"])
         is_on_new_repo_page = "/new" in cur_url or "new repository" in cur_title.lower()
-
         if is_new_repo:
             if not is_on_new_repo_page:
-                return PlanResponse(action="navigate", value="https://github.com/new",
-                                    reasoning="Go to new repository page")
-            # On /new page — fill repo name field
+                return PlanResponse(action="navigate", value="https://github.com/new", reasoning="Open new repository form")
             repo_name = extract_repo_name(req.task)
             name_field = first(lambda m: m.role == "input:text")
             if name_field and name_field.id not in done:
-                return PlanResponse(action="type", mark_id=name_field.id,
-                                    value=repo_name or "my-new-repo",
-                                    reasoning=f"Fill repo name: {repo_name or 'my-new-repo'}")
-            # Click Create repository button
-            create_btn = first(lambda m: m.role == "button" and m.label and
-                               any(w in m.label.lower() for w in ["create repository", "create repo"]))
+                return PlanResponse(action="type", mark_id=name_field.id, value=repo_name or "my-new-repo", reasoning=f"Fill repo name: {repo_name or 'my-new-repo'}")
+            create_btn = first(lambda m: m.role == "button" and m.label and any(w in m.label.lower() for w in ["create repository", "create repo"]))
             if create_btn:
-                return PlanResponse(action="click", mark_id=create_btn.id,
-                                    reasoning="Click Create repository")
-            # Fallback: any submit button
-            submit = first(lambda m: m.role in ("button","input:submit") and m.label and
-                           m.label.lower() in ("submit","create","save","done"))
+                return PlanResponse(action="click", mark_id=create_btn.id, reasoning="Click Create repository")
+            submit = first(lambda m: m.role in ("button", "input:submit") and m.label and m.label.lower() in ("submit", "create", "save", "done"))
             if submit:
                 return PlanResponse(action="click", mark_id=submit.id, reasoning="Submit form")
 
-    # ── WhatsApp Web flows ─────────────────────────────────────────────────────
     if "whatsapp" in cur_url.lower():
         is_send = any(w in task_l for w in ["send", "message", "msg", "text", "say", "hi", "hello"])
-        phone   = extract_phone(req.task)
-        message = extract_message(req.task) or re.sub(
-            r'(send|message|msg|whatsapp|to|\d[\d\s\-]+)', '', req.task, flags=re.I
-        ).strip() or "hi"
+        phone = extract_phone(req.task)
+        message = extract_message(req.task) or re.sub(r'(send|message|msg|whatsapp|to|\d[\d\s\-]+)', '', req.task, flags=re.I).strip() or "hi"
 
         if is_send and phone:
             wa_chat_url = f"https://web.whatsapp.com/send?phone={phone}"
-            # Check if we're already in a chat (URL has /send?phone or /_/ pattern)
             in_chat = phone in cur_url or "/send" in cur_url or "/_/" in cur_url
-            on_whatsapp = "whatsapp" in cur_url.lower()
+            if "whatsapp" not in cur_url.lower() or (not in_chat and "/send" not in cur_url):
+                return PlanResponse(action="navigate", value=wa_chat_url, reasoning=f"Open WhatsApp chat with {phone}")
 
-            if not on_whatsapp or (not in_chat and "/send" not in cur_url):
-                return PlanResponse(action="navigate", value=wa_chat_url,
-                                    reasoning=f"Open WhatsApp chat with {phone}")
-
-            # On chat page — find message input (contenteditable)
             msg_box = first(lambda m: m.role == "editable")
             if not msg_box:
                 msg_box = first(lambda m: m.role in ("textarea", "input:text"))
-
             if msg_box and msg_box.id not in done:
-                return PlanResponse(action="type", mark_id=msg_box.id, value=message,
-                                    reasoning=f"Type: {message}")
+                return PlanResponse(action="type", mark_id=msg_box.id, value=message, reasoning=f"Type: {message}")
 
-            # After typing, click the Send button (arrow/paper-plane icon button)
-            send_btn = first(lambda m: m.role == "button" and m.label and
-                             any(w in m.label.lower() for w in ["send", "submit"]))
+            send_btn = first(lambda m: m.role == "button" and m.label and any(w in m.label.lower() for w in ["send", "submit"]))
             if not send_btn:
-                # WhatsApp send button has no label — pick the last button in the chat area
                 send_btn = first(lambda m: m.role == "button")
             if send_btn:
-                return PlanResponse(action="click", mark_id=send_btn.id,
-                                    reasoning="Click Send button")
-            # Fallback: press Enter on message box
+                return PlanResponse(action="click", mark_id=send_btn.id, reasoning="Click Send button")
             if msg_box:
-                return PlanResponse(action="press_key", mark_id=msg_box.id, value="Enter",
-                                    reasoning="Send via Enter")
+                return PlanResponse(action="press_key", mark_id=msg_box.id, value="Enter", reasoning="Send via Enter")
 
         elif is_send:
             contact = extract_contact(req.task)
             search_box = first(lambda m: m.role in ("input:text", "input:search", "editable"))
             if search_box and search_box.id not in done:
-                return PlanResponse(action="type", mark_id=search_box.id, value=contact,
-                                    reasoning=f"Search contact: {contact}")
+                return PlanResponse(action="type", mark_id=search_box.id, value=contact, reasoning=f"Search contact: {contact}")
             if search_box and search_box.id in done:
-                return PlanResponse(action="press_key", mark_id=search_box.id, value="Enter",
-                                    reasoning="Open contact")
+                return PlanResponse(action="press_key", mark_id=search_box.id, value="Enter", reasoning="Open contact")
             msg_box = first(lambda m: m.role == "editable")
             if msg_box and msg_box.id not in done:
-                return PlanResponse(action="type", mark_id=msg_box.id, value=message,
-                                    reasoning=f"Type: {message}")
+                return PlanResponse(action="type", mark_id=msg_box.id, value=message, reasoning=f"Type: {message}")
             if msg_box and msg_box.id in done:
-                return PlanResponse(action="press_key", mark_id=msg_box.id, value="Enter",
-                                    reasoning="Send message")
+                return PlanResponse(action="press_key", mark_id=msg_box.id, value="Enter", reasoning="Send message")
 
-    # ── Search tasks (Amazon, Google, YouTube, etc.) ───────────────────────────
-    is_search = any(w in task_l for w in ["search", "find", "look", "buy", "watch"])
+    is_search = any(w in task_l for w in ["search", "find", "look", "buy", "watch", "open", "go to"])
     if is_search and cur_site:
         query = extract_query(task_l, cur_site)
         search_box = first(lambda m: m.role in ("input:search", "input:text"), pool=all_marks)
         if search_box:
             if search_box.id not in done:
                 q = query or re.sub(r"(go to|open|search for|search|find|buy|watch|on \w+)", "", task_l).strip()
-                return PlanResponse(action="type", mark_id=search_box.id, value=q,
-                                    reasoning=f"Type '{q}' in search box")
-            else:
-                return PlanResponse(action="press_key", mark_id=search_box.id, value="Enter",
-                                    reasoning="Submit search")
+                return PlanResponse(action="type", mark_id=search_box.id, value=q, reasoning=f"Type '{q}' in search box")
+            return PlanResponse(action="press_key", mark_id=search_box.id, value="Enter", reasoning="Submit search")
 
-    # ── Generic form filling ───────────────────────────────────────────────────
-    name_f  = first(lambda m: m.role == "input:text")
+    if any(w in task_l for w in ["fill", "register", "signup", "sign up", "form"]):
+        form_fields = [
+            ("name", first(lambda m: m.role == "input:text")),
+            ("email", first(lambda m: m.role == "input:email")),
+            ("phone", first(lambda m: m.role == "input:tel")),
+            ("address", first(lambda m: m.role in ("input:text", "textarea") and (m.label or "").lower() in {"address", "street address"})),
+        ]
+        for key, field in form_fields:
+            if field and field.id not in done:
+                return PlanResponse(action="type", mark_id=field.id, use_vault_field=key, reasoning=f"Fill {key} field")
+
+    name_f = first(lambda m: m.role == "input:text")
     email_f = first(lambda m: m.role == "input:email")
-    tel_f   = first(lambda m: m.role == "input:tel")
-    pass_f  = first(lambda m: m.role == "input:password")
+    tel_f = first(lambda m: m.role == "input:tel")
+    pass_f = first(lambda m: m.role == "input:password")
 
-    if name_f:  return PlanResponse(action="type", mark_id=name_f.id,  use_vault_field="name",  reasoning="Text field")
-    if email_f: return PlanResponse(action="type", mark_id=email_f.id, use_vault_field="email", reasoning="Email field")
-    if tel_f:   return PlanResponse(action="type", mark_id=tel_f.id,   use_vault_field="phone", reasoning="Phone field")
-    if pass_f:  return PlanResponse(action="type", mark_id=pass_f.id,  value="Demo@1234",        reasoning="Password field")
+    if name_f:
+        return PlanResponse(action="type", mark_id=name_f.id, use_vault_field="name", reasoning="Name field")
+    if email_f:
+        return PlanResponse(action="type", mark_id=email_f.id, use_vault_field="email", reasoning="Email field")
+    if tel_f:
+        return PlanResponse(action="type", mark_id=tel_f.id, use_vault_field="phone", reasoning="Phone field")
+    if pass_f:
+        return PlanResponse(action="type", mark_id=pass_f.id, value="Demo@1234", reasoning="Password field")
 
-    # ── Submit buttons ─────────────────────────────────────────────────────────
-    SUBMIT = {"submit","next","continue","register","save","login","log in","sign in",
-              "sign up","send","confirm","proceed","done","search","add to cart",
-              "buy now","checkout","place order","apply","create","create repository"}
-    submit_f = first(lambda m: m.role in ("button","input:submit") and
-                     m.label and m.label.lower() in SUBMIT)
+    SUBMIT = {"submit", "next", "continue", "register", "save", "login", "log in", "sign in", "sign up", "send", "confirm", "proceed", "done", "search", "add to cart", "buy now", "checkout", "place order", "apply", "create", "create repository"}
+    submit_f = first(lambda m: m.role in ("button", "input:submit") and m.label and m.label.lower() in SUBMIT)
     if submit_f:
         return PlanResponse(action="click", mark_id=submit_f.id, reasoning=f"Click: {submit_f.label}")
 

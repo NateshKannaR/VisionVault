@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<title>Privacy Vision Agent</title>
+<style>
+:root {
+  --bg: #0f1117;
+  --surface: #1a1d27;
+  --surface2: #22263a;
+  --border: #2e3250;
+  --accent: #6c63ff;
+  --accent2: #4ade80;
+  --danger: #f87171;
+  --warn: #fbbf24;
+  --text: #e2e8f0;
+  --text2: #94a3b8;
+  --text3: #64748b;
+  --radius: 8px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  width: 420px;
+  min-height: 500px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 13px;
+}
+
+/* ── Header ── */
+.header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.header-left { display: flex; align-items: center; gap: 8px; }
+.logo { font-size: 18px; }
+.title { font-size: 14px; font-weight: 700; color: var(--text); }
+.subtitle { font-size: 10px; color: var(--text3); margin-top: 1px; }
+.status-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--text3); flex-shrink: 0;
+}
+.status-dot.online { background: var(--accent2); box-shadow: 0 0 6px var(--accent2); }
+.status-dot.error  { background: var(--danger); }
+
+/* ── Tabs ── */
+.tabs {
+  display: flex;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 0 8px;
+}
+.tab {
+  flex: 1; padding: 10px 4px; background: none; border: none;
+  color: var(--text3); font-size: 11px; font-weight: 500;
+  cursor: pointer; border-bottom: 2px solid transparent;
+  transition: color .15s, border-color .15s;
+}
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.tab:hover:not(.active) { color: var(--text2); }
+
+/* ── Panels ── */
+.panel { display: none; padding: 14px 16px; }
+.panel.active { display: block; }
+
+/* ── Task input ── */
+.task-wrap { position: relative; }
+.task-input {
+  width: 100%; background: var(--surface2); border: 1px solid var(--border);
+  border-radius: var(--radius); color: var(--text); font-size: 13px;
+  padding: 10px 12px; resize: none; height: 72px;
+  transition: border-color .15s;
+}
+.task-input:focus { outline: none; border-color: var(--accent); }
+.task-input::placeholder { color: var(--text3); }
+.char-count { position: absolute; bottom: 8px; right: 10px; font-size: 10px; color: var(--text3); }
+
+/* ── Buttons ── */
+.btn {
+  width: 100%; padding: 10px; border: none; border-radius: var(--radius);
+  font-size: 13px; font-weight: 600; cursor: pointer;
+  transition: opacity .15s, transform .1s;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+}
+.btn:active { transform: scale(.98); }
+.btn:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+.btn-primary { background: var(--accent); color: #fff; margin-top: 10px; }
+.btn-primary:hover:not(:disabled) { opacity: .9; }
+.btn-run { background: linear-gradient(135deg, #4ade80, #22c55e); color: #000; margin-top: 8px; }
+.btn-run:hover:not(:disabled) { opacity: .9; }
+.btn-sm {
+  width: auto; padding: 6px 14px; font-size: 12px;
+  border-radius: 6px; border: none; cursor: pointer; font-weight: 600;
+}
+.btn-confirm { background: var(--accent2); color: #000; }
+.btn-reject  { background: var(--surface2); color: var(--text2); border: 1px solid var(--border); }
+
+/* ── Preview ── */
+.preview-wrap {
+  margin-top: 12px; border-radius: var(--radius);
+  overflow: hidden; border: 1px solid var(--border); display: none;
+  position: relative;
+}
+.preview-wrap img { width: 100%; display: block; }
+.preview-label {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  background: rgba(0,0,0,.7); color: #fff; font-size: 10px;
+  padding: 4px 8px; text-align: center;
+}
+
+/* ── Stats grid ── */
+.stats-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  gap: 6px; margin-top: 12px;
+}
+.stat-card {
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 8px 6px; text-align: center;
+}
+.stat-val { font-size: 18px; font-weight: 700; color: var(--accent); }
+.stat-lbl { font-size: 9px; color: var(--text3); margin-top: 2px; line-height: 1.3; }
+
+/* ── Timing bar ── */
+.timing-row {
+  display: flex; gap: 4px; margin-top: 8px; align-items: center;
+}
+.timing-seg {
+  height: 4px; border-radius: 2px; min-width: 4px;
+  transition: width .3s;
+}
+.t-scan { background: #818cf8; }
+.t-shot { background: #38bdf8; }
+.t-redact { background: #fb923c; }
+.timing-labels { display: flex; gap: 10px; margin-top: 4px; flex-wrap: wrap; }
+.timing-lbl { font-size: 10px; color: var(--text3); }
+.timing-lbl span { color: var(--text2); font-weight: 600; }
+
+/* ── Action log ── */
+.log-wrap { margin-top: 10px; }
+.log-title { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px; }
+.log-entry {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 8px; background: var(--surface2);
+  border-radius: 6px; margin-bottom: 4px;
+  border-left: 3px solid var(--accent2);
+}
+.log-entry.error { border-left-color: var(--danger); }
+.log-icon { font-size: 12px; }
+.log-text { flex: 1; font-size: 11px; color: var(--text2); }
+.log-ms { font-size: 10px; color: var(--text3); }
+
+/* ── Confirm box ── */
+.confirm-wrap {
+  margin-top: 10px; background: var(--surface2);
+  border: 1px solid var(--warn); border-radius: var(--radius);
+  padding: 12px; display: none;
+}
+.confirm-title { font-size: 11px; font-weight: 600; color: var(--warn); margin-bottom: 6px; }
+.confirm-text { font-size: 12px; color: var(--text2); margin-bottom: 10px; line-height: 1.5; }
+.confirm-btns { display: flex; gap: 8px; }
+
+/* ── Status message ── */
+.status-msg {
+  margin-top: 10px; padding: 8px 10px; border-radius: 6px;
+  font-size: 12px; display: none;
+}
+.status-msg.info    { background: #1e3a5f; color: #93c5fd; border: 1px solid #2563eb44; }
+.status-msg.success { background: #14532d; color: #86efac; border: 1px solid #16a34a44; }
+.status-msg.error   { background: #450a0a; color: #fca5a5; border: 1px solid #dc262644; }
+.status-msg.warn    { background: #451a03; color: #fcd34d; border: 1px solid #d9770644; }
+
+/* ── Vault ── */
+.vault-note {
+  font-size: 11px; color: var(--text3); background: var(--surface2);
+  border: 1px solid var(--border); border-radius: 6px;
+  padding: 8px 10px; margin-bottom: 12px; line-height: 1.5;
+}
+.field-group { margin-bottom: 10px; }
+.field-label { font-size: 11px; color: var(--text3); margin-bottom: 4px; display: block; }
+.field-input {
+  width: 100%; background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 6px; color: var(--text); font-size: 12px; padding: 8px 10px;
+}
+.field-input:focus { outline: none; border-color: var(--accent); }
+.field-input::placeholder { color: var(--text3); }
+.vault-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+/* ── Settings ── */
+.setting-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 0; border-bottom: 1px solid var(--border);
+}
+.setting-item:last-of-type { border-bottom: none; }
+.setting-label { font-size: 12px; color: var(--text2); }
+.setting-desc  { font-size: 10px; color: var(--text3); margin-top: 2px; }
+.setting-select {
+  background: var(--surface2); border: 1px solid var(--border);
+  color: var(--text); border-radius: 6px; padding: 5px 8px; font-size: 11px;
+}
+.toggle {
+  position: relative; width: 36px; height: 20px; cursor: pointer;
+}
+.toggle input { opacity: 0; width: 0; height: 0; }
+.toggle-slider {
+  position: absolute; inset: 0; background: var(--border);
+  border-radius: 20px; transition: .2s;
+}
+.toggle-slider:before {
+  content: ""; position: absolute; width: 14px; height: 14px;
+  left: 3px; top: 3px; background: white; border-radius: 50%; transition: .2s;
+}
+.toggle input:checked + .toggle-slider { background: var(--accent); }
+.toggle input:checked + .toggle-slider:before { transform: translateX(16px); }
+
+.server-input {
+  width: 100%; background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 6px; color: var(--text); font-size: 12px; padding: 8px 10px;
+  margin-top: 8px;
+}
+.server-input:focus { outline: none; border-color: var(--accent); }
+
+.backend-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 8px; border-radius: 20px; font-size: 10px; font-weight: 600;
+}
+.backend-badge.groq   { background: #1e1b4b; color: #a5b4fc; border: 1px solid #4338ca44; }
+.backend-badge.openai { background: #052e16; color: #86efac; border: 1px solid #16a34a44; }
+.backend-badge.mock   { background: #1c1917; color: #a8a29e; border: 1px solid #57534e44; }
+.backend-badge.ollama { background: #1a1a2e; color: #c084fc; border: 1px solid #7c3aed44; }
+
+/* ── Spinner ── */
+@keyframes spin { to { transform: rotate(360deg); } }
+.spinner {
+  width: 14px; height: 14px; border: 2px solid transparent;
+  border-top-color: currentColor; border-radius: 50%;
+  animation: spin .6s linear infinite; display: inline-block;
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <span class="logo">🔒</span>
+    <div>
+      <div class="title">Privacy Vision Agent</div>
+      <div class="subtitle">On-device redaction · Cloud AI planning</div>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:6px;">
+    <div class="status-dot" id="serverDot" title="Server status"></div>
+    <span id="backendBadge" class="backend-badge mock">mock</span>
+  </div>
+</div>
+
+<div class="tabs">
+  <button class="tab active" data-tab="run">▶ Run</button>
+  <button class="tab" data-tab="vault">🔑 Vault</button>
+  <button class="tab" data-tab="settings">⚙ Settings</button>
+</div>
+
+<!-- ── RUN PANEL ── -->
+<div id="panel-run" class="panel active">
+
+  <div class="task-wrap">
+    <textarea class="task-input" id="task"
+      placeholder="What should the agent do?&#10;e.g. fill this signup form&#10;     search for wireless headphones&#10;     click the login button"></textarea>
+    <span class="char-count" id="charCount">0</span>
+  </div>
+
+  <button class="btn btn-primary" id="scanBtn">
+    <span>🔍</span> Scan &amp; Redact Page
+  </button>
+
+  <div class="preview-wrap" id="previewWrap">
+    <img id="preview" alt="Redacted preview"/>
+    <div class="preview-label">🔒 Redacted — this is what leaves your device</div>
+  </div>
+
+  <div class="stats-grid" id="statsGrid" style="display:none">
+    <div class="stat-card">
+      <div class="stat-val" id="s-pii">0</div>
+      <div class="stat-lbl">PII<br>Redacted</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val" id="s-marks">0</div>
+      <div class="stat-lbl">Interactive<br>Marks</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val" id="s-total">0ms</div>
+      <div class="stat-lbl">Scan<br>Time</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val" id="s-actions">0</div>
+      <div class="stat-lbl">Actions<br>Done</div>
+    </div>
+  </div>
+
+  <div id="timingWrap" style="display:none">
+    <div class="timing-row" id="timingBar"></div>
+    <div class="timing-labels" id="timingLabels"></div>
+  </div>
+
+  <button class="btn btn-run" id="runBtn" style="display:none">
+    <span>⚡</span> Send to AI &amp; Execute
+  </button>
+
+  <div class="confirm-wrap" id="confirmWrap">
+    <div class="confirm-title">⚠ Agent wants to perform an action</div>
+    <div class="confirm-text" id="confirmText"></div>
+    <div class="confirm-btns">
+      <button class="btn-sm btn-confirm" id="confirmYes">✓ Allow</button>
+      <button class="btn-sm btn-reject"  id="confirmNo">✗ Reject</button>
+    </div>
+  </div>
+
+  <div class="log-wrap" id="logWrap" style="display:none">
+    <div class="log-title">Action Log</div>
+    <div id="logEntries"></div>
+  </div>
+
+  <div class="status-msg" id="statusMsg"></div>
+
+</div>
+
+<!-- ── VAULT PANEL ── -->
+<div id="panel-vault" class="panel">
+  <div class="vault-note">
+    🔐 Stored only in this browser. Never sent to the server — the AI only requests a field <em>type</em> (e.g. "email"), and the real value is filled locally from here.
+  </div>
+  <div class="vault-grid">
+    <div class="field-group">
+      <label class="field-label">Full Name</label>
+      <input class="field-input" id="v-name" placeholder="John Doe" type="text"/>
+    </div>
+    <div class="field-group">
+      <label class="field-label">Email</label>
+      <input class="field-input" id="v-email" placeholder="john@example.com" type="text"/>
+    </div>
+    <div class="field-group">
+      <label class="field-label">Phone</label>
+      <input class="field-input" id="v-phone" placeholder="+1 555-000-0000" type="text"/>
+    </div>
+    <div class="field-group">
+      <label class="field-label">Username</label>
+      <input class="field-input" id="v-username" placeholder="johndoe" type="text"/>
+    </div>
+    <div class="field-group">
+      <label class="field-label">Company</label>
+      <input class="field-input" id="v-company" placeholder="Acme Corp" type="text"/>
+    </div>
+    <div class="field-group">
+      <label class="field-label">Postal Code</label>
+      <input class="field-input" id="v-zip" placeholder="10001" type="text"/>
+    </div>
+  </div>
+  <div class="field-group" style="margin-top:4px">
+    <label class="field-label">Address</label>
+    <input class="field-input" id="v-address" placeholder="123 Main St, City, State" type="text"/>
+  </div>
+  <button class="btn btn-primary" id="saveVault" style="margin-top:12px">Save Vault</button>
+  <div class="status-msg" id="vaultStatus"></div>
+</div>
+
+<!-- ── SETTINGS PANEL ── -->
+<div id="panel-settings" class="panel">
+
+  <div class="setting-item">
+    <div>
+      <div class="setting-label">Redaction Style</div>
+      <div class="setting-desc">How PII regions are hidden in the screenshot</div>
+    </div>
+    <select class="setting-select" id="s-redactMode">
+      <option value="black">■ Black box</option>
+      <option value="blur">⬛ Pixelate</option>
+    </select>
+  </div>
+
+  <div class="setting-item">
+    <div>
+      <div class="setting-label">Server URL</div>
+      <div class="setting-desc">FastAPI backend endpoint</div>
+    </div>
+  </div>
+  <input class="server-input" id="s-serverUrl" value="http://localhost:8000/plan-action"/>
+
+  <button class="btn btn-primary" id="saveSettings" style="margin-top:12px">Save Settings</button>
+  <div class="status-msg" id="settingsStatus"></div>
+
+  <div style="margin-top:16px; padding-top:12px; border-top:1px solid var(--border)">
+    <div style="font-size:11px; color:var(--text3); margin-bottom:8px; text-transform:uppercase; letter-spacing:.5px;">Server Status</div>
+    <div id="serverInfo" style="font-size:12px; color:var(--text2);">Checking…</div>
+    <button class="btn btn-primary" id="checkServer" style="margin-top:8px; background:var(--surface2); border:1px solid var(--border); color:var(--text2);">
+      Check Connection
+    </button>
+  </div>
+
+</div>
+
+<script src="popup.js"></script>
+</body>
+</html>

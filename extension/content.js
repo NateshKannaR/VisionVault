@@ -285,7 +285,7 @@ function tagInteractiveElements() {
 // ── Phase 2: execute actions ──────────────────────────────────────────────────
 async function setEditableText(el, value) {
   const delay = (ms) => new Promise(r => setTimeout(r, ms));
-  const humanDelay = () => delay(18 + Math.random() * 17);
+  const humanDelay = () => delay(80 + Math.random() * 60);
 
   el.focus();
   await delay(60);

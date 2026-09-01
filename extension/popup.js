@@ -62,7 +62,7 @@ document.getElementById("checkServer").addEventListener("click", checkServer);
 async function loadVault() {
   const { vault } = await chrome.storage.local.get("vault");
   const v = vault || {};
-  ["name", "email", "phone", "address", "username", "company", "zip"].forEach((k) => {
+  ["name", "email", "phone", "address", "username", "company", "zip", "password", "about"].forEach((k) => {
     const el = document.getElementById("v-" + k);
     if (el) el.value = v[k] || "";
   });
@@ -70,7 +70,7 @@ async function loadVault() {
 
 document.getElementById("saveVault").addEventListener("click", async () => {
   const vault = {};
-  ["name", "email", "phone", "address", "username", "company", "zip"].forEach((k) => {
+  ["name", "email", "phone", "address", "username", "company", "zip", "password", "about"].forEach((k) => {
     const el = document.getElementById("v-" + k);
     if (el) vault[k] = el.value.trim();
   });
@@ -166,7 +166,7 @@ scanBtn.addEventListener("click", () => {
 
   chrome.runtime.sendMessage({ type: "SCAN", task }, (res) => {
     scanBtn.disabled = false;
-    scanBtn.innerHTML = '<span>🔍</span> Scan &amp; redact page';
+    scanBtn.innerHTML = `<span style="display:inline-flex; align-items:center; justify-content:center; margin-right:8px; vertical-align:middle;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 7V5a2 2 0 0 1 2-2h2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M17 3h2a2 2 0 0 1 2 2v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M21 17v2a2 2 0 0 1-2 2h-2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M7 21H5a2 2 0 0 1-2-2v-2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/></svg></span>Scan &amp; redact page`;
 
     if (!res || !res.ok) {
       showStatus("statusMsg", "error", "✗ " + (res?.error || "Scan failed. Make sure you're on a normal webpage."));
@@ -197,7 +197,7 @@ runBtn.addEventListener("click", () => {
 
   chrome.runtime.sendMessage({ type: "RUN" }, (res) => {
     runBtn.disabled = false;
-    runBtn.innerHTML = '<span>⚡</span> Run automation';
+    runBtn.innerHTML = `<span style="display:inline-flex; align-items:center; justify-content:center; margin-right:8px; vertical-align:middle;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M10 8.5l5 3.5-5 3.5V8.5Z" fill="currentColor"/></svg></span>Run automation`;
 
     if (!res || !res.ok) {
       showStatus("statusMsg", "error", "✗ " + (res?.error || "Server error. Is the backend running?"));

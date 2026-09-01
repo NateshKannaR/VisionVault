@@ -11,6 +11,8 @@ const VAULT_KEY_MAP = {
   email: "email", phone: "phone", name: "name", address: "address",
   username: "username", fullname: "name", mobile: "phone",
   company: "company", zip: "address", postal: "address",
+  about: "about", bio: "about", description: "about",
+  password: "password", passwd: "password", pass: "password",
 };
 
 // Actions that cause navigation — agent must wait and re-scan after these
@@ -362,7 +364,7 @@ async function phaseRun() {
       });
       session.filledIds.push(resp.mark_id);
       session.actionLog.push({
-        action: "type", field: resp.use_vault_field || resp.value || "?",
+        action: "type", field: resp.use_vault_field || (resp.value !== undefined ? resp.value : "?") || "?",
         mark_id: resp.mark_id, serverMs, ok: exec?.ok,
       });
       notifyPopup({ type: "filled", field: resp.use_vault_field || resp.value, mark_id: resp.mark_id });
@@ -462,7 +464,10 @@ async function phaseConfirm() {
   // After a click, wait for possible navigation then re-scan and continue
   notifyPopup({ type: "step", step: session.stepCount, status: "Click executed, waiting for page..." });
   await waitForTabLoad(session.tabId, 5000);
-  await rescanCurrentTab(true); // click may have navigated
+  // Only reset filledIds if the URL actually changed (real navigation)
+  const tabAfter = await new Promise(r => chrome.tabs.get(session.tabId, r));
+  const urlChanged = tabAfter.url && session.pageInfo?.url && !tabAfter.url.startsWith(session.pageInfo.url);
+  await rescanCurrentTab(urlChanged);
 
   // Continue the agent loop automatically after confirmed click
   return phaseRun();

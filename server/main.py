@@ -309,6 +309,9 @@ def mock_plan(req: PlanRequest) -> PlanResponse:
             if msg_box and msg_box.id in done:
                 return PlanResponse(action="press_key", mark_id=msg_box.id, value="Enter", reasoning="Send message")
 
+    if any(w in task_l for w in ["scroll", "load more", "read more", "next page", "more results"]):
+        return PlanResponse(action="scroll_page", value=500, reasoning="Scroll the page to reveal more content.")
+
     is_search = any(w in task_l for w in ["search", "find", "look", "buy", "watch", "open", "go to"])
     if is_search and cur_site:
         query = extract_query(task_l, cur_site)

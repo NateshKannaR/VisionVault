@@ -196,6 +196,10 @@ function localMockPlan(session) {
     }
   }
 
+  if (/scroll|load more|read more|next page|more results/.test(task)) {
+    return { action: "scroll_page", value: 500, reasoning: "Scroll the page to reveal more content." };
+  }
+
   if (/search|find|look for|buy|watch/.test(task)) {
     const searchBox = first((m) => (m.role === "input:search" || m.role === "input:text" || m.role === "editable") && !allDone.has(m.id));
     if (searchBox) {

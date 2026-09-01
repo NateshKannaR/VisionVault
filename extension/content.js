@@ -417,9 +417,40 @@ async function executeAction(action, mark_id, value) {
         el.scrollIntoView({ behavior: "smooth", block: "center" });
         break;
 
-      case "scroll_page":
-        window.scrollBy({ top: value ?? 300, behavior: "smooth" });
+      case "scroll_page": {
+        const amount = Number(value) || 400;
+        const scrollTargets = [
+          document.scrollingElement,
+          document.body,
+          document.documentElement,
+          ...Array.from(document.querySelectorAll('[data-scrollable="true"], [style*="overflow"], [style*="overflow-y"], [style*="overflow:auto"], [style*="overflow-y:auto"]'))
+        ].filter(Boolean);
+
+        let scrolled = false;
+        for (const target of scrollTargets) {
+          try {
+            const before = target.scrollTop || 0;
+            if (typeof target.scrollBy === "function") {
+              target.scrollBy({ top: amount, behavior: "smooth" });
+            } else if (typeof target.scrollTo === "function") {
+              target.scrollTo({ top: before + amount, behavior: "smooth" });
+            } else {
+              target.scrollTop = (target.scrollTop || 0) + amount;
+            }
+            const after = target.scrollTop || 0;
+            if (after !== before || target === document.scrollingElement || target === document.documentElement || target === document.body) {
+              scrolled = true;
+              break;
+            }
+          } catch (_) {}
+        }
+
+        if (!scrolled) {
+          const current = window.scrollY || document.documentElement.scrollTop || 0;
+          window.scrollTo({ top: current + amount, behavior: "smooth" });
+        }
         break;
+      }
 
       default:
         return { ok: false, error: `Unknown action: ${action}` };

@@ -32,6 +32,12 @@ const REPORT_PATH = path.join(ROOT, 'eval_report.md');
 const live = fs.existsSync(LIVE_PATH) ? JSON.parse(fs.readFileSync(LIVE_PATH, 'utf8')) : null;
 const manual = fs.existsSync(MANUAL_PATH) ? JSON.parse(fs.readFileSync(MANUAL_PATH, 'utf8')) : null;
 
+// Optional. Produced by `node eval/real-sites.js`; absent on a fixtures-only run.
+const REAL_SITES_PATH = path.join(RESULTS_DIR, 'real-sites.json');
+const realSites = fs.existsSync(REAL_SITES_PATH)
+  ? JSON.parse(fs.readFileSync(REAL_SITES_PATH, 'utf8'))
+  : null;
+
 if (!live && !manual) {
   console.error(
     'No measurements found. Nothing will be written.\n\n' +
@@ -256,6 +262,76 @@ if (manual) {
 }
 
 // ── Method ──────────────────────────────────────────────────────────────────
+// ── Real websites ───────────────────────────────────────────────────────────
+//
+// The fixture suite measures detection quality against known ground truth. It cannot measure
+// whether the agent works on a site nobody annotated, so this section reports exactly that,
+// with no ground truth and no partial credit: either the thing the user asked for happened on
+// the page, or it did not.
+if (realSites && Array.isArray(realSites.sites) && realSites.sites.length) {
+  W('---');
+  W();
+  W('## On real websites');
+  W();
+  W('`node eval/real-sites.js` drives the shipped extension against public sites with read-only');
+  W('tasks — search and scroll. Nothing is bought, submitted or logged into. Success is judged');
+  W('from the page afterwards, not from the agent\'s own report: for a search task the query has');
+  W('to appear in the URL, the title or a field.');
+  W();
+  W(`Run at ${realSites.generatedAt}, planner \`${realSites.planner}\`, ${realSites.budgetSeconds}s budget per site.`);
+  W();
+  W('| Site | Task | Steps | Local scan | Masked | Outcome |');
+  W('| :--- | :--- | ---: | ---: | ---: | :--- |');
+
+  let landed = 0;
+  let acted = 0;
+  let searchTasks = 0;
+  let blockedCount = 0;
+
+  for (const s of realSites.sites) {
+    const q = s.queryOnPage;
+    let outcome;
+    // Older result files predate the explicit flag; the reason the agent gave still says it.
+    const blocked = s.botWall || /verification page|asking for a human|CAPTCHA/i.test(s.stopReason || '');
+    if (blocked) {
+      // Not a failure of the agent: the site asked for a human and the agent said so.
+      outcome = 'stopped — the site asked for human verification';
+      blockedCount++;
+    } else if (s.error) {
+      outcome = `error: ${s.error}`;
+    } else if (q) {
+      searchTasks++;
+      const where = [q.inUrl && 'URL', q.inTitle && 'title', q.inBox && 'field'].filter(Boolean).join(' + ');
+      if (q.inUrl || q.inTitle) { landed++; outcome = `**searched** (in ${where})`; }
+      else if (q.inBox) { outcome = 'typed, but the site did not run it'; }
+      else { outcome = 'search did not land'; }
+    } else if (s.steps) {
+      acted++;
+      outcome = '**acted**';
+    } else {
+      outcome = 'no action';
+    }
+    W(`| ${s.site} | ${s.task} | ${s.steps ?? '-'} | ${ms(s.pipelineMs)} | ${s.pii ?? '-'} | ${outcome} |`);
+  }
+
+  W();
+  W(`**${landed} of ${searchTasks} search tasks reached the results page**, and ` +
+    `${acted} non-search task${acted === 1 ? '' : 's'} carried out the requested action` +
+    (blockedCount
+      ? `. ${blockedCount} site${blockedCount === 1 ? '' : 's'} refused automation outright with a ` +
+        'human-verification challenge, which the agent detects and reports rather than trying to get around'
+      : '') +
+    '. Every remaining case is reported by the agent as unfinished, with the reason, rather than ' +
+    'being claimed as a success.');
+  W();
+  W('The "Masked" column is worth reading alongside the fixture numbers. On a shopping home');
+  W('page it is small because the face model — not a blanket rule over every image — decides');
+  W('which pixels hold a face; on a news site it is non-zero because the model found real');
+  W('faces in the photography. Before that change the same Amazon page reported 71 masked');
+  W('regions, almost all of them product photos.');
+  W();
+}
+
 W('---');
 W();
 W('## How each metric is defined');

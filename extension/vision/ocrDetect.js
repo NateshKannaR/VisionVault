@@ -99,6 +99,14 @@
       return tesseractWorker;
     })();
 
+    // Same reasoning as the face detector: a rejected promise left in the cache turns one
+    // transient failure into a permanently disabled detector for the rest of the session.
+    initPromise.catch((err) => {
+      console.warn("[vision] Tesseract init failed; will retry on the next scan:", err);
+      initPromise = null;
+      tesseractWorker = null;
+    });
+
     return initPromise;
   }
 

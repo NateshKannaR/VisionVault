@@ -309,6 +309,19 @@
     </div>
 
     <div class="field">
+      <label class="check">
+        <input type="checkbox" id="s-dismissOverlays" checked />
+        <span>Close cookie banners and modal pop-ups automatically</span>
+      </label>
+      <p class="hint">
+        A consent wall or a login modal swallows every click underneath it, so the agent clears
+        one before acting. It only presses controls whose own text dismisses them — accept,
+        close, not now — never sign-in, subscribe or anything that buys something, and it tells
+        you in the activity log which one it pressed.
+      </p>
+    </div>
+
+    <div class="field">
       <label class="field-label" for="s-serverUrl">Planning server</label>
       <input class="input" id="s-serverUrl" type="text" value="http://127.0.0.1:8000/api/agent/step" />
       <p class="hint">Leave unreachable to plan entirely on-device.</p>

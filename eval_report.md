@@ -21,11 +21,11 @@ measurement rather than bookkeeping.
 
 | Setting | Value |
 | :--- | :--- |
-| Run at | 2026-09-03T14:53:12.958Z |
+| Run at | 2026-09-03T18:35:32.544Z |
 | Chrome | Chrome/152.0.7977.65 |
 | Node | v24.16.0 |
 | Platform | win32 x64 |
-| Planning backend | gemini (chain: gemini -> groq -> mock) |
+| Planning backend | gemini (chain: gemini -> groq -> ollama -> mock) |
 | Redaction mode | black |
 | Scans per page | 3 |
 | Match threshold | a prediction counts as covering a region when it hides ≥ 50% of it |
@@ -45,7 +45,7 @@ Across 6 fixture pages, 3 scans each,
 | :--- | :---: | :--- |
 | PII recall | **100.0%** | share of annotated sensitive regions covered by a redaction box |
 | PII precision | **100.0%** | redactions that hid something annotated sensitive, not something annotated safe |
-| Redaction tightness (IoU) | **93.6%** | how closely each mask matches the region it hides |
+| Redaction tightness (IoU) | **93.8%** | how closely each mask matches the region it hides |
 | Pixel leaks | **0** | regions whose original ink survived into the returned PNG |
 | Surviving ink | **0.00%** | share of each region's original ink left unpainted (lower is better) |
 | Mean masked fraction | **98.2%** | share of ground-truth pixels actually painted over |
@@ -53,19 +53,19 @@ Across 6 fixture pages, 3 scans each,
 | Role accuracy | **100.0%** | tagged elements given the correct role |
 | Mark box IoU | **98.3%** | geometric accuracy of the reported element boxes |
 | Mark ID stability | **stable** | identical IDs across repeated scans of the same page |
-| Mean scan latency | **1813ms** | full local pipeline, capture to redacted image |
-| p95 scan latency | **2079ms** | worst case across all runs |
+| Mean scan latency | **1564ms** | full local pipeline, capture to redacted image |
+| p95 scan latency | **1713ms** | worst case across all runs |
 
 ### Per page
 
 | Page | Regions | Recall | Precision | IoU | Pixel leaks | Marks | Role acc. | Latency |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| Signup form | 11 | 100.0% | 100.0% | 96.4% | 0 | 100.0% | 100.0% | 1795ms |
-| Admin dashboard | 18 | 100.0% | 100.0% | 100.0% | 0 | 100.0% | 100.0% | 1992ms |
-| E-commerce checkout | 7 | 100.0% | 100.0% | 100.0% | 0 | 100.0% | 100.0% | 1872ms |
-| Registration survey | 6 | 100.0% | 100.0% | 100.0% | 0 | 100.0% | 100.0% | 1629ms |
-| Social feed (+ same-origin iframe) | 9 | 100.0% | 100.0% | 98.0% | 0 | 100.0% | 100.0% | 1886ms |
-| Pixel-only receipt (DOM blind spot) | 4 | 100.0% | 100.0% | 67.5% | 0 | 100.0% | 100.0% | 1702ms |
+| Signup form | 11 | 100.0% | 100.0% | 97.4% | 0 | 100.0% | 100.0% | 1592ms |
+| Admin dashboard | 18 | 100.0% | 100.0% | 100.0% | 0 | 100.0% | 100.0% | 1651ms |
+| E-commerce checkout | 7 | 100.0% | 100.0% | 100.0% | 0 | 100.0% | 100.0% | 1563ms |
+| Registration survey | 6 | 100.0% | 100.0% | 100.0% | 0 | 100.0% | 100.0% | 1476ms |
+| Social feed (+ same-origin iframe) | 9 | 100.0% | 100.0% | 98.0% | 0 | 100.0% | 100.0% | 1634ms |
+| Pixel-only receipt (DOM blind spot) | 4 | 100.0% | 100.0% | 67.5% | 0 | 100.0% | 100.0% | 1465ms |
 
 Each row is the mean of its repeats. The redacted frame from the first scan of each page
 is saved next to the results as `eval/results/redacted-<page>.png`, so the masking can be
@@ -91,15 +91,15 @@ The same pages, the same pipeline, scanned twice: once with OCR on, once with it
 
 | Profile | Mean latency | PII recall | Pixel leaks |
 | :--- | :---: | :---: | :---: |
-| Full — DOM + face + OCR | 1813ms | 100.0% | 0 |
-| Fast — DOM + face, no OCR | 155ms | 83.3% | 4 |
+| Full — DOM + face + OCR | 1564ms | 100.0% | 0 |
+| Fast — DOM + face, no OCR | 111ms | 83.3% | 4 |
 
 | Stage | Mean cost |
 | :--- | :---: |
-| Screen capture + DOM scan (all frames) | 71ms |
-| UltraFace ONNX (WASM SIMD) | 49ms |
-| Tesseract OCR (WASM) | 1651ms |
-| OffscreenCanvas redaction | 51ms |
+| Screen capture + DOM scan (all frames) | 50ms |
+| UltraFace ONNX (WASM SIMD) | 34ms |
+| Tesseract OCR (WASM) | 1456ms |
+| OffscreenCanvas redaction | 31ms |
 
 OCR dominates the budget. On pages whose text lives in the DOM it changes nothing, because
 the DOM rules already found that text — which is why the fast profile scores the same
@@ -112,12 +112,12 @@ setting so the choice is the user's, not a hidden default.
 
 | Measure | Value |
 | :--- | :---: |
-| Extension on disk, total | 22.24 MB |
+| Extension on disk, total | 22.35 MB |
 | &nbsp;&nbsp;ML runtimes (`lib/`) | 18.93 MB |
 | &nbsp;&nbsp;Model weights (`models/`) | 3.10 MB |
-| &nbsp;&nbsp;Extension code | 0.18 MB |
-| Offscreen JS heap in use, after scanning | 13.3 MB |
-| Offscreen JS heap allocated | 15.8 MB |
+| &nbsp;&nbsp;Extension code | 0.29 MB |
+| Offscreen JS heap in use, after scanning | 14.2 MB |
+| Offscreen JS heap allocated | 17.3 MB |
 
 Inference runs in an MV3 offscreen document, off the page's main thread, so a scan does
 not block the page the user is reading.
@@ -125,16 +125,16 @@ not block the page the user is reading.
 ### End-to-end task
 
 One full task — *"Fill the signup form with my details"* — from a cleared form, planned by
-the live server chain (gemini (chain: gemini -> groq -> mock)).
+the live server chain (gemini (chain: gemini -> groq -> ollama -> mock)).
 
 | Measure | Value |
 | :--- | :---: |
-| Initial scan (local pipeline) | 2381ms |
-| Agent loop, 7 steps | 30563ms |
-| Total wall clock | 32944ms |
-| Sensitive regions redacted before first upload | 13 |
+| Initial scan (local pipeline) | 2105ms |
+| Agent loop, 6 steps | 17416ms |
+| Total wall clock | 19521ms |
+| Sensitive regions redacted before first upload | 16 |
 | Interactive elements offered to the planner | 9 |
-| Loop terminated cleanly | yes |
+| Loop terminated cleanly | no |
 
 Field values after the run — every one resolved from the local vault on-device, none of
 them ever sent to the server:
@@ -144,14 +144,46 @@ them ever sent to the server:
   "fullName": "Ada Lovelace",
   "email": "ada@localhost.test",
   "phone": "+44 20 7946 0102",
-  "username": "Ada Lovelace",
+  "username": "ada",
   "password": "(non-empty)",
   "address": "12 Analytical Way, London"
 }
 ```
 
 Per-step latency is dominated by the cloud planner, not by the client. The local scan
-costs 2381ms; each planning call to the hosted model took seconds.
+costs 2105ms; each planning call to the hosted model took seconds.
+
+---
+
+## On real websites
+
+`node eval/real-sites.js` drives the shipped extension against public sites with read-only
+tasks — search and scroll. Nothing is bought, submitted or logged into. Success is judged
+from the page afterwards, not from the agent's own report: for a search task the query has
+to appear in the URL, the title or a field.
+
+Run at 2026-09-03T18:20:08.652Z, planner `gemini (gemini -> groq -> ollama -> mock)`, 75s budget per site.
+
+| Site | Task | Steps | Local scan | Masked | Outcome |
+| :--- | :--- | ---: | ---: | ---: | :--- |
+| Amazon.in | search for iqoo neo 6 and show me | 1 | 3246ms | 1 | **searched** (in URL + title + field) |
+| Flipkart | search for running shoes and show me | 5 | 1510ms | 2 | **searched** (in URL + title + field) |
+| Wikipedia | search for quantum computing | 1 | 1814ms | 7 | **searched** (in URL + title) |
+| YouTube | search for lofi study music | 1 | 1321ms | 0 | **searched** (in URL + title + field) |
+| GitHub | search for onnxruntime | 2 | 1834ms | 2 | **searched** (in URL) |
+| Stack Overflow | search for webassembly simd | 1 | 3450ms | 2 | stopped — the site asked for human verification |
+| MDN | search for OffscreenCanvas | 2 | 1810ms | 0 | **searched** (in URL + title) |
+| BBC News | scroll down and show me more headlines | 1 | 2644ms | 2 | **acted** |
+| Hacker News | scroll down and show me more stories | 1 | 3498ms | 2 | **acted** |
+| MakeMyTrip | search for flights to goa | 4 | 2277ms | 4 | typed, but the site did not run it |
+
+**6 of 7 search tasks reached the results page**, and 2 non-search tasks carried out the requested action. 1 site refused automation outright with a human-verification challenge, which the agent detects and reports rather than trying to get around. Every remaining case is reported by the agent as unfinished, with the reason, rather than being claimed as a success.
+
+The "Masked" column is worth reading alongside the fixture numbers. On a shopping home
+page it is small because the face model — not a blanket rule over every image — decides
+which pixels hold a face; on a news site it is non-zero because the model found real
+faces in the photography. Before that change the same Amazon page reported 71 masked
+regions, almost all of them product photos.
 
 ---
 

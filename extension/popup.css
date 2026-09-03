@@ -393,3 +393,25 @@ select {
 ::-webkit-scrollbar { width: 9px; height: 9px; }
 ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 5px; border: 2px solid var(--bg); }
 ::-webkit-scrollbar-track { background: transparent; }
+
+/* ── Planner tier pill ────────────────────────────────────────────────────
+   Names which tier of the planning chain answered a step. A failover from the
+   hosted model to the local one is otherwise invisible — it just feels slower —
+   so the tier is stated rather than left to be guessed at. */
+.tier-pill {
+  flex: none; align-self: flex-start;
+  padding: 1px 6px; border-radius: 999px;
+  font-size: 9.5px; font-weight: 600; letter-spacing: .02em;
+  text-transform: uppercase; white-space: nowrap;
+  border: 1px solid var(--border-strong); color: var(--text-faint);
+  background: var(--surface);
+}
+.tier-pill.tier-gemini,
+.tier-pill.tier-groq {
+  color: var(--accent); border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  background: var(--accent-soft);
+}
+.tier-pill.tier-ollama {
+  color: var(--safe); border-color: color-mix(in srgb, var(--safe) 40%, transparent);
+  background: color-mix(in srgb, var(--safe) 12%, transparent);
+}

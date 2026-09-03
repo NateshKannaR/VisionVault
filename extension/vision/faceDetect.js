@@ -197,6 +197,17 @@
       return ortSession;
     })();
 
+    // A rejected initPromise must not be cached. Without this, one transient failure to create
+    // the session — a slow disk, a memory spike while another tab loads — permanently disables
+    // face detection for the life of the offscreen document, and every later scan silently
+    // falls back to masking every image on the page. Observed live: a run where one site
+    // reported 65 masked regions where it had reported 1 a few minutes earlier.
+    initPromise.catch((err) => {
+      console.warn("[vision] UltraFace init failed; will retry on the next scan:", err);
+      initPromise = null;
+      ortSession = null;
+    });
+
     return initPromise;
   }
 

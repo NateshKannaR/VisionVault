@@ -14,6 +14,8 @@
  *   4. Every outbound request body is inspected: no vault value, no raw capture.
  *   5. A risky click halts for confirmation and only proceeds when approved.
  *   6. Fail-closed: with redaction forced to fail, the scan aborts and NOTHING is transmitted.
+ *   7. A DOM change triggers a re-scan that updates both session state and the panel.
+ *   8. A field the vault cannot fill pauses the run and asks, and the answer stays local.
  *
  * Usage:
  *   node eval/verify-live.js            # uses the local planner if no server is running
@@ -45,6 +47,23 @@ const failures = [];
 function check(ok, label, detail = '') {
   if (ok) { pass++; console.log(`  PASS  ${label}`); }
   else { fail++; failures.push(label); console.log(`  FAIL  ${label}${detail ? `\n        ${detail}` : ''}`); }
+}
+
+/**
+ * Records every panel notification so a test can read back what the agent said it was doing.
+ * Installed once; the buffer can be cleared per section.
+ */
+async function installNotificationSpy(h) {
+  await h.worker.evaluate(() => {
+    globalThis.__notifications = [];
+    if (globalThis.__notifyPatched) return;
+    globalThis.__notifyPatched = true;
+    const original = notifyPopup;
+    notifyPopup = function (data) {
+      globalThis.__notifications.push(data);
+      return original(data);
+    };
+  });
 }
 
 function section(title) {
@@ -179,7 +198,17 @@ function section(title) {
   // ── 3. Automation ──────────────────────────────────────────────────────────
   section('3. Run the automation loop');
   await page.bringToFront();
+
+  // Watch what the panel is told. The action log records what was executed; the step statuses
+  // record what the supervisor decided and why, which is the only way to see from outside why
+  // a run ended where it did.
+  await installNotificationSpy(h);
+
   const run = await h.worker.evaluate(() => phaseRun());
+  const runSteps = await h.worker.evaluate(() =>
+    (globalThis.__notifications || []).filter((n) => n && n.type === 'step').map((n) => n.status));
+  console.log('  observed: step-by-step ->');
+  for (const st of runSteps) console.log(`            ${st}`);
   const stepsTaken = (run.actionLog || []).length;
 
   console.log(`  observed: ${stepsTaken} action(s), done=${run.done}, needsConfirm=${!!run.needsConfirm}`);
@@ -192,7 +221,14 @@ function section(title) {
   console.log(`  observed: field values now = ${JSON.stringify(filled)}`);
 
   check(stepsTaken >= 2, `loop executed multiple steps (${stepsTaken})`);
-  check(run.done === true || run.needsConfirm === true, 'loop reached a terminal state (done, or halted for approval)');
+  // Three legitimate ways for the loop to stop, all of them terminal from the panel's point of
+  // view: it finished, it wants a click approved, or it wants a value the vault does not hold.
+  // A run that ends in none of these is one that fell out of the loop without saying why.
+  check(
+    run.done === true || run.needsConfirm === true || run.needsInput === true,
+    'loop reached a terminal state (done, awaiting approval, or awaiting a value)',
+    JSON.stringify({ done: run.done, needsConfirm: run.needsConfirm, needsInput: run.needsInput, error: run.error })
+  );
 
   const resolvedFromVault = Object.values(filled).filter((v) => v && Object.values(VAULT).includes(v));
   check(
@@ -228,11 +264,22 @@ function section(title) {
   check(imageIssues.length === 0, 'every transmitted image is a PNG data URL', imageIssues.join('; '));
 
   // The transmitted image must be the REDACTED one: verify by re-checking ink survival on it.
+  //
+  // The FIRST request, not the last. `boxes` holds each field's rectangle as measured during
+  // the initial scan, and those coordinates are only meaningful against a capture of the same
+  // viewport. The agent scrolls while it works — typing into a field brings it into view — so
+  // a later screenshot shows a different slice of the page and the comparison is nonsense.
+  // Checking it that way reported the avatar as leaked when the avatar had simply scrolled out
+  // of shot. The first request is the one taken from the page state these boxes describe.
   if (sentBodies.length) {
     try {
-      const lastImg = JSON.parse(sentBodies[sentBodies.length - 1].body).redactedImage;
+      const firstBody = JSON.parse(sentBodies[0].body);
+      const lastImg = firstBody.redactedImage;
       if (lastImg) {
         const sentDecoded = decodeDataUrl(lastImg);
+        // Keep the exact bytes that went to the server, so a disputed result can be looked at.
+        fs.writeFileSync(path.join(RESULTS_DIR, 'verify-transmitted.png'),
+                         Buffer.from(lastImg.slice(lastImg.indexOf(',') + 1), 'base64'));
         const worst = Object.entries(boxes).map(([name, box]) => ({
           name, ...inkSurvival(reference, sentDecoded, box, { viewportWidth: view.w, viewportHeight: view.h }),
         })).filter((r) => r.leaked);
@@ -359,17 +406,9 @@ function section(title) {
   // Re-establish a session (section 6 deliberately destroyed it).
   await h.worker.evaluate((task) => phaseScan(task), 'Fill the signup form with my details');
 
-  // Spy on the panel notifications so we can prove the UI is told, not just the session.
+  // Reset the capture; the spy itself is already installed.
   await h.worker.evaluate(() => {
     globalThis.__notifications = [];
-    if (!globalThis.__notifyPatched) {
-      globalThis.__notifyPatched = true;
-      const original = notifyPopup;
-      notifyPopup = function (data) {
-        globalThis.__notifications.push(data);
-        return original(data);
-      };
-    }
   });
 
   const beforeChange = await h.worker.evaluate(() => ({
@@ -427,6 +466,64 @@ function section(title) {
   // wholesale by the re-scan, which is what the loop reads on its next step.
   console.log(`  note:     marks ${beforeChange.marks} -> ${afterChange.marks} ` +
               '(tagging is viewport-only; the injected fields are below the fold)');
+
+  // ── 8. A value the vault does not have ─────────────────────────────────────
+  section('8. A field with no vault value pauses and asks, rather than inventing one');
+
+  // Empty one field and leave the rest. The agent should reach that field, stop, and name it.
+  await h.worker.evaluate(async (vault) => {
+    await chrome.storage.local.set({ vault });
+  }, { ...VAULT, phone: '' });
+
+  const askBefore = sentBodies.length;
+  await h.worker.evaluate((task) => phaseScan(task), 'Fill the signup form with my details');
+
+  // Point the session at a dead port so the on-device planner drives this section. That makes
+  // the field order deterministic — a hosted model might reach the empty field on step two or
+  // step five, or propose a gated click first — and it exercises the offline path at the same
+  // time, which is the state the extension is in whenever the server is not running.
+  await h.worker.evaluate(() => { session.serverUrl = 'http://127.0.0.1:9/dead'; });
+
+  const askRun = await h.worker.evaluate(() => phaseRun());
+
+  console.log(`  observed: needsInput=${askRun.needsInput} field=${JSON.stringify(askRun.fieldKey)} ` +
+              `label=${JSON.stringify(askRun.fieldLabel)}`);
+
+  check(askRun.needsInput === true, 'the loop halts and asks for the missing value',
+        JSON.stringify({ done: askRun.done, needsConfirm: askRun.needsConfirm, error: askRun.error }));
+  check(askRun.fieldKey === 'phone', 'it names the field it needs', `got ${askRun.fieldKey}`);
+  check(askRun.done !== true, 'the run is paused, not finished');
+
+
+  // Supplying the value must resume the run and persist it when asked.
+  //
+  // Called directly rather than through chrome.runtime.sendMessage: a service worker does not
+  // receive its own runtime messages, so posting one here would simply be dropped.
+  const provided = askRun.needsInput
+    ? await h.worker.evaluate(
+        (payload) => provideInput(payload),
+        { value: VAULT.phone, saveToVault: true, fieldKey: 'phone', mark_id: askRun.action.mark_id }
+      ).catch((e) => ({ ok: false, error: String(e) }))
+    : { ok: false, error: 'the run never asked, so there was nothing to answer' };
+
+  const storedPhone = await h.worker.evaluate(async () => {
+    const { vault } = await chrome.storage.local.get('vault');
+    return vault?.phone || '';
+  });
+
+  console.log(`  observed: resume -> ${JSON.stringify(provided && provided.ok)}  vault.phone now ${JSON.stringify(storedPhone)}`);
+  check(storedPhone === VAULT.phone, 'the answer is written to the local vault when asked',
+        `stored ${JSON.stringify(storedPhone)}`);
+
+  const askBodies = sentBodies.slice(askBefore);
+  const askLeaks = askBodies.filter((b) => (b.body || '').includes(VAULT.phone));
+  check(askLeaks.length === 0, 'the value supplied by hand is never transmitted either',
+        `${askLeaks.length} request(s) contained it`);
+
+  // Restore the full vault for anything that runs after this.
+  await h.worker.evaluate(async (vault) => {
+    await chrome.storage.local.set({ vault });
+  }, VAULT);
 
   // ── Summary ────────────────────────────────────────────────────────────────
   console.log(`\n${'='.repeat(70)}`);

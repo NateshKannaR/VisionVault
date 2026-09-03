@@ -110,6 +110,36 @@ const open2 = planNextAction({
 });
 is(open2.action, 'done', 'and stops once that target has been opened');
 
+// ── A field's own label decides what belongs in it ───────────────────────────────────────
+//
+// A planner shown "Aadhaar number" and a menu of eight vault keys picks the nearest one rather
+// than declining; observed live, it chose `phone`. The label overrules it, and a label naming
+// an identifier the vault has no equivalent for is put to the user instead of guessed at.
+console.log('\nvault key from a field label\n');
+
+is(TaskPlanner.vaultKeyForLabel('Email address').key, 'email', 'email address -> email');
+is(TaskPlanner.vaultKeyForLabel('Mobile number').key, 'phone', 'mobile number -> phone');
+is(TaskPlanner.vaultKeyForLabel('Username').key, 'username', 'username -> username');
+is(TaskPlanner.vaultKeyForLabel('Full name').key, 'name', 'full name -> name');
+is(TaskPlanner.vaultKeyForLabel('Postcode').key, 'address', 'postcode -> address');
+
+is(TaskPlanner.vaultKeyForLabel('Aadhaar number'),
+   { key: null, unknownIdentifier: true }, 'aadhaar is an identifier the vault has no key for');
+is(TaskPlanner.vaultKeyForLabel('PAN card number'),
+   { key: null, unknownIdentifier: true }, 'PAN likewise');
+is(TaskPlanner.vaultKeyForLabel('Passport number'),
+   { key: null, unknownIdentifier: true }, 'passport likewise');
+is(TaskPlanner.vaultKeyForLabel('CVV'),
+   { key: null, unknownIdentifier: true }, 'a card security code is never guessed at');
+
+is(TaskPlanner.vaultKeyForLabel('Referral code'),
+   { key: null, unknownIdentifier: false }, 'an unrecognised field is neither mapped nor flagged');
+is(TaskPlanner.vaultKeyForLabel(''),
+   { key: null, unknownIdentifier: false }, 'an empty label says nothing');
+
+// "Company name" must not be read as a person's name by the trailing \bname\b rule.
+is(TaskPlanner.vaultKeyForLabel('Company').key, 'company', 'company -> company');
+
 console.log('\n' + '='.repeat(60));
 if (failures.length) {
   console.log(`${failures.length} of ${checks} checks FAILED`);

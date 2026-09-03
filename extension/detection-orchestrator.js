@@ -247,6 +247,61 @@
     return unionArea > 0 ? interArea / unionArea : 0;
   }
 
+  // Media whose own markup says it depicts a person. Kept masked even when the face model
+  // finds nothing: an avatar turned away from the camera, a low-resolution profile thumbnail
+  // or a photo of an ID card are all things the model can miss and the page has told us about.
+  const PERSON_MEDIA_RE = /avatar|profile|selfie|headshot|portrait|passport|aadhaar|licence|license|\bid[-_ ]?card\b|user[-_ ]?(?:pic|photo|image)/i;
+
+  /**
+   * Drops the blanket "every image might contain a face" DOM regions once the face model has
+   * actually run.
+   *
+   * The DOM scanner marks every image and canvas over 48px as possible face media. That is the
+   * right fail-closed default when no model is available, but it is a poor rule when one is:
+   * on a shopping home page it masks dozens of product photos, which both destroys the visual
+   * context the planner needs and counts as a redaction the page never required. The face
+   * detector exists precisely to answer this question, so when it has run, it is the authority.
+   *
+   * Media the page itself labels as a person is kept regardless, and so is everything from
+   * every other detection rule.
+   *
+   * @param {Array} regions        DOM regions from the page scan
+   * @param {boolean} faceModelRan whether face detection actually executed for this frame
+   */
+  function filterMediaRegions(regions, faceModelRan) {
+    if (!faceModelRan) return regions;
+    return (regions || []).filter((r) => {
+      if (r.reason !== "possible_face_or_media") return true;
+      const hint = `${r.label || ""} ${r.alt || ""} ${r.className || ""} ${r.src || ""}`;
+      if (PERSON_MEDIA_RE.test(hint)) return true;
+      return isAvatarShaped(r);
+    });
+  }
+
+  /**
+   * Small, roughly square AND round — the shape a profile picture has in a list, a comment
+   * thread or a table row.
+   *
+   * These are kept masked because they are precisely where the face model is least reliable:
+   * UltraFace runs at 320x240, so a 56px avatar in a 1280px viewport is about 14px at model
+   * scale, well under its floor. Above ~140px a face is large enough for the model to judge,
+   * and that is also the size at which product photography starts, so the blanket rule is
+   * dropped there.
+   */
+  function isAvatarShaped(region) {
+    const w = region.w || 0;
+    const h = region.h || 0;
+    if (w < 24 || h < 24) return false;
+    const shorter = Math.min(w, h);
+    if (shorter > 140) return false;
+    const ratio = w / h;
+    if (ratio < 0.7 || ratio > 1.4) return false;
+    // Small and square is not enough on its own: a shopping home page is full of small square
+    // product thumbnails, and masking them all put Amazon back to 65 masked regions. Round is
+    // what distinguishes a profile picture from a product tile.
+    return region.circular === true;
+  }
+
   /**
    * Deduplicates and merges regions across DOM, Face, and OCR detection sources.
    */
@@ -449,13 +504,16 @@
         };
       }
 
-      const domPii = Array.isArray(domResult?.piiRegions) ? domResult.piiRegions : [];
+      const rawDomPii = Array.isArray(domResult?.piiRegions) ? domResult.piiRegions : [];
       const marks = Array.isArray(domResult?.marks) ? domResult.marks : [];
       const frameStats = domResult?.frameStats || { total: 1, merged: 1, skipped: 0 };
+      // Decided below, once we know whether the face model actually ran.
+      let domPii = rawDomPii;
 
       // 2. Run visual inference (Face + OCR) via Offscreen Document
       let faceBoxes = [];
       let ocrRegions = [];
+      let faceModelRan = false;
       let mergedRegions = domPii;
       let offscreenTimings = { faceInference: 0, ocrInference: 0, visionInference: 0, merge: 0 };
 
@@ -507,8 +565,15 @@
             visionWarmedUp = true;
             faceBoxes = response.faceBoxes || [];
             ocrRegions = response.ocrRegions || [];
-            mergedRegions = response.mergedRegions || mergeRegions(domPii, faceBoxes, ocrRegions);
             offscreenTimings = response.timings || offscreenTimings;
+            // The face model ran, so it — not a blanket rule — decides which pixels hold a
+            // face. See filterMediaRegions for why this matters.
+            faceModelRan = response.faceOk === true;
+            if (!faceModelRan) {
+              console.warn("[vision] Face model produced no verdict; keeping the blanket media rule.");
+            }
+            domPii = filterMediaRegions(rawDomPii, faceModelRan);
+            mergedRegions = mergeRegions(domPii, faceBoxes, ocrRegions);
           } else {
             mergedRegions = mergeRegions(domPii, [], []);
           }
@@ -556,7 +621,11 @@
         dom: domPii.length,
         vision_face: faceBoxes.length,
         vision_ocr: ocrRegions.length,
-        merged: mergedRegions.length
+        merged: mergedRegions.length,
+        // Whether the face model actually produced a verdict this scan. When it did not, the
+        // blanket media rule stays in force and the masked count jumps — which is the correct
+        // fail-closed behaviour, but indistinguishable from over-detection unless it is stated.
+        faceOk: faceModelRan,
       };
 
       const timings = {

@@ -182,6 +182,32 @@
     [/full\s*name|first\s*name|last\s*name|surname|\bname\b/, "name"],
   ];
 
+  // Fields that hold a personal identifier the vault has no equivalent for. Typing a phone
+  // number into one because "phone" was the closest available key is worse than not filling
+  // it: the value is wrong, it is personal, and it goes into a field that may validate it.
+  // These are asked about instead.
+  const UNKNOWN_IDENTIFIER_RE =
+    /aadhaar|aadhar|\bpan\b|passport|licence|license|voter|ssn|social security|nino|national insurance|tax id|gst|ifsc|upi|account number|card number|cvv|otp|pin\b/i;
+
+  /**
+   * Which vault key a field's own label calls for, judged from the label alone.
+   *
+   * Used to sanity-check what a planner asked for. A model looking at "Aadhaar number" and an
+   * eight-key menu will pick the nearest key rather than decline — observed live, it chose
+   * "phone" — so the label gets the final say on its own field.
+   *
+   * @returns {{key: string|null, unknownIdentifier: boolean}}
+   */
+  function vaultKeyForLabel(label) {
+    const text = String(label || "").toLowerCase();
+    if (!text) return { key: null, unknownIdentifier: false };
+    if (UNKNOWN_IDENTIFIER_RE.test(text)) return { key: null, unknownIdentifier: true };
+    for (const [pattern, key] of FIELD_LABEL_RULES) {
+      if (pattern.test(text)) return { key, unknownIdentifier: false };
+    }
+    return { key: null, unknownIdentifier: false };
+  }
+
   function isSearchBox(mark) {
     if (mark.role === "input:search") return true;
     const label = (mark.label || "").toLowerCase();
@@ -298,7 +324,9 @@
     return bits.length ? `Task complete — ${bits.join(", ")}.` : "Nothing further to do for this task.";
   }
 
-  const TaskPlanner = { parseTask, planNextAction, alreadyOnSite, siteUrlFor, KNOWN_SITES };
+  const TaskPlanner = {
+    parseTask, planNextAction, alreadyOnSite, siteUrlFor, vaultKeyForLabel, KNOWN_SITES,
+  };
 
   global.TaskPlanner = TaskPlanner;
   if (typeof module !== "undefined" && module.exports) module.exports = TaskPlanner;

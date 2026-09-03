@@ -90,6 +90,11 @@
       ocrRegions: ocrResult.regions || [],
       mergedRegions: merged,
       detectorsEnabled: { face: enableFaceDetection, ocr: enableOCR },
+      // Did the models actually produce a verdict? "enabled" is what the user asked for;
+      // this is what happened. Downstream decisions that relax a fail-closed default must
+      // depend on the second, never the first.
+      faceOk: enableFaceDetection && faceResult.backend !== "error",
+      ocrOk: enableOCR && !ocrResult.skipped,
       timings: {
         faceInference: faceResult.inferenceMs || 0,
         ocrInference: ocrResult.inferenceMs || 0,

@@ -30,7 +30,21 @@ document.querySelectorAll(".tab").forEach((btn) => {
 
 // ── Task box ──────────────────────────────────────────────────────────────────
 const taskEl = $("task");
-taskEl.addEventListener("input", () => { $("charCount").textContent = taskEl.value.length; });
+
+// The task the current scan was taken for. Editing the instruction after scanning would
+// otherwise run the new words against the old snapshot of the page, silently.
+let scannedTask = null;
+
+taskEl.addEventListener("input", () => {
+  $("charCount").textContent = taskEl.value.length;
+  if (scannedTask !== null && taskEl.value.trim() !== scannedTask) {
+    scannedTask = null;
+    if (!runBtn.hidden) {
+      runBtn.hidden = true;
+      showStatus("statusMsg", "info", "Instruction changed — scan again so the agent sees the current page.");
+    }
+  }
+});
 taskEl.addEventListener("keydown", (e) => {
   if ((e.ctrlKey || e.metaKey) && e.key === "Enter") { e.preventDefault(); $("scanBtn").click(); }
 });
@@ -70,8 +84,26 @@ async function checkServer() {
     const data = await res.json();
     dot.className = "status-dot";
     badge.textContent = data.backend || "mock";
-    const chain = (data.chain || []).join(" → ") || data.backend;
-    info.innerHTML = `Connected. Planning chain: <strong>${esc(chain)}</strong>.`;
+
+    // Show the chain with each tier's model, and say plainly which tiers are currently
+    // resting. A hosted provider running out of quota is the normal case, not an emergency —
+    // but it explains why planning feels different, so it should be visible rather than felt.
+    const cooldowns = data.cooldowns || {};
+    const models = data.models || {};
+    const chain = (data.chain || []).map((t) => {
+      const model = models[t];
+      const rest = cooldowns[t];
+      const label = model ? `${t} (${model})` : t;
+      return rest ? `<s title="${esc(rest.reason)}">${esc(label)}</s>` : `<strong>${esc(label)}</strong>`;
+    }).join(" → ") || esc(data.backend || "mock");
+
+    const rested = Object.entries(cooldowns);
+    const note = rested.length
+      ? `<br><span style="color:var(--text-muted)">Resting: ` +
+        rested.map(([t, c]) => `${esc(t)} — ${esc(c.reason)}, retrying in ${Math.ceil(c.retry_in_s / 60)} min`).join("; ") +
+        `. The next tier answers meanwhile.</span>`
+      : "";
+    info.innerHTML = `Connected. Planning chain: ${chain}.${note}`;
   } catch (err) {
     dot.className = "status-dot error";
     badge.textContent = "on-device";
@@ -121,6 +153,7 @@ async function loadSettings() {
   const ocrOn = s.enableOCR !== false;
   const faceOn = s.enableFaceDetection !== false;
   $("s-visionDepth").value = ocrOn ? "full" : (faceOn ? "fast" : "dom");
+  $("s-dismissOverlays").checked = s.dismissOverlays !== false;
 }
 loadSettings();
 
@@ -132,6 +165,7 @@ $("saveSettings").addEventListener("click", async () => {
     serverUrl: $("s-serverUrl").value.trim(),
     enableOCR: depth === "full",
     enableFaceDetection: depth === "full" || depth === "fast",
+    dismissOverlays: $("s-dismissOverlays").checked,
   };
   await chrome.storage.local.set({ settings });
   showStatus("settingsStatus", "success", "Settings saved.");
@@ -295,7 +329,26 @@ function addLogEntry(iconName, html, ms, isError) {
 }
 
 /** A single in-progress row at the tail of the log, replaced as the step advances. */
-function setLiveStep(text) {
+// How each planning tier is named in the UI. Showing this makes a silent failover — the
+// hosted model hitting its quota and the local one taking over — visible instead of just
+// feeling slower for no stated reason.
+const TIER_LABELS = {
+  gemini: "Gemini",
+  groq: "Groq",
+  ollama: "Local model",
+  mock: "Built-in rules",
+  "on-device": "On-device",
+  server: "",
+};
+
+function tierPill(tier) {
+  if (!tier) return "";
+  const label = TIER_LABELS[tier] !== undefined ? TIER_LABELS[tier] : tier;
+  if (!label) return "";
+  return `<span class="tier-pill tier-${esc(tier)}">${esc(label)}</span>`;
+}
+
+function setLiveStep(text, tier) {
   if (!liveStepRow) {
     liveStepRow = document.createElement("div");
     liveStepRow.className = "log-entry running";
@@ -303,7 +356,8 @@ function setLiveStep(text) {
     logWrap.hidden = false;
   }
   liveStepRow.innerHTML =
-    `<span class="log-icon"><span class="spinner"></span></span><span class="log-msg">${text}</span>`;
+    `<span class="log-icon"><span class="spinner"></span></span>` +
+    `<span class="log-msg">${text}</span>${tierPill(tier)}`;
   logEntries.scrollTop = logEntries.scrollHeight;
 }
 function clearLiveStep() {
@@ -346,32 +400,42 @@ scanBtn.addEventListener("click", () => {
       return;
     }
 
-    const d = res.result;
-    $("preview").src = d.preview;
-    previewWrap.hidden = false;
-    statsGrid.hidden = false;
-
-    renderRegions(d.regions, d.viewport);
-
-    setStat("s-pii", d.piiCount);
-    setStat("s-marks", d.markCount);
-    setStat("s-total", (d.timings?.total || 0) + "ms");
-    setStat("s-actions", 0);
-    renderTimings(d.timings);
-
-    runBtn.hidden = false;
-    runBtn.innerHTML = RUN_LABEL;
-
-    const fs = d.frameStats || {};
-    const frameNote = (fs.total > 1) ? ` across ${fs.merged}/${fs.total} frames` : "";
-    showStatus(
-      "statusMsg",
-      "success",
-      `<strong>${d.piiCount}</strong> sensitive region${d.piiCount === 1 ? "" : "s"} masked on this device${frameNote}. ` +
-      `The image above is exactly what would be sent.`
-    );
+    renderScan(res.result, true);
   });
 });
+
+/** Paints a scan result into the panel. Shared by the Scan button and the run-time recovery. */
+function renderScan(d, announce) {
+  if (!d) return;
+  $("preview").src = d.preview;
+  previewWrap.hidden = false;
+  statsGrid.hidden = false;
+  idleState.hidden = true;
+
+  renderRegions(d.regions, d.viewport);
+
+  setStat("s-pii", d.piiCount);
+  setStat("s-marks", d.markCount);
+  setStat("s-total", (d.timings?.total || 0) + "ms");
+  setStat("s-actions", 0);
+  renderTimings(d.timings);
+
+  runBtn.hidden = false;
+  runBtn.innerHTML = RUN_LABEL;
+  // The scan is the privacy review step; Run is what the user is being asked to approve next.
+  scannedTask = taskEl.value.trim();
+  if (announce) runBtn.focus();
+
+  if (!announce) return;
+  const fs = d.frameStats || {};
+  const frameNote = (fs.total > 1) ? ` across ${fs.merged}/${fs.total} frames` : "";
+  showStatus(
+    "statusMsg",
+    "success",
+    `<strong>${d.piiCount}</strong> sensitive region${d.piiCount === 1 ? "" : "s"} masked on this device${frameNote}. ` +
+    `The image above is exactly what would be sent.`
+  );
+}
 
 // ── Run / Stop ────────────────────────────────────────────────────────────────
 runBtn.addEventListener("click", () => {
@@ -380,18 +444,45 @@ runBtn.addEventListener("click", () => {
   confirmWrap.hidden = true;
   hideStatus("statusMsg");
   setLiveStep("Planning the first step…");
+  startRun(true);
+});
 
+/**
+ * Sends RUN, and recovers from the one failure the user should never have to think about.
+ *
+ * Chrome tears down an idle MV3 service worker after about 30 seconds. If that happens between
+ * scanning and pressing Run, the scan state is gone and the loop has nothing to work from.
+ * Silently re-scanning and trying once more is exactly what the user would do by hand.
+ */
+function startRun(allowRescan) {
   chrome.runtime.sendMessage({ type: "RUN" }, (res) => {
-    runBtn.disabled = false;
-    runBtn.innerHTML = RUN_LABEL;
-    setRunning(false);
-    if (!res || !res.ok) {
-      showStatus("statusMsg", "error", esc(res?.error || "The agent could not run."));
+    const expired = !res?.ok && /run scan first/i.test(res?.error || "");
+    if (expired && allowRescan) {
+      setLiveStep("Re-reading the page…");
+      chrome.runtime.sendMessage({ type: "SCAN", task: taskEl.value.trim() }, (scanRes) => {
+        if (!scanRes || !scanRes.ok) {
+          finishRun({ ok: false, error: scanRes?.error || "Could not re-read the page." });
+          return;
+        }
+        renderScan(scanRes.result, false);
+        startRun(false);
+      });
       return;
     }
-    handleStepResult(res.result);
+    finishRun(res);
   });
-});
+}
+
+function finishRun(res) {
+  runBtn.disabled = false;
+  runBtn.innerHTML = RUN_LABEL;
+  setRunning(false);
+  if (!res || !res.ok) {
+    showStatus("statusMsg", "error", esc(res?.error || "The agent could not run."));
+    return;
+  }
+  handleStepResult(res.result);
+}
 
 stopBtn.addEventListener("click", () => {
   stopBtn.disabled = true;
@@ -432,10 +523,17 @@ function handleStepResult(r) {
     currentMissingMarkId = r.action.mark_id;
     confirmWrap.hidden = true;
     reveal(inputPromptWrap);
+    const fieldName = r.fieldLabel && r.fieldLabel !== r.fieldKey
+      ? `${esc(r.fieldLabel)} (${esc(r.fieldKey)})`
+      : esc(r.fieldKey);
     $("inputPromptText").innerHTML =
-      `The agent needs <strong>${esc(r.fieldKey)}</strong> for element #${esc(r.action.mark_id)}, ` +
-      `and your vault has no value for it.`;
+      `The page is asking for <strong>${fieldName}</strong>, and your vault has no value for it. ` +
+      `Type it once and the agent will carry on — it stays on this machine either way.`;
     const el = $("missingInputValue");
+    // A secret must not sit in clear text in a panel that stays open on screen.
+    const secret = /password|passcode|pin|otp|cvv|secret/i.test(r.fieldKey || "");
+    el.type = secret ? "password" : "text";
+    el.placeholder = secret ? "Enter the value (hidden as you type)" : `Enter your ${esc(r.fieldKey)}`;
     el.value = "";
     el.focus();
     showStatus("statusMsg", "info", "Waiting for a value from you.");
@@ -465,11 +563,31 @@ function handleStepResult(r) {
   if (r.stopped) {
     showStatus("statusMsg", "warn", `Stopped. ${ok} action${ok === 1 ? "" : "s"} had completed.`);
   } else if (log.length) {
+    // Say what was achieved, not just how many calls succeeded. "3 actions succeeded" tells
+    // you nothing about whether the thing you asked for happened.
+    const achieved = describeProgress(r.progress);
+    const counts = `${ok} action${ok === 1 ? "" : "s"}${failed ? `, ${failed} failed` : ""}`;
     showStatus("statusMsg", failed ? "warn" : "success",
-      `Finished — ${ok} action${ok === 1 ? "" : "s"} succeeded${failed ? `, ${failed} failed` : ""}.`);
+      achieved ? `${achieved} <span style="opacity:.7">(${counts})</span>` : `Finished — ${counts}.`);
   } else {
     showStatus("statusMsg", "info", "Nothing to do for this task on this page.");
   }
+}
+
+/** Turns the agent's progress record into one sentence about what actually happened. */
+function describeProgress(p) {
+  if (!p) return "";
+  const bits = [];
+  if (p.navigated) bits.push("opened the site");
+  // querySubmitted is the strong claim — the query reached the URL or title. queryLanded on
+  // its own only means the text is sitting in a field, which is not the same thing.
+  if (p.querySubmitted) bits.push("ran the search");
+  else if (p.queryLanded) bits.push("typed the query (the site did not run it)");
+  if ((p.opened || []).length) bits.push(`opened ${p.opened.length} item${p.opened.length === 1 ? "" : "s"}`);
+  if (p.scrolled) bits.push("scrolled the page");
+  if (p.filledAny) bits.push("filled the form");
+  if (!bits.length) return "";
+  return "Done — " + bits.join(", ") + ".";
 }
 
 // ── Missing value prompt ──────────────────────────────────────────────────────
@@ -533,7 +651,7 @@ chrome.runtime.onMessage.addListener((msg) => {
   const d = msg.data;
 
   if (d.type === "step") {
-    setLiveStep(`Step ${esc(d.step)} — ${esc(d.status)}`);
+    setLiveStep(`Step ${esc(d.step)} — ${esc(d.status)}`, d.planner);
   }
   if (d.type === "filled") {
     addLogEntry("type", `Filled <strong>${esc(d.field)}</strong> in element #${esc(d.mark_id)}`, null);

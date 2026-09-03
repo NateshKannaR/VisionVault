@@ -408,13 +408,33 @@ function frameOffsetInTopViewport() {
   return { x: Math.round(offX), y: Math.round(offY), isTop: false };
 }
 
+/**
+ * Is this element rendered as a circle or near-circle?
+ *
+ * A profile picture is round on nearly every site that has one; a product thumbnail is not.
+ * Used to decide which small images stay masked when the face model has already had its say.
+ */
+function isCircular(el, rect) {
+  try {
+    const radius = getComputedStyle(el).borderRadius || "";
+    const first = radius.split(/\s|\//)[0] || "";
+    const shorter = Math.min(rect.w || 0, rect.h || 0);
+    if (!shorter) return false;
+    if (first.endsWith("%")) return parseFloat(first) >= 40;
+    if (first.endsWith("px")) return parseFloat(first) >= shorter * 0.4;
+    return false;
+  } catch (_) {
+    return false;
+  }
+}
+
 // ── Phase 1: scan for PII regions ────────────────────────────────────────────
 function scanForPII() {
   const regions = [];
   const seen = new Set();
   let nodeCount = 0;
 
-  function addRegion(el, type, reason, label = null) {
+  function addRegion(el, type, reason, label = null, extra = null) {
     if (!el) return;
     const r = rectOf(el);
     if (r.w < 2 || r.h < 2) return;
@@ -430,7 +450,8 @@ function scanForPII() {
       type,
       sensitive: true,
       reason,
-      label
+      label,
+      ...(extra || {})
     });
   }
 
@@ -468,12 +489,28 @@ function scanForPII() {
     }
   }
 
-  // 4. Media images / videos (potential face / ID card media)
+  // 4. Media that could hold a face or an identity document.
+  //
+  //    This is the fail-closed default for when no face model is available. When one HAS run,
+  //    detection-orchestrator.js drops these in favour of the model's own boxes — otherwise
+  //    every product photo on a shopping page gets blacked out, which wrecks both the visual
+  //    context the planner needs and the precision of the redaction itself.
+  //
+  //    The markup hints travel with the region so that filter can keep anything the page
+  //    itself describes as a person, whatever the model concluded.
   document.querySelectorAll("img, video, canvas").forEach(el => {
     if (el.offsetParent === null) return;
     const r = rectOf(el);
     if (r.w >= 48 && r.h >= 48) {
-      addRegion(el, "media", "possible_face_or_media", "media");
+      addRegion(el, "media", "possible_face_or_media", "media", {
+        alt: (el.getAttribute("alt") || "").slice(0, 80),
+        className: (typeof el.className === "string" ? el.className : "").slice(0, 80),
+        src: (el.getAttribute("src") || "").slice(0, 120),
+        // Circular is the strongest available signal for "this is a person". Product
+        // thumbnails, logos and category tiles are square or rectangular; profile pictures are
+        // round almost everywhere. Computed here because only the page can see the style.
+        circular: isCircular(el, r),
+      });
     }
   });
 
@@ -583,9 +620,15 @@ function scanPage() {
 async function executeActionInFrame(payload = {}) {
   const actionType = (payload.action || payload.type || "").toLowerCase();
   const targetId = payload.mark_id ?? payload.target;
-  const NO_TARGET_NEEDED = ["scroll_page", "wait", "done"];
+  // The executor owns the definition of which actions need a marked element; asking it keeps
+  // the two from drifting apart. The fallback covers the (impossible in practice) case of
+  // this frame having content.js without action-executor.js.
+  const targetless = globalThis.ActionExecutor?.TARGETLESS_ACTIONS ||
+    new Set(["scroll_page", "wait", "done", "dismiss_overlays", "open_search", "probe_query"]);
 
-  if (!NO_TARGET_NEEDED.includes(actionType) && !resolveMarkElement(targetId)) {
+  // "scroll" with no id is a page scroll, so it needs no element either.
+  const needsElement = !targetless.has(actionType) && !(actionType === "scroll" && targetId == null);
+  if (needsElement && !resolveMarkElement(targetId)) {
     return { ok: false, notInThisFrame: true, error: `mark_id ${targetId} not found in this frame` };
   }
 

@@ -9,8 +9,9 @@ __pycache__/
 # Secrets — .env.example is the template that IS committed
 server/.env
 
-# Server request/response log, written at runtime
-server/logs/*.jsonl
+# Server logs, written at runtime. They record the tasks you typed and the pages you were
+# on, so the whole directory stays local.
+server/logs/
 
 # Evaluation output. eval_report.md IS committed (it is the report); these are its inputs
 # and the images a run leaves behind.

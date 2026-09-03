@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VisionVault Fixture — Admin Dashboard</title>
+<link rel="stylesheet" href="fixture.css">
+</head>
+<!-- EVALUATION FIXTURE. See signup-form.html for the annotation contract. -->
+<body data-fixture-id="admin-dashboard" data-fixture-kind="dashboard">
+  <h1>Customer directory</h1>
+  <p class="sub" data-gt-safe>Internal admin console — 4 accounts shown.</p>
+
+  <div class="nav">
+    <button data-gt-safe data-gt-mark="button">Overview</button>
+    <button data-gt-safe data-gt-mark="button">Customers</button>
+    <button data-gt-safe data-gt-mark="button">Reports</button>
+    <button class="danger" data-gt-safe data-gt-mark="button">Delete selected</button>
+  </div>
+
+  <div class="card">
+    <div class="field" style="max-width:340px">
+      <label for="q">Search customers</label>
+      <input type="search" id="q" name="search" placeholder="Search by name or email"
+             data-gt-safe data-gt-mark="input:search">
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th data-gt-safe>Photo</th><th data-gt-safe>Name</th><th data-gt-safe>Email</th>
+          <th data-gt-safe>Phone</th><th data-gt-safe>Plan</th><th data-gt-safe>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><img class="avatar" src="../assets/face-1.png" alt="" data-gt-pii="face"></td>
+          <td class="pii" data-gt-pii="name">Priya Raghavan</td>
+          <td class="pii" data-gt-pii="email">priya.raghavan@examplemail.com</td>
+          <td class="pii" data-gt-pii="phone">+91 98450 31776</td>
+          <td data-gt-safe>Business</td>
+          <td><button data-gt-safe data-gt-mark="button">View</button></td>
+        </tr>
+        <tr>
+          <td><img class="avatar" src="../assets/face-2.png" alt="" data-gt-pii="face"></td>
+          <td class="pii" data-gt-pii="name">Daniel Okonkwo</td>
+          <td class="pii" data-gt-pii="email">daniel.okonkwo@examplemail.com</td>
+          <td class="pii" data-gt-pii="phone">+44 7700 900312</td>
+          <td data-gt-safe>Starter</td>
+          <td><button data-gt-safe data-gt-mark="button">View</button></td>
+        </tr>
+        <tr>
+          <td><img class="avatar" src="../assets/face-3.png" alt="" data-gt-pii="face"></td>
+          <td class="pii" data-gt-pii="name">Marta Kowalczyk</td>
+          <td class="pii" data-gt-pii="email">marta.kowalczyk@examplemail.com</td>
+          <td class="pii" data-gt-pii="phone">+48 512 447 903</td>
+          <td data-gt-safe>Business</td>
+          <td><button data-gt-safe data-gt-mark="button">View</button></td>
+        </tr>
+        <tr>
+          <td><img class="avatar" src="../assets/face-4.png" alt="" data-gt-pii="face"></td>
+          <td class="pii" data-gt-pii="name">Samuel Adeyemi</td>
+          <td class="pii" data-gt-pii="email">samuel.adeyemi@examplemail.com</td>
+          <td class="pii" data-gt-pii="phone">+234 803 447 1120</td>
+          <td data-gt-safe>Enterprise</td>
+          <td><button data-gt-safe data-gt-mark="button">View</button></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2 data-gt-safe>Billing references</h2>
+    <p class="pii" data-gt-pii="card">Primary card: 5425 2334 3010 9903</p>
+    <p class="pii" data-gt-pii="ssn">Tax ID on file: 412-88-7391</p>
+    <p class="muted" data-gt-safe>Retention policy: records are archived after 24 months of inactivity.</p>
+  </div>
+</body>
+</html>

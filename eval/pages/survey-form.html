@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VisionVault Fixture — Registration Survey</title>
+<link rel="stylesheet" href="fixture.css">
+</head>
+<!-- EVALUATION FIXTURE. See signup-form.html for the annotation contract. -->
+<body data-fixture-id="survey-form" data-fixture-kind="form">
+  <h1>Conference registration</h1>
+  <p class="sub" data-gt-safe>Section 1 of 2 &middot; All responses are stored locally in this fixture.</p>
+
+  <div class="card">
+    <div class="field">
+      <label for="q1">Your full name</label>
+      <input type="text" id="q1" name="fullname" value="Marta Kowalczyk"
+             data-gt-pii="name" data-gt-mark="input:text">
+    </div>
+    <div class="field">
+      <label for="q2">Work email</label>
+      <input type="email" id="q2" name="email" value="marta.kowalczyk@examplemail.com"
+             data-gt-pii="email" data-gt-mark="input:email">
+    </div>
+    <div class="field">
+      <label for="q3">Mobile number</label>
+      <input type="tel" id="q3" name="mobile" value="+48 512 447 903"
+             data-gt-pii="phone" data-gt-mark="input:tel">
+    </div>
+    <div class="field">
+      <label for="q4">Passport number (for the visa letter)</label>
+      <input type="text" id="q4" name="passport" value="P4471902"
+             data-gt-pii="passport" data-gt-mark="input:text">
+    </div>
+    <div class="field">
+      <label for="q5">Billing PAN</label>
+      <input type="text" id="q5" name="pan" value="AXKPR4471J"
+             data-gt-pii="pan" data-gt-mark="input:text">
+    </div>
+    <div class="field">
+      <label for="q6">Bank IFSC for the refund</label>
+      <input type="text" id="q6" name="ifsc" value="HDFC0004471"
+             data-gt-pii="ifsc" data-gt-mark="input:text">
+    </div>
+  </div>
+
+  <div class="card">
+    <h2 data-gt-safe>Section 2 &mdash; preferences</h2>
+    <div class="field">
+      <label for="q7">Which track are you attending?</label>
+      <select id="q7" name="track" data-gt-safe data-gt-mark="select">
+        <option>On-device machine learning</option>
+        <option>Privacy engineering</option>
+        <option>Browser platform internals</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="q8">Dietary notes (optional)</label>
+      <textarea id="q8" name="notes" rows="2" data-gt-safe data-gt-mark="textarea">No nuts, vegetarian</textarea>
+    </div>
+    <div class="field">
+      <label for="q9">Anything else you would like the organisers to know?</label>
+      <textarea id="q9" name="about" rows="2" data-gt-safe data-gt-mark="textarea"></textarea>
+    </div>
+    <p class="pii" data-gt-pii="email">Confirmation will be sent to marta.kowalczyk@examplemail.com</p>
+    <p class="muted" data-gt-safe>Questions? The organising committee reads this form every weekday.</p>
+    <div class="nav" style="margin-top:14px">
+      <button data-gt-safe data-gt-mark="button">Clear form</button>
+      <button class="primary" data-gt-safe data-gt-mark="button">Submit registration</button>
+    </div>
+  </div>
+</body>
+</html>

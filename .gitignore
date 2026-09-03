@@ -1,0 +1,21 @@
+# Node
+node_modules/
+package-lock.json
+
+# Python
+__pycache__/
+*.pyc
+
+# Secrets — .env.example is the template that IS committed
+server/.env
+
+# Server request/response log, written at runtime
+server/logs/*.jsonl
+
+# Evaluation output. eval_report.md IS committed (it is the report); these are its inputs
+# and the images a run leaves behind.
+eval/results/live-eval.json
+eval/results/*.png
+
+# Local scratch
+*.log

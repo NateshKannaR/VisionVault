@@ -1,0 +1,22 @@
+{
+  "name": "visionvault",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Privacy-preserving browser vision agent \u2014 local PII detection and redaction, cloud planning over a sanitized view (SIH PS 26171).",
+  "scripts": {
+    "test": "node eval/test-vision-pipeline.js && node eval/test-coordinate-mapping.js && node eval/test-task-planner.js",
+    "eval": "node eval/run-full-eval.js --repeats 3",
+    "report": "node eval/generate-report.js",
+    "verify": "node eval/verify-live.js",
+    "diagnose": "node eval/diagnose.js",
+    "ocr-tuning": "node eval/ocr-tuning.js",
+    "real-sites": "node eval/real-sites.js --budget 75"
+  },
+  "devDependencies": {
+    "puppeteer-core": "^23.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT"
+}

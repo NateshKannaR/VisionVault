@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VisionVault Fixture — Checkout</title>
+<link rel="stylesheet" href="fixture.css">
+</head>
+<!-- EVALUATION FIXTURE. See signup-form.html for the annotation contract. -->
+<body data-fixture-id="ecommerce-checkout" data-fixture-kind="ecommerce">
+  <h1>Checkout</h1>
+  <p class="sub" data-gt-safe>Order #A-77120 &middot; 2 items &middot; Total &pound;148.00</p>
+
+  <div class="card">
+    <h2 data-gt-safe>Order summary</h2>
+    <p data-gt-safe>Aurora 40mm Over-Ear Headphones &mdash; &pound;119.00</p>
+    <p data-gt-safe>Braided USB-C Cable, 2m &mdash; &pound;29.00</p>
+    <p class="muted" data-gt-safe>Delivery estimate: 2&ndash;4 working days. Free returns within 30 days.</p>
+  </div>
+
+  <div class="card">
+    <h2 data-gt-safe>Delivery address</h2>
+    <div class="row">
+      <div class="field">
+        <label for="recipient">Recipient</label>
+        <input type="text" id="recipient" name="name" value="Daniel Okonkwo"
+               data-gt-pii="name" data-gt-mark="input:text">
+      </div>
+      <div class="field">
+        <label for="cphone">Contact phone</label>
+        <input type="tel" id="cphone" name="phone" value="+44 7700 900312"
+               data-gt-pii="phone" data-gt-mark="input:tel">
+      </div>
+    </div>
+    <div class="field">
+      <label for="addr">Street address</label>
+      <textarea id="addr" name="address" rows="2" data-gt-pii="address"
+                data-gt-mark="textarea">28 Calder Road, Flat 4B, Manchester M14 5QT</textarea>
+    </div>
+    <p class="pii" data-gt-pii="email">Order updates go to daniel.okonkwo@examplemail.com</p>
+  </div>
+
+  <div class="card">
+    <h2 data-gt-safe>Payment</h2>
+    <div class="row">
+      <div class="field">
+        <label for="card">Card number</label>
+        <input type="text" id="card" name="cardnumber" autocomplete="cc-number" value="4539 8842 1176 3320"
+               data-gt-pii="card" data-gt-mark="input:text">
+      </div>
+      <div class="field">
+        <label for="cvv">Security code</label>
+        <input type="password" id="cvv" name="cvv" value="4471"
+               data-gt-pii="password" data-gt-mark="input:password">
+      </div>
+    </div>
+    <p class="pii" data-gt-pii="card">Saved card ending in 5425 2334 3010 9903</p>
+
+    <div class="field" style="max-width:320px">
+      <label for="ship">Shipping method</label>
+      <select id="ship" name="shipping" data-gt-safe data-gt-mark="select">
+        <option value="standard">Standard &mdash; free</option>
+        <option value="express">Express &mdash; &pound;6.00</option>
+      </select>
+    </div>
+
+    <div class="nav" style="margin-top:16px">
+      <button data-gt-safe data-gt-mark="button">Back to basket</button>
+      <button class="primary" data-gt-safe data-gt-mark="button">Pay &pound;148.00 now</button>
+    </div>
+  </div>
+</body>
+</html>

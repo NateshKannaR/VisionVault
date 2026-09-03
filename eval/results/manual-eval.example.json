@@ -1,0 +1,29 @@
+{
+  "_readme": [
+    "Optional. Copy this file to manual-eval.json and fill it in to add hand-recorded results",
+    "to eval_report.md — checks that cannot be automated, or a run performed on a different",
+    "machine. Anything recorded here is labelled MANUAL in the report; automated figures from",
+    "eval/results/live-eval.json are labelled AUTOMATED. Delete the _readme keys when filling",
+    "this in.",
+    "",
+    "To record results by hand: load extension/ unpacked at chrome://extensions, open a page,",
+    "run Scan & Redact in the side panel, and read the figures off the panel and the service",
+    "worker console. Then run: node eval/generate-report.js"
+  ],
+  "recordedBy": "your name",
+  "recordedAt": "2026-01-01",
+  "method": "Chrome 152 on Windows 11, extension loaded unpacked, side panel figures read by hand",
+  "observations": [
+    {
+      "check": "Redacted preview shows every password field blacked out",
+      "result": "pass",
+      "evidence": "side panel preview, demo-page.html, 6 regions reported"
+    },
+    {
+      "check": "No unredacted image appears in the Network tab",
+      "result": "pass",
+      "evidence": "DevTools > Network > /api/agent/step > Payload: redactedImage begins data:image/png and matches the preview"
+    }
+  ],
+  "notes": "Free-form markdown appended to the manual section of the report."
+}

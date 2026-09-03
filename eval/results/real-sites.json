@@ -1,0 +1,360 @@
+{
+  "generatedAt": "2026-09-03T15:53:55.802Z",
+  "planner": "gemini (gemini -> groq -> mock)",
+  "budgetSeconds": 70,
+  "sites": [
+    {
+      "site": "Amazon.in",
+      "task": "search for iqoo neo 6 and show me",
+      "landedOn": "https://www.amazon.in/",
+      "scanMs": 4255,
+      "pii": 7,
+      "marks": 59,
+      "sources": {
+        "dom": 7,
+        "vision_face": 0,
+        "vision_ocr": 0,
+        "merged": 7
+      },
+      "frames": {
+        "total": 1,
+        "merged": 1,
+        "skipped": 0
+      },
+      "pipelineMs": 3572,
+      "screenshot": "real-amazon-in.png",
+      "runMs": 50150,
+      "steps": 2,
+      "stopped": false,
+      "timedOut": false,
+      "actions": [
+        "type",
+        "type"
+      ],
+      "needsConfirm": false,
+      "finalUrl": "https://www.amazon.in/s?k=iqoo+neo+6&ref=nb_sb_noss",
+      "urlChanged": true,
+      "parsedQuery": "iqoo neo 6",
+      "queryOnPage": {
+        "inBox": true,
+        "inUrl": true,
+        "inTitle": true
+      }
+    },
+    {
+      "site": "Flipkart",
+      "task": "search for running shoes and show me",
+      "landedOn": "https://www.flipkart.com/",
+      "scanMs": 1973,
+      "pii": 37,
+      "marks": 33,
+      "sources": {
+        "dom": 49,
+        "vision_face": 0,
+        "vision_ocr": 0,
+        "merged": 37
+      },
+      "frames": {
+        "total": 1,
+        "merged": 1,
+        "skipped": 0
+      },
+      "pipelineMs": 1671,
+      "screenshot": "real-flipkart.png",
+      "runMs": 27882,
+      "steps": 2,
+      "stopped": false,
+      "timedOut": false,
+      "actions": [
+        "type",
+        "type"
+      ],
+      "needsConfirm": false,
+      "finalUrl": "https://www.flipkart.com/",
+      "urlChanged": false,
+      "parsedQuery": "running shoes",
+      "queryOnPage": {
+        "inBox": true,
+        "inUrl": false,
+        "inTitle": false
+      }
+    },
+    {
+      "site": "Wikipedia",
+      "task": "search for quantum computing",
+      "landedOn": "https://www.wikipedia.org/",
+      "scanMs": 2571,
+      "pii": 8,
+      "marks": 26,
+      "sources": {
+        "dom": 8,
+        "vision_face": 0,
+        "vision_ocr": 0,
+        "merged": 8
+      },
+      "frames": {
+        "total": 1,
+        "merged": 1,
+        "skipped": 0
+      },
+      "pipelineMs": 2104,
+      "screenshot": "real-wikipedia.png",
+      "runMs": 58439,
+      "steps": 3,
+      "stopped": false,
+      "timedOut": false,
+      "actions": [
+        "type",
+        "type",
+        "type"
+      ],
+      "needsConfirm": false,
+      "finalUrl": "https://en.wikipedia.org/wiki/Quantum_computing",
+      "urlChanged": true,
+      "parsedQuery": "quantum computing",
+      "queryOnPage": {
+        "inBox": false,
+        "inUrl": true,
+        "inTitle": true
+      }
+    },
+    {
+      "site": "YouTube",
+      "task": "search for lofi study music",
+      "landedOn": "https://www.youtube.com/",
+      "scanMs": 2060,
+      "pii": 0,
+      "marks": 13,
+      "sources": {
+        "dom": 0,
+        "vision_face": 0,
+        "vision_ocr": 0,
+        "merged": 0
+      },
+      "frames": {
+        "total": 3,
+        "merged": 2,
+        "skipped": 1
+      },
+      "pipelineMs": 1386,
+      "screenshot": "real-youtube.png",
+      "runMs": 34694,
+      "steps": 2,
+      "stopped": false,
+      "timedOut": false,
+      "actions": [
+        "type",
+        "type"
+      ],
+      "needsConfirm": false,
+      "finalUrl": "https://www.youtube.com/results?search_query=lofi+study+music",
+      "urlChanged": true,
+      "parsedQuery": "lofi study music",
+      "queryOnPage": {
+        "inBox": true,
+        "inUrl": true,
+        "inTitle": true
+      }
+    },
+    {
+      "site": "GitHub",
+      "task": "search for onnxruntime",
+      "landedOn": "https://github.com/",
+      "scanMs": 2239,
+      "pii": 13,
+      "marks": 14,
+      "sources": {
+        "dom": 16,
+        "vision_face": 0,
+        "vision_ocr": 0,
+        "merged": 13
+      },
+      "frames": {
+        "total": 1,
+        "merged": 1,
+        "skipped": 0
+      },
+      "pipelineMs": 1981,
+      "screenshot": "real-github.png",
+      "runMs": 6550,
+      "steps": 0,
+      "stopped": false,
+      "timedOut": false,
+      "actions": [],
+      "needsConfirm": false,
+      "finalUrl": "https://github.com/",
+      "urlChanged": false,
+      "parsedQuery": "onnxruntime",
+      "queryOnPage": {
+        "inBox": false,
+        "inUrl": false,
+        "inTitle": false
+      }
+    },
+    {
+      "site": "Stack Overflow",
+      "task": "search for webassembly simd",
+      "landedOn": "https://stackoverflow.com/questions",
+      "scanMs": 10393,
+      "pii": 2,
+      "marks": 73,
+      "sources": {
+        "dom": 2,
+        "vision_face": 0,
+        "vision_ocr": 0,
+        "merged": 2
+      },
+      "frames": {
+        "total": 1,
+        "merged": 1,
+        "skipped": 0
+      },
+      "pipelineMs": 4565,
+      "screenshot": "real-stack-overflow.png",
+      "runMs": 100007,
+      "steps": 0,
+      "stopped": false,
+      "timedOut": true,
+      "actions": [],
+      "needsConfirm": false,
+      "finalUrl": "https://stackoverflow.com/questions",
+      "urlChanged": false,
+      "parsedQuery": "webassembly simd",
+      "queryOnPage": {
+        "inBox": false,
+        "inUrl": false,
+        "inTitle": false
+      }
+    },
+    {
+      "site": "MDN",
+      "task": "search for OffscreenCanvas",
+      "landedOn": "https://developer.mozilla.org/en-US/",
+      "scanMs": 2776,
+      "pii": 1,
+      "marks": 16,
+      "sources": {
+        "dom": 1,
+        "vision_face": 0,
+        "vision_ocr": 0,
+        "merged": 1
+      },
+      "frames": {
+        "total": 1,
+        "merged": 1,
+        "skipped": 0
+      },
+      "pipelineMs": 2084,
+      "screenshot": "real-mdn.png",
+      "runMs": 10399,
+      "steps": 0,
+      "stopped": false,
+      "timedOut": false,
+      "actions": [],
+      "needsConfirm": false,
+      "finalUrl": "https://developer.mozilla.org/en-US/",
+      "urlChanged": false,
+      "parsedQuery": "OffscreenCanvas",
+      "queryOnPage": {
+        "inBox": false,
+        "inUrl": false,
+        "inTitle": false
+      }
+    },
+    {
+      "site": "BBC News",
+      "task": "scroll down and show me more headlines",
+      "landedOn": "https://www.bbc.com/news",
+      "scanMs": 3094,
+      "pii": 21,
+      "marks": 32,
+      "sources": {
+        "dom": 21,
+        "vision_face": 0,
+        "vision_ocr": 0,
+        "merged": 21
+      },
+      "frames": {
+        "total": 4,
+        "merged": 3,
+        "skipped": 1
+      },
+      "pipelineMs": 2696,
+      "screenshot": "real-bbc-news.png",
+      "runMs": 100014,
+      "steps": 0,
+      "stopped": false,
+      "timedOut": true,
+      "actions": [],
+      "needsConfirm": false,
+      "finalUrl": "https://www.bbc.com/news",
+      "urlChanged": false,
+      "parsedQuery": null
+    },
+    {
+      "site": "Hacker News",
+      "task": "scroll down and show me more stories",
+      "landedOn": "https://news.ycombinator.com/",
+      "scanMs": 4339,
+      "pii": 1,
+      "marks": 170,
+      "sources": {
+        "dom": 1,
+        "vision_face": 0,
+        "vision_ocr": 1,
+        "merged": 1
+      },
+      "frames": {
+        "total": 1,
+        "merged": 1,
+        "skipped": 0
+      },
+      "pipelineMs": 3647,
+      "screenshot": "real-hacker-news.png",
+      "runMs": 100006,
+      "steps": 0,
+      "stopped": false,
+      "timedOut": true,
+      "actions": [],
+      "needsConfirm": false,
+      "finalUrl": "https://news.ycombinator.com/",
+      "urlChanged": false,
+      "parsedQuery": null
+    },
+    {
+      "site": "MakeMyTrip",
+      "task": "search for flights to goa",
+      "landedOn": "https://www.makemytrip.com/",
+      "scanMs": 3513,
+      "pii": 53,
+      "marks": 29,
+      "sources": {
+        "dom": 53,
+        "vision_face": 0,
+        "vision_ocr": 0,
+        "merged": 53
+      },
+      "frames": {
+        "total": 1,
+        "merged": 1,
+        "skipped": 0
+      },
+      "pipelineMs": 2798,
+      "screenshot": "real-makemytrip.png",
+      "runMs": 100007,
+      "steps": 0,
+      "stopped": false,
+      "timedOut": true,
+      "actions": [],
+      "needsConfirm": false,
+      "finalUrl": "https://www.makemytrip.com/",
+      "urlChanged": false,
+      "parsedQuery": "flights to goa",
+      "queryOnPage": {
+        "inBox": false,
+        "inUrl": false,
+        "inTitle": false
+      }
+    }
+  ]
+}

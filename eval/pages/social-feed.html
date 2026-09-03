@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VisionVault Fixture — Social Feed</title>
+<link rel="stylesheet" href="fixture.css">
+</head>
+<!--
+  EVALUATION FIXTURE. See signup-form.html for the annotation contract.
+  This page also embeds a SAME-ORIGIN IFRAME, so it doubles as the multi-frame aggregation test.
+-->
+<body data-fixture-id="social-feed" data-fixture-kind="social">
+  <h1>Your feed</h1>
+  <p class="sub" data-gt-safe>3 new posts &middot; 1 embedded profile card</p>
+
+  <div class="card">
+    <div class="post">
+      <img class="avatar" src="../assets/face-2.png" alt="" data-gt-pii="face">
+      <div>
+        <div data-gt-safe><strong>Daniel Okonkwo</strong> &middot; 2h</div>
+        <p data-gt-safe>Finally got the offline model bundle under two megabytes. Notes in the thread.</p>
+        <p class="pii" data-gt-pii="email">Reach me at daniel.okonkwo@examplemail.com</p>
+      </div>
+    </div>
+
+    <div class="post">
+      <img class="avatar" src="../assets/face-3.png" alt="" data-gt-pii="face">
+      <div>
+        <div data-gt-safe><strong>Marta Kowalczyk</strong> &middot; 5h</div>
+        <p data-gt-safe>Running the workshop again next month. Same room, new material.</p>
+        <p class="pii" data-gt-pii="phone">Call the desk on +48 512 447 903 to reserve a seat.</p>
+      </div>
+    </div>
+
+    <div class="post">
+      <img class="avatar" src="../assets/face-1.png" alt="" data-gt-pii="face">
+      <div>
+        <div data-gt-safe><strong>Priya Raghavan</strong> &middot; 1d</div>
+        <p data-gt-safe>Benchmarks are up. WASM SIMD is holding steady on mid-range laptops.</p>
+        <p class="pii" data-gt-pii="upi">Tips welcome: priya.raghavan@okhdfcbank</p>
+      </div>
+    </div>
+
+    <div class="nav" style="margin-top:14px">
+      <button data-gt-safe data-gt-mark="button">Load more posts</button>
+      <a href="#trending" data-gt-safe data-gt-mark="link">Trending today</a>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2 data-gt-safe>Suggested for you</h2>
+    <iframe src="social-feed-embed.html" title="Embedded profile card"></iframe>
+  </div>
+</body>
+</html>

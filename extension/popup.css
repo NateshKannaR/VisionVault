@@ -415,3 +415,63 @@ select {
   color: var(--safe); border-color: color-mix(in srgb, var(--safe) 40%, transparent);
   background: color-mix(in srgb, var(--safe) 12%, transparent);
 }
+
+/* ── Vault Lock & PIN Security ───────────────────────────────────────────── */
+.ic-xl { width: 26px; height: 26px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.65; stroke-linecap: round; stroke-linejoin: round; }
+
+.vault-lock-view {
+  display: flex; flex-direction: column; align-items: center; text-align: center;
+  padding: 24px 16px; background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-lg); box-shadow: var(--shadow); margin: 6px 0 12px;
+}
+
+.vault-lock-badge {
+  display: flex; align-items: center; justify-content: center;
+  width: 52px; height: 52px; border-radius: 50%;
+  background: var(--accent-soft); color: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  margin-bottom: 12px;
+}
+
+.vault-lock-heading {
+  font-size: 15px; font-weight: 650; color: var(--text); margin-bottom: 4px;
+}
+
+.vault-lock-hint {
+  font-size: 12px; color: var(--text-muted); line-height: 1.45; max-width: 260px;
+}
+
+.vault-banner {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 8px 12px; margin-bottom: 12px; background: var(--surface);
+  border: 1px dashed var(--border-strong); border-radius: var(--r);
+}
+
+.vault-banner-info {
+  display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px;
+  font-weight: 540; color: var(--text-muted);
+}
+.vault-banner-info .ic { color: var(--accent); }
+
+.vault-status-pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600;
+  background: var(--safe-soft); color: var(--safe);
+  border: 1px solid color-mix(in srgb, var(--safe) 35%, transparent);
+}
+.vault-status-pill .ic { width: 13px; height: 13px; }
+
+.vault-setup-card {
+  margin-bottom: 14px;
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-6px); }
+  40%, 80% { transform: translateX(6px); }
+}
+.shake {
+  animation: shake 0.35s ease-in-out;
+}
+

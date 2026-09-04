@@ -24,6 +24,174 @@
   // values (addresses, bios) do not add seconds of latency to a step.
   const PER_CHAR_TYPING_LIMIT = 60;
 
+  // ── Visual Ghost Cursor & Interaction Feedback ──────────────────────────────────────────
+
+  let cursorEl = null;
+  let cursorBadgeEl = null;
+  let cursorStyleEl = null;
+  let cursorHideTimer = null;
+
+  function ensureCursorStyles() {
+    if (cursorStyleEl && cursorStyleEl.isConnected) return;
+    cursorStyleEl = document.createElement("style");
+    cursorStyleEl.id = "vagent-cursor-styles";
+    cursorStyleEl.textContent = `
+      #vagent-cursor-container {
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        pointer-events: none !important;
+        z-index: 2147483647 !important;
+        overflow: hidden !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+      #vagent-ghost-cursor {
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 28px !important;
+        height: 28px !important;
+        transform: translate3d(-100px, -100px, 0);
+        transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.2s ease;
+        pointer-events: none !important;
+        filter: drop-shadow(0 3px 10px rgba(0, 0, 0, 0.5));
+        opacity: 0;
+        will-change: transform, opacity;
+      }
+      #vagent-ghost-cursor.visible {
+        opacity: 1 !important;
+      }
+      #vagent-cursor-badge {
+        position: absolute !important;
+        left: 22px !important;
+        top: 18px !important;
+        background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%) !important;
+        color: #e0e7ff !important;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+        font-size: 11px !important;
+        font-weight: 600 !important;
+        padding: 2px 9px !important;
+        border-radius: 6px !important;
+        white-space: nowrap !important;
+        border: 1px solid rgba(165, 180, 252, 0.45) !important;
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35) !important;
+        opacity: 0;
+        transform: translateY(4px);
+        transition: opacity 0.15s ease, transform 0.15s ease;
+        pointer-events: none !important;
+      }
+      #vagent-cursor-badge.visible {
+        opacity: 1 !important;
+        transform: translateY(0) !important;
+      }
+      .vagent-click-ripple {
+        position: absolute !important;
+        border-radius: 50% !important;
+        border: 2px solid #818cf8 !important;
+        background: rgba(99, 102, 241, 0.25) !important;
+        pointer-events: none !important;
+        transform: translate(-50%, -50%) scale(0.2);
+        animation: vagentRippleAnim 0.45s cubic-bezier(0.1, 0.8, 0.3, 1) forwards !important;
+      }
+      @keyframes vagentRippleAnim {
+        0% { transform: translate(-50%, -50%) scale(0.2); opacity: 1; }
+        100% { transform: translate(-50%, -50%) scale(2.4); opacity: 0; }
+      }
+      .vagent-element-highlight {
+        outline: 2.5px solid #6366f1 !important;
+        outline-offset: 2px !important;
+        box-shadow: 0 0 14px rgba(99, 102, 241, 0.55) !important;
+        transition: outline 0.15s ease, box-shadow 0.15s ease !important;
+      }
+    `;
+    (document.head || document.documentElement).appendChild(cursorStyleEl);
+  }
+
+  function ensureCursor() {
+    ensureCursorStyles();
+    let container = document.getElementById("vagent-cursor-container");
+    if (!container) {
+      container = document.createElement("div");
+      container.id = "vagent-cursor-container";
+      container.innerHTML = `
+        <div id="vagent-ghost-cursor">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M4 2L19 12L12 13.5L8.5 21L4 2Z" fill="#6366f1" stroke="#ffffff" stroke-width="1.6" stroke-linejoin="round"/>
+            <circle cx="12" cy="12" r="2.2" fill="#a5b4fc"/>
+          </svg>
+          <div id="vagent-cursor-badge"></div>
+        </div>
+      `;
+      (document.body || document.documentElement).appendChild(container);
+    }
+    cursorEl = document.getElementById("vagent-ghost-cursor");
+    cursorBadgeEl = document.getElementById("vagent-cursor-badge");
+    return { container, cursor: cursorEl, badge: cursorBadgeEl };
+  }
+
+  async function moveVisualCursor(targetX, targetY, label = "") {
+    try {
+      const { cursor, badge } = ensureCursor();
+      if (!cursor) return;
+
+      clearTimeout(cursorHideTimer);
+      cursor.classList.add("visible");
+      cursor.style.transform = `translate3d(${targetX}px, ${targetY}px, 0)`;
+
+      if (badge) {
+        if (label) {
+          badge.textContent = label;
+          badge.classList.add("visible");
+        } else {
+          badge.classList.remove("visible");
+        }
+      }
+
+      // Smooth visual glide pause so the user perceives the cursor arrival
+      await delay(260);
+    } catch (_) {}
+  }
+
+  function playClickRipple(x, y) {
+    try {
+      const { container } = ensureCursor();
+      if (!container) return;
+      const ripple = document.createElement("div");
+      ripple.className = "vagent-click-ripple";
+      ripple.style.left = `${x}px`;
+      ripple.style.top = `${y}px`;
+      ripple.style.width = "34px";
+      ripple.style.height = "34px";
+      container.appendChild(ripple);
+      setTimeout(() => {
+        try { ripple.remove(); } catch (_) {}
+      }, 500);
+    } catch (_) {}
+  }
+
+  function highlightElement(el) {
+    if (!el || !el.classList) return;
+    try {
+      el.classList.add("vagent-element-highlight");
+      setTimeout(() => {
+        try { el.classList.remove("vagent-element-highlight"); } catch (_) {}
+      }, 600);
+    } catch (_) {}
+  }
+
+  function scheduleCursorFade(ms = 1800) {
+    clearTimeout(cursorHideTimer);
+    cursorHideTimer = setTimeout(() => {
+      try {
+        if (cursorEl) cursorEl.classList.remove("visible");
+        if (cursorBadgeEl) cursorBadgeEl.classList.remove("visible");
+      } catch (_) {}
+    }, ms);
+  }
+
   // ── Visibility helpers ──────────────────────────────────────────────────────────────────
 
   function isVisible(el) {
@@ -145,6 +313,13 @@
       document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", keyCode: 27, which: 27, bubbles: true }));
       const stillThere = candidates.filter(isBlockingOverlay).length;
       if (stillThere < candidates.length) labels.push("Escape");
+    }
+
+    // Dismiss floating calendar popups or datepickers that block interaction on search result pages
+    const openCalendar = document.querySelector('.DayPicker, .datePickerContainer, [class*="calendar" i]:not([style*="display: none"])');
+    if (openCalendar && isVisible(openCalendar)) {
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", keyCode: 27, which: 27, bubbles: true }));
+      labels.push("Escape (Calendar)");
     }
 
     return { dismissed: labels.length, labels };
@@ -320,11 +495,24 @@
    * Finds a visible autocomplete suggestion matching the typed value.
    * Used for city pickers on travel sites (MakeMyTrip, Goibibo, IRCTC, etc.)
    */
-  function findAutocompleteSuggestion(value) {
+  function findAutocompleteSuggestion(value, fieldHint = "") {
     const norm = (s) => String(s || "").toLowerCase().trim();
-    const target = norm(value);
+    let raw = norm(value);
+
+    // Extract core city if value contains sentences like "flights from X to Y"
+    let target = raw;
+    const mTo = raw.match(/\bto\s+([a-zA-Z\s]+)$/i) || raw.match(/\bfrom\s+[a-zA-Z\s]+\s+to\s+([a-zA-Z\s]+)/i);
+    const mFrom = raw.match(/\bfrom\s+([a-zA-Z\s]+?)\s+to\b/i) || raw.match(/\bfrom\s+([a-zA-Z\s]+)$/i);
+    if (mTo && mTo[1] && (fieldHint.toLowerCase().includes("to") || !mFrom)) {
+      target = norm(mTo[1]);
+    } else if (mFrom && mFrom[1]) {
+      target = norm(mFrom[1]);
+    }
+    target = target.replace(/\b(?:the|a|an|flights?|tickets?|hotels?|cabs?)\b/gi, "").trim();
+
     // Common suggestion list selectors across travel sites
     const listSelectors = [
+      '.react-autosuggest__suggestions-list li',
       '[role="listbox"] [role="option"]',
       '[role="listbox"] li',
       '.react-autosuggest__suggestion',
@@ -339,11 +527,69 @@
     for (const sel of listSelectors) {
       const items = Array.from(document.querySelectorAll(sel)).filter(isVisible);
       if (!items.length) continue;
-      // Prefer exact match, then starts-with, then contains
-      const exact = items.find((el) => norm(el.textContent).startsWith(target));
-      const contains = items.find((el) => norm(el.textContent).includes(target));
-      const first = items[0]; // fallback: first visible suggestion
-      return exact || contains || first;
+
+      // Filter out 'nearby' banners or wrong cities (e.g. Navi Mumbai when searching Mumbai, Genoa when searching Goa)
+      const validItems = items.filter((el) => {
+        const txt = norm(el.textContent);
+        if (txt.includes("nearby airport") || txt.includes("recent searches") || txt.includes("popular searches")) return false;
+        if (target === "goa" && !raw.includes("genoa") && !raw.includes("italy")) {
+          if (txt.includes("genoa") || txt.includes("italy")) return false;
+        }
+        if (target === "mumbai" && !raw.includes("navi") && txt.includes("navi mumbai")) return false;
+        if (target === "delhi" && !raw.includes("hindon") && txt.includes("hindon")) return false;
+        return true;
+      });
+
+      const pool = validItems.length ? validItems : items;
+
+      function scoreSuggestion(el) {
+        const txt = norm(el.textContent);
+        let score = 0;
+        // Strict penalty for wrong city / country
+        if (target === "goa" && !raw.includes("genoa") && !raw.includes("italy")) {
+          if (txt.includes("genoa") || txt.includes("italy")) return -1000;
+        }
+
+        // Specific boosts for Goa airports
+        if (target === "goa") {
+          if (txt.includes("dabolim") || txt.includes("goi") || txt.includes("mopa") || txt.includes("gox")) score += 250;
+          if (txt.includes("goa") && txt.includes("india")) score += 180;
+        }
+
+        // Boost Indian domestic airports on Indian travel sites unless international search
+        const isIndianTravelSite = /makemytrip|goibibo|easemytrip|cleartrip|yatra|irctc/i.test(window.location.hostname);
+        if (isIndianTravelSite && !raw.includes("international") && !raw.includes("italy") && !raw.includes("usa") && !raw.includes("uk") && !raw.includes("europe")) {
+          if (txt.includes("india")) score += 80;
+          if (txt.includes("italy") || txt.includes("united states") || txt.includes("europe")) score -= 150;
+        }
+
+        // Word boundary match: e.g. "goa," or "goa -" or "goa ("
+        try {
+          const targetWordRe = new RegExp(`(^|[\\s,()/-])${target}([\\s,()/-]|$)`, "i");
+          if (targetWordRe.test(txt)) score += 60;
+        } catch (_) {}
+
+        if (txt.startsWith(target + " ") || txt.startsWith(target + ",") || txt.startsWith(target + " -")) score += 50;
+        else if (txt.includes(target + ",") || txt.includes(target + " -") || txt.includes(target + " ")) score += 30;
+        else if (txt.startsWith(target)) score += 20;
+        else if (txt.includes(target)) score += 10;
+        return score;
+      }
+
+      const scored = pool
+        .map((el) => ({ el, score: scoreSuggestion(el) }))
+        .filter((item) => item.score > 0)
+        .sort((a, b) => b.score - a.score);
+
+      if (scored.length > 0) return scored[0].el;
+
+      // Fallback to basic match if scoring didn't yield positive items
+      const fallback = pool.find((el) => {
+        const txt = norm(el.textContent);
+        if (target === "goa" && (txt.includes("genoa") || txt.includes("italy"))) return false;
+        return txt.includes(target);
+      });
+      if (fallback) return fallback;
     }
     return null;
   }
@@ -360,7 +606,7 @@
     const target = cleanMatch && cleanMatch[1] && cleanMatch[1].trim().length >= 3 ? cleanMatch[1].trim() : rawTarget;
 
     // 1. Click the dropdown trigger to open the menu
-    realisticClick(el);
+    await realisticClick(el, "Open Menu");
 
     // 2. Poll for the dropdown menu / options to appear
     const optionSelectors = [
@@ -395,7 +641,7 @@
     }
 
     if (matched) {
-      realisticClick(matched);
+      await realisticClick(matched, `Select "${(matched.textContent || value || "").trim().slice(0, 16)}"`);
       await delay(100);
       return { ok: true, customSelected: true };
     }
@@ -406,7 +652,7 @@
   // ── Submission ───────────────────────────────────────────────────────────────────────────
 
   /** Submits the form owning `el`, preferring a real submit button click. */
-  function submitOwningForm(el) {
+  async function submitOwningForm(el) {
     const form = el.form || (el.closest && el.closest("form"));
     if (!form) return false;
     const submitBtn = form.querySelector(
@@ -414,7 +660,7 @@
       'button[aria-label*="search" i], button[title*="search" i], button:not([type="reset"]):not([type="button"])'
     );
     if (submitBtn && isVisible(submitBtn)) {
-      realisticClick(submitBtn);
+      await realisticClick(submitBtn, "Submit");
       return true;
     }
     if (typeof form.requestSubmit === "function") {
@@ -434,7 +680,7 @@
    * Only used after Enter and form submission have already been attempted, and only within the
    * input's immediate ancestry, so it cannot wander off and click something unrelated.
    */
-  function clickNearbySearchControl(el) {
+  async function clickNearbySearchControl(el) {
     let scope = el.parentElement;
     for (let depth = 0; depth < 4 && scope; depth++) {
       const candidates = Array.from(scope.querySelectorAll(
@@ -443,7 +689,7 @@
       )).filter((c) => c !== el && isVisible(c) && !NEVER_DISMISS_RE.test(controlText(c)));
       const best = candidates.find((c) => SEARCH_TEXT_RE.test(controlText(c)) || c.type === "submit");
       if (best) {
-        realisticClick(best);
+        await realisticClick(best, "Search");
         return true;
       }
       scope = scope.parentElement;
@@ -484,25 +730,76 @@
     // On flight / travel search sites (e.g. MakeMyTrip, Goibibo), the "From" / "To" element
     // is often a readonly display field or card. Clicking it opens the real search input.
     if (targetEl.readOnly || (targetEl.tagName !== "INPUT" && targetEl.tagName !== "TEXTAREA" && !targetEl.isContentEditable)) {
-      realisticClick(targetEl);
-      await delay(250);
-      const active = document.activeElement;
-      if (active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA") && !active.readOnly) {
-        targetEl = active;
-      } else {
+      await realisticClick(targetEl, "Open Field");
+      let realInput = null;
+      for (let attempt = 0; attempt < 12; attempt++) {
+        await delay(80);
+        const active = document.activeElement;
+        if (active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA") && !active.readOnly && isVisible(active)) {
+          realInput = active;
+          break;
+        }
         const opened = document.querySelector(
-          '.react-autosuggest__input, [role="combobox"] input, input[placeholder*="From" i], input[placeholder*="To" i], input[placeholder*="City" i], input[placeholder*="Airport" i], input[placeholder*="Search" i], input:focus'
+          '.react-autosuggest__input, input:focus, [role="combobox"] input, input[placeholder*="From" i], input[placeholder*="To" i], input[placeholder*="City" i], input[placeholder*="Airport" i], input[placeholder*="Search" i]'
         );
-        if (opened && isVisible(opened)) targetEl = opened;
+        if (opened && isVisible(opened)) {
+          realInput = opened;
+          break;
+        }
       }
+      if (realInput) targetEl = realInput;
     }
 
     try { targetEl.scrollIntoView({ block: "center", behavior: "instant" }); } catch (_) {}
+
+    let r = targetEl.getBoundingClientRect();
+    if (r.width < 2 || r.height < 2 || (r.left <= 0 && r.top <= 0)) {
+      const active = document.activeElement;
+      if (active && active !== document.body && isVisible(active)) {
+        targetEl = active;
+        r = targetEl.getBoundingClientRect();
+      } else {
+        const opened = document.querySelector('.react-autosuggest__input, input:focus');
+        if (opened && isVisible(opened)) {
+          targetEl = opened;
+          r = targetEl.getBoundingClientRect();
+        }
+      }
+    }
+
+    // Never glide to (0, 0) top-left corner
+    const x = r.width > 2 ? Math.max(12, Math.min(window.innerWidth - 10, r.left + Math.min(r.width / 2, 40))) : (cursorX > 10 ? cursorX : window.innerWidth / 2);
+    const y = r.height > 2 ? Math.max(12, Math.min(window.innerHeight - 10, r.top + r.height / 2)) : (cursorY > 10 ? cursorY : window.innerHeight / 2);
+    await moveVisualCursor(x, y, text ? `Type "${text.slice(0, 16)}${text.length > 16 ? '...' : ''}"` : "Type");
+    highlightElement(targetEl);
+
     targetEl.focus();
     targetEl.dispatchEvent(new FocusEvent("focusin", { bubbles: true }));
     await delay(40);
 
-    const val = text ?? "";
+    let val = text ?? "";
+
+    // City / Travel field protection: NEVER type an entire prompt into a city/airport field!
+    const fieldIdentifier = ((targetEl.getAttribute("placeholder") || "") + " " +
+                             (targetEl.getAttribute("name") || "") + " " +
+                             (targetEl.getAttribute("aria-label") || "") + " " +
+                             (targetEl.id || "") + " " +
+                             (targetEl.closest && targetEl.closest("label")?.textContent || "")).toLowerCase();
+    const isCityPicker = /from|to|origin|destination|depart|arriv|city|airport/i.test(fieldIdentifier);
+
+    if (isCityPicker && (val.length > 15 || /\b(?:flights?|from|to|tickets?)\b/i.test(val))) {
+      const isTo = /to|dest|arriv/i.test(fieldIdentifier);
+      const mTo = val.match(/\bto\s+([a-zA-Z\s]+?)(?:\s+(?:on|for|date|and|,)|$)/i) ||
+                  val.match(/\bfrom\s+[a-zA-Z\s]+\s+to\s+([a-zA-Z\s]+?)(?:\s+(?:on|for|date|and|,)|$)/i);
+      const mFrom = val.match(/\bfrom\s+([a-zA-Z\s]+?)\s+to\b/i) ||
+                    val.match(/\bfrom\s+([a-zA-Z\s]+?)(?:\s+(?:on|for|date|and|,)|$)/i);
+
+      if (isTo && mTo && mTo[1]) {
+        val = mTo[1].replace(/\b(?:the|a|an|flights?|tickets?|hotels?)\b/gi, "").trim();
+      } else if (!isTo && mFrom && mFrom[1]) {
+        val = mFrom[1].replace(/\b(?:the|a|an|flights?|tickets?|hotels?)\b/gi, "").trim();
+      }
+    }
 
     if (targetEl.isContentEditable) {
       const selection = window.getSelection();
@@ -521,6 +818,7 @@
       targetEl.dispatchEvent(new InputEvent("input", {
         bubbles: true, cancelable: true, inputType: "insertText", data: val,
       }));
+      scheduleCursorFade(2000);
       return true;
     }
 
@@ -559,6 +857,7 @@
     }
 
     targetEl.dispatchEvent(new Event("change", { bubbles: true }));
+    scheduleCursorFade(2000);
     return true;
   }
 
@@ -567,22 +866,45 @@
   }
 
   /**
-   * A click that works on frameworks which ignore `.click()` alone.
-   *
-   * Many SPA components listen for `pointerdown`/`mousedown` and never see the synthetic
-   * `click` that HTMLElement.click() dispatches on its own.
+   * A click that works on frameworks which ignore `.click()` alone,
+   * complete with visual ghost cursor glide and ripple animations.
    */
-  function realisticClick(el) {
+  async function realisticClick(el, label = "Click") {
+    if (!el) return;
     try { el.scrollIntoView({ block: "center", behavior: "instant" }); } catch (_) {}
     const r = el.getBoundingClientRect();
-    const x = r.left + r.width / 2;
-    const y = r.top + r.height / 2;
-    const opts = { bubbles: true, cancelable: true, composed: true, clientX: x, clientY: y, button: 0 };
+    const x = Math.max(0, Math.min(window.innerWidth - 10, r.left + r.width / 2));
+    const y = Math.max(0, Math.min(window.innerHeight - 10, r.top + r.height / 2));
 
-    try { el.focus({ preventScroll: true }); } catch (_) {}
-    for (const type of ["pointerover", "pointerenter", "pointerdown", "mousedown", "pointerup", "mouseup"]) {
-      const Ctor = type.startsWith("pointer") && typeof PointerEvent === "function" ? PointerEvent : MouseEvent;
-      try { el.dispatchEvent(new Ctor(type, opts)); } catch (_) {}
+    await moveVisualCursor(x, y, label);
+    playClickRipple(x, y);
+    highlightElement(el);
+
+    // 1. Attempt Native Hardware-Level OS Mouse Click via Chrome DevTools Protocol (CDP)
+    // Dispatches authentic isTrusted: true OS events through Chromium's native hardware input pipeline.
+    let cdpSuccess = false;
+    try {
+      if (typeof chrome !== "undefined" && chrome?.runtime?.sendMessage) {
+        const cdpRes = await chrome.runtime.sendMessage({
+          type: "CDP_CLICK",
+          x: Math.round(x),
+          y: Math.round(y),
+        });
+        if (cdpRes && cdpRes.ok && cdpRes.nativeCdp) {
+          cdpSuccess = true;
+        }
+      }
+    } catch (_) {}
+
+    // 2. Synthetic Event Cascade Fallback (if CDP not active / available)
+    if (!cdpSuccess) {
+      const opts = { bubbles: true, cancelable: true, composed: true, clientX: x, clientY: y, button: 0 };
+      try { el.focus({ preventScroll: true }); } catch (_) {}
+      for (const type of ["pointerover", "pointerenter", "pointerdown", "mousedown", "pointerup", "mouseup"]) {
+        const Ctor = type.startsWith("pointer") && typeof PointerEvent === "function" ? PointerEvent : MouseEvent;
+        try { el.dispatchEvent(new Ctor(type, opts)); } catch (_) {}
+      }
+      el.click();
     }
 
     // Toggle ARIA checkbox / switch if applicable
@@ -592,7 +914,7 @@
       el.setAttribute("aria-checked", String(!isChecked));
     }
 
-    el.click();
+    scheduleCursorFade(2000);
   }
 
   // Actions that operate on the page as a whole rather than on one marked element. Exported,
@@ -634,7 +956,7 @@
     try {
       switch (actionType) {
         case "click":
-          realisticClick(el);
+          await realisticClick(el, "Click");
           return { ok: true };
 
         case "type": {
@@ -654,13 +976,15 @@
           if (isAutocomplete && value) {
             // Wait for dropdown to appear
             let suggestion = null;
+            const hint = ((el.getAttribute("placeholder") || "") + " " + (el.id || "") + " " + (el.name || "") + " " + (el.closest && el.closest("label")?.textContent || "")).toLowerCase();
             for (let i = 0; i < 20; i++) {
               await delay(150);
-              suggestion = findAutocompleteSuggestion(value);
+              suggestion = findAutocompleteSuggestion(value, hint);
               if (suggestion) break;
             }
             if (suggestion) {
-              realisticClick(suggestion);
+              const labelText = (suggestion.textContent || "").trim().slice(0, 16);
+              await realisticClick(suggestion, `Select "${labelText}"`);
               return { ok: true, typed: true, clickedSuggestion: true };
             }
           }
@@ -686,7 +1010,7 @@
           el.focus();
           dispatchKey(el, keyVal);
           if ((keyVal === "Enter" || keyVal === "Return") && !el.isContentEditable) {
-            submitOwningForm(el);
+            await submitOwningForm(el);
           }
           return { ok: true };
         }
@@ -711,10 +1035,11 @@
           return { ok: false, error: "Target element for select not found." };
 
         case "scroll":
-          // "scroll" with an element means bring it into view; without one it means scroll the
-          // page. Planners emit both spellings — the prompt says "scroll", the action list says
-          // "scroll_page" — and a page scroll must not fail merely over the name.
           if (!el) return await executeAction({ ...action, type: "scroll_page" }, elementResolver);
+          try {
+            const r = el.getBoundingClientRect();
+            await moveVisualCursor(r.left + r.width / 2, r.top + r.height / 2, "Scroll");
+          } catch (_) {}
           el.scrollIntoView({ behavior: "smooth", block: "center" });
           return { ok: true };
 
@@ -723,20 +1048,32 @@
           const before = window.scrollY;
           window.scrollBy({ top: scrollAmount, behavior: "smooth" });
           await delay(500);
-          // Report honestly whether the page actually moved; a page already at the bottom
-          // otherwise looks like endless successful scrolling to the planner.
           const moved = Math.abs(window.scrollY - before) > 4;
           return { ok: true, moved, scrollY: window.scrollY };
         }
 
-        case "hover":
+        case "hover": {
+          try {
+            const r = el.getBoundingClientRect();
+            await moveVisualCursor(r.left + r.width / 2, r.top + r.height / 2, "Hover");
+            highlightElement(el);
+          } catch (_) {}
           el.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
           el.dispatchEvent(new MouseEvent("mouseenter", { bubbles: true }));
+          scheduleCursorFade(1500);
           return { ok: true };
+        }
 
-        case "focus":
+        case "focus": {
+          try {
+            const r = el.getBoundingClientRect();
+            await moveVisualCursor(r.left + r.width / 2, r.top + r.height / 2, "Focus");
+            highlightElement(el);
+          } catch (_) {}
           el.focus();
+          scheduleCursorFade(1500);
           return { ok: true };
+        }
 
         case "wait":
           await delay(Math.min(Number(value) || 1000, 5000));
@@ -760,6 +1097,7 @@
           return { ok: true, ...detectBotWall() };
 
         case "done":
+          scheduleCursorFade(100);
           return { ok: true, done: true };
 
         default:

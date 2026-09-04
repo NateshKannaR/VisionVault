@@ -24,13 +24,13 @@
 
 (function (global) {
   /** How many times the same action signature may run before it is treated as a loop. */
-  const MAX_SIGNATURE_REPEATS = 3;
+  const MAX_SIGNATURE_REPEATS = 2;
 
   /** How many steps may pass with no observable page change before the run is abandoned. */
-  const MAX_STEPS_WITHOUT_PROGRESS = 8;
+  const MAX_STEPS_WITHOUT_PROGRESS = 4;
 
   /** How many times a planner's `done` may be overruled. Prevents guard-vs-planner ping-pong. */
-  const MAX_DONE_OVERRIDES = 6;
+  const MAX_DONE_OVERRIDES = 2;
 
   function normalizeType(resp) {
     return (resp?.action?.type || resp?.action || resp?.type || "").toString().toLowerCase().trim();
@@ -79,6 +79,7 @@
     }
     if (parsed.wantsScroll && !p.scrolled) return false;
     if (parsed.wantsFill && !p.filledAny) return false;
+    if (parsed.wantsMessage && !p.messageSent) return false;
     if (parsed.wantsBook) return false;
     return true;
   }
@@ -95,7 +96,7 @@
    */
   function goalFullyVerified(parsed, progress) {
     if (!parsed || parsed.wantsFill || parsed.wantsBook) return false;
-    const hasVerifiableIntent = !!parsed.query || (parsed.openTargets || []).length > 0 || parsed.wantsScroll;
+    const hasVerifiableIntent = !!parsed.query || (parsed.openTargets || []).length > 0 || parsed.wantsScroll || (parsed.wantsMessage && progress?.messageSent);
     if (!hasVerifiableIntent) return false;
     return goalSatisfied(parsed, progress);
   }
@@ -108,6 +109,7 @@
     for (const t of parsed?.openTargets || []) if (!(p.opened || []).includes(t)) left.push(`open "${t}"`);
     if (parsed?.wantsScroll && !p.scrolled) left.push("scroll the page");
     if (parsed?.wantsFill && !p.filledAny) left.push("fill the form");
+    if (parsed?.wantsMessage && !p.messageSent) left.push(`send message to ${parsed.recipient || "recipient"}`);
     return left.join(", ");
   }
 
@@ -262,6 +264,29 @@
         }
       }
 
+      // ── Rule 2b: search query must be typed before clicking navigation/login links ───
+      if (type === "click" && parsed?.query && !progress.queryLanded && !parsed?.wantsBook) {
+        const target = marks.find((m) => String(m.id) === String(action.mark_id));
+        const tLabel = ((target?.label || "") + " " + (proposed?.reasoning || "")).toLowerCase();
+        const isSearchBtn = target && (
+          /search|find|go|submit/i.test(target.label || "") ||
+          target.role === "input:submit"
+        );
+        const isDismiss = target && /close|dismiss|accept|agree|got it/i.test(target.label || "");
+        const isDistraction = /sign\s*in|login|log\s*in|account|register|bestseller|trending|deal|cart|order/i.test(tLabel);
+
+        const alt = ctx.deterministic;
+        const altType = normalizeType(alt);
+
+        if ((isDistraction || (!isSearchBtn && !isDismiss)) && alt && altType === "type") {
+          return {
+            action: { ...alt, action: altType },
+            substituted: true,
+            reason: `Intercepted click on "${target?.label || "link"}" before search ran; typing "${parsed.query}" into search box first.`,
+          };
+        }
+      }
+
       // ── Rule 3: never type the user's whole sentence into a search box. ──────────────────
       if (type === "type" && !action.use_vault_field && parsed?.query && action.value) {
         const target = marks.find((m) => String(m.id) === String(action.mark_id));
@@ -317,8 +342,14 @@
       }
 
       // ── Rule 5: loop detection. ──────────────────────────────────────────────────────────
+      const target = marks.find((m) => String(m.id) === String(action.mark_id));
+      const targetLabel = (target?.label || "").toLowerCase().trim();
       const sig = signatureOf(type, action.mark_id, action.value);
-      const seen = signatureCounts.get(sig) || 0;
+      const semSig = targetLabel ? ["semantic", type, targetLabel.slice(0, 30), String(action.value || "").slice(0, 60).toLowerCase()].join("|") : null;
+      const seenExact = signatureCounts.get(sig) || 0;
+      const seenSem = semSig ? (signatureCounts.get(semSig) || 0) : 0;
+      const seen = Math.max(seenExact, seenSem);
+
       if (seen >= maxRepeats) {
         const alt = ctx.deterministic;
         const altType = normalizeType(alt);
@@ -343,11 +374,15 @@
     }
 
     /** Records what actually happened, after execution. */
-    function record(type, markId, value, ok) {
+    function record(type, markId, value, ok, targetLabel = "") {
       const sig = signatureOf(type, markId, value);
-      // Only a *successful* action counts toward the repeat budget in a way that blocks retry;
-      // a failed action is allowed one honest retry before the same rule applies.
-      signatureCounts.set(sig, (signatureCounts.get(sig) || 0) + (ok ? 1 : 0.5));
+      const inc = ok ? 1 : 0.5;
+      signatureCounts.set(sig, (signatureCounts.get(sig) || 0) + inc);
+      if (targetLabel) {
+        const cleanLabel = targetLabel.slice(0, 30).toLowerCase().trim();
+        const semSig = ["semantic", type, cleanLabel, String(value || "").slice(0, 60).toLowerCase()].join("|");
+        signatureCounts.set(semSig, (signatureCounts.get(semSig) || 0) + inc);
+      }
       history.push({ signature: sig, type, ok, at: Date.now() });
     }
 

@@ -403,5 +403,56 @@ test('a field that cannot be filled does not trap the agent', () => {
     'nothing changed twice over, so the run ends');
 });
 
+// ── Search Task: Distractor / Sign-in clicks are intercepted ─────────────────────────────
+test('clicking sign-in or bestsellers before search query lands is intercepted', () => {
+  const task = 'open amazon and search headsets';
+  const parsed = TaskPlanner.parseTask(task);
+  const guard = AgentGuard.createGuard(parsed);
+  const amazonMarks = [
+    { id: 101, role: 'input:search', label: 'Search Amazon.in' },
+    { id: 102, role: 'link', label: 'Hello, sign in Account & Lists' },
+    { id: 103, role: 'link', label: 'Bestsellers' },
+  ];
+  const deterministic = { action: 'type', mark_id: 101, value: 'headsets', reasoning: 'Search for "headsets"' };
+
+  // Model hallucinates and tries to click "Bestsellers"
+  const v1 = guard.review({ action: 'click', mark_id: 103, reasoning: "explore bestsellers" },
+    { marks: amazonMarks, pageInfo, progress: { queryLanded: false }, task, deterministic });
+  assert.strictEqual(v1.action.action, 'type');
+  assert.strictEqual(v1.action.mark_id, 101);
+  assert.strictEqual(v1.action.value, 'headsets');
+  assert.ok(v1.substituted);
+
+  // Model tries to click "Sign in"
+  const v2 = guard.review({ action: 'click', mark_id: 102, reasoning: "sign in to account" },
+    { marks: amazonMarks, pageInfo, progress: { queryLanded: false }, task, deterministic });
+  assert.strictEqual(v2.action.action, 'type');
+  assert.strictEqual(v2.action.mark_id, 101);
+  assert.strictEqual(v2.action.value, 'headsets');
+  assert.ok(v2.substituted);
+});
+
+test('semantic loop detection catches repeated clicks on same label with shifting mark IDs', () => {
+  const task = 'explore items';
+  const parsed = TaskPlanner.parseTask(task);
+  const guard = AgentGuard.createGuard(parsed);
+
+  // Step 1: Click "Sign in" (mark 201)
+  const m1 = [{ id: 201, role: 'link', label: 'Sign in' }];
+  guard.review({ action: 'click', mark_id: 201 }, { marks: m1, pageInfo, progress: {}, task });
+  guard.record('click', 201, null, true, 'Sign in');
+
+  // Step 2: Page re-rendered, new mark ID 305 for "Sign in"
+  const m2 = [{ id: 305, role: 'link', label: 'Sign in' }];
+  guard.review({ action: 'click', mark_id: 305 }, { marks: m2, pageInfo, progress: {}, task });
+  guard.record('click', 305, null, true, 'Sign in');
+
+  // Step 3: Page re-rendered again, mark ID 409 for "Sign in"
+  const m3 = [{ id: 409, role: 'link', label: 'Sign in' }];
+  const v3 = guard.review({ action: 'click', mark_id: 409 }, { marks: m3, pageInfo, progress: {}, task });
+  assert.ok(v3.stop || v3.substituted, 'repeated semantic clicks must be blocked');
+});
+
 console.log(`\n${passed} passed, ${failed} failed\n`);
 process.exit(failed ? 1 : 0);
+

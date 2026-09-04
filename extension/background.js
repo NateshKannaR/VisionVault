@@ -308,7 +308,19 @@ async function scanTab(tabId, windowId, settings, retries = SCAN_ATTEMPT_DELAYS_
     await new Promise(r => setTimeout(r, SCAN_ATTEMPT_DELAYS_MS[attempt - 1] ?? 2500));
 
     const tab = await new Promise(r => chrome.tabs.get(tabId, r));
-    const pageInfo = await msgTab(tabId, { type: "GET_PAGE_INFO" }, { frameId: 0 }) || {};
+    let pageInfo = await msgTab(tabId, { type: "GET_PAGE_INFO" }, { frameId: 0 }) || {};
+
+    // For travel booking homepages: keep search widget in viewport before search is submitted
+    if ((pageInfo.scroll_y || 0) > 80 && session?.parsedTask?.wantsBook && !session?.progress?.querySubmitted) {
+      try {
+        await chrome.scripting.executeScript({
+          target: { tabId },
+          func: () => window.scrollTo({ top: 0, behavior: "instant" })
+        });
+        await new Promise(r => setTimeout(r, 200));
+        pageInfo = await msgTab(tabId, { type: "GET_PAGE_INFO" }, { frameId: 0 }) || pageInfo;
+      } catch (_) {}
+    }
 
     const result = await scanAndRedact(tabId, windowId || tab.windowId, {
       redactMode: settings.redactMode || "black",
@@ -1059,6 +1071,10 @@ async function phaseRun() {
               search_query: session.parsedTask.query,
               site: session.parsedTask.siteUrl,
               open_targets: session.parsedTask.openTargets,
+              from_city: session.parsedTask.from,
+              to_city: session.parsedTask.to,
+              date: session.parsedTask.date,
+              category: session.parsedTask.category,
             } : null,
             progress: session.progress,
             image: session.redacted,
@@ -1314,6 +1330,13 @@ async function phaseRun() {
         if (typedOk) {
           session.filledIds.push(resp.mark_id);
           if (fieldKey) session.progress.filledAny = true;
+          const valLower = String(value || "").toLowerCase();
+          if (session.parsedTask?.from && valLower.includes(session.parsedTask.from.toLowerCase())) {
+            session.progress.fromTyped = true;
+          }
+          if (session.parsedTask?.to && valLower.includes(session.parsedTask.to.toLowerCase())) {
+            session.progress.toTyped = true;
+          }
         }
 
         session.actionLog.push({
@@ -1417,10 +1440,25 @@ async function phaseRun() {
         }
 
         noteResult(session, clickOk);
-        guard.record("click", resp.mark_id, resp.value, clickOk);
+        const targetMark = (session.marks || []).find((m) => String(m.id) === String(resp.mark_id));
+        guard.record("click", resp.mark_id, resp.value, clickOk, targetMark?.label);
         if (clickOk) {
           session.filledIds.push(resp.mark_id);
           if (resp.openTarget) session.progress.opened.push(resp.openTarget);
+          const rText = (String(resp.reasoning || "") + " " + String(resp.value || "")).toLowerCase();
+          if (session.parsedTask?.from && (rText.includes(session.parsedTask.from.toLowerCase()) || rText.includes("origin"))) {
+            session.progress.fromTyped = true;
+          }
+          if (session.parsedTask?.to && (rText.includes(session.parsedTask.to.toLowerCase()) || rText.includes("destination"))) {
+            session.progress.toTyped = true;
+          }
+          const tLabel = ((targetMark?.label || "") + " " + rText).toLowerCase();
+          if (/\b(send|submit)\b/i.test(targetMark?.label || "") || rText.includes("send message") || rText.includes("click send")) {
+            session.progress.messageSent = true;
+          }
+          if (session.parsedTask?.recipient && tLabel.includes(session.parsedTask.recipient.toLowerCase())) {
+            session.progress.contactOpened = true;
+          }
         }
         session.actionLog.push({ action: "click", mark_id: resp.mark_id, serverMs, ok: clickOk, error: clickOk ? undefined : exec?.error });
         notifyPopup({
@@ -1650,8 +1688,91 @@ async function skipInput({ mark_id } = {}) {
   return { ok: true, result };
 }
 
+// ── Native Hardware Mouse via Chrome DevTools Protocol (CDP) ─────────────────
+const _attachedDebuggers = new Set();
+
+async function ensureDebuggerAttached(tabId) {
+  if (!tabId || typeof chrome.debugger === "undefined") return false;
+  if (_attachedDebuggers.has(tabId)) return true;
+  return new Promise((resolve) => {
+    chrome.debugger.attach({ tabId }, "1.3", () => {
+      if (chrome.runtime.lastError) {
+        const msg = chrome.runtime.lastError.message || "";
+        if (msg.includes("Already attached")) {
+          _attachedDebuggers.add(tabId);
+          return resolve(true);
+        }
+        console.warn("[CDP] Debugger attach failed:", msg);
+        return resolve(false);
+      }
+      _attachedDebuggers.add(tabId);
+      resolve(true);
+    });
+  });
+}
+
+async function cdpDispatchClick(tabId, x, y) {
+  try {
+    const attached = await ensureDebuggerAttached(tabId);
+    if (!attached) return { ok: false, error: "Debugger attach not available" };
+
+    const target = { tabId };
+    const px = Math.round(x);
+    const py = Math.round(y);
+
+    // 1. Hardware mouse move to coordinates
+    await chrome.debugger.sendCommand(target, "Input.dispatchMouseEvent", {
+      type: "mouseMoved",
+      x: px,
+      y: py,
+    });
+
+    // 2. Hardware mouse press (left button, isTrusted: true)
+    await chrome.debugger.sendCommand(target, "Input.dispatchMouseEvent", {
+      type: "mousePressed",
+      button: "left",
+      x: px,
+      y: py,
+      clickCount: 1,
+    });
+
+    await new Promise((r) => setTimeout(r, 45));
+
+    // 3. Hardware mouse release
+    await chrome.debugger.sendCommand(target, "Input.dispatchMouseEvent", {
+      type: "mouseReleased",
+      button: "left",
+      x: px,
+      y: py,
+      clickCount: 1,
+    });
+
+    return { ok: true, nativeCdp: true };
+  } catch (e) {
+    console.warn("[CDP] Hardware click failed, falling back to DOM click:", e);
+    return { ok: false, error: e.message };
+  }
+}
+
+try {
+  chrome.debugger.onDetach.addListener((source) => {
+    if (source?.tabId) _attachedDebuggers.delete(source.tabId);
+  });
+} catch (_) {}
+
 // ── Message router ────────────────────────────────────────────────────────────
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg.type === "CDP_CLICK") {
+    const tabId = sender?.tab?.id || session?.tabId;
+    if (!tabId) {
+      sendResponse({ ok: false, error: "No active tab for CDP click" });
+      return true;
+    }
+    cdpDispatchClick(tabId, msg.x, msg.y)
+      .then(r => sendResponse(r))
+      .catch(e => sendResponse({ ok: false, error: e.message }));
+    return true;
+  }
   if (msg.type === "DOM_CHANGED") {
     if (sender?.tab?.id != null) scheduleDomChangeRescan(sender.tab.id);
     sendResponse({ ok: true });

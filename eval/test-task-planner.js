@@ -140,9 +140,34 @@ is(TaskPlanner.vaultKeyForLabel(''),
 // "Company name" must not be read as a person's name by the trailing \bname\b rule.
 is(TaskPlanner.vaultKeyForLabel('Company').key, 'company', 'company -> company');
 
+// ── Messaging: WhatsApp task parsing and planning ──────────────────────────────────────────
+console.log('\nMessaging: WhatsApp task parsing and planning\n');
+const waParsed = TaskPlanner.parseTask('open whatsapp and send hi to niswan');
+is(waParsed.site, 'whatsapp', 'site is whatsapp');
+is(waParsed.siteUrl, 'https://web.whatsapp.com', 'siteUrl is web.whatsapp.com');
+is(waParsed.wantsMessage, true, 'wantsMessage is true');
+is(waParsed.recipient, 'niswan', 'recipient is niswan');
+is(waParsed.message, 'hi', 'message is hi');
+is(waParsed.category, null, 'category is null (not flights!)');
+is(waParsed.to, null, 'to city is null (not niswan!)');
+
+const waStep1 = TaskPlanner.planNextAction({
+  task: 'open whatsapp and send hi to niswan',
+  marks: [
+    { id: 1, role: 'editable', label: 'Type a message' },
+    { id: 2, role: 'button', label: 'Send' },
+  ],
+  filledIds: [],
+  pageInfo: { url: 'https://web.whatsapp.com' },
+  progress: { navigated: true },
+});
+is(waStep1.action, 'click', 'clicks send button when visible');
+is(waStep1.mark_id, 2, 'target is send button mark');
+
 console.log('\n' + '='.repeat(60));
 if (failures.length) {
   console.log(`${failures.length} of ${checks} checks FAILED`);
   process.exit(1);
 }
 console.log(`All ${checks} task-planner checks passed.`);
+

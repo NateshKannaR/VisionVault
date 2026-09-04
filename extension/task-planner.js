@@ -102,6 +102,7 @@
       wantsBook: /\b(book|booking|reserve|reservation|order|buy|purchase|ticket|flight|hotel|cab|train|bus|ride)\b/i.test(text),
       wantsSearch: false,
       // Extracted travel/booking parameters
+      category: null,
       from: null,
       to: null,
       date: null,
@@ -110,11 +111,64 @@
       tripType: null, // "one-way", "round-trip"
     };
 
-    // Extract travel parameters: "from X to Y"
-    const fromToMatch = text.match(/\bfrom\s+([\w\s]+?)\s+to\s+([\w\s]+?)(?:\s+(?:on|for|date|and|,|$))/i);
-    if (fromToMatch) {
-      result.from = fromToMatch[1].trim();
-      result.to = fromToMatch[2].trim();
+    const isTravel = result.wantsBook ||
+      /\b(flights?|flying|fly|airline|airlines?|airways?|airport|airports?|hotels?|homestays?|villas?|resorts?|rooms?|lodging|trains?|rail|irctc|buses?|bus|volvo|cabs?|taxi|car rental|makemytrip|goibibo|cleartrip)\b/i.test(text);
+
+    if (isTravel) {
+      if (/\b(hotels?|homestays?|villas?|resorts?|rooms?|lodging)\b/i.test(text)) result.category = "hotels";
+      else if (/\b(trains?|rail|irctc)\b/i.test(text)) result.category = "trains";
+      else if (/\b(buses?|bus|volvo)\b/i.test(text)) result.category = "buses";
+      else if (/\b(cabs?|taxi|car rental)\b/i.test(text)) result.category = "cabs";
+      else result.category = "flights";
+
+      // Extract travel parameters: "from X to Y", "to Y from X", or "X to Y flights"
+      const fromToMatch = text.match(/\bfrom\s+([a-zA-Z\s]+?)\s+to\s+([a-zA-Z\s]+?)(?:\s+(?:on|for|date|and|,|tickets?|flights?)|$)/i);
+      const toFromMatch = text.match(/\bto\s+([a-zA-Z\s]+?)\s+from\s+([a-zA-Z\s]+?)(?:\s+(?:on|for|date|and|,|tickets?|flights?)|$)/i);
+      const bareToMatch = text.match(/\b(?:flights?|tickets?|cabs?|bus|trains?)\s+(?:from\s+)?([a-zA-Z\s]+?)\s+to\s+([a-zA-Z\s]+?)(?:\s+(?:on|for|date|and|,)|$)/i) ||
+                          text.match(/\b([a-zA-Z\s]+?)\s+to\s+([a-zA-Z\s]+?)\s+(?:flights?|tickets?|cabs?|bus|trains?)\b/i);
+
+      if (fromToMatch) {
+        result.from = fromToMatch[1].trim();
+        result.to = fromToMatch[2].trim();
+      } else if (toFromMatch) {
+        result.to = toFromMatch[1].trim();
+        result.from = toFromMatch[2].trim();
+      } else if (bareToMatch) {
+        result.from = bareToMatch[1].trim();
+        result.to = bareToMatch[2].trim();
+      } else {
+        const singleTo = text.match(/\bto\s+([a-zA-Z\s]+?)(?:\s+(?:on|for|date|and|,|tickets?|flights?)|$)/i);
+        const singleFrom = text.match(/\bfrom\s+([a-zA-Z\s]+?)(?:\s+(?:on|for|date|and|,|tickets?|flights?)|$)/i);
+        if (singleTo) result.to = singleTo[1].trim();
+        if (singleFrom) result.from = singleFrom[1].trim();
+      }
+
+      // Clean leading articles / trailing keywords from extracted cities
+      for (const key of ["from", "to"]) {
+        if (result[key]) {
+          result[key] = result[key]
+            .replace(/^(?:the|a|an)\s+/i, "")
+            .replace(/\s+(?:flights?|tickets?|cabs?|bus|trains?|hotels?)$/i, "")
+            .trim();
+        }
+      }
+    }
+
+    // Messaging / Chat task detection:
+    // e.g. "send hi to niswan", "message niswan saying hi", "send a message to niswan"
+    const msgMatch = text.match(/\b(?:send|message|msg|text|dm)\s+(?:a\s+message\s+(?:saying\s+|that\s+)?|message\s+)?['"]?([^'"]+?)['"]?\s+to\s+([a-zA-Z0-9_\s]+?)(?:\s+(?:on|via|in)\s+(?:whatsapp|slack|telegram|teams)|$)/i) ||
+                     text.match(/\b(?:to\s+([a-zA-Z0-9_\s]+?)\s+(?:send|message|msg|text)\s+['"]?([^'"]+?)['"]?)(?:\s+(?:on|via|in)\s+(?:whatsapp|slack|telegram|teams)|$)/i);
+
+    if (msgMatch) {
+      result.wantsMessage = true;
+      result.message = msgMatch[1].trim();
+      result.recipient = msgMatch[2].trim();
+    } else if (/\b(send|message|msg|text|chat)\b/i.test(text) && /\bto\s+([a-zA-Z0-9_\s]+)/i.test(text)) {
+      const rec = text.match(/\bto\s+([a-zA-Z0-9_\s]+?)(?:\s+(?:on|via|in)\s+(?:whatsapp|slack|telegram|teams)|$)/i);
+      if (rec) {
+        result.wantsMessage = true;
+        result.recipient = rec[1].trim();
+      }
     }
 
     // Date: "on 15 jan", "on 2025-01-15", "tomorrow", "next monday"
@@ -277,6 +331,44 @@
       if (bookPlan) return bookPlan;
     }
 
+    // 2b. Messaging / Chat flow (WhatsApp, Telegram, Slack, etc.)
+    const isMsgPlatform = /web\.whatsapp\.com|telegram|slack/i.test(url || "");
+    if (parsed.wantsMessage || isMsgPlatform) {
+      // Step A: If the Send button is visible, click it to send the message!
+      const sendBtn = first((m) =>
+        /^\s*send\s*$/i.test(m.label || "") ||
+        (/send/i.test(m.label || "") && (m.role === "button" || m.role === "clickable"))
+      );
+      if (sendBtn) {
+        return { action: "click", mark_id: sendBtn.id, reasoning: "Click Send to send the message" };
+      }
+
+      // Step B: If in chat and message box is available, type message
+      const msgBox = first((m) =>
+        m.role === "editable" ||
+        /type a message/i.test(m.label || "") ||
+        (FILLABLE_ROLES.has(m.role) && /message/i.test(m.label || ""))
+      );
+      if (msgBox && parsed.message && !progress.messageTyped) {
+        return { action: "type", mark_id: msgBox.id, value: parsed.message, reasoning: `Type "${parsed.message}" into message box` };
+      }
+
+      // Step C: If recipient is specified and not yet opened, click contact or use search
+      if (parsed.recipient && !progress.contactOpened) {
+        const contact = first((m) => {
+          const l = (m.label || "").toLowerCase();
+          return l.includes(parsed.recipient.toLowerCase()) && (m.role === "clickable" || m.role === "button" || m.role === "link");
+        });
+        if (contact) {
+          return { action: "click", mark_id: contact.id, reasoning: `Open chat with ${parsed.recipient}` };
+        }
+        const searchChat = first((m) => /search or start a new chat/i.test(m.label || "") || isSearchBox(m));
+        if (searchChat) {
+          return { action: "type", mark_id: searchChat.id, value: parsed.recipient, reasoning: `Search for contact "${parsed.recipient}"` };
+        }
+      }
+    }
+
     // 3. Run the search, once.
     if (parsed.query && !progress.searched) {
       const box = first(isSearchBox) || first((m) => FILLABLE_ROLES.has(m.role));
@@ -352,24 +444,65 @@
     const isToField = (m) => /\b(to|destination|arrival|arriving|flying to|to city)\b/i.test(m.label || "");
     const isSearchBtn = (m) => /\b(search|find|search flights|search buses|search trains|get flights)\b/i.test(m.label || "") &&
                                (m.role === "button" || m.role === "clickable" || m.role === "input:submit");
-    const isFlightsTab = (m) => /\bflights?\b/i.test(m.label || "") && (m.role === "link" || m.role === "button" || m.role === "clickable");
-    const isSuggestion = (m) => /\b(suggestion|option|result|item|listitem)\b/i.test(m.role || "") ||
-                                 m.role === "link" && (m.label || "").length > 2 && (m.label || "").length < 60;
+    const isFlightsTab = (m) => /\bflights?\b/i.test(m.label || "") && !/\b(hotels?|packages?|homestays?)\b/i.test(m.label || "") && (m.role === "link" || m.role === "button" || m.role === "clickable");
+    const isSuggestion = (m) => !/\b(hotels?|homestays?|villas?|resorts?)\b/i.test(m.label || "") &&
+                                 (/\b(suggestion|option|result|item|listitem)\b/i.test(m.role || "") ||
+                                  (m.role === "link" && (m.label || "").length > 2 && (m.label || "").length < 60));
 
-    // Step 0: Click Flights tab if visible and not already on flights page
+    // Step 0: Ensure we are on the flights page
+    const currentUrl = progress.currentUrl || "";
+    const isWrongTravelPage = /\/(hotels|cabs|activities|tours|railways|trains|bus-tickets|buses|holidays|homestays)/i.test(currentUrl);
+    if (isWrongTravelPage) {
+      return { action: "navigate", value: "https://www.makemytrip.com/flights/", reasoning: "Navigate back to Flights section" };
+    }
     if (step === 0) {
       const flightsTab = available.find(isFlightsTab);
-      if (flightsTab && !/\/flights/i.test(progress.currentUrl || "")) {
+      if (flightsTab && !/\/flights/i.test(currentUrl)) {
         progress.bookingStep = 1;
-        return { action: "click", mark_id: flightsTab.id, reasoning: "Click Flights tab" };
+        return { action: "click", mark_id: flightsTab.id, reasoning: "Click Flights tab to ensure we are in Flights section" };
       }
       progress.bookingStep = 1;
+    }
+
+    // Helper to find the best suggestion for a given city name
+    function pickCitySuggestion(cityName) {
+      if (!cityName) return null;
+      const rawTarget = norm(cityName);
+      const target = rawTarget.split(" ")[0];
+
+      const isCandidate = (m) => {
+        if (!isSuggestion(m)) return false;
+        const txt = norm(m.label);
+        if (target === "goa" && !rawTarget.includes("genoa") && !rawTarget.includes("italy")) {
+          if (txt.includes("genoa") || txt.includes("italy")) return false;
+        }
+        if (target === "mumbai" && !rawTarget.includes("navi") && txt.includes("navi mumbai")) return false;
+        return true;
+      };
+
+      const candidates = available.filter(isCandidate);
+      if (!candidates.length) return null;
+
+      const score = (m) => {
+        const txt = norm(m.label);
+        let s = 0;
+        if (target === "goa") {
+          if (txt.includes("dabolim") || txt.includes("goi") || txt.includes("mopa") || txt.includes("gox")) s += 200;
+          if (txt.includes("goa") && txt.includes("india")) s += 150;
+        }
+        if (txt.includes("india")) s += 50;
+        if (txt.includes(target)) s += 30;
+        return s;
+      };
+
+      candidates.sort((a, b) => score(b) - score(a));
+      return candidates[0];
     }
 
     // Step 1: Type origin city into From field
     if (step <= 1 && parsed.from && !progress.fromTyped) {
       // First check if a suggestion dropdown is open from a previous type
-      const suggestion = available.find((m) => isSuggestion(m) && norm(m.label).includes(norm(parsed.from).split(" ")[0]));
+      const suggestion = pickCitySuggestion(parsed.from);
       if (suggestion) {
         progress.fromTyped = true;
         progress.bookingStep = 2;
@@ -384,7 +517,11 @@
 
     // Step 2: Click origin suggestion
     if (step <= 2 && parsed.from && !progress.fromTyped) {
-      const suggestion = available.find((m) => isSuggestion(m));
+      const suggestion = pickCitySuggestion(parsed.from) || available.find((m) => {
+        const txt = norm(m.label);
+        if (norm(parsed.from) === "goa" && (txt.includes("genoa") || txt.includes("italy"))) return false;
+        return isSuggestion(m);
+      });
       if (suggestion) {
         progress.fromTyped = true;
         progress.bookingStep = 3;
@@ -395,7 +532,7 @@
 
     // Step 3: Type destination city into To field
     if (!progress.toTyped && parsed.to) {
-      const suggestion = available.find((m) => isSuggestion(m) && norm(m.label).includes(norm(parsed.to).split(" ")[0]));
+      const suggestion = pickCitySuggestion(parsed.to);
       if (suggestion) {
         progress.toTyped = true;
         progress.bookingStep = 4;
@@ -410,7 +547,11 @@
 
     // Step 4: Click destination suggestion
     if (!progress.toTyped) {
-      const suggestion = available.find((m) => isSuggestion(m));
+      const suggestion = pickCitySuggestion(parsed.to) || available.find((m) => {
+        const txt = norm(m.label);
+        if (norm(parsed.to) === "goa" && (txt.includes("genoa") || txt.includes("italy"))) return false;
+        return isSuggestion(m);
+      });
       if (suggestion) {
         progress.toTyped = true;
         progress.bookingStep = 5;

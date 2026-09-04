@@ -25,6 +25,9 @@ document.querySelectorAll(".tab").forEach((btn) => {
     document.querySelectorAll(".panel").forEach((p) => {
       p.classList.toggle("active", p.id === "panel-" + btn.dataset.tab);
     });
+    if (btn.dataset.tab === "vault" && typeof updateVaultUI === "function") {
+      updateVaultUI();
+    }
   });
 });
 
@@ -117,13 +120,180 @@ $("checkServer").addEventListener("click", checkServer);
 
 // ── Vault ─────────────────────────────────────────────────────────────────────
 const VAULT_KEYS = ["name", "email", "phone", "address", "username", "company", "zip", "password", "about"];
+let isVaultUnlocked = false;
+
+async function updateVaultUI() {
+  const hasPin = typeof hasVaultPin === "function" ? await hasVaultPin() : false;
+  const lockedView = $("vaultLockedView");
+  const unlockedView = $("vaultUnlockedView");
+  const setupCard = $("vaultSetupCard");
+  const noPinBanner = $("vaultNoPinBanner");
+  const activeHeader = $("vaultActiveLockHeader");
+
+  if (hasPin && !isVaultUnlocked) {
+    if (lockedView) lockedView.hidden = false;
+    if (unlockedView) unlockedView.hidden = true;
+    if (setupCard) setupCard.hidden = true;
+    const pinInput = $("vaultUnlockPin");
+    if (pinInput) pinInput.value = "";
+  } else {
+    if (lockedView) lockedView.hidden = true;
+    if (unlockedView) unlockedView.hidden = false;
+    if (noPinBanner) noPinBanner.hidden = hasPin;
+    if (activeHeader) activeHeader.hidden = !hasPin;
+    await loadVault();
+  }
+}
 
 async function loadVault() {
   const { vault } = await chrome.storage.local.get("vault");
   const v = vault || {};
   VAULT_KEYS.forEach((k) => { const el = $("v-" + k); if (el) el.value = v[k] || ""; });
 }
-loadVault();
+
+function lockVaultNow() {
+  isVaultUnlocked = false;
+  VAULT_KEYS.forEach((k) => { const el = $("v-" + k); if (el) el.value = ""; });
+  hideStatus("vaultStatus");
+  updateVaultUI();
+}
+
+// Unlock controls
+$("vaultUnlockBtn").addEventListener("click", async () => {
+  const pin = $("vaultUnlockPin").value;
+  if (!pin) {
+    showStatus("vaultUnlockStatus", "warn", "Please enter your PIN");
+    return;
+  }
+  const valid = typeof verifyVaultPin === "function" ? await verifyVaultPin(pin) : true;
+  if (valid) {
+    isVaultUnlocked = true;
+    hideStatus("vaultUnlockStatus");
+    updateVaultUI();
+  } else {
+    showStatus("vaultUnlockStatus", "error", "Incorrect PIN");
+    const pinInput = $("vaultUnlockPin");
+    pinInput.classList.remove("shake");
+    void pinInput.offsetWidth;
+    pinInput.classList.add("shake");
+    pinInput.value = "";
+    pinInput.focus();
+    setTimeout(() => pinInput.classList.remove("shake"), 400);
+  }
+});
+
+$("vaultUnlockPin").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    $("vaultUnlockBtn").click();
+  }
+});
+
+$("toggleUnlockPin").addEventListener("click", (e) => {
+  const field = $("vaultUnlockPin");
+  const showing = field.type === "text";
+  field.type = showing ? "password" : "text";
+  e.currentTarget.setAttribute("aria-pressed", String(!showing));
+  e.currentTarget.setAttribute("aria-label", showing ? "Show PIN" : "Hide PIN");
+  e.currentTarget.innerHTML = icon(showing ? "eye" : "eye-off");
+});
+
+$("vaultLockNowBtn").addEventListener("click", lockVaultNow);
+
+$("vaultOpenSetupBtn").addEventListener("click", () => {
+  $("vaultSetupCard").hidden = false;
+  $("vaultSetupTitle").innerHTML = `${icon("key")} Set Vault PIN`;
+  $("vaultCurrentPinGroup").hidden = true;
+  $("vaultCurrentPin").value = "";
+  $("vaultNewPin").value = "";
+  $("vaultConfirmPin").value = "";
+  $("removePinBtn").hidden = true;
+  hideStatus("vaultSetupStatus");
+  $("vaultNewPin").focus();
+});
+
+$("vaultChangePinBtn").addEventListener("click", () => {
+  $("vaultSetupCard").hidden = false;
+  $("vaultSetupTitle").innerHTML = `${icon("sliders")} Manage Vault PIN`;
+  $("vaultCurrentPinGroup").hidden = false;
+  $("vaultCurrentPin").value = "";
+  $("vaultNewPin").value = "";
+  $("vaultConfirmPin").value = "";
+  $("removePinBtn").hidden = false;
+  hideStatus("vaultSetupStatus");
+  $("vaultCurrentPin").focus();
+});
+
+$("cancelPinBtn").addEventListener("click", () => {
+  $("vaultSetupCard").hidden = true;
+  hideStatus("vaultSetupStatus");
+});
+
+$("savePinBtn").addEventListener("click", async () => {
+  const hasPin = typeof hasVaultPin === "function" ? await hasVaultPin() : false;
+  if (hasPin) {
+    const current = $("vaultCurrentPin").value;
+    if (!current) {
+      showStatus("vaultSetupStatus", "error", "Please enter your current PIN");
+      return;
+    }
+    const ok = typeof verifyVaultPin === "function" ? await verifyVaultPin(current) : true;
+    if (!ok) {
+      showStatus("vaultSetupStatus", "error", "Current PIN is incorrect");
+      return;
+    }
+  }
+
+  const newPin = $("vaultNewPin").value.trim();
+  const confirm = $("vaultConfirmPin").value.trim();
+  if (newPin.length < 4) {
+    showStatus("vaultSetupStatus", "warn", "PIN must be at least 4 digits/characters");
+    return;
+  }
+  if (newPin !== confirm) {
+    showStatus("vaultSetupStatus", "error", "New PIN and confirmation do not match");
+    return;
+  }
+
+  try {
+    if (typeof setVaultPin === "function") {
+      await setVaultPin(newPin);
+    }
+    isVaultUnlocked = true;
+    showStatus("vaultSetupStatus", "success", "Vault PIN saved successfully");
+    setTimeout(() => {
+      $("vaultSetupCard").hidden = true;
+      hideStatus("vaultSetupStatus");
+      updateVaultUI();
+    }, 1000);
+  } catch (err) {
+    showStatus("vaultSetupStatus", "error", err.message || "Failed to set PIN");
+  }
+});
+
+$("removePinBtn").addEventListener("click", async () => {
+  const current = $("vaultCurrentPin").value;
+  if (!current) {
+    showStatus("vaultSetupStatus", "error", "Please enter your current PIN to remove lock");
+    return;
+  }
+  try {
+    if (typeof removeVaultPin === "function") {
+      await removeVaultPin(current);
+    }
+    isVaultUnlocked = false;
+    showStatus("vaultSetupStatus", "success", "PIN lock removed");
+    setTimeout(() => {
+      $("vaultSetupCard").hidden = true;
+      hideStatus("vaultSetupStatus");
+      updateVaultUI();
+    }, 1000);
+  } catch (err) {
+    showStatus("vaultSetupStatus", "error", err.message || "Incorrect current PIN");
+  }
+});
+
+updateVaultUI();
 
 $("saveVault").addEventListener("click", async () => {
   const vault = {};

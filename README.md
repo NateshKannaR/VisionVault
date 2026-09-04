@@ -427,3 +427,4 @@ UltraFace RFB-320 — MIT (Linzaer). Tesseract.js / Tesseract — Apache 2.0.
 ONNX Runtime Web — MIT (Microsoft). All model and runtime assets are bundled; nothing is
 fetched from a CDN at runtime.
 # VisionVault
+# VisionVault

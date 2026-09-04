@@ -4,6 +4,7 @@ FastAPI Backend with Multi-VLM: Google Gemini (AI Studio) -> Groq -> OpenAI -> S
 """
 
 import base64
+import io
 import json
 import os
 import re
@@ -14,6 +15,12 @@ import urllib.error
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+try:
+    from PIL import Image
+    _PIL_AVAILABLE = True
+except ImportError:
+    _PIL_AVAILABLE = False
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -21,7 +28,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 # Load environment variables from .env
-load_dotenv()
+load_dotenv(Path(__file__).parent / ".env")
 
 app = FastAPI(title="VisionVault Privacy Agent Server")
 
@@ -50,21 +57,22 @@ def log_session_event(event_type: str, data: Dict[str, Any]):
         print(f"[server-log] Failed to write log: {e}")
 
 # ── Backend Selection ────────────────────────────────────────────────────────
-# Chain: Ollama (minicpm-v) -> Gemini -> OpenRouter -> mock
+# Chain: Ollama (Qwen2.5-VL 7B) -> OpenRouter -> Gemini -> mock
 BACKEND = "mock"
 gemini_key = os.getenv("GEMINI_API_KEY", "").strip()
 openrouter_key = os.getenv("OPENROUTER_API_KEY", "").strip()
+ollama_host = os.getenv("OLLAMA_HOST", "").strip()
 
-if gemini_key:
+if ollama_host:
+    BACKEND = "ollama"
+    print(f"[server] [OK] Tier 1: Ollama ({ollama_host})")
+elif openrouter_key:
+    BACKEND = "openrouter"
+    print(f"[server] [OK] Tier 2: OpenRouter ({os.getenv('OPENROUTER_MODEL', 'google/gemini-2.5-flash')})")
+elif gemini_key:
     BACKEND = "gemini"
-    print(f"[server] [OK] Tier 2: Google Gemini ({os.getenv('GEMINI_MODEL', 'gemini-3.6-flash')})")
-
-if openrouter_key:
-    if BACKEND == "mock":
-        BACKEND = "openrouter"
-    print(f"[server] [OK] Tier 3: OpenRouter ({os.getenv('OPENROUTER_MODEL', 'google/gemini-2.5-flash')})")
-
-if BACKEND == "mock":
+    print(f"[server] [OK] Tier 3: Google Gemini ({os.getenv('GEMINI_MODEL', 'gemini-2.0-flash')})")
+else:
     print("[server] [INFO] Backend: Deterministic rule-based planner (no API key configured)")
 
 # ── Schemas ──────────────────────────────────────────────────────────────────
@@ -113,6 +121,10 @@ class TaskHints(BaseModel):
     search_query: Optional[str] = None
     site: Optional[str] = None
     open_targets: Optional[List[str]] = None
+    from_city: Optional[str] = None
+    to_city: Optional[str] = None
+    date: Optional[str] = None
+    category: Optional[str] = None
 
 class Progress(BaseModel):
     """What the instruction has achieved so far, as observed by the client.
@@ -127,6 +139,9 @@ class Progress(BaseModel):
     scrolled: bool = False
     filled_any: bool = Field(default=False, alias="filledAny")
     opened: List[str] = []
+    from_typed: bool = Field(default=False, alias="fromTyped")
+    to_typed: bool = Field(default=False, alias="toTyped")
+    booking_step: int = Field(default=0, alias="bookingStep")
 
     model_config = {"populate_by_name": True, "extra": "ignore"}
 
@@ -172,19 +187,164 @@ def describe_hints(hints: Optional[TaskHints], task: str = "") -> str:
         lines.append("The instruction contains no search query.")
     return "\n".join(lines)
 
-def marks_for_prompt(req: "AgentStepRequest", with_boxes: bool) -> List[dict]:
-    """The element table sent to a planner, trimmed to what it can act on.
+FILLABLE_ROLES = {"input:text", "input:search", "input:email", "input:tel",
+                  "input:password", "textarea", "editable", "combobox"}
+SELECT_ROLES = {"select", "input:select", "combobox"}
+CLICKABLE_ROLES = {"link", "button", "clickable", "input:submit", "input:checkbox", "input:radio", "checkbox", "radio"}
+SEARCH_LABEL_RE = re.compile(r"search|find|query|keyword|looking for|explore", re.I)
 
-    Pixel boxes are included only for a model that is also receiving the screenshot, since
-    they exist to let it correlate a numbered mark with what it can see. For a text-only model
-    they are ~40 tokens per element of noise, and on this project that mattered twice over:
-    it slowed generation, and it burned a shared daily token budget four times faster than
-    necessary."""
-    limit = 40
+
+def extract_travel_entities(task: str) -> dict:
+    """Extracts origin city (from_city), destination city (to_city), date, and service category from task string."""
+    t = (task or "").strip()
+    entities = {"from_city": None, "to_city": None, "date": None, "category": None}
+
+    if re.search(r"\b(hotels?|homestays?|villas?|resorts?|rooms?|lodging)\b", t, re.I):
+        entities["category"] = "hotels"
+    elif re.search(r"\b(trains?|rail|irctc)\b", t, re.I):
+        entities["category"] = "trains"
+    elif re.search(r"\b(buses?|bus|volvo)\b", t, re.I):
+        entities["category"] = "buses"
+    elif re.search(r"\b(cabs?|taxi|car rental)\b", t, re.I):
+        entities["category"] = "cabs"
+    elif re.search(r"\b(flights?|flying|fly|airline|airlines?|airways?|airport|airports?)\b", t, re.I):
+        entities["category"] = "flights"
+    elif re.search(r"\b(makemytrip|goibibo|cleartrip|expedia|booking\.com)\b", t, re.I):
+        entities["category"] = "flights"
+
+    # Only look for origin/destination if travel context is present or explicit "from X to Y" syntax
+    is_travel = bool(entities["category"]) or bool(re.search(r"\b(book|tickets?|travel|trip|vacation)\b", t, re.I))
+
+    from_to = re.search(r"\bfrom\s+([a-zA-Z\s]+?)\s+to\s+([a-zA-Z\s]+?)(?:\s+(?:on|for|date|and|,|tickets?|flights?)|$)", t, re.I)
+    to_from = re.search(r"\bto\s+([a-zA-Z\s]+?)\s+from\s+([a-zA-Z\s]+?)(?:\s+(?:on|for|date|and|,|tickets?|flights?)|$)", t, re.I)
+    bare_to = re.search(r"\b(?:flights?|tickets?|cabs?|bus|trains?)\s+(?:from\s+)?([a-zA-Z\s]+?)\s+to\s+([a-zA-Z\s]+?)(?:\s+(?:on|for|date|and|,)|$)", t, re.I) or \
+              re.search(r"\b([a-zA-Z\s]+?)\s+to\s+([a-zA-Z\s]+?)\s+(?:flights?|tickets?|cabs?|bus|trains?)\b", t, re.I)
+
+    if from_to:
+        entities["from_city"] = from_to.group(1).strip()
+        entities["to_city"] = from_to.group(2).strip()
+        if not entities["category"]: entities["category"] = "flights"
+    elif to_from:
+        entities["to_city"] = to_from.group(1).strip()
+        entities["from_city"] = to_from.group(2).strip()
+        if not entities["category"]: entities["category"] = "flights"
+    elif bare_to:
+        entities["from_city"] = bare_to.group(1).strip()
+        entities["to_city"] = bare_to.group(2).strip()
+        if not entities["category"]: entities["category"] = "flights"
+    elif is_travel:
+        m_to = re.search(r"\bto\s+([a-zA-Z\s]+?)(?:\s+(?:on|for|date|and|,|tickets?|flights?)|$)", t, re.I)
+        m_from = re.search(r"\bfrom\s+([a-zA-Z\s]+?)(?:\s+(?:on|for|date|and|,|tickets?|flights?)|$)", t, re.I)
+        if m_to: entities["to_city"] = m_to.group(1).strip()
+        if m_from: entities["from_city"] = m_from.group(1).strip()
+
+    for k in ["from_city", "to_city"]:
+        if entities[k]:
+            entities[k] = re.sub(r"^(?:the|a|an)\s+", "", entities[k], flags=re.I)
+            entities[k] = re.sub(r"\s+(?:flights?|tickets?|cabs?|bus|trains?|hotels?)$", "", entities[k], flags=re.I).strip()
+
+    return entities
+
+
+def rank_marks_for_task(marks: List[Mark], task: str, category: Optional[str] = None) -> List[Mark]:
+    """Sorts marks so task-relevant targets (tabs, inputs, buttons, suggestions) appear first."""
+    entities = extract_travel_entities(task)
+    search_q = extract_search_query(task)
+
+    has_travel_intent = bool(
+        category or
+        entities.get("category") or
+        entities.get("from_city") or
+        entities.get("to_city") or
+        re.search(r"\b(flights?|hotels?|airports?|airlines?|makemytrip|goibibo|cleartrip|irctc|redbus)\b", task or "", re.I)
+    )
+    cat = (category or entities.get("category") or "flights") if has_travel_intent else None
+    from_city = (entities.get("from_city") or "").lower()
+    to_city = (entities.get("to_city") or "").lower()
+
+    def score_mark(m: Mark) -> int:
+        label = (m.label or "").lower()
+        role = (m.role or "").lower()
+        score = 0
+
+        # Messaging / Chat platform prioritization (WhatsApp, Telegram, etc.):
+        is_msg_task = bool(re.search(r"\b(whatsapp|telegram|slack|message|msg|send\s+.*to|chat|text\s+.*to)\b", task or "", re.I))
+        if is_msg_task:
+            # 1. Send button gets the highest priority
+            if re.search(r"^\s*send\s*$", label) or ("send" in label and any(r in role for r in ["button", "clickable"])):
+                return 800
+            # 2. Message input box
+            if role == "editable" or "type a message" in label:
+                return 600
+            # 3. Search contacts input
+            if "search" in label and role in FILLABLE_ROLES:
+                return 400
+
+        # E-commerce & general search query prioritization:
+        if search_q and not has_travel_intent and not is_msg_task:
+            # 1. Heavily boost actual search inputs
+            if _is_search_mark(m) and role in FILLABLE_ROLES:
+                return 500
+            # 2. Search submit buttons
+            if any(w in label for w in ["search", "find", "go"]) and any(w in role for w in ["button", "submit", "clickable"]):
+                return 200
+            # 3. Penalize common hallucination / distractor targets when search has not landed
+            if re.search(r"\b(sign\s*in|sign\s*up|log\s*in|accounts?|profile|register|bestsellers?|best\s*sellers?|trending|todays?\s*deals?|deals?|customer\s*service|help|prime|sell|registry|gift\s*cards?|cart|basket|orders?|returns?)\b", label):
+                return -1000
+
+        # Anti-hallucination Category Guard:
+        # If user wants flights, penalize promotional hotel cards, homestays, packages, etc.
+        if cat == "flights":
+            if re.search(r"\b(hotels?|homestays?|villas?|resorts?|holiday\s*packages?|trains?|buses?|cabs?)\b", label):
+                return -1000
+            if re.search(r"^\s*flights?\s*$", label):
+                score += 100
+        elif cat == "hotels":
+            if re.search(r"\b(flights?|trains?|buses?|cabs?)\b", label):
+                return -1000
+            if re.search(r"^\s*hotels?\s*$", label):
+                score += 100
+
+        # Fillable inputs or travel field pickers (From / To / Departure / Search)
+        is_travel_field = any(w in label for w in ["from", "origin", "departure", "flying from", "source", "to", "destination", "arrival", "flying to"])
+        if role in FILLABLE_ROLES or (is_travel_field and role in CLICKABLE_ROLES):
+            score += 50
+            if any(w in label for w in ["from", "origin", "departure", "flying from", "source"]):
+                score += 40
+            if any(w in label for w in ["to", "destination", "arrival", "flying to"]):
+                score += 40
+            if any(w in label for w in ["date", "depart"]):
+                score += 20
+            if "search" in label or role == "input:search":
+                score += 30
+
+        # Search / Find action buttons
+        if ("search" in label or "find" in label) and ("button" in role or "clickable" in role or role == "input:submit"):
+            score += 60
+
+        # Dropdown options / suggestions
+        if any(w in role for w in ["option", "suggestion", "listitem"]):
+            score += 70
+
+        # Relevant cities
+        if from_city and from_city in label:
+            score += 35
+        if to_city and to_city in label:
+            score += 35
+
+        return score
+
+    return sorted(marks, key=score_mark, reverse=True)
+
+
+def marks_for_prompt(req: "AgentStepRequest", with_boxes: bool) -> List[dict]:
+    """The element table sent to a planner, trimmed to what it can act on, ranked by task relevance."""
+    limit = 45
+    available = [m for m in req.marks if m.id not in (req.filled_mark_ids or [])]
+    cat = req.task_hints.category if req.task_hints else None
+    ranked = rank_marks_for_task(available, req.task, cat)
     out = []
-    for m in req.marks:
-        if m.id in (req.filled_mark_ids or []):
-            continue
+    for m in ranked:
         entry = {"id": m.id, "role": m.role, "label": (m.label or "")[:60]}
         if with_boxes and m.box:
             entry["box"] = m.box
@@ -200,6 +360,10 @@ def describe_progress(progress: Optional["Progress"]) -> str:
         return "PROGRESS SO FAR: nothing done yet (this is the first step)."
     done, todo = [], []
     (done if progress.navigated else todo).append("navigate to the site")
+    if getattr(progress, "from_typed", False):
+        done.append("origin city entered/selected")
+    if getattr(progress, "to_typed", False):
+        done.append("destination city entered/selected")
     if progress.searched or progress.query_landed:
         (done if progress.query_landed else todo).append(
             "run the search (typed, but the query has NOT landed on the page yet)"
@@ -591,14 +755,32 @@ def extract_open_targets(task: str) -> List[str]:
 # the decision. Sending an image such a model cannot read would only add seconds of latency.
 
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://127.0.0.1:11434").rstrip("/")
-# 25s, not 35: past this the client is better served by the deterministic tier, which
-# answers instantly. A local model that cannot reply in 25s is too big for the loop.
-OLLAMA_TIMEOUT = float(os.getenv("OLLAMA_TIMEOUT", "25"))
+OLLAMA_TIMEOUT = float(os.getenv("OLLAMA_TIMEOUT", "60"))
 # Keeps the model resident between steps, so only the first call pays the load cost.
 OLLAMA_KEEP_ALIVE = os.getenv("OLLAMA_KEEP_ALIVE", "20m")
 
 # Cached so a dead Ollama is not re-probed on every single step.
 _ollama_state: Dict[str, Any] = {"checked_at": 0.0, "model": None, "warming": False}
+
+
+def compress_image_for_ollama(b64_str: str, max_dim: int = 768, quality: int = 75) -> str:
+    """Downscales screenshot to reduce visual tokens from ~3500 to ~600 for Ollama VLM.
+    This prevents OOM, thread locks, and timeouts on laptop GPUs over local Wi-Fi."""
+    if not _PIL_AVAILABLE or not b64_str:
+        return b64_str
+    try:
+        raw = base64.b64decode(b64_str)
+        img = Image.open(io.BytesIO(raw))
+        if max(img.size) > max_dim:
+            img.thumbnail((max_dim, max_dim), Image.Resampling.LANCZOS)
+        buf = io.BytesIO()
+        if img.mode in ("RGBA", "P"):
+            img = img.convert("RGB")
+        img.save(buf, format="JPEG", quality=quality, optimize=True)
+        return base64.b64encode(buf.getvalue()).decode("utf-8")
+    except Exception as e:
+        print(f"[server] Ollama image compression fallback: {e}")
+        return b64_str
 
 
 def _http_json(url: str, payload: Optional[dict], timeout: float, method: str = "POST") -> Optional[dict]:
@@ -611,18 +793,21 @@ def _http_json(url: str, payload: Optional[dict], timeout: float, method: str = 
         )
         with urllib.request.urlopen(request, timeout=timeout) as response:
             return json.loads(response.read().decode("utf-8"))
-    except Exception:
+    except urllib.error.HTTPError as e:
+        err_body = ""
+        try:
+            err_body = e.read().decode("utf-8", errors="ignore")
+        except Exception:
+            pass
+        print(f"[server] HTTP {method} to {url} failed: {e} - Response: {err_body}")
+        return None
+    except Exception as e:
+        print(f"[server] HTTP {method} to {url} failed: {e}")
         return None
 
 
 def _rank_ollama_models(models: List[dict]) -> List[str]:
-    """Fastest usable planner first.
-
-    Local inference speed is dominated by parameter count: measured on this machine a 14B Q4
-    model produces 3.8 tok/s, which makes a ~90-token JSON plan take 40 seconds — far too slow
-    to sit in an interactive loop. A small instruction-tuned model answers the same
-    multiple-choice question in a couple of seconds, so size ascending is the right default.
-    Coder-specialised and embedding-only models rank last; they are tuned for other work."""
+    """Ranks Qwen vision models first, then other vision models, then small instruction models."""
     def key(m):
         name = (m.get("name") or "")
         size = m.get("size") or 0
@@ -632,29 +817,34 @@ def _rank_ollama_models(models: List[dict]) -> List[str]:
             billions = float(re.sub(r"[^0-9.]", "", params) or 0)
         except ValueError:
             billions = 0.0
-        specialised = 1 if re.search(r"coder|embed|vision|code", name, re.I) else 0
-        return (specialised, billions or size / 1e9, name)
+        # Priority 0: Qwen models (qwen2.5-vl, qwen)
+        # Priority 1: Other vision models (minicpm-v, llava)
+        # Priority 2: General instruction models
+        # Priority 3: Coder or embedding models
+        if re.search(r"qwen.*vl|qwen", name, re.I):
+            priority = 0
+        elif re.search(r"minicpm|llava|vision|vl\b", name, re.I):
+            priority = 1
+        elif re.search(r"coder|embed|code", name, re.I):
+            priority = 3
+        else:
+            priority = 2
+        return (priority, billions or size / 1e9, name)
     return [m.get("name") for m in sorted(models, key=key) if m.get("name")]
 
 
 def ollama_model(force: bool = False) -> Optional[str]:
     """The local model to plan with, or None when Ollama is not reachable.
 
-    Re-probed at most every 30s so an Ollama that starts (or stops) mid-session is picked up
-    without adding a round trip to every planning step. Set OLLAMA_MODEL to pin a specific one."""
+    Discovers available models from {OLLAMA_HOST}/api/tags. Re-probed at most every 30s so an
+    Ollama that starts (or changes models) mid-session is picked up automatically."""
     now = time.time()
     if not force and now - _ollama_state["checked_at"] < 30:
         return _ollama_state["model"]
-    # While the warm-up is mapping a model into memory, Ollama serialises API calls, so a probe
-    # issued now would block and then time out — reporting the tier as absent purely because it
-    # was busy getting ready. The warm-up has already resolved the name; trust it.
     if not force and _ollama_state.get("warming"):
         return _ollama_state["model"]
 
     _ollama_state["checked_at"] = now
-    # 5s, not 2s: Ollama serialises API calls while it is mapping a model into memory, so a
-    # probe issued during the startup warm-up would otherwise time out and report the whole
-    # tier as absent.
     tags = _http_json(f"{OLLAMA_HOST}/api/tags", None, 5.0, method="GET")
     models = (tags or {}).get("models", [])
     names = [m.get("name") for m in models if m.get("name")]
@@ -662,17 +852,25 @@ def ollama_model(force: bool = False) -> Optional[str]:
         _ollama_state["model"] = None
         return None
 
-    preferred = os.getenv("OLLAMA_MODEL", "").strip()
+    preferred = os.getenv("OLLAMA_MODEL", "qwen2.5-vl:7b").strip()
+    chosen = None
     if preferred:
-        exact = next((n for n in names if n == preferred), None)
-        prefix = next((n for n in names if n.startswith(preferred.split(":")[0])), None)
-        chosen = exact or prefix
-        if chosen:
-            _ollama_state["model"] = chosen
-            return chosen
+        exact = next((n for n in names if n.lower() == preferred.lower()), None)
+        prefix = next((n for n in names if n.lower().startswith(preferred.split(":")[0].lower())), None)
+        fuzzy = next((n for n in names if any(p in n.lower() for p in preferred.lower().split(":") if len(p) >= 3)), None)
+        chosen = exact or prefix or fuzzy
 
-    _ollama_state["model"] = _rank_ollama_models(models)[0]
-    return _ollama_state["model"]
+    # Prioritize any Qwen model from the tags if preferred didn't match directly
+    if not chosen:
+        chosen = next((n for n in names if "qwen" in n.lower()), None)
+
+    if not chosen:
+        ranked = _rank_ollama_models(models)
+        chosen = ranked[0] if ranked else names[0]
+
+    _ollama_state["model"] = chosen
+    print(f"[server] Ollama /api/tags at {OLLAMA_HOST}: {names} -> Using Tier 1 model: {chosen}")
+    return chosen
 
 
 def warm_ollama() -> None:
@@ -701,14 +899,72 @@ def warm_ollama() -> None:
 def build_planner_prompt(req: "AgentStepRequest", marks_summary: List[dict]) -> str:
     """The instruction shared by every text-tier planner, so tiers behave consistently."""
     hints = req.task_hints
+    entities = extract_travel_entities(req.task)
+    from_city = (hints.from_city if hints and hints.from_city else entities.get("from_city"))
+    to_city = (hints.to_city if hints and hints.to_city else entities.get("to_city"))
+    hint_cat = getattr(hints, "category", None) if hints else None
+    entities_cat = entities.get("category")
+    has_travel = bool(
+        entities_cat or
+        (hint_cat and hint_cat in ("flights", "hotels", "trains", "buses", "cabs") and
+         re.search(r"\b(flights?|hotels?|airports?|airlines?|makemytrip|goibibo|cleartrip|irctc|redbus|tickets?|book)\b", req.task or "", re.I))
+    )
+    category = (hint_cat or entities_cat) if has_travel else None
+
+    cat_rule = ""
+    if category == "flights":
+        cat_rule = """
+*** CRITICAL SERVICE CATEGORY: FLIGHTS ONLY ***
+- The user requested a FLIGHT search.
+- NEVER click on 'Hotels', 'Hotels in Goa', 'Homestays', 'Villas', or 'Holiday Packages' under ANY circumstances!
+- If not currently on the Flights tab, click ONLY the 'Flights' tab.
+- NEVER click promotional hotel cards even if they mention the destination city! Focus strictly on flight origin/destination fields and the 'Search' button.
+"""
+    elif category == "hotels":
+        cat_rule = """
+*** CRITICAL SERVICE CATEGORY: HOTELS ONLY ***
+- The user requested a HOTEL search. Stay in the Hotels section.
+"""
+
     travel_context = ""
-    if hints:
-        parts = []
-        if getattr(hints, 'from_city', None): parts.append(f"FROM: {hints.from_city}")
-        if getattr(hints, 'to_city', None): parts.append(f"TO: {hints.to_city}")
-        if getattr(hints, 'date', None): parts.append(f"DATE: {hints.date}")
-        if parts:
-            travel_context = "TRAVEL PARAMETERS:\n" + "\n".join(f"  {p}" for p in parts) + "\n"
+    if has_travel and (from_city or to_city or category):
+        travel_context = f"""TRAVEL PARAMETERS DETECTED:
+  SERVICE CATEGORY: {category.upper() if category else 'FLIGHTS'}
+  ORIGIN / FROM CITY: "{from_city or 'Not specified'}"
+  DESTINATION / TO CITY: "{to_city or 'Not specified'}"
+{cat_rule}
+CRITICAL INSTRUCTIONS FOR TRAVEL/BOOKING SITES:
+- If typing into the 'From' / origin city box: type ONLY "{from_city}". NEVER type full sentences like "{req.task}".
+- If typing into the 'To' / destination city box: type ONLY "{to_city}". NEVER type full sentences like "{req.task}".
+- If a suggestion list appears after typing, click the matching city option from the dropdown.
+- Do NOT press Enter on city fields."""
+
+    is_messaging = bool(re.search(r"\b(whatsapp|telegram|slack|message|msg|send\s+.*to|chat|text\s+.*to)\b", req.task or "", re.I)) or \
+                   bool(req.page_info and req.page_info.url and re.search(r"web\.whatsapp\.com|telegram|slack", req.page_info.url, re.I))
+
+    messaging_context = ""
+    if is_messaging:
+        messaging_context = """
+*** CRITICAL MESSAGING / CHAT DIRECTIVE ***
+The user is performing a messaging action (e.g. on WhatsApp, Telegram, or chat platform).
+1. If the target contact or chat is not open, click the contact from the chat list or search for the contact name.
+2. If the message text has not been entered into the chat message box, type the message into the message box.
+3. If the message text is in the message box, or if the Send button (green send arrow, paper airplane, or button labeled 'Send') is visible:
+   YOUR IMMEDIATE ACTION MUST BE TO CLICK THE SEND BUTTON!
+4. NEVER return 'done' while a message draft is sitting in the input box unsent!
+"""
+
+    search_context = ""
+    search_q = (hints.search_query if hints and hints.search_query else extract_search_query(req.task))
+    if search_q and (not req.progress or not req.progress.query_landed) and not is_messaging:
+        search_context = f"""
+*** CRITICAL SEARCH DIRECTIVE ***
+- SEARCH QUERY TO EXECUTE: "{search_q}"
+- The user wants to search for: "{search_q}".
+- Your IMMEDIATE action MUST be to type "{search_q}" into the search input box.
+- DO NOT click on 'Sign In', 'Account & Lists', 'Bestsellers', 'Deals', 'Trending', 'Customer Service', or category links!
+- DO NOT explore or browse other sections before typing the search query into the search box!
+"""
 
     return f"""You are VisionVault, a browser automation planner. You choose ONE next UI action.
 
@@ -722,6 +978,8 @@ ALREADY PROCESSED MARK IDs: {req.filled_mark_ids}
 
 {describe_hints(req.task_hints, req.task)}
 {travel_context}
+{messaging_context}
+{search_context}
 AVAILABLE INTERACTIVE ELEMENTS (choose "target" from these ids ONLY):
 {json.dumps(marks_summary, indent=2)}
 
@@ -737,9 +995,9 @@ RULES:
    - After filling all fields, click the Search/Find button.
    - On results page: click the desired flight/hotel/train to select it.
    - Then proceed through passenger details, payment steps as shown.
-4. When typing a search query, use the SEARCH QUERY above verbatim.
+4. When typing a search query, use the SEARCH QUERY above verbatim. When a search query is present and has not landed yet, you MUST type it into the search box. NEVER click sign-in, login, account, or category links.
 5. Do not repeat an action listed under PROGRESS as already done.
-6. Return "done" ONLY when the ENTIRE task (including booking confirmation) is complete.
+6. Return "done" ONLY when the ENTIRE task (including message delivery or booking confirmation) is complete. If a Send button is available on a chat, click Send.
 7. If a dropdown/suggestion list appeared, click the correct option from it.
 8. If a calendar/date picker appeared, click the correct date.
 9. If a modal/overlay appeared, interact with it to proceed.
@@ -756,17 +1014,18 @@ def plan_with_ollama(req: "AgentStepRequest") -> Optional[StepResponse]:
     if not model:
         return None
 
-    marks_summary = [
-        {"id": m.id, "role": m.role, "label": (m.label or "")[:48]}
-        for m in req.marks if m.id not in (req.filled_mark_ids or [])
-    ][:30]
-
-    # minicpm-v and other vision models in the family accept an image.
-    # Send the redacted screenshot when available so the model can see the page.
-    is_vision = re.search(r"minicpm|llava|bakllava|moondream|vision|vl\b", model, re.I)
-    img_b64 = (req.redactedImage or req.image or "") if is_vision else ""
+    # Qwen2.5-VL, minicpm-v and other vision models in the family accept an image.
+    # Send the redacted screenshot when vision is enabled.
+    # Set-of-Marks text mode (OLLAMA_VISION=false by default) delivers fast (<1-2s), lightweight (~2KB)
+    # requests without GPU VRAM exhaustion or HTTP 400 image decoding failures on local laptops.
+    is_vision = bool(re.search(r"minicpm|llava|bakllava|moondream|vision|vl\b|qwen", model, re.I))
+    use_vision = os.getenv("OLLAMA_VISION", "false").lower() in ("true", "1", "yes")
+    img_b64 = (req.redactedImage or req.image or "") if (use_vision and is_vision) else ""
     if img_b64 and "," in img_b64:
         img_b64 = img_b64.split(",", 1)[1]
+
+    # Use unified ranked marks with bounding boxes for full spatial awareness
+    marks_summary = marks_for_prompt(req, with_boxes=True)
 
     messages = [
         {"role": "system",
@@ -774,8 +1033,10 @@ def plan_with_ollama(req: "AgentStepRequest") -> Optional[StepResponse]:
                     "Keep \"reasoning\" under 12 words."},
     ]
     user_msg: Dict[str, Any] = {"role": "user", "content": build_planner_prompt(req, marks_summary)}
-    if img_b64 and is_vision:
-        user_msg["images"] = [img_b64]
+    if img_b64 and use_vision:
+        compressed_b64 = compress_image_for_ollama(img_b64, max_dim=768, quality=75)
+        if compressed_b64 and len(compressed_b64.strip()) > 100:
+            user_msg["images"] = [compressed_b64.strip()]
     messages.append(user_msg)
 
     payload = {
@@ -790,18 +1051,20 @@ def plan_with_ollama(req: "AgentStepRequest") -> Optional[StepResponse]:
     # One retry only. A second full generation on a slow local model costs more time than the
     # deterministic tier below would take to answer perfectly well.
     for attempt in (1, 2):
+        t0 = time.time()
         data = _http_json(f"{OLLAMA_HOST}/api/chat", payload, OLLAMA_TIMEOUT)
+        elapsed = time.time() - t0
         if not data:
-            print(f"[server] Ollama ({model}) attempt {attempt}: no response")
+            print(f"[server] Ollama ({model}) attempt {attempt}: no response ({elapsed:.1f}s)")
             continue
         content = (data.get("message") or {}).get("content", "")
         parsed = robust_json_parse(content)
         if not parsed or not isinstance(parsed, dict):
-            print(f"[server] Ollama ({model}) attempt {attempt}: unparseable output")
+            print(f"[server] Ollama ({model}) attempt {attempt}: unparseable output ({elapsed:.1f}s)")
             continue
         act = parsed.get("action") or {}
         reasoning = parsed.get("reasoning") or f"Local {model} plan"
-        print(f"[server] [OLLAMA:{model}] Action: {act.get('type')} (target: {act.get('target')}) - {reasoning}")
+        print(f"[server] [OLLAMA:{model}] Action: {act.get('type')} (target: {act.get('target')}) - {reasoning} ({elapsed:.1f}s)")
         return StepResponse(
             reasoning=reasoning,
             action=StepAction(
@@ -916,11 +1179,7 @@ def mock_plan(marks: List[Mark], task: str, filled_ids: Optional[List[int]] = No
 #   * an action aimed at a mark id that is not on the page (hallucinated or stale)
 #   * more work proposed after everything the user asked for was already done
 
-FILLABLE_ROLES = {"input:text", "input:search", "input:email", "input:tel",
-                  "input:password", "textarea", "editable", "combobox"}
-SELECT_ROLES = {"select", "input:select", "combobox"}
-CLICKABLE_ROLES = {"link", "button", "clickable", "input:submit", "input:checkbox", "input:radio", "checkbox", "radio"}
-SEARCH_LABEL_RE = re.compile(r"search|find|query|keyword|looking for|explore", re.I)
+
 
 
 def _is_search_mark(mark: Mark) -> bool:
@@ -945,10 +1204,6 @@ def repair_plan(plan: StepResponse, req: AgentStepRequest, tier: str) -> StepRes
     if kind == "scroll" and action.target is None:
         kind = action.type = "scroll_page"
 
-    # Nothing to repair on a terminal action.
-    if kind in ("done", "", "none", "finish", "stop"):
-        return plan
-
     target = marks.get(action.target) if action.target is not None else None
 
     # 1. A target that is not on the page cannot be acted on. Prefer re-aiming at a sensible
@@ -957,6 +1212,31 @@ def repair_plan(plan: StepResponse, req: AgentStepRequest, tier: str) -> StepRes
         notes.append(f"target {action.target} is not on this page")
         target = None
         action.target = None
+
+    # Messaging Guard: On WhatsApp / chat platforms, if a Send button is visible (meaning draft text is present),
+    # clicking the Send button is MANDATORY. Do not allow 'done' or re-clicking the draft message!
+    is_messaging = bool(re.search(r"\b(whatsapp|telegram|slack|message|msg|send\s+.*to|chat|text\s+.*to)\b", req.task or "", re.I)) or \
+                   bool(req.page_info and req.page_info.url and re.search(r"web\.whatsapp\.com|telegram|slack", req.page_info.url, re.I))
+
+    send_btn = next((
+        m for m in available
+        if re.search(r"^\s*send\s*$", m.label or "", re.I) or
+           (("send" in (m.label or "").lower() or m.label == "Send") and any(r in (m.role or "").lower() for r in ["button", "clickable", "icon"]))
+    ), None) if is_messaging else None
+
+    if is_messaging and send_btn:
+        t_label = (target.label or "").lower() if target else ""
+        if kind in ("done", "", "none", "finish", "stop") or (kind == "click" and target and target.id != send_btn.id and ("draft" in t_label or "message" in t_label)):
+            notes.append(f"Intercepted '{kind}' while Send button is available; clicking Send button to send the message")
+            kind, action.type = "click", "click"
+            action.target = send_btn.id
+            action.reasoning = "Click Send button to send the message"
+            target = send_btn
+            plan.reasoning = "Click Send button to send message"
+
+    # Terminal actions: if still done after guards, return plan.
+    if kind in ("done", "", "none", "finish", "stop"):
+        return plan
 
     # 2. Only repair search-specific mistakes when there is an outstanding search query
     # AND the task is not a booking/travel flow (where clicking fields is intentional).
@@ -970,41 +1250,68 @@ def repair_plan(plan: StepResponse, req: AgentStepRequest, tier: str) -> StepRes
         if search_box is None:
             search_box = next((m for m in available if m.role in FILLABLE_ROLES), None)
 
+        is_search_submit = (
+            target is not None and 
+            ("button" in (target.role or "").lower() or target.role == "input:submit" or "clickable" in (target.role or "").lower()) and
+            bool(re.search(r"\b(search|find|go|submit)\b", target.label or "", re.I))
+        )
+        is_dismiss_btn = (
+            target is not None and
+            bool(re.search(r"\b(close|dismiss|accept|agree|got it|continue without)\b", target.label or "", re.I))
+        )
+
         # 2a. "click" aimed at an actual SEARCH INPUT specifically — should be type instead.
-        # Do NOT convert clicks on suggestions, comboboxes, buttons, or links!
-        if kind == "click" and target is not None and target.role in ("input:search", "input:text") and _is_search_mark(target):
+        if search_box and kind == "click" and target is not None and target.id == search_box.id:
             notes.append("clicking a search box does not run a search; typing instead")
             kind, action.type = "type", "type"
+            action.target = search_box.id
             action.value = query
+            action.reasoning = f"Type '{query}' into search box"
+            target = search_box
 
-        # 2b. "select" aimed at something that is not a dropdown — retarget.
+        # 2b. "click" aimed at unrelated navigation, sign-in, categories, links before search query has landed:
+        elif search_box and kind == "click" and not is_search_submit and not is_dismiss_btn:
+            target_desc = (target.label if target and target.label else None) or str(action.target)
+            notes.append(f"Intercepted click on '{target_desc}' before search query '{query}' was entered; retargeted to search box")
+            kind, action.type = "type", "type"
+            action.target = search_box.id
+            action.value = query
+            action.reasoning = f"Type '{query}' into search box"
+            target = search_box
+
+        # 2c. Ignored scroll before search query has landed:
+        elif search_box and kind in ("scroll_page", "scroll"):
+            notes.append(f"Ignored scroll before search query '{query}' was entered; typing into search box instead")
+            kind, action.type = "type", "type"
+            action.target = search_box.id
+            action.value = query
+            action.reasoning = f"Type '{query}' into search box"
+            target = search_box
+
+        # 2d. "select" aimed at something that is not a dropdown — retarget.
         elif kind == "select" and target is not None and target.role not in SELECT_ROLES:
             real_select = next((m for m in available if m.role in SELECT_ROLES), None)
             if real_select:
                 notes.append(f"{target.role} is not a dropdown; retargeted to select element")
                 action.target = real_select.id
 
-        # 2c. "type" aimed at a non-fillable role.
-        elif kind == "type" and target is not None and target.role not in FILLABLE_ROLES and search_box:
-            notes.append(f"{target.role} cannot accept text; retargeted to the search box")
+        # 2e. "type" aimed at a non-fillable role or non-search input when a search box exists:
+        elif kind == "type" and search_box and (action.target is None or (target is not None and target.role not in FILLABLE_ROLES) or (target is not None and target.id != search_box.id and not _is_search_mark(target))):
+            notes.append("retargeted typing to the search box")
             action.target = search_box.id
+            target = search_box
 
-        # 2d. "type" aimed at a native dropdown — switch to select.
+        # 2f. "type" aimed at a native dropdown — switch to select.
         elif kind == "type" and target is not None and target.role == "select":
             notes.append("target is a dropdown; switching type to select")
             kind, action.type = "select", "select"
 
-        # 2e. "type" with no target — use the search box.
-        elif kind == "type" and action.target is None and search_box:
-            notes.append("no target given; using the search box")
-            action.target = search_box.id
-
-        # 2f. "type" with no value — fill from query.
+        # 2g. "type" with no value — fill from query.
         if kind == "type" and not action.value and not action.use_vault_field:
             notes.append("empty value; using the extracted search query")
             action.value = query
 
-        # 2g. Typed value contains the whole sentence — trim to query.
+        # 2h. Typed value contains the whole sentence — trim to query.
         if kind == "type" and action.value and not action.use_vault_field:
             value = action.value.strip()
             if len(value) > len(query) and query.lower() in value.lower():
@@ -1012,7 +1319,185 @@ def repair_plan(plan: StepResponse, req: AgentStepRequest, tier: str) -> StepRes
                 action.value = query
 
     elif is_booking:
-        # For booking flows: only fix clearly wrong targets, leave click/type completely alone!
+        entities = extract_travel_entities(req.task)
+        category = (req.task_hints.category if req.task_hints and getattr(req.task_hints, "category", None) else entities.get("category", "flights"))
+        from_city = (req.task_hints.from_city if req.task_hints and req.task_hints.from_city else entities.get("from_city"))
+        to_city = (req.task_hints.to_city if req.task_hints and req.task_hints.to_city else entities.get("to_city"))
+
+        # Category Guard: If searching for flights, keep agent in Flights and prevent any wrong-section navigation or clicks
+        if category == "flights":
+            current_url = (req.page_info.url if req.page_info and req.page_info.url else "").lower()
+            flights_tab = next((m for m in available if re.search(r"^\s*flights?\s*$", m.label or "", re.I) and not re.search(r"search|find", m.label or "", re.I)), None) or \
+                          next((m for m in available if re.search(r"\bflights?\b", m.label or "", re.I) and not re.search(r"\b(hotels?|packages?|homestays?|cabs?|trains?|buses?|search|find)\b", m.label or "", re.I)), None)
+
+            # Check 1: If current page URL is in /hotels, /cabs, /activities, /railways, /bus-tickets, /holidays, navigate directly to /flights/
+            is_wrong_section = bool(re.search(r"/(hotels|cabs|activities|tours|railways|trains|bus-tickets|buses|holidays|homestays)/?", current_url))
+            if is_wrong_section:
+                notes.append(f"Browser navigated to wrong section ({current_url}); navigating directly to Flights")
+                return StepResponse(
+                    reasoning="Navigate to Flights section",
+                    action=StepAction(type="navigate", value="https://www.makemytrip.com/flights/", reasoning="Go to Flights")
+                )
+
+            # Check 2: If model clicked an unrelated category tab/card (hotels, cabs, trains, buses)
+            t_label = (target.label or "") if target else ""
+            a_reason = action.reasoning or ""
+            target_label = (t_label + " " + a_reason).lower()
+            if kind == "click" and re.search(r"\b(hotels?|homestays?|villas?|resorts?|cabs?|taxis?|trains?|buses?|holidays?)\b", target_label):
+                target_desc = (target.label if target and target.label else None) or action.target
+                notes.append(f"Intercepted click on unrelated category element '{target_desc}' during FLIGHT search")
+                from_field = next((m for m in available if re.search(r"\b(from|origin|departure|source)\b", m.label or "", re.I) and (m.role in FILLABLE_ROLES or m.role in CLICKABLE_ROLES)), None)
+                to_field = next((m for m in available if re.search(r"\b(to|destination|arrival)\b", m.label or "", re.I) and (m.role in FILLABLE_ROLES or m.role in CLICKABLE_ROLES)), None)
+                search_btn = next((m for m in available if re.search(r"\b(search|find)\b", m.label or "", re.I) and ("button" in m.role or "clickable" in m.role or m.role == "input:submit")), None)
+
+                if flights_tab and "/flights" not in current_url:
+                    action.target = flights_tab.id
+                    action.reasoning = "Switch to Flights tab"
+                    target = flights_tab
+                elif from_city and not getattr(progress, "from_typed", False) and from_field:
+                    kind, action.type = "type", "type"
+                    action.target = from_field.id
+                    action.value = from_city
+                    action.reasoning = f"Type origin city '{from_city}' into From field"
+                    target = from_field
+                elif to_city and not getattr(progress, "to_typed", False) and to_field:
+                    kind, action.type = "type", "type"
+                    action.target = to_field.id
+                    action.value = to_city
+                    action.reasoning = f"Type destination city '{to_city}' into To field"
+                    target = to_field
+                elif search_btn:
+                    action.target = search_btn.id
+                    action.reasoning = "Click Search Flights button"
+                    target = search_btn
+                elif flights_tab:
+                    action.target = flights_tab.id
+                    action.reasoning = "Click Flights tab"
+                    target = flights_tab
+
+            # Check 3: Foreign airport guard (e.g. Genoa, Italy vs Goa, India)
+            if (to_city and "goa" in to_city.lower()) or (from_city and "goa" in from_city.lower()):
+                t_label = (target.label or "") if target else ""
+                a_reason = (action.reasoning or "")
+                dest_clicked = (t_label + " " + a_reason).lower()
+                if kind == "click" and ("genoa" in dest_clicked or "italy" in dest_clicked):
+                    notes.append(f"Intercepted click on foreign airport '{t_label or action.target}' during domestic Goa flight search")
+                    goa_sugg = next((m for m in available if re.search(r"\b(dabolim|goi|mopa|gox|goa)\b", m.label or "", re.I) and not re.search(r"\b(genoa|italy)\b", m.label or "", re.I)), None)
+                    if goa_sugg:
+                        action.target = goa_sugg.id
+                        action.reasoning = f"Select domestic Goa airport: {goa_sugg.label}"
+                        target = goa_sugg
+
+        # Scroll Guard: On booking search pages, form is at the top. Never scroll down away from search form before searching!
+        is_search_done = getattr(progress, "searched", False) or getattr(progress, "query_landed", False)
+        scroll_y = int((req.page_info.scroll_y or 0) if req.page_info else 0)
+        if not is_search_done:
+            if scroll_y > 120:
+                notes.append(f"Page was scrolled down {scroll_y}px away from search form; scrolling back to top")
+                return StepResponse(
+                    reasoning="Scroll back to top to access search fields",
+                    action=StepAction(type="scroll_page", value=str(-scroll_y), reasoning="Scroll to top of page")
+                )
+            elif kind in ("scroll_page", "scroll"):
+                notes.append("Ignored scroll_page on travel form before search is submitted")
+                to_field = next((m for m in available if re.search(r"\b(to|destination|arrival)\b", m.label or "", re.I) and (m.role in FILLABLE_ROLES or m.role in CLICKABLE_ROLES)), None)
+                from_field = next((m for m in available if re.search(r"\b(from|origin|departure|source)\b", m.label or "", re.I) and (m.role in FILLABLE_ROLES or m.role in CLICKABLE_ROLES)), None)
+                search_btn = next((m for m in available if re.search(r"\b(search|find)\b", m.label or "", re.I) and ("button" in m.role or "clickable" in m.role or m.role == "input:submit")), None)
+                if getattr(progress, "from_typed", False) and to_city and to_field:
+                    kind, action.type = "type", "type"
+                    action.target = to_field.id
+                    action.value = to_city
+                    action.reasoning = f"Type destination city '{to_city}' into To field"
+                    target = to_field
+                elif from_city and from_field:
+                    kind, action.type = "type", "type"
+                    action.target = from_field.id
+                    action.value = from_city
+                    action.reasoning = f"Type origin city '{from_city}' into From field"
+                    target = from_field
+                elif search_btn:
+                    kind, action.type = "click", "click"
+                    action.target = search_btn.id
+                    action.reasoning = "Click Search Flights button"
+                    target = search_btn
+
+        # Guard: If origin city is already done and model attempts to type origin city again or target From field:
+        if getattr(progress, "from_typed", False) and from_city and to_city:
+            t_label = (target.label or "") if target else ""
+            is_typing_from = (kind == "type" and action.value and from_city.lower() in action.value.lower()) or \
+                             (re.search(r"\b(from|origin|departure|source)\b", t_label, re.I))
+            if is_typing_from:
+                if not getattr(progress, "to_typed", False):
+                    to_field = next((m for m in available if re.search(r"\b(to|destination|arrival)\b", m.label or "", re.I)), None)
+                    if to_field:
+                        notes.append(f"Origin city '{from_city}' already completed; retargeted to destination field for '{to_city}'")
+                        kind, action.type = "type", "type"
+                        action.target = to_field.id
+                        action.value = to_city
+                        action.reasoning = f"Type destination city '{to_city}' into To field"
+                        target = to_field
+                else:
+                    search_btn = next((m for m in available if re.search(r"\b(search|find)\b", m.label or "", re.I) and ("button" in m.role or "clickable" in m.role or m.role == "input:submit")), None)
+                    if search_btn:
+                        notes.append(f"Both origin '{from_city}' and destination '{to_city}' completed; retargeted to Search button")
+                        kind, action.type = "click", "click"
+                        action.target = search_btn.id
+                        action.reasoning = "Click Search Flights button"
+                        target = search_btn
+
+        # Guard: If both origin and destination cities are entered, proceed immediately to Search Flights button
+        if getattr(progress, "from_typed", False) and getattr(progress, "to_typed", False):
+            search_btn = next((m for m in available if re.search(r"\b(search|find)\b", m.label or "", re.I) and ("button" in m.role or "clickable" in m.role or m.role == "input:submit")), None)
+            t_label = (target.label or "") if target else ""
+            if search_btn and (kind != "click" or (target and target.id != search_btn.id and re.search(r"\b(from|to|origin|destination|departure|arrival|flight)\b", t_label, re.I))):
+                notes.append("Origin and destination cities already entered; clicking Search Flights button")
+                kind, action.type = "click", "click"
+                action.target = search_btn.id
+                action.reasoning = "Click Search Flights button"
+                target = search_btn
+
+        # Convert clicks on destination/origin input boxes into type actions
+        if kind == "click" and target is not None:
+            t_label = (target.label or "").lower()
+            a_reason = (action.reasoning or "").lower()
+            is_dest = (any(w in t_label or w in a_reason for w in ["to", "destination", "arrival", "dest", "flying to"]) or getattr(progress, "from_typed", False)) and not getattr(progress, "to_typed", False)
+            is_orig = any(w in t_label or w in a_reason for w in ["from", "origin", "departure", "source"]) and not getattr(progress, "from_typed", False)
+
+            if is_dest and to_city and (target.role in FILLABLE_ROLES or "to" in t_label or "destination" in t_label or "enter" in a_reason):
+                notes.append(f"Model clicked destination input to enter text; converted to type '{to_city}'")
+                kind, action.type = "type", "type"
+                action.value = to_city
+                action.reasoning = f"Type destination city '{to_city}' into To field"
+            elif is_orig and from_city and (target.role in FILLABLE_ROLES or "from" in t_label or "origin" in t_label or "enter" in a_reason):
+                notes.append(f"Model clicked origin input to enter text; converted to type '{from_city}'")
+                kind, action.type = "type", "type"
+                action.value = from_city
+                action.reasoning = f"Type origin city '{from_city}' into From field"
+
+        # Fix: If kind is "type" and value contains the whole sentence or travel keywords:
+        if kind == "type" and action.value:
+            val_lower = action.value.lower().strip()
+            t_label = (target.label or "") if target else ""
+            t_role = (target.role or "") if target else ""
+            target_text = (t_label + " " + t_role).lower()
+
+            is_to_target = any(w in target_text for w in ["to", "destination", "dest", "arrival", "flying to", "arriving"]) or "to" in (action.reasoning or "").lower()
+            is_from_target = any(w in target_text for w in ["from", "origin", "source", "depart", "flying from", "departing"]) or "from" in (action.reasoning or "").lower()
+
+            if ("flight" in val_lower or "from" in val_lower or "to" in val_lower or len(action.value) > 20):
+                if is_to_target and to_city:
+                    notes.append(f"trimmed destination input from full sentence to '{to_city}'")
+                    action.value = to_city
+                elif is_from_target and from_city:
+                    notes.append(f"trimmed origin input from full sentence to '{from_city}'")
+                    action.value = from_city
+                elif to_city and not is_from_target:
+                    notes.append(f"trimmed input to destination city '{to_city}'")
+                    action.value = to_city
+                elif from_city:
+                    notes.append(f"trimmed input to origin city '{from_city}'")
+                    action.value = from_city
+
         # 2b. "select" aimed at non-dropdown.
         if kind == "select" and target is not None and target.role not in SELECT_ROLES:
             real_select = next((m for m in available if m.role in SELECT_ROLES), None)
@@ -1075,19 +1560,20 @@ def _goal_complete(req: AgentStepRequest, progress: Progress) -> bool:
 @app.get("/health")
 def health():
     local_model = ollama_model()
+    current_backend = "ollama" if local_model else ("openrouter" if openrouter_key else ("gemini" if gemini_key else "mock"))
     return {
         "status": "ok",
-        "backend": BACKEND,
+        "backend": current_backend,
         "chain": [t for t in [
             "ollama" if local_model else None,
-            "gemini" if gemini_key else None,
             "openrouter" if openrouter_key else None,
+            "gemini" if gemini_key else None,
             "mock",
         ] if t],
         "models": {
             "ollama": local_model,
-            "gemini": os.getenv("GEMINI_MODEL", "gemini-3.6-flash"),
             "openrouter": os.getenv("OPENROUTER_MODEL", "google/gemini-2.5-flash"),
+            "gemini": os.getenv("GEMINI_MODEL", "gemini-2.0-flash"),
         },
         "ollama_host": OLLAMA_HOST,
         # Tiers currently rested by the circuit breaker, and how long until they are retried.
@@ -1108,29 +1594,23 @@ async def agent_step(req: AgentStepRequest):
     plan = None
     tier = None
 
-    # Tier 1: Friend's Ollama — minicpm-v is a vision model, runs locally on the network
+    # Tier 1: Friend's Ollama — Qwen2.5-VL 7B running locally on network
     if tier_available("ollama"):
         plan = plan_with_ollama(req)
         if plan:
             tier = "ollama"
 
-    # Tier 2: Google Gemini
-    if not plan and gemini_key and tier_available("gemini"):
-        plan = plan_with_gemini(req)
-        if plan:
-            tier = "gemini"
-
-    # Tier 3: OpenRouter fallover
+    # Tier 2: OpenRouter (e.g. Gemini 2.5 Flash / Qwen)
     if not plan and openrouter_key and tier_available("openrouter"):
         plan = plan_with_openrouter(req)
         if plan:
             tier = "openrouter"
 
-    # Tier 3: local Ollama — no internet required
-    if not plan and tier_available("ollama"):
-        plan = plan_with_ollama(req)
+    # Tier 3: Google Gemini
+    if not plan and gemini_key and tier_available("gemini"):
+        plan = plan_with_gemini(req)
         if plan:
-            tier = "ollama"
+            tier = "gemini"
 
     # Tier 4: deterministic rules — cannot fail
     if not plan:
@@ -1164,30 +1644,28 @@ async def agent_step_stream(req: AgentStepRequest):
         def emit(obj):
             return f"data: {json.dumps(obj)}\n\n"
 
+        # Tier 1: Friend's Ollama
         if tier_available("ollama"):
             plan = plan_with_ollama(req)
             if plan:
                 tier = "ollama"
                 yield emit({"tier": tier, "reasoning": plan.reasoning, "partial": True})
 
-        if not plan and gemini_key and tier_available("gemini"):
-            plan = plan_with_gemini(req)
-            if plan:
-                tier = "gemini"
-                yield emit({"tier": tier, "reasoning": plan.reasoning, "partial": True})
-
+        # Tier 2: OpenRouter
         if not plan and openrouter_key and tier_available("openrouter"):
             plan = plan_with_openrouter(req)
             if plan:
                 tier = "openrouter"
                 yield emit({"tier": tier, "reasoning": plan.reasoning, "partial": True})
 
-        if not plan and tier_available("ollama"):
-            plan = plan_with_ollama(req)
+        # Tier 3: Google Gemini
+        if not plan and gemini_key and tier_available("gemini"):
+            plan = plan_with_gemini(req)
             if plan:
-                tier = "ollama"
+                tier = "gemini"
                 yield emit({"tier": tier, "reasoning": plan.reasoning, "partial": True})
 
+        # Tier 4: Mock
         if not plan:
             plan = mock_plan(req.marks, req.task, req.filled_mark_ids, req.page_info, req.progress)
             tier = "mock"

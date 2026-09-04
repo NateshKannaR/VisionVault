@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VisionVault Fixture — Laptop results</title>
+<link rel="stylesheet" href="fixture.css">
+<style>
+  /* Deliberately generic markup: no semantic class names an agent could key off. Cards are
+     found by SHAPE — repeated siblings sharing a tag and class, each with a heading and a
+     link — which is exactly what page-reader.js looks for on a real shopping site. */
+  .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin-top: 16px; }
+  .xk4 { border: 1px solid #d8dce3; border-radius: 10px; padding: 14px; background: #fff; }
+  .xk4 h3 { font-size: 15px; margin: 0 0 6px; }
+  .xk4 h3 a { color: #14315e; text-decoration: none; }
+  .xk4 .p { font-size: 17px; font-weight: 700; margin: 6px 0 2px; }
+  .xk4 .r { font-size: 12px; color: #5c6470; }
+  .xk4 .s { font-size: 12px; color: #5c6470; margin-top: 5px; }
+  .bar { display: flex; gap: 8px; align-items: center; margin-top: 14px; flex-wrap: wrap; }
+  .bar button, .bar select { padding: 7px 12px; font: inherit; border-radius: 7px; border: 1px solid #c3c9d2; background: #fff; cursor: pointer; }
+  .cartbar { margin-top: 18px; padding: 12px 14px; border: 1px dashed #c3c9d2; border-radius: 10px; background: #fbfcfe; }
+  #cartState { font-weight: 600; }
+</style>
+</head>
+<!--
+  EVALUATION FIXTURE — a product results page.
+
+  Exists to test the workflow the problem statement asks for end to end, repeatably and
+  offline: search -> read the results -> compare ratings and prices -> choose the best within
+  a budget -> add it to the cart. Real shopping sites cannot be used for that: they change
+  hourly, rate-limit, and must never be transacted against by a test.
+
+  Every product, price and rating here is invented. The one PII region is the signed-in
+  customer's own details in the header, which is what a real results page shows and what the
+  redaction pipeline has to catch.
+
+  Ground truth for the choice: within a ₹50,000 budget the best-rated item is "Vertex 16 Slim"
+  (4.7, ₹48,500). Nimbus Pro 15 rates the same but costs more; Zephyr X1 rates higher but is
+  over budget.
+-->
+<body data-fixture-id="shop-results" data-fixture-kind="ecommerce">
+
+  <header class="card" style="display:flex;justify-content:space-between;align-items:center">
+    <h1 style="margin:0">Laptops</h1>
+    <p class="pii" data-gt-pii="email" style="margin:0">Signed in as maya.venkatesh@examplemail.com</p>
+  </header>
+
+  <div class="bar">
+    <label for="q" class="sr">Search</label>
+    <input type="search" id="q" name="q" value="laptop" placeholder="Search products" data-gt-safe data-gt-mark="input:search" style="flex:1;min-width:180px">
+    <select id="sort" data-gt-safe data-gt-mark="select">
+      <option value="rel">Sort: relevance</option>
+      <option value="price">Sort: price low to high</option>
+      <option value="rating">Sort: customer rating</option>
+    </select>
+    <button id="filter" data-gt-safe data-gt-mark="button">Under ₹50,000</button>
+  </div>
+
+  <p class="muted" data-gt-safe>4 results</p>
+
+  <div class="grid">
+    <div class="xk4">
+      <h3><a href="#aurora" data-gt-safe data-gt-mark="link">Aurora 14 Ultrabook 16GB</a></h3>
+      <div class="p">₹54,999</div>
+      <div class="r">4.4 out of 5 · 1,204 ratings</div>
+      <div class="s">Core i5 · 16GB RAM · 512GB SSD · 1.2kg</div>
+    </div>
+    <div class="xk4">
+      <h3><a href="#nimbus" data-gt-safe data-gt-mark="link">Nimbus Pro 15 32GB</a></h3>
+      <div class="p">₹71,000</div>
+      <div class="r">4.7 out of 5 · 880 ratings</div>
+      <div class="s">Ryzen 7 · 32GB RAM · 1TB SSD · 1.7kg</div>
+    </div>
+    <div class="xk4">
+      <h3><a href="#vertex" data-gt-safe data-gt-mark="link">Vertex 16 Slim</a></h3>
+      <div class="p">₹48,500</div>
+      <div class="r">4.7 out of 5 · 2,310 ratings</div>
+      <div class="s">Core i5 · 16GB RAM · 512GB SSD · 1.5kg</div>
+    </div>
+    <div class="xk4">
+      <h3><a href="#zephyr" data-gt-safe data-gt-mark="link">Zephyr X1 Creator</a></h3>
+      <div class="p">₹88,000</div>
+      <div class="r">4.9 out of 5 · 640 ratings</div>
+      <div class="s">Core i7 · 32GB RAM · 2TB SSD · 1.9kg</div>
+    </div>
+  </div>
+
+  <div class="cartbar">
+    <p>Cart: <span id="cartState">empty</span></p>
+    <!-- "Add to bag", not "Add to cart": the agent must match by purpose, not by exact words. -->
+    <button id="add" data-gt-safe data-gt-mark="button">Add to bag</button>
+    <button id="checkout" data-gt-safe data-gt-mark="button">Proceed to checkout</button>
+  </div>
+
+  <script>
+    // Which product the user last opened. A real site navigates; this records it so a test can
+    // assert what the agent chose without needing a second page.
+    window.__selected = null;
+    document.querySelectorAll('.xk4 a').forEach((a) => {
+      a.addEventListener('click', (e) => {
+        e.preventDefault();
+        window.__selected = a.textContent.trim();
+        document.querySelectorAll('.xk4').forEach((c) => { c.style.outline = ''; });
+        a.closest('.xk4').style.outline = '2px solid #2f56d9';
+      });
+    });
+    document.getElementById('add').addEventListener('click', () => {
+      window.__cart = window.__selected || '(nothing selected)';
+      document.getElementById('cartState').textContent = window.__cart;
+    });
+    document.getElementById('checkout').addEventListener('click', () => {
+      window.__checkout = true;
+      document.getElementById('cartState').textContent = (window.__cart || 'empty') + ' — at checkout';
+    });
+  </script>
+</body>
+</html>

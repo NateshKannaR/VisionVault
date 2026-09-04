@@ -62,8 +62,18 @@
    * This is what makes `done` trustworthy. A planner saying "done" on step 1 with an empty
    * search box is wrong, and this is how the guard knows.
    */
-  function goalSatisfied(parsed, progress) {
+  /** With a workflow plan, "done" means every milestone is done — nothing less. */
+  function planOutstanding(plan) {
+    if (!plan || !Array.isArray(plan.milestones) || !plan.milestones.length) return null;
+    return plan.milestones.find((m) => m.status !== "done" && m.status !== "skipped") || null;
+  }
+  function hasPlan(plan) {
+    return !!(plan && Array.isArray(plan.milestones) && plan.milestones.length);
+  }
+
+  function goalSatisfied(parsed, progress, plan) {
     const p = progress || {};
+    if (hasPlan(plan)) return planOutstanding(plan) === null;
     if (!parsed) return true;
 
     // A search is only done when the query demonstrably reached the page — typed into a field,
@@ -90,7 +100,8 @@
    * verified from the page itself: the query reached the URL, every named target was opened,
    * the page scrolled.
    */
-  function goalFullyVerified(parsed, progress) {
+  function goalFullyVerified(parsed, progress, plan) {
+    if (hasPlan(plan)) return planOutstanding(plan) === null;
     if (!parsed || parsed.wantsFill) return false;
     const hasVerifiableIntent = !!parsed.query || (parsed.openTargets || []).length > 0 || parsed.wantsScroll;
     if (!hasVerifiableIntent) return false;
@@ -98,9 +109,13 @@
   }
 
   /** Human-readable summary of what remains, used in UI messages. */
-  function describeRemaining(parsed, progress) {
+  function describeRemaining(parsed, progress, plan) {
     const p = progress || {};
     const left = [];
+    if (hasPlan(plan)) {
+      const m = planOutstanding(plan);
+      return m ? m.title.toLowerCase() : "";
+    }
     if (parsed?.query && !p.queryLanded) left.push(`search for "${parsed.query}"`);
     for (const t of parsed?.openTargets || []) if (!(p.opened || []).includes(t)) left.push(`open "${t}"`);
     if (parsed?.wantsScroll && !p.scrolled) left.push("scroll the page");
@@ -120,6 +135,39 @@
     "input:text", "input:search", "input:email", "input:tel", "input:password",
     "input:url", "textarea", "editable",
   ]);
+
+  /**
+   * What each kind of milestone may legitimately do.
+   *
+   * Only the kinds whose work is NOT clicking are listed: `open`, `act`, `fill` and `navigate`
+   * are open-ended by nature and are policed by the other rules instead. Terminal and
+   * workflow-level verbs are allowed everywhere, because ending a run or moving to the next
+   * milestone is always a valid answer.
+   */
+  const ALWAYS_ALLOWED = ["done", "next_milestone", "wait", "none", "finish", "stop", ""];
+  const ALLOWED_BY_KIND = {
+    answer: new Set([...ALWAYS_ALLOWED, "answer", "read_page"]),
+    read: new Set([...ALWAYS_ALLOWED, "read_page", "answer", "scroll_page", "scroll", "scroll_to"]),
+    scroll: new Set([...ALWAYS_ALLOWED, "scroll_page", "scroll", "scroll_to", "read_page"]),
+    search: new Set([...ALWAYS_ALLOWED, "type", "click", "press_key", "select", "scroll_page", "scroll", "navigate", "read_page"]),
+  };
+
+  /** "a 3rd", "a 2nd" — these strings are shown to the user, so they read as English. */
+  function ordinal(n) {
+    const i = Math.round(n);
+    const suffix = (i % 100 >= 11 && i % 100 <= 13) ? "th"
+      : ({ 1: "st", 2: "nd", 3: "rd" }[i % 10] || "th");
+    return `a ${i}${suffix}`;
+  }
+
+  function describeKind(kind) {
+    return {
+      answer: "a conclusion from what was read",
+      read: "reading the page",
+      scroll: "scrolling",
+      search: "running the search",
+    }[kind] || "something else";
+  }
 
   // Controls that commit a form. Narrower than the click-risk list: this is about "would this
   // end the form", not "is this dangerous".
@@ -141,9 +189,13 @@
   }
 
   /** One line describing what the run achieved, for the panel. */
-  function describeCompletion(parsed, progress) {
+  function describeCompletion(parsed, progress, plan) {
     const p = progress || {};
     const bits = [];
+    if (hasPlan(plan)) {
+      const done = plan.milestones.filter((m) => m.status === "done");
+      return done.length ? `Done — ${done.map((m) => m.title.toLowerCase()).join(", ")}.` : "Done.";
+    }
     if (p.navigated && parsed?.site) bits.push(`opened ${parsed.site}`);
     if (p.queryLanded && parsed?.query) bits.push(`searched for "${parsed.query}"`);
     if ((p.opened || []).length) bits.push(`opened ${p.opened.length} item(s)`);
@@ -171,7 +223,14 @@
     function review(proposed, ctx = {}) {
       const marks = ctx.marks || [];
       const progress = ctx.progress || {};
-      const fingerprint = fingerprintOf(ctx.pageInfo, marks, (ctx.filledIds || []).length);
+      const plan = ctx.plan || null;
+      // Milestones completed count as progress: a read, an answer or a navigation can leave
+      // every page signal unchanged while the workflow has genuinely moved on.
+      const milestonesDone = hasPlan(plan) ? plan.milestones.filter((m) => m.status === "done").length : 0;
+      const fingerprint = fingerprintOf(ctx.pageInfo, marks, (ctx.filledIds || []).length + milestonesDone);
+      // A fill milestone in a workflow behaves exactly like a fill task without one.
+      const current = planOutstanding(plan);
+      const filling = current ? current.kind === "fill" : !!parsed?.wantsFill;
 
       // ── Stall detection. Nothing visible has changed for several steps. ──────────────────
       if (lastFingerprint !== null && fingerprint === lastFingerprint) {
@@ -193,7 +252,7 @@
           stop: true,
           substituted: true,
           reason: `The page stopped responding to the agent — ${staleSteps} steps with no visible change. ` +
-                  (describeRemaining(parsed, progress) ? `Not completed: ${describeRemaining(parsed, progress)}.` : ""),
+                  (describeRemaining(parsed, progress, plan) ? `Not completed: ${describeRemaining(parsed, progress, plan)}.` : ""),
         };
       }
 
@@ -206,9 +265,9 @@
       // Further actions at this point are the planner inventing work — which is how "scroll
       // down and show me more headlines" became six scrolls, and how a finished search turned
       // into a tour of the results page.
-      if (type && type !== "done" && goalFullyVerified(parsed, progress)) {
+      if (type && type !== "done" && goalFullyVerified(parsed, progress, plan)) {
         return {
-          action: { action: "done", reasoning: describeCompletion(parsed, progress) },
+          action: { action: "done", reasoning: describeCompletion(parsed, progress, plan) },
           substituted: true,
           reason: "",
         };
@@ -217,7 +276,7 @@
       // ── Rule 1: a pure scroll instruction may not click anything. ────────────────────────
       // "scroll down and show me more stories" is not permission to open a link whose text
       // happens to contain "down".
-      if (type === "click" && isPureScrollTask(parsed)) {
+      if (type === "click" && isPureScrollTask(parsed) && (!current || current.kind === "scroll")) {
         if (progress.scrolled) {
           return {
             action: { action: "done", reasoning: "Scrolled as requested." },
@@ -235,7 +294,7 @@
       // proposed clicking "Create account". The click-risk gate caught it and asked for
       // approval, which is the safety net working - but the right answer was to carry on
       // filling, not to ask the user whether to submit an incomplete form.
-      if (type === "click" && parsed?.wantsFill) {
+      if (type === "click" && filling) {
         const target = marks.find((m) => String(m.id) === String(action.mark_id));
         const remaining = unfilledFields(marks, ctx.filledIds);
         const alt = ctx.deterministic;
@@ -259,8 +318,49 @@
         }
       }
 
+      // ── Rule 2b: the action must suit the milestone in hand. ─────────────────────────────
+      //
+      // A milestone says what kind of work is outstanding, and some kinds do not involve the
+      // DOM at all. "Confirm selection" is an `answer`: it means state the conclusion from
+      // what was read. Observed live, a planner answered it with a click on a different
+      // product — the run had already put the right laptop in the cart, then opened the wrong
+      // one on the way to writing its summary. Reading is similar: once a page has been read,
+      // clicking around it is not what "compare the options" asked for.
+      if (current && ALLOWED_BY_KIND[current.kind] && !ALLOWED_BY_KIND[current.kind].has(type)) {
+        const alt = ctx.deterministic;
+        const altType = normalizeType(alt);
+        if (alt && altType && ALLOWED_BY_KIND[current.kind].has(altType)) {
+          return {
+            action: { ...alt, action: altType },
+            substituted: true,
+            reason: `"${current.title}" calls for ${describeKind(current.kind)}, not a ${type}.`,
+          };
+        }
+      }
+
+      // ── Rule 2c: do not navigate away from the search box you are about to use. ──────────
+      //
+      // A link click during an outstanding search leaves the page, and the box goes with it.
+      // Observed live on eBay: step one clicked an unlabelled link, the home page was replaced,
+      // two attempts to reveal a search box failed, and the milestone was abandoned. A button
+      // is left alone — on GitHub and MDN a button is what mounts the search input — but a link
+      // is never how a search is run when a box is already visible.
+      if (type === "click" && parsed?.query && !progress.queryLanded && (!current || current.kind === "search")) {
+        const target = marks.find((m) => String(m.id) === String(action.mark_id));
+        const box = marks.find((m) => FILLABLE_ROLES.has(m.role) && !(ctx.filledIds || []).map(String).includes(String(m.id)));
+        if (target && target.role === "link" && box) {
+          return {
+            action: { action: "type", mark_id: box.id, value: parsed.query,
+                      reasoning: `Search for "${parsed.query}"` },
+            substituted: true,
+            reason: `Not following a link while the search is outstanding — typing into "${box.label || "the search box"}" instead.`,
+          };
+        }
+      }
+
       // ── Rule 3: never type the user's whole sentence into a search box. ──────────────────
-      if (type === "type" && !action.use_vault_field && parsed?.query && action.value) {
+      if (type === "type" && !action.use_vault_field && parsed?.query && action.value &&
+          (!current || current.kind === "search")) {
         const target = marks.find((m) => String(m.id) === String(action.mark_id));
         const value = String(action.value);
         const wholeTask = String(ctx.task || "").trim().toLowerCase();
@@ -281,12 +381,12 @@
         // evaluation fixture the planner called a six-field signup done after five, leaving
         // the address blank. Bounded by MAX_DONE_OVERRIDES, so a form with fields nothing can
         // fill still terminates.
-        const fillIncomplete = !!parsed?.wantsFill && unfilledFields(marks, ctx.filledIds).length > 0;
+        const fillIncomplete = filling && unfilledFields(marks, ctx.filledIds).length > 0;
 
-        if ((goalSatisfied(parsed, progress) && !fillIncomplete) || doneOverrides >= MAX_DONE_OVERRIDES) {
-          const unmet = describeRemaining(parsed, progress);
+        if ((goalSatisfied(parsed, progress, plan) && !fillIncomplete) || doneOverrides >= MAX_DONE_OVERRIDES) {
+          const unmet = describeRemaining(parsed, progress, plan);
           return {
-            action: { action: "done", reasoning: proposed?.reasoning || "Task complete." },
+            action: { ...proposed, action: "done", reasoning: proposed?.reasoning || "Task complete." },
             substituted: false,
             reason: unmet && doneOverrides >= MAX_DONE_OVERRIDES
               ? `Stopping: could not complete ${unmet} on this page.`
@@ -299,7 +399,7 @@
           doneOverrides++;
           const outstanding = fillIncomplete
             ? `${unfilledFields(marks, ctx.filledIds).length} form field(s)`
-            : `"${describeRemaining(parsed, progress)}"`;
+            : `"${describeRemaining(parsed, progress, plan)}"`;
           return {
             action: { ...alt, action: altType },
             substituted: true,
@@ -307,9 +407,9 @@
           };
         }
         return {
-          action: { action: "done", reasoning: proposed?.reasoning || "" },
+          action: { ...proposed, action: "done", reasoning: proposed?.reasoning || "" },
           substituted: false,
-          reason: describeRemaining(parsed, progress) ? `Could not complete: ${describeRemaining(parsed, progress)}.` : "",
+          reason: describeRemaining(parsed, progress, plan) ? `Could not complete: ${describeRemaining(parsed, progress, plan)}.` : "",
         };
       }
 
@@ -324,7 +424,7 @@
           return {
             action: { ...alt, action: altType },
             substituted: true,
-            reason: `Refused a ${seen + 1}th identical ${type}; trying a different approach.`,
+            reason: `Refused ${ordinal(seen + 1)} identical ${type}; trying a different approach.`,
           };
         }
         return {
@@ -332,7 +432,7 @@
           stop: true,
           substituted: true,
           reason: `The same ${type} produced no effect ${seen} times — stopping rather than looping. ` +
-                  (describeRemaining(parsed, progress) ? `Not completed: ${describeRemaining(parsed, progress)}.` : ""),
+                  (describeRemaining(parsed, progress, plan) ? `Not completed: ${describeRemaining(parsed, progress, plan)}.` : ""),
         };
       }
 
@@ -374,6 +474,7 @@
     unfilledFields,
     fingerprintOf,
     signatureOf,
+    planOutstanding,
     MAX_SIGNATURE_REPEATS,
     MAX_STEPS_WITHOUT_PROGRESS,
   };

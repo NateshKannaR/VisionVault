@@ -40,6 +40,7 @@ const PAGES = [
   { file: 'survey-form.html', label: 'Registration survey', kind: 'form' },
   { file: 'social-feed.html', label: 'Social feed (+ same-origin iframe)', kind: 'social' },
   { file: 'pixel-receipt.html', label: 'Pixel-only receipt (DOM blind spot)', kind: 'pixel-only' },
+  { file: 'shop-results.html', label: 'Product results (multi-step journey)', kind: 'ecommerce' },
 ];
 
 const argv = process.argv.slice(2);

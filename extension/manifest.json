@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "VisionVault",
-  "version": "1.0.0",
-  "description": "Local PII redaction + vault + cloud VLM automation on sanitized screens.",
+  "version": "2.0.0",
+  "description": "A private browser agent: reads the screen on your device, masks anything personal before a planner sees it, and carries out multi-step tasks on any website.",
   "permissions": ["activeTab", "scripting", "tabs", "storage", "sidePanel", "offscreen"],
   "host_permissions": ["<all_urls>", "file://*/*"],
   "background": {
@@ -33,7 +33,7 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["action-executor.js", "content.js"],
+      "js": ["action-executor.js", "page-reader.js", "content.js"],
       "run_at": "document_idle",
       "all_frames": true
     }

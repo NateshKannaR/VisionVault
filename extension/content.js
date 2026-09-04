@@ -526,7 +526,7 @@ function inferRole(el) {
   const placeholder = (el.getAttribute("placeholder") || "").toLowerCase();
 
   if (tag === "input") {
-    if (type === "submit" || type === "button") return "button";
+    if (type === "submit" || type === "button" || type === "image") return "button";
     if (type === "search" || role === "searchbox") return "input:search";
     return `input:${type || "text"}`;
   }
@@ -534,7 +534,13 @@ function inferRole(el) {
   if (tag === "a" || role === "link") return "link";
   if (tag === "select") return "select";
   if (tag === "textarea") return "textarea";
-  if (role === "textbox" || role === "searchbox" || role === "combobox") return "editable";
+  if (role === "textbox" || role === "searchbox") return "editable";
+  // A combobox that is not an input is a custom dropdown: it opens a list, it is not typed into.
+  if (role === "combobox" || role === "listbox") return "select";
+  if (role === "option") return "option";
+  if (role === "checkbox" || role === "switch" || role === "radio") return "checkbox";
+  if (role === "tab") return "tab";
+  if (role === "menuitem" || role === "menuitemradio" || role === "menuitemcheckbox") return "menuitem";
   if (el.getAttribute("contenteditable") === "true") return "editable";
   if (aria.includes("message") || placeholder.includes("message")) return "editable";
   return "clickable";
@@ -546,8 +552,14 @@ function tagInteractiveElements() {
   const usedIds = new Set();
   const seen = new WeakSet();
 
+  // File inputs are tagged so the planner can see them; they cannot be driven by script, and
+  // the executor answers an "upload" on one by handing the step to the person.
   const candidates = document.querySelectorAll(
-    'a, button, input:not([type="hidden"]):not([type="file"]), textarea, select, [role="button"], [role="link"], [role="searchbox"], [role="textbox"], [role="tab"], [role="menuitem"], [contenteditable="true"], .nav-link, .btn, [id*="search" i], [name*="search" i], [name*="keywords" i]'
+    'a, button, input:not([type="hidden"]), textarea, select, [role="button"], [role="link"], ' +
+    '[role="searchbox"], [role="textbox"], [role="combobox"], [role="listbox"], [role="option"], ' +
+    '[role="checkbox"], [role="switch"], [role="radio"], [role="tab"], [role="menuitem"], ' +
+    '[role="menuitemradio"], [role="menuitemcheckbox"], [contenteditable="true"], summary, ' +
+    '.nav-link, .btn, [id*="search" i], [name*="search" i], [name*="keywords" i]'
   );
 
   candidates.forEach((el) => {
@@ -696,6 +708,20 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
   if (msg.type === "GET_PAGE_INFO") {
     sendResponse(getPageInfo());
+    return true;
+  }
+
+  // What the page says, PII-scrubbed, for comparison and extraction. Top frame only: the
+  // reader walks the whole document, and an ad iframe answering first would describe an ad.
+  if (msg.type === "READ_PAGE") {
+    if (window !== window.top) return false;
+    try {
+      const reader = globalThis.__vagentReader;
+      if (!reader) { sendResponse({ ok: false, error: "Page reader not loaded in this frame." }); return true; }
+      sendResponse({ ok: true, content: reader.readPage() });
+    } catch (err) {
+      sendResponse({ ok: false, error: String(err && err.message ? err.message : err) });
+    }
     return true;
   }
 });

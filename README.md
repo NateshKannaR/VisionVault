@@ -1,63 +1,82 @@
 # VisionVault — a privacy-preserving vision agent that runs in the browser
 
-**SIH PS 26171.** A Chrome MV3 extension that lets a cloud vision-language model drive your
-browser, while every piece of sensitive data stays on your machine.
+A Chrome extension that reads the screen **on your device**, paints over anything personal
+before a single byte leaves, and then carries out multi-step tasks on any website from a
+sanitized view. Built for SIH 2026 problem statement **26171**.
 
-> **Just want to use it?** [START-HERE.md](START-HERE.md) is the two-minute version.
+The premise of that problem statement is a split: the client has the data and not the compute,
+the server has the compute and must never get the data. VisionVault holds that line in code
+rather than in a promise — the service worker cannot transmit an image the redaction pipeline
+did not produce, and the planner is only ever told the *name* of a personal field, never its
+value.
 
-The idea is simple to state and fiddly to get right: a server-side agent is powerful but you
-must hand it your screen; a client-side agent keeps your data but has no room for a real model.
-VisionVault splits the work. Perception and redaction run locally, in WebAssembly, on your
-machine. Only a **redacted screenshot plus numbered element boxes** ever leave the browser. The
-server reasons over that sanitized view and replies with an abstract action — *type your email
-into element 4148216* — and the client resolves what "your email" means, locally, from a vault
-the server never sees.
+```
+   YOUR BROWSER                                          THE SERVER
+   ┌───────────────────────────────────────┐             ┌──────────────────────┐
+   │ 1  DOM scan (every same-origin frame) │             │  Gemini  (vision)    │
+   │    UltraFace ONNX · Tesseract OCR     │             │  Groq    (vision)    │
+   │              ↓                        │  redacted   │  Ollama  (local)     │
+   │ 2  merge regions · paint them out     │─ image ────>│  rules   (always)    │
+   │    FAIL CLOSED: no image, no request  │  + marks    │        ↓             │
+   │              ↓                        │  + plan     │  repair_plan()       │
+   │ 3  guard · execute · verify · re-scan │<─ one ──────│  one action          │
+   │    vault values substituted HERE      │  action     └──────────────────────┘
+   └───────────────────────────────────────┘
+```
 
----
+## What it does that a scripted automation cannot
+
+You type a sentence. It becomes a **workflow** — an ordered list of milestones — and the agent
+works through it one page at a time, verifying each milestone against the page rather than
+assuming it happened.
+
+> *"find the best laptop under 50000, compare the ratings and add the best one to the cart"*
+
+```
+  1. Search for "laptop under 50000"     search   ✓
+  2. Read and compare the results        read     ✓   4 products extracted
+  3. Open the best match                 open     ✓   Vertex 16 Slim · ₹48,500 · 4.7/5
+  4. Add it to the cart                  act      ✓   approved by you first
+  5. Summarise what was found            answer   ✓
+```
+
+Measured end to end on the evaluation fixture: **45 seconds, 9 actions, the correct product**,
+with the cart step held for human approval. `npm run verify:journey` runs exactly this and
+checks the decision, not just that buttons were pressed.
+
+Nothing about that is site-specific. There are no per-site selectors anywhere in the codebase.
+The agent works from standard HTML semantics, ARIA, and observable behaviour: did a field
+appear, did the value land, did the URL change.
 
 ## What actually happens on each step
 
-```
-┌── YOUR MACHINE ─────────────────────────────────────────────────────────────────────┐
-│                                                                                     │
-│  1. CAPTURE + READ THE SCREEN            2. FIND WHAT IS SENSITIVE (all local)       │
-│     • chrome.tabs.captureVisibleTab         • DOM: input types, autocomplete,        │
-│     • DOM scan in EVERY same-origin           <label> text, table column headers,    │
-│       frame, merged into one view             regexes (email/phone/card/SSN/         │
-│     • interactive elements tagged with         Aadhaar/PAN/passport/IFSC/UPI)        │
-│       deterministic, scan-stable IDs        • UltraFace ONNX  → faces, ~46ms         │
-│                                             • Tesseract OCR   → text baked into      │
-│                                               pixels, ~1.7s                          │
-│                                             • merged, IoU-deduplicated               │
-│                                                                                     │
-│  3. REDACT — OffscreenCanvas paints over every detected region.                      │
-│     If this step throws, the request is ABORTED. There is no code path that          │
-│     transmits an unredacted or partially redacted frame.                             │
-└─────────────────────────────────┬───────────────────────────────────────────────────┘
-                                  │  redacted PNG + [{id, role, box, label}]
-                                  ▼
-┌── SERVER (server/main.py) ──────────────────────────────────────────────────────────┐
-│  Gemini → Groq → your local Ollama → deterministic rules. Sees only the redacted     │
-│  frame, the numbered boxes, and what the task has achieved so far. Every tier's      │
-│  answer is checked against that element list before it is returned.                  │
-│  Replies with ONE action, referring to personal data symbolically:                   │
-│      { "type": "type", "target": 4148216, "use_vault_field": "email" }               │
-└─────────────────────────────────┬───────────────────────────────────────────────────┘
-                                  │  abstract action
-                                  ▼
-┌── YOUR MACHINE ─────────────────────────────────────────────────────────────────────┐
-│  4. SUPERVISE — agent-guard.js checks the proposed action against what the task      │
-│     actually asked for: no repeats, no clicks on a scroll-only task, no "done"       │
-│     while the search has not run. It can veto, and says why.                         │
-│  5. RESOLVE + EXECUTE — vault.js turns "email" into your real address from           │
-│     chrome.storage.local and types it into the page. The value never goes upstream.  │
-│     A field the vault has no value for pauses and asks you, once.                    │
-│     Consequential clicks (pay, submit, delete, sign-up…) stop for your approval.     │
-│  6. RE-SCAN and loop, until the instruction is demonstrably carried out.             │
-└─────────────────────────────────────────────────────────────────────────────────────┘
-```
+1. **Scan.** `chrome.scripting.executeScript({ allFrames: true })` runs the DOM scan in every
+   same-origin frame; each frame reports its own coordinates plus its offset inside the top
+   viewport. Cross-origin frames cannot compute that offset and are dropped rather than
+   painted at a guess. `chrome.tabs.captureVisibleTab` takes the screenshot.
 
----
+2. **Detect, locally.** An offscreen document runs UltraFace (ONNX Runtime Web, WASM-SIMD) and
+   Tesseract OCR in parallel on the raw frame. DOM rules, face boxes and OCR hits are merged by
+   IoU into one region list.
+
+3. **Redact, or abort.** Every region is painted out on an `OffscreenCanvas` at full
+   resolution, then the image is downscaled to at most 1280px wide. If anything in that
+   function throws, it throws a `RedactionError` and the raw screenshot goes out of scope
+   unused. There is no code path on which an unredacted pixel reaches the network.
+
+4. **Plan.** The redacted image, the Set-of-Marks element table, the workflow plan and the
+   progress so far go to the server. The response is exactly one action. When the milestone in
+   hand is a `read`, the client also sends what the page *says* — headings, listed items,
+   tables — scrubbed of PII patterns first, with sensitive table columns dropped.
+
+5. **Supervise.** `agent-guard.js` reviews the proposed action against the plan and the page
+   before it touches the DOM: it will not click during an `answer` milestone, will not submit a
+   half-empty form, will not type the user's whole sentence into a search box, and will not
+   accept `done` while a milestone is outstanding.
+
+6. **Execute and verify.** The action runs in the frame the mark actually lives in. Then the
+   page is asked whether it worked — did the query reach the URL, did the value land, did the
+   page scroll — and only that answer advances the workflow.
 
 ## Measured results
 
@@ -65,8 +84,8 @@ Numbers live in **[`eval_report.md`](eval_report.md)** and are regenerated from 
 Chrome run — see [Evaluation](#evaluation) below. Nothing in that report is hand-written; the
 generator refuses to run without a results file.
 
-Last run: 6 annotated fixture pages, 55 sensitive regions, 3 scans each, Chrome 152.
-Plus ten public websites, reported in full under
+Last run: 7 annotated fixture pages, 3 scans each, Chrome 152. Plus 22 public websites across
+e-commerce, travel, productivity, media and services, reported in full under
 [On real websites](eval_report.md#on-real-websites).
 
 | | |
@@ -79,19 +98,41 @@ Plus ten public websites, reported in full under
 | Mean local pipeline latency | **1.56s** with OCR, **0.11s** without (p95 1.73s) |
 | Extension on disk / offscreen heap | 22.4 MB / 8-14 MB depending on page size |
 
-On ten public websites, with read-only search and scroll tasks and success judged from the
-page afterwards rather than from the agent's own report:
+### The multi-step workflow, end to end
+
+`npm run verify:journey` drives the whole thing against a fixture whose right answer is a fact:
 
 | | |
 | :--- | :--- |
-| Search tasks that reached the results page | **6 of 7** (Amazon, Flipkart, Wikipedia, YouTube, GitHub, MDN) |
-| Scroll tasks that acted | **2 of 2** (BBC News, Hacker News) |
-| Sites that refused automation | 1 — Stack Overflow served a CAPTCHA, which the agent detects and reports |
-| Steps per task | 1 for most; 2 where the search box had to be opened first |
-| Typical local scan | 1.3–3.5s depending on page size |
+| Task | *"find the best laptop under 50000, compare the ratings and add the best one to the cart"* |
+| Milestones completed | **5 of 5** |
+| Product chosen | **Vertex 16 Slim** — 4.7/5 at ₹48,500, the best-rated inside the budget |
+| Products read and compared | 4, with prices and ratings extracted from the page |
+| Human approval | requested before the cart step, as designed |
+| End to end | **45s over 9 actions** |
+| Checks passed | **19 of 19**, including that the page's own PII never reached the server |
 
-The one genuine miss is MakeMyTrip, whose "search" is a structured journey planner rather than
-a text box: the agent types the query, cannot make it mean anything to that widget, and says so.
+That number was 170s before the planning chain was given a deadline. Same behaviour, same
+result; the difference was entirely tiers being allowed to fail slowly.
+
+### On live websites
+
+22 public sites, read-only tasks, success judged from the page afterwards rather than from the
+agent's own report. Full table in [`eval_report.md`](eval_report.md#on-real-websites); the
+honest summary is that ordinary search, scroll and read tasks work, and structured widgets do
+not:
+
+- **Searches land** on Amazon, Flipkart, Myntra, Wikipedia, YouTube, GitHub, MDN and others,
+  usually in one step and 10-15 seconds including the local scan.
+- **Reading works**: on Hacker News, *"read this page and tell me the top stories"* produced a
+  correct summary naming the top three stories with their point counts.
+- **Modal-heavy sites work.** Flipkart's login pop-up is closed automatically; before that was
+  fixed, the run ended in three seconds having done nothing.
+- **A structured journey planner is not a search box.** MakeMyTrip takes an origin, a
+  destination and a date; the agent types the query, cannot make it mean anything to that
+  widget, and says so rather than claiming success.
+- **A site that refuses automation is respected.** Stack Overflow has served a `/nocaptcha`
+  challenge; the agent detects it and hands the page back.
 
 The caveats, all measured rather than glossed:
 
@@ -121,10 +162,11 @@ The caveats, all measured rather than glossed:
   IoU is unchanged at 93.8%, and the scan got faster (mean 1.56s, p95 1.71s) because there are
   far fewer regions to merge and paint. If the face model fails or is switched off, the blanket
   rule returns.
-- **Per-step latency in a full task is dominated by the hosted model**, not by the client. The
-  recorded end-to-end run completed 7 steps in 33s wall-clock, of which the initial local scan
-  was ~2.3s; the rest was planning round-trips, and individual calls have ranged from 3s to 30s
-  depending on the hosted model's load.
+- **Per-step latency is dominated by the planner, and is now bounded.** The local pipeline is
+  ~1.6s per scan; a planning call is 0.6-3.5s when the chain is healthy. When it is not, the
+  whole chain is capped at 12 seconds before the local tier answers — see
+  [the planning chain](#the-planning-chain-and-what-happens-when-it-breaks) for the three
+  specific traps that made this worth measuring rather than assuming.
 
 ---
 
@@ -136,10 +178,29 @@ the extension never sees an error, only a slightly different planner.
 
 | Tier | What it is | Sees the screenshot | Measured latency | Fails when |
 | :--- | :--- | :--- | :--- | :--- |
-| 1 | **Gemini** (hosted VLM) | yes | ~3s | quota, network, key |
-| 2 | **Groq** (hosted) | vision models only | 0.9–2.4s | quota, network, key |
-| 3 | **Ollama** (your machine) | no — marks only | 0.5–0.8s | Ollama not running |
+| 1 | **Gemini** (hosted VLM) | yes | 0.6–3s | quota, network, key |
+| 2 | **Groq** (hosted) | vision models only | 0.7–2.4s | quota, network, key |
+| 3 | **Ollama** (your machine) | no — marks only | 0.5–2s | Ollama not running |
 | 4 | **Deterministic rules** | no | <1ms | never |
+
+The chain is bounded, not just ordered. One step may spend `STEP_PLAN_BUDGET_S` (12s) across
+all hosted tiers, two models each, with a per-call timeout; past that the local tiers answer,
+and they answer in about a second. That bound is the single most valuable latency fix in the
+system: measured on a five-stage journey while both providers were degraded — 503s, read
+timeouts, and a vision model rejecting its own JSON — steps cost 13s, 17s, 25s and 25s and the
+run took **170 seconds**. With the budget, the same run takes **45 seconds**. Nothing was
+broken either time; every tier was simply being allowed to fail slowly in turn.
+
+Three specific traps, each found by measurement rather than reasoning:
+
+- **The Groq SDK retries twice by default.** A 9-second timeout was really a 27-second one; one
+  call was measured at 22.5s inside a 12s budget. `max_retries=0` — the planning chain is
+  already a retry policy, and a better one, because the next attempt is a different model.
+- **A tier that is merely slow is invisible to an ordinary circuit breaker.** A 503 is not a
+  quota message and a timeout is not reported at all, so a provider having a bad afternoon was
+  re-asked on every single step. Two consecutive duds now rest the tier for two minutes.
+- **The local tier needs a deadline too.** It is reached exactly when a step is already late,
+  and a 25-second timeout with a retry could add 50 seconds to a step that had no budget left.
 
 Verified by disabling each tier in turn and checking the next one takes over with a usable
 action — `python eval/test-fallback-chain.py`. On the run recorded below, Gemini was returning
@@ -202,6 +263,17 @@ can veto or substitute an action but never invents a target, and when it interve
   set aside and put to the user once everything else is done.
 - **"Typed" is not "searched".** The client verifies the query reached the URL or title, not
   merely a field, and escalates if it did not.
+- **The action must suit the milestone.** An `answer` milestone means state a conclusion from
+  what was read; the DOM is not involved. *(Before: with the right laptop already in the cart,
+  a planner answered "Confirm selection" by clicking a different, more expensive product.)*
+- **A milestone the page cannot satisfy is skipped, not fatal.** A plan may include "apply a
+  price filter" on a site that has no such filter. Retrying it burned the whole step budget and
+  ended with nothing done — measured, a five-stage journey stopped at two of five with three
+  achievable milestones untouched. It is now abandoned after four attempts, named in the
+  completion card as a warning, and the workflow carries on.
+- **A planner's "done" is about the milestone, not the task.** With milestones outstanding it
+  advances the plan instead of ending the run. Bounded: every skip moves the plan forward, so
+  it cannot loop.
 
 ### Making a search actually run
 
@@ -246,6 +318,8 @@ Some pages cannot be automated, and saying so is more useful than trying harder:
 | The right value goes in the right field | the field's own label overrules the planner's choice of vault key; a label naming an identifier the vault has no equivalent for (Aadhaar, PAN, passport, CVV) is set aside and put to you rather than filled with the nearest match |
 | Element labels cannot smuggle PII | `safeLabel()` never uses an input's `value`, and drops any candidate that matches a PII pattern |
 | Page context cannot smuggle PII | `page_info` carries origin + path only — no query string, no fragment, no page text |
+| Page *content* is scrubbed before it is read | `page-reader.js` runs every extracted string through the same PII patterns and replaces matches with `[redacted]`; table columns whose header names a sensitive field are dropped wholesale; an item whose own title matches a PII pattern is discarded. Only sent on a `read` milestone, never on every step |
+| The site memory cannot leak either | `site-memory.js` stores element *labels* and outcomes, never values or page text, and it never leaves the device |
 | Consequential actions need a human | risk-gated click confirmation (below) |
 
 ### Click confirmation — the exact policy
@@ -265,6 +339,16 @@ does, no more and no less:
   gating every unlabelled link would stop the agent browsing at all.
 - **Strict.** Every click requires approval.
 
+The target's own label is the authority; the planner's prose is only a secondary signal, and a
+noisy one. *"Close the login popup blocking the page"* is a dismissal that happens to contain
+the word "login" — observed live on Flipkart, that alone halted a run for approval before a
+single action had been taken. Reasoning that is plainly about clearing an overlay no longer
+gates a control that is not itself risky.
+
+When the agent does stop, you have three answers, not two: **Approve**, **Cancel**, or
+**Modify** — type what to do instead, and that instruction goes to the planner in place of the
+action it proposed.
+
 Non-click actions are never gated: typing is reversible, and vault values are substituted
 locally, so a `type` action exposes nothing.
 
@@ -281,15 +365,22 @@ extension/
   manifest.json              MV3 config. Note content_security_policy: WebAssembly needs
                              'wasm-unsafe-eval' — without it both local models fail silently.
   content.js                 DOM PII scan, Set-of-Marks tagging, deterministic IDs, per-frame API
-  action-executor.js         THE action executor (click/type/press_key/select/scroll_page/
-                             clear/scroll/hover/focus/wait/dismiss_overlays/open_search/
-                             probe_query/search_url/done). Content script, loaded in every
+  action-executor.js         THE action executor (click/type/press_key/select/check/
+                             scroll_page/scroll_to/clear/scroll/hover/focus/wait/upload/
+                             dismiss_overlays/open_search/probe_query/search_url/
+                             detect_bot_wall/done). Content script, loaded in every
                              frame. There is no second implementation, and no site-specific
                              selector anywhere in it.
   agent-guard.js             Supervises the planner: loop detection, goal verification,
-                             refuses a "done" the page does not support
-  task-planner.js            Parses the instruction; plans on-device when no server answers
-  background.js              Service worker: agent loop, vault resolution, click risk gate
+                             milestone-appropriate actions, refuses a "done" the page does
+                             not support
+  task-planner.js            Parses the instruction, decomposes it into a workflow, and plans
+                             on-device when no server answers; chooses between what was read
+  page-reader.js             Reads what the page SAYS — headings, listed items, tables — as
+                             PII-scrubbed structured JSON, so the agent can compare and choose.
+                             Finds listings by shape, never by a site's class names.
+  site-memory.js             What worked per site (labels only) and the local run history
+  background.js              Service worker: workflow loop, vault resolution, click risk gate
   detection-orchestrator.js  Capture + all-frame merge + offscreen ML + fail-closed redaction
   offscreen.html/.js         MV3 offscreen document hosting the WASM models
   vault.js                   On-device vault; symbolic field → real value
@@ -301,17 +392,23 @@ extension/
   models/                    version-RFB-320.onnx (1.27 MB) + eng.traineddata.gz
   lib/                       ONNX Runtime Web + Tesseract WASM, bundled — no CDN at runtime
 server/
-  main.py                    FastAPI. Chain: Gemini → Groq → Ollama → deterministic rules,
-                             plus repair_plan(), which validates every tier's answer
+  main.py                    FastAPI. Three endpoints: /api/agent/plan (decompose a task into
+                             milestones), /api/agent/step (one action), /api/agent/summary
+                             (write the completion report). Chain: Gemini → Groq → Ollama →
+                             deterministic rules, plus repair_plan(), which validates every
+                             tier's answer against the page it was shown
   restart.ps1                stops whatever holds the port, then starts a fresh instance
 eval/
-  pages/                     6 fixture pages carrying their own ground-truth annotations
+  pages/                     7 fixture pages carrying their own ground-truth annotations,
+                             including shop-results.html — the multi-step journey fixture
   assets/                    generated fixture images (+ the scripts that generate them)
   lib/                       browser harness, PNG decoder, scoring maths
   run-full-eval.js           the live evaluation
-  real-sites.js              runs the agent against ten public websites and reports outcomes
+  real-sites.js              runs the agent against 22 public websites across five categories
+  verify-journey.js          the full multi-step workflow end to end, checking the DECISION
+  test-workflow.js           42 unit tests: decomposition, milestone planning, choosing
   probe-search-dom.js        dumps how a site's search box is actually built
-  test-agent-guard.js        26 unit tests, one per failure seen on a live site
+  test-agent-guard.js        28 unit tests, one per failure seen on a live site
   test-source-hygiene.js     catches escapes mangled into control characters, which silently
                              disabled three regexes during this work
   test-panel-wiring.js       the panel's script and its markup must still agree
@@ -364,13 +461,28 @@ latency is dominated by parameter count. `OLLAMA_MODEL` pins a specific one.
 
 ### 3. Try it
 
-Open `mock-apps/demo-page.html`, type a task such as *"fill the signup form with my details"*,
-then **Scan & Redact Screen**. The panel shows the redacted frame that would be uploaded, the
-per-source detection counts and the stage timings. **Execute Safe Automation** runs the loop.
+Go to any website, type what you want, and press **Run task**:
+
+```
+search for iqoo neo 6 and show me
+find the best laptop under 50000, compare the ratings and add the best one to the cart
+read this page and tell me the top stories
+fill the signup form with my details
+```
+
+The panel shows the workflow as a checklist and ticks each milestone off as the page proves it
+happened, with the live line naming what is running, which planner chose it, and how confident
+that planner was. The run ends on a completion card: what was achieved, the results it found,
+what it could not do, and why.
+
+To see the privacy step, press **Preview what is sent** instead. The panel shows the exact
+redacted image with every masked region outlined and colour-coded by detector; nothing has been
+transmitted yet. Tick Settings → *Pause after the scan* to make that the default.
 
 To confirm nothing sensitive is leaving: open DevTools → Network on the service worker, run a
 step, and inspect the `/api/agent/step` payload. `redactedImage` is the same image shown in the
-preview, and no vault value appears anywhere in the request body.
+preview, and no vault value appears anywhere in the request body. `npm run verify` checks
+exactly that automatically, against the bytes on the wire.
 
 ---
 
@@ -394,6 +506,28 @@ Set `VV_CHROME` if Chrome is not at the default path.
 Results that cannot be automated can be hand-recorded — copy
 `eval/results/manual-eval.example.json` to `manual-eval.json`, fill it in, and re-run the
 generator. Every row in the report is labelled `AUTOMATED` or `MANUAL`.
+
+### Verifying the multi-step workflow
+
+```bash
+node eval/verify-journey.js
+```
+
+Drives the full journey — *"find the best laptop under 50000, compare the ratings and add the
+best one to the cart"* — against `eval/pages/shop-results.html`, where the right answer is a
+fact rather than an opinion: Vertex 16 Slim rates 4.7 at ₹48,500; Nimbus Pro rates the same and
+costs more; Zephyr rates higher and is over budget. It asserts the **decision**, not that
+buttons were pressed:
+
+- the task decomposes into milestones including a read before the choice;
+- the agent reads the page and extracts all four products with prices and ratings;
+- it opens **Vertex 16 Slim** and adds it to the cart;
+- the cart step stops for human approval first;
+- the customer email printed on the page never reaches the server, and neither does any vault
+  value, on any of the requests;
+- the run ends with a written summary, structured findings, and an entry in local history.
+
+Measured: **19/19 checks, 45 seconds, 9 actions.**
 
 ### Verifying behaviour and the privacy invariants
 

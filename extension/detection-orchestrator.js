@@ -404,6 +404,14 @@
    * screenshot and never returns a partially redacted image. Callers must treat a
    * throw as "abort the request; transmit nothing".
    */
+  // Widest the redacted image is kept at. A screenshot is captured at the display's device
+  // pixel ratio, so a 1280px viewport on a HiDPI screen produces a 2560px PNG — roughly four
+  // times the bytes, uploaded on every single step, for detail no planner uses: it is choosing
+  // among numbered marks, not reading fine print. Redaction is applied at full resolution
+  // first, so nothing is smuggled through by the resize, and the panel displays this same
+  // image — "what the server receives" stays literally true.
+  const MAX_IMAGE_WIDTH = 1280;
+
   async function redactImage(rawScreenshot, regions = [], vpW, vpH, mode = "black") {
     if (!rawScreenshot) throw new RedactionError("No screenshot supplied to redactImage().");
     try {
@@ -450,7 +458,19 @@
         }
       }
 
-      const redactedBlob = await canvas.convertToBlob({ type: "image/png" });
+      // Downscale AFTER every mask is painted, never before.
+      let outCanvas = canvas;
+      if (bitmap.width > MAX_IMAGE_WIDTH) {
+        const scale = MAX_IMAGE_WIDTH / bitmap.width;
+        outCanvas = new OffscreenCanvas(MAX_IMAGE_WIDTH, Math.max(1, Math.round(bitmap.height * scale)));
+        const octx = outCanvas.getContext("2d");
+        octx.imageSmoothingEnabled = true;
+        octx.imageSmoothingQuality = "medium";
+        octx.drawImage(canvas, 0, 0, outCanvas.width, outCanvas.height);
+      }
+      bitmap.close();
+
+      const redactedBlob = await outCanvas.convertToBlob({ type: "image/png" });
       const buf = await redactedBlob.arrayBuffer();
       const bytes = new Uint8Array(buf);
       let b64 = "";

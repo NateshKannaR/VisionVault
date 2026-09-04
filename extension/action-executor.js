@@ -12,8 +12,9 @@
  * consistently on a site nobody has seen before.
  *
  * Supported action types:
- *   click, type, press_key, select, scroll_page, clear, scroll, hover, focus, wait,
- *   dismiss_overlays, open_search, done
+ *   click, type, press_key, select, check, scroll_page, scroll_to, clear, scroll, hover,
+ *   focus, wait, upload, dismiss_overlays, open_search, probe_query, search_url,
+ *   detect_bot_wall, done
  */
 
 (function (global) {
@@ -67,7 +68,7 @@
   //               every subsequent action, which makes the agent unusable on much of the web.
   const CLOSE_RE = /^(?:\s*)(?:close|dismiss|no thanks|not now|maybe later|skip|later|×|✕|✖|x)(?:\s*)$/i;
   const CONSENT_RE = /^(?:\s*)(?:accept(?:\s+all)?(?:\s+cookies)?|allow all|allow cookies|agree|i agree|got it|ok|okay|continue)(?:\s*)$/i;
-  const CLOSE_LABEL_RE = /\b(?:close|dismiss|no thanks|not now|skip)\b/i;
+  const CLOSE_LABEL_RE = /\b(?:close|dismiss|no thanks|not now|skip)\b|(?:^|[^a-z])(?:×|✕|✖)(?:[^a-z]|$)/i;
 
   // What makes an overlay a cookie notice rather than an agreement to something.
   const CONSENT_CONTEXT_RE =
@@ -118,8 +119,25 @@
       if (labels.length >= maxToClose) break;
       if (TRANSACTIONAL_OVERLAY_RE.test((overlay.textContent || "").slice(0, 600))) continue;
 
-      const buttons = Array.from(overlay.querySelectorAll('button, [role="button"], a[href="#"], input[type="button"]'))
-        .filter(isVisible);
+      // Not only real buttons. A great many sites draw their close control as a bare <span>
+      // or <div> holding a "✕" glyph, with the click handler bound to it — Flipkart's login
+      // modal is one, and it defeated this entirely: the dialog stayed up, swallowed every
+      // click beneath it, and the run ended having done nothing. So anything small, visible
+      // and labelled as a close counts, whatever tag it happens to use.
+      const buttons = Array.from(overlay.querySelectorAll(
+        'button, [role="button"], a[href="#"], input[type="button"], ' +
+        '[aria-label*="close" i], [title*="close" i], [class*="close" i], [data-testid*="close" i], ' +
+        'span, div, i, svg'
+      )).filter((el) => {
+        if (!isVisible(el)) return false;
+        const r = el.getBoundingClientRect();
+        // A <div> the size of the dialog is the dialog, not its close button.
+        if (r.width > 220 || r.height > 220) return false;
+        if (/^(?:BUTTON|A|INPUT)$/.test(el.tagName) || el.getAttribute("role") === "button") return true;
+        // A generic element only qualifies if it is labelled or reads as a close glyph.
+        const text = (el.textContent || "").trim();
+        return CLOSE_RE.test(text) || CLOSE_LABEL_RE.test(controlText(el));
+      }).slice(0, 40);
 
       const overlayText = (overlay.textContent || "").slice(0, 1200);
       const isConsentNotice = CONSENT_CONTEXT_RE.test(overlayText);
@@ -473,8 +491,36 @@
   // silently disagreeing meant every page-level probe was rejected as "not in this frame".
   const TARGETLESS_ACTIONS = new Set([
     "scroll_page", "wait", "done", "dismiss_overlays", "open_search", "probe_query",
-    "search_url", "detect_bot_wall",
+    "search_url", "detect_bot_wall", "scroll_to",
   ]);
+
+  /**
+   * Chooses `value` in a dropdown that is not a <select>: a combobox/listbox button that opens
+   * a list of options. Clicks it open, waits for options to appear, and clicks the one whose
+   * text means the requested value. Generic: works from ARIA roles and visible text.
+   */
+  async function selectCustomOption(el, value) {
+    const want = String(value || "").trim().toLowerCase();
+    if (!want) return { ok: false, error: "No option value given." };
+    const optionsNow = () => Array.from(document.querySelectorAll('[role="option"], [role="menuitem"], [role="menuitemradio"], li[data-value], li[role="presentation"] > *'))
+      .filter(isVisible);
+    let options = optionsNow();
+    if (!options.length) {
+      realisticClick(el);
+      for (let i = 0; i < 20 && !options.length; i++) {
+        await delay(100);
+        options = optionsNow();
+      }
+    }
+    if (!options.length) return { ok: false, error: "The dropdown opened no options." };
+    const norm = (s) => String(s || "").trim().toLowerCase();
+    const match = options.find((o) => norm(o.textContent) === want) ||
+                  options.find((o) => norm(o.textContent).includes(want)) ||
+                  options.find((o) => norm(o.getAttribute("data-value")) === want);
+    if (!match) return { ok: false, error: `Option "${value}" not found among ${options.length} option(s).` };
+    realisticClick(match);
+    return { ok: true, chosen: (match.textContent || "").trim().slice(0, 60) };
+  }
 
   /**
    * Executes an action on a target element.
@@ -507,8 +553,16 @@
     try {
       switch (actionType) {
         case "click":
+          // A file chooser cannot be driven from a content script; opening it and leaving the
+          // person to pick a file is the honest outcome, and the loop asks them to.
+          if (el.tagName === "INPUT" && (el.type || "").toLowerCase() === "file") {
+            return { ok: false, needsUser: true, error: "This is a file chooser; the person must pick the file." };
+          }
           realisticClick(el);
-          return { ok: true };
+          return { ok: true, label: (el.getAttribute("aria-label") || el.textContent || "").trim().slice(0, 60) };
+
+        case "upload":
+          return { ok: false, needsUser: true, error: "File uploads need the person to choose the file." };
 
         case "type": {
           await simulateType(el, value);
@@ -553,19 +607,43 @@
           return { ok: true };
         }
 
+        case "check":
+        case "toggle": {
+          const isInput = el.tagName === "INPUT";
+          const before = isInput ? el.checked : el.getAttribute("aria-checked") === "true";
+          realisticClick(el);
+          await delay(80);
+          const after = isInput ? el.checked : el.getAttribute("aria-checked") === "true";
+          return { ok: true, changed: before !== after, checked: after };
+        }
+
         case "select":
           if (el.tagName.toLowerCase() === "select") {
-            const opt = Array.from(el.options).find(
-              (o) => o.value === value || o.text.toLowerCase() === (value || "").toLowerCase()
-            );
+            const want = String(value || "").trim().toLowerCase();
+            const opts = Array.from(el.options);
+            const opt = opts.find((o) => o.value === value || o.text.trim().toLowerCase() === want) ||
+                        opts.find((o) => o.text.trim().toLowerCase().includes(want));
             if (opt) {
+              el.focus();
               el.value = opt.value;
+              el.dispatchEvent(new Event("input", { bubbles: true }));
               el.dispatchEvent(new Event("change", { bubbles: true }));
-              return { ok: true };
+              return { ok: true, chosen: opt.text.trim().slice(0, 60) };
             }
-            return { ok: false, error: `Option "${value}" not found in <select>.` };
+            return { ok: false, error: `Option "${value}" not found in <select> (${opts.length} options).` };
           }
-          return { ok: false, error: "Target is not a select element." };
+          // A custom dropdown: combobox / listbox / a button that opens a list.
+          return await selectCustomOption(el, value);
+
+        case "scroll_to": {
+          const reader = global.__vagentReader;
+          if (!reader || typeof reader.scrollToText !== "function") {
+            return { ok: false, error: "Page reader not loaded in this frame." };
+          }
+          const r = reader.scrollToText(value);
+          if (r.ok) await delay(250);
+          return r;
+        }
 
         case "scroll":
           // "scroll" with an element means bring it into view; without one it means scroll the

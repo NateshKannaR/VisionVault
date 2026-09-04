@@ -38,6 +38,15 @@
     <g id="i-layers"><path d="M12 3.6l8.4 4.2-8.4 4.2L3.6 7.8z"/><path d="M3.6 12.4L12 16.6l8.4-4.2M3.6 16.6L12 20.8l8.4-4.2"/></g>
     <g id="i-sparkle"><path d="M12 4.2l1.7 4.6 4.6 1.7-4.6 1.7L12 16.8l-1.7-4.6L5.7 10.5l4.6-1.7z"/><path d="M18.5 15.5l.7 1.9 1.9.7-1.9.7-.7 1.9-.7-1.9-1.9-.7 1.9-.7z"/></g>
     <g id="i-chevron"><path d="M9 5.5l6.5 6.5L9 18.5"/></g>
+    <g id="i-list"><path d="M8 6.5h12M8 12h12M8 17.5h12"/><path d="M4 6.5h.02M4 12h.02M4 17.5h.02"/></g>
+    <g id="i-book"><path d="M4.5 5.5A2 2 0 0 1 6.5 3.5H19v15H6.5a2 2 0 0 0-2 2z"/><path d="M4.5 5.5v15M8.5 7.5h7"/></g>
+    <g id="i-history"><path d="M3.8 12a8.2 8.2 0 1 0 2.4-5.8"/><path d="M3.6 4v4.8h4.8"/><path d="M12 7.8V12l2.8 1.8"/></g>
+    <g id="i-flag"><path d="M5 20.5V4.5"/><path d="M5 5h12.5l-2.2 3.8 2.2 3.7H5"/></g>
+    <g id="i-copy"><rect x="8.5" y="8.5" width="11" height="11" rx="2"/><path d="M5.5 15.5h-1a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v1"/></g>
+    <g id="i-user"><circle cx="12" cy="8.5" r="3.6"/><path d="M4.8 20c.9-3.9 3.6-6 7.2-6s6.3 2.1 7.2 6"/></g>
+    <g id="i-trash"><path d="M4.5 7h15M9.5 7V4.5h5V7M6.5 7l.9 12.5h9.2L17.5 7"/></g>
+    <g id="i-edit"><path d="M4 20h4.5L19 9.5 14.5 5 4 15.5z"/><path d="M12.5 7l4.5 4.5"/></g>
+    <g id="i-bolt"><path d="M13 3.5L5.5 13.5h6l-1 7 7.5-10h-6z"/></g>
   </defs>
 </svg>
 
@@ -63,6 +72,7 @@
 
 <nav class="tabs" role="tablist" aria-label="Sections">
   <button class="tab active" data-tab="run" role="tab" aria-selected="true" aria-controls="panel-run">Run</button>
+  <button class="tab" data-tab="history" role="tab" aria-selected="false" aria-controls="panel-history">History</button>
   <button class="tab" data-tab="vault" role="tab" aria-selected="false" aria-controls="panel-vault">Vault</button>
   <button class="tab" data-tab="settings" role="tab" aria-selected="false" aria-controls="panel-settings">Settings</button>
 </nav>
@@ -71,36 +81,44 @@
   <!-- ── RUN ────────────────────────────────────────────────────────────── -->
   <section id="panel-run" class="panel active" role="tabpanel" tabindex="0">
 
-    <div class="field">
+    <div class="field" id="taskField">
       <div class="field-head">
         <label class="field-label" for="task">What should the agent do?</label>
-        <span class="counter"><span id="charCount">0</span>/240</span>
+        <span class="counter"><span id="charCount">0</span>/400</span>
       </div>
-      <textarea id="task" rows="2" maxlength="240"
-                placeholder="search for wireless earbuds and show me"></textarea>
-      <div class="chips" role="group" aria-label="Example tasks">
+      <textarea id="task" rows="2" maxlength="400"
+                placeholder="find the best wireless earbuds under 3000, compare the ratings and add the best one to cart"></textarea>
+      <div class="chips" id="quickChips" role="group" aria-label="Example tasks">
         <button class="quick-chip" data-template="search for wireless earbuds and show me">Search a product</button>
+        <button class="quick-chip" data-template="find the best laptop under 50000, compare ratings and open the best one">Compare &amp; choose</button>
         <button class="quick-chip" data-template="fill the signup form with my details">Fill a form</button>
-        <button class="quick-chip" data-template="scroll down and show me more">Scroll for more</button>
+        <button class="quick-chip" data-template="read this page and summarize it">Summarise page</button>
       </div>
-      <p class="kbd-hint"><kbd>Ctrl</kbd>+<kbd>Enter</kbd> to scan</p>
+      <p class="kbd-hint"><kbd>Ctrl</kbd>+<kbd>Enter</kbd> to run</p>
     </div>
 
-    <div class="actions">
-      <button class="btn btn-primary" id="scanBtn">
-        <svg class="ic" viewBox="0 0 24 24"><use href="#i-scan"/></svg>
-        <span>Scan &amp; redact screen</span>
+    <!--
+      One primary button at a time. Stop REPLACES Run while a task is running rather than
+      sitting beside it: three buttons across a 400px panel wrapped their labels onto three
+      lines each, and the one that matters at any given moment is never ambiguous.
+    -->
+    <div class="actions" id="actionRow">
+      <button class="btn btn-primary" id="runTaskBtn">
+        <svg class="ic" viewBox="0 0 24 24"><use href="#i-bolt"/></svg>
+        <span>Run task</span>
       </button>
-      <div class="actions-row">
-        <button class="btn btn-accent" id="runBtn" hidden>
-          <svg class="ic" viewBox="0 0 24 24"><use href="#i-play"/></svg>
-          <span>Run automation</span>
-        </button>
-        <button class="btn btn-ghost btn-stop" id="stopBtn" hidden>
-          <svg class="ic" viewBox="0 0 24 24"><use href="#i-stop"/></svg>
-          <span>Stop</span>
-        </button>
-      </div>
+      <button class="btn btn-accent" id="runBtn" hidden>
+        <svg class="ic" viewBox="0 0 24 24"><use href="#i-play"/></svg>
+        <span>Send &amp; run</span>
+      </button>
+      <button class="btn btn-stop" id="stopBtn" hidden>
+        <svg class="ic" viewBox="0 0 24 24"><use href="#i-stop"/></svg>
+        <span>Stop</span>
+      </button>
+      <button class="btn btn-ghost btn-quiet" id="scanBtn">
+        <svg class="ic" viewBox="0 0 24 24"><use href="#i-scan"/></svg>
+        <span>Preview what is sent</span>
+      </button>
     </div>
 
     <div class="toast" id="statusMsg" role="status" aria-live="polite"></div>
@@ -118,7 +136,7 @@
         </div>
         <div class="idle-step">
           <span class="idle-num">3</span>
-          <div><strong>Act on your behalf</strong><span>Your real details are filled in here, never uploaded. Risky clicks wait for you.</span></div>
+          <div><strong>Plan, act, verify, report</strong><span>Multi-step tasks on any site. Your real details are filled in here, never uploaded. Risky clicks wait for you.</span></div>
         </div>
       </div>
     </div>
@@ -128,6 +146,97 @@
       <div class="sk-line sk-head"></div>
       <div class="sk-frame"></div>
       <div class="sk-metrics"><span></span><span></span><span></span><span></span></div>
+    </div>
+
+    <!-- Live status: what is happening right now -->
+    <div class="now" id="nowBar" hidden>
+      <span class="now-icon" id="nowIcon"><span class="spinner"></span></span>
+      <span class="now-text" id="nowText">Planning…</span>
+      <span class="now-meta">
+        <span class="tier-pill" id="nowPlanner" hidden></span>
+        <span class="conf" id="nowConf" hidden title="The planner's own confidence in this step"></span>
+        <span class="mono" id="nowElapsed">0s</span>
+      </span>
+    </div>
+
+    <!-- Workflow plan -->
+    <div class="card plan" id="planWrap" hidden>
+      <div class="card-head">
+        <span><svg class="ic" viewBox="0 0 24 24"><use href="#i-list"/></svg> Workflow</span>
+        <span class="mono" id="planMeta"></span>
+      </div>
+      <ol class="steps" id="planSteps"></ol>
+      <p class="plan-needs" id="planNeeds" hidden></p>
+    </div>
+
+    <!-- Completion -->
+    <div class="card result" id="resultWrap" hidden>
+      <div class="result-head" id="resultHead">
+        <span class="result-icon" id="resultIcon"><svg class="ic" viewBox="0 0 24 24"><use href="#i-check"/></svg></span>
+        <div class="result-title">
+          <strong id="resultTitle">Done</strong>
+          <span class="mono" id="resultStats"></span>
+        </div>
+      </div>
+      <p class="result-summary" id="resultSummary"></p>
+      <ul class="result-highlights" id="resultHighlights"></ul>
+      <div class="result-findings" id="resultFindings" hidden></div>
+      <ul class="result-warnings" id="resultWarnings" hidden></ul>
+      <div class="result-actions">
+        <button class="btn btn-primary btn-sm" id="runAgainBtn"><svg class="ic" viewBox="0 0 24 24"><use href="#i-refresh"/></svg><span>Run again</span></button>
+        <button class="btn btn-ghost btn-sm" id="copySummaryBtn"><svg class="ic" viewBox="0 0 24 24"><use href="#i-copy"/></svg><span>Copy summary</span></button>
+        <button class="btn btn-ghost btn-sm" id="newTaskBtn"><svg class="ic" viewBox="0 0 24 24"><use href="#i-edit"/></svg><span>New task</span></button>
+      </div>
+    </div>
+
+    <!-- Human approval -->
+    <div class="card gate" id="confirmWrap" hidden>
+      <div class="gate-head">
+        <svg class="ic" viewBox="0 0 24 24"><use href="#i-alert"/></svg>
+        <span>Approval required</span>
+      </div>
+      <div class="gate-body" id="confirmText"></div>
+      <div class="gate-form" id="modifyForm" hidden>
+        <textarea id="modifyNote" rows="2" placeholder="Tell the agent what to do instead, e.g. “choose the cheaper one” or “skip this and go to checkout”"></textarea>
+      </div>
+      <div class="gate-actions">
+        <button class="btn btn-danger" id="confirmYes">Approve</button>
+        <button class="btn btn-ghost" id="confirmModify">Modify</button>
+        <button class="btn btn-ghost" id="confirmNo">Cancel</button>
+      </div>
+    </div>
+
+    <!-- Missing vault value -->
+    <div class="card gate gate-info" id="inputPromptWrap" hidden>
+      <div class="gate-head">
+        <svg class="ic" viewBox="0 0 24 24"><use href="#i-key"/></svg>
+        <span>Value needed</span>
+      </div>
+      <div class="gate-body" id="inputPromptText"></div>
+      <div class="gate-form">
+        <input class="input" id="missingInputValue" type="text" placeholder="Enter the value to use" />
+        <label class="check">
+          <input type="checkbox" id="saveMissingToVault" checked />
+          <span>Save to my local vault for next time</span>
+        </label>
+      </div>
+      <div class="gate-actions">
+        <button class="btn btn-primary" id="inputPromptSubmit">Use this value</button>
+        <button class="btn btn-ghost" id="inputPromptSkip">Skip field</button>
+      </div>
+    </div>
+
+    <!-- Something only the person can do: a CAPTCHA, a file chooser -->
+    <div class="card gate gate-info" id="userTurnWrap" hidden>
+      <div class="gate-head">
+        <svg class="ic" viewBox="0 0 24 24"><use href="#i-user"/></svg>
+        <span>Your turn</span>
+      </div>
+      <div class="gate-body" id="userTurnText"></div>
+      <div class="gate-actions">
+        <button class="btn btn-primary" id="continueBtn">I have done it — continue</button>
+        <button class="btn btn-ghost" id="userTurnStop">Stop here</button>
+      </div>
     </div>
 
     <!-- Redacted preview + what was masked -->
@@ -152,6 +261,7 @@
 
       <div class="legend" id="regionLegend"></div>
       <p class="preview-foot" id="regionHint">Every box below was painted over before this image left the page.</p>
+      <p class="preview-page mono" id="previewPage" hidden></p>
     </figure>
 
     <!-- Metrics -->
@@ -188,39 +298,6 @@
       <div class="timing-legend" id="timingLabels"></div>
     </div>
 
-    <!-- Human approval -->
-    <div class="card gate" id="confirmWrap" hidden>
-      <div class="gate-head">
-        <svg class="ic" viewBox="0 0 24 24"><use href="#i-alert"/></svg>
-        <span>Approval required</span>
-      </div>
-      <div class="gate-body" id="confirmText"></div>
-      <div class="gate-actions">
-        <button class="btn btn-danger" id="confirmYes">Approve &amp; continue</button>
-        <button class="btn btn-ghost" id="confirmNo">Reject</button>
-      </div>
-    </div>
-
-    <!-- Missing vault value -->
-    <div class="card gate gate-info" id="inputPromptWrap" hidden>
-      <div class="gate-head">
-        <svg class="ic" viewBox="0 0 24 24"><use href="#i-key"/></svg>
-        <span>Value needed</span>
-      </div>
-      <div class="gate-body" id="inputPromptText"></div>
-      <div class="gate-form">
-        <input class="input" id="missingInputValue" type="text" placeholder="Enter the value to use" />
-        <label class="check">
-          <input type="checkbox" id="saveMissingToVault" checked />
-          <span>Save to my local vault for next time</span>
-        </label>
-      </div>
-      <div class="gate-actions">
-        <button class="btn btn-primary" id="inputPromptSubmit">Use this value</button>
-        <button class="btn btn-ghost" id="inputPromptSkip">Skip field</button>
-      </div>
-    </div>
-
     <!-- Activity -->
     <div class="card log" id="logWrap" hidden>
       <div class="card-head">
@@ -229,6 +306,22 @@
       </div>
       <div class="log-entries" id="logEntries"></div>
     </div>
+  </section>
+
+  <!-- ── HISTORY ────────────────────────────────────────────────────────── -->
+  <section id="panel-history" class="panel" role="tabpanel" tabindex="0">
+    <div class="section-head">
+      <div>
+        <h2 class="section-title">Past runs</h2>
+        <p class="hint">Stored on this device only. Nothing here is sent anywhere.</p>
+      </div>
+      <button class="btn btn-ghost btn-sm" id="clearHistoryBtn">
+        <svg class="ic" viewBox="0 0 24 24"><use href="#i-trash"/></svg>
+        <span>Clear</span>
+      </button>
+    </div>
+    <div class="history" id="historyList"></div>
+    <p class="empty" id="historyEmpty">No runs yet. Your completed tasks will appear here, with what each one achieved.</p>
   </section>
 
   <!-- ── VAULT ──────────────────────────────────────────────────────────── -->
@@ -265,6 +358,12 @@
 
     <div class="field"><label class="field-label" for="v-about">About</label><textarea id="v-about" rows="2" placeholder="Short bio used for free-text fields"></textarea></div>
 
+    <div class="field" id="extraVaultWrap" hidden>
+      <span class="field-label">Remembered answers</span>
+      <div class="extra-vault" id="extraVault"></div>
+      <p class="hint">Values you typed when the agent asked for something the vault did not hold, and chose to keep.</p>
+    </div>
+
     <button class="btn btn-primary btn-block" id="saveVault">
       <svg class="ic" viewBox="0 0 24 24"><use href="#i-check"/></svg>
       <span>Save vault</span>
@@ -274,6 +373,48 @@
 
   <!-- ── SETTINGS ───────────────────────────────────────────────────────── -->
   <section id="panel-settings" class="panel" role="tabpanel" tabindex="0">
+    <div class="field">
+      <label class="field-label" for="s-preferences">Preferences the planner may use</label>
+      <textarea id="s-preferences" rows="2" placeholder="e.g. budget under ₹50,000 · prefer Dell or Lenovo · vegetarian · window seat"></textarea>
+      <p class="hint">
+        Sent with every task so choices match you. Keep it to preferences — nothing personal
+        belongs here; that goes in the Vault, which is never sent.
+      </p>
+    </div>
+
+    <div class="field">
+      <label class="field-label" for="s-confirmPolicy">Click confirmation</label>
+      <select class="input" id="s-confirmPolicy">
+        <option value="risky">Risk-based — confirm consequential clicks</option>
+        <option value="all">Strict — confirm every click</option>
+      </select>
+      <p class="hint">
+        Risk-based pauses for pay / buy / checkout / add to cart / submit / delete / sign-up /
+        login / share targets, and for any control with no readable label. Typing is never
+        gated — vault values are substituted on your device.
+      </p>
+    </div>
+
+    <div class="field">
+      <label class="check">
+        <input type="checkbox" id="s-reviewBeforeSend" />
+        <span>Pause after the scan so I can review the redacted image before anything is sent</span>
+      </label>
+    </div>
+
+    <div class="field">
+      <label class="check">
+        <input type="checkbox" id="s-dismissOverlays" checked />
+        <span>Close cookie banners and modal pop-ups automatically</span>
+      </label>
+      <p class="hint">
+        A consent wall or a login modal swallows every click underneath it, so the agent clears
+        one before acting. It only presses controls whose own text dismisses them — accept,
+        close, not now — never sign-in, subscribe or anything that buys something, and it tells
+        you in the activity log which one it pressed.
+      </p>
+    </div>
+
     <div class="field">
       <label class="field-label" for="s-redactMode">Redaction style</label>
       <select class="input" id="s-redactMode">
@@ -292,32 +433,6 @@
       <p class="hint">
         OCR is the only stage that reads text baked into images, and the slowest. Measured on the
         evaluation fixtures: full ≈1.8s per scan, fast ≈0.15s. Redaction runs at every depth.
-      </p>
-    </div>
-
-    <div class="field">
-      <label class="field-label" for="s-confirmPolicy">Click confirmation</label>
-      <select class="input" id="s-confirmPolicy">
-        <option value="risky">Risk-based — confirm consequential clicks</option>
-        <option value="all">Strict — confirm every click</option>
-      </select>
-      <p class="hint">
-        Risk-based pauses for pay / buy / checkout / submit / delete / sign-up / login / share
-        targets, and for any control with no readable label. Typing is never gated — vault values
-        are substituted on your device.
-      </p>
-    </div>
-
-    <div class="field">
-      <label class="check">
-        <input type="checkbox" id="s-dismissOverlays" checked />
-        <span>Close cookie banners and modal pop-ups automatically</span>
-      </label>
-      <p class="hint">
-        A consent wall or a login modal swallows every click underneath it, so the agent clears
-        one before acting. It only presses controls whose own text dismisses them — accept,
-        close, not now — never sign-in, subscribe or anything that buys something, and it tells
-        you in the activity log which one it pressed.
       </p>
     </div>
 
@@ -342,6 +457,21 @@
         </button>
       </div>
       <p class="diag-body" id="serverInfo">Checking…</p>
+    </div>
+
+    <div class="card diag">
+      <div class="card-head">
+        <span><svg class="ic" viewBox="0 0 24 24"><use href="#i-book"/></svg> Site memory</span>
+        <button class="btn btn-ghost btn-sm" id="clearMemoryBtn">
+          <svg class="ic" viewBox="0 0 24 24"><use href="#i-trash"/></svg>
+          <span>Forget</span>
+        </button>
+      </div>
+      <p class="diag-body">
+        The agent remembers, per site, which search box worked and which pop-up it closed, so
+        repeat visits take fewer steps. Labels only, on this device. Forgetting also clears the
+        run history.
+      </p>
     </div>
   </section>
 </main>

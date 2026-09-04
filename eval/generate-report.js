@@ -280,13 +280,16 @@ if (realSites && Array.isArray(realSites.sites) && realSites.sites.length) {
   W();
   W(`Run at ${realSites.generatedAt}, planner \`${realSites.planner}\`, ${realSites.budgetSeconds}s budget per site.`);
   W();
-  W('| Site | Task | Steps | Local scan | Masked | Outcome |');
-  W('| :--- | :--- | ---: | ---: | ---: | :--- |');
+  W('| Site | Category | Task | Steps | Milestones | Local scan | Masked | Outcome |');
+  W('| :--- | :--- | :--- | ---: | ---: | ---: | ---: | :--- |');
 
   let landed = 0;
   let acted = 0;
   let searchTasks = 0;
   let blockedCount = 0;
+  let readTasks = 0;
+  let answered = 0;
+  const stepTimes = [];
 
   for (const s of realSites.sites) {
     const q = s.queryOnPage;
@@ -305,24 +308,53 @@ if (realSites && Array.isArray(realSites.sites) && realSites.sites.length) {
       if (q.inUrl || q.inTitle) { landed++; outcome = `**searched** (in ${where})`; }
       else if (q.inBox) { outcome = 'typed, but the site did not run it'; }
       else { outcome = 'search did not land'; }
+    } else if (s.wantedRead) {
+      readTasks++;
+      if (s.answered) {
+        answered++;
+        outcome = s.itemsRead ? `**read ${s.itemsRead} items and answered**` : '**read the page and answered**';
+      } else {
+        outcome = 'read nothing';
+      }
     } else if (s.steps) {
       acted++;
       outcome = '**acted**';
     } else {
       outcome = 'no action';
     }
-    W(`| ${s.site} | ${s.task} | ${s.steps ?? '-'} | ${ms(s.pipelineMs)} | ${s.pii ?? '-'} | ${outcome} |`);
+    if (s.steps && s.runMs) stepTimes.push(s.runMs / s.steps);
+    const miles = s.milestonesTotal ? `${s.milestonesDone}/${s.milestonesTotal}` : '-';
+    W(`| ${s.site} | ${s.group || '-'} | ${s.task} | ${s.steps ?? '-'} | ${miles} | ${ms(s.pipelineMs)} | ${s.pii ?? '-'} | ${outcome} |`);
   }
 
   W();
-  W(`**${landed} of ${searchTasks} search tasks reached the results page**, and ` +
-    `${acted} non-search task${acted === 1 ? '' : 's'} carried out the requested action` +
+  W(`**${landed} of ${searchTasks} search tasks reached the results page**, ` +
+    `${answered} of ${readTasks} read-and-answer task${readTasks === 1 ? '' : 's'} produced an answer, and ` +
+    `${acted} other task${acted === 1 ? '' : 's'} carried out the requested action` +
     (blockedCount
       ? `. ${blockedCount} site${blockedCount === 1 ? '' : 's'} refused automation outright with a ` +
         'human-verification challenge, which the agent detects and reports rather than trying to get around'
       : '') +
     '. Every remaining case is reported by the agent as unfinished, with the reason, rather than ' +
     'being claimed as a success.');
+  W();
+  if (stepTimes.length) {
+    stepTimes.sort((a, b) => a - b);
+    const mean = stepTimes.reduce((x, y) => x + y, 0) / stepTimes.length;
+    W();
+    W(`Per-step wall clock across every site that acted: mean ${ms(mean)}, median ` +
+      `${ms(stepTimes[Math.floor(stepTimes.length / 2)])}, worst ${ms(stepTimes[stepTimes.length - 1])}. ` +
+      'That includes the full local scan — capture, DOM across all frames, face and OCR ' +
+      'inference, region merge and redaction — as well as the planning round trip, because ' +
+      'both happen on every step.');
+  }
+
+  W();
+  W('The "Milestones" column is the honest one. A task decomposed into five stages that ' +
+    'completes three of them is reported as `3/5` and as a *partial* outcome, with the skipped ' +
+    'stages and the reason named on the completion card. A milestone the page offers no way to ' +
+    'satisfy — a price filter a site does not have — is abandoned after four attempts so the ' +
+    'stages after it still run.');
   W();
   W('The "Masked" column is worth reading alongside the fixture numbers. On a shopping home');
   W('page it is small because the face model — not a blanket rule over every image — decides');

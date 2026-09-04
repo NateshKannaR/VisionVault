@@ -164,6 +164,37 @@ const waStep1 = TaskPlanner.planNextAction({
 is(waStep1.action, 'click', 'clicks send button when visible');
 is(waStep1.mark_id, 2, 'target is send button mark');
 
+// Do NOT click "Send document"
+const waDocStep = TaskPlanner.planNextAction({
+  task: 'open whatsapp and send hi to niswan',
+  marks: [
+    { id: 10, role: 'button', label: 'Send document' },
+    { id: 11, role: 'input:text', label: 'Search or start new chat' },
+  ],
+  filledIds: [],
+  pageInfo: { url: 'https://web.whatsapp.com' },
+  progress: { navigated: true },
+});
+is(waDocStep.action, 'type', 'does not click send document; types into search');
+is(waDocStep.mark_id, 11, 'target is search contact input');
+
+// Dialpad / Calls screen recovery
+const waDialpadStep = TaskPlanner.planNextAction({
+  task: 'open whatsapp and send hi to Appa',
+  marks: [
+    { id: 20, role: 'heading', label: 'Phone number' },
+    { id: 21, role: 'text', label: 'Enter a phone number to start a chat' },
+    { id: 22, role: 'button', label: 'Back' },
+    { id: 23, role: 'button', label: 'Send document' },
+  ],
+  filledIds: [],
+  pageInfo: { url: 'https://web.whatsapp.com' },
+  progress: { navigated: true },
+});
+is(waDialpadStep.action, 'click', 'recovers from dialpad by clicking Back');
+is(waDialpadStep.mark_id, 22, 'targets Back button');
+
+
 console.log('\n' + '='.repeat(60));
 if (failures.length) {
   console.log(`${failures.length} of ${checks} checks FAILED`);

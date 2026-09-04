@@ -170,6 +170,16 @@ function safeLabel(el) {
     }
   };
 
+  const dataIcon = () => {
+    try {
+      return el.getAttribute("data-icon") ||
+             (el.querySelector && el.querySelector("[data-icon]") ? el.querySelector("[data-icon]").getAttribute("data-icon") : "") ||
+             "";
+    } catch (_) {
+      return "";
+    }
+  };
+
   const candidates = isFormControl
     ? [
         associatedLabel(),
@@ -177,12 +187,14 @@ function safeLabel(el) {
         el.getAttribute("placeholder"),
         el.getAttribute("title"),
         el.getAttribute("name"),
+        dataIcon(),
       ]
     : [
         el.innerText,
         el.getAttribute("aria-label"),
         el.getAttribute("title"),
         el.getAttribute("placeholder"),
+        dataIcon(),
       ];
 
   for (const raw of candidates) {

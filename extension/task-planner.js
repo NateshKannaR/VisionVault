@@ -334,11 +334,29 @@
     // 2b. Messaging / Chat flow (WhatsApp, Telegram, Slack, etc.)
     const isMsgPlatform = /web\.whatsapp\.com|telegram|slack/i.test(url || "");
     if (parsed.wantsMessage || isMsgPlatform) {
-      // Step A: If the Send button is visible, click it to send the message!
-      const sendBtn = first((m) =>
-        /^\s*send\s*$/i.test(m.label || "") ||
-        (/send/i.test(m.label || "") && (m.role === "button" || m.role === "clickable"))
+      // Step 0: Recovery if stuck in calls or dialpad screen (e.g. on WhatsApp Web)
+      const isDialpadScreen = available.some((m) =>
+        /enter a phone number|phone number|voice and video calling|go to calls/i.test(m.label || "")
       );
+      if (isDialpadScreen) {
+        const backBtn = first((m) => /^\s*(back|<|←)\s*$/i.test(m.label || "") && (m.role === "button" || m.role === "clickable"));
+        if (backBtn) {
+          return { action: "click", mark_id: backBtn.id, reasoning: "Click Back to exit phone dialpad and return to chats" };
+        }
+        const chatsTab = first((m) => /^\s*chats?\b/i.test(m.label || "") && (m.role === "button" || m.role === "clickable" || m.role === "tab"));
+        if (chatsTab) {
+          return { action: "click", mark_id: chatsTab.id, reasoning: "Switch back to Chats tab" };
+        }
+      }
+
+      // Step A: If the real Send button is visible, click it to send the message!
+      // Must NOT match attachments like "Send document", "Send photo", etc.
+      const isRealSendBtn = (m) => {
+        const l = (m.label || "").trim().toLowerCase();
+        if (/\b(document|photo|video|contact|location|file|media|audio|voice|call)\b/i.test(l)) return false;
+        return /^\s*send(\s+message)?\s*$/i.test(l) || (l === "send" && (m.role === "button" || m.role === "clickable"));
+      };
+      const sendBtn = first(isRealSendBtn);
       if (sendBtn) {
         return { action: "click", mark_id: sendBtn.id, reasoning: "Click Send to send the message" };
       }
@@ -362,7 +380,7 @@
         if (contact) {
           return { action: "click", mark_id: contact.id, reasoning: `Open chat with ${parsed.recipient}` };
         }
-        const searchChat = first((m) => /search or start a new chat/i.test(m.label || "") || isSearchBox(m));
+        const searchChat = first((m) => /search or start a new chat/i.test(m.label || "") || /search\s*(contacts|chats)/i.test(m.label || "") || isSearchBox(m));
         if (searchChat) {
           return { action: "type", mark_id: searchChat.id, value: parsed.recipient, reasoning: `Search for contact "${parsed.recipient}"` };
         }

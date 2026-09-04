@@ -246,6 +246,19 @@ def extract_travel_entities(task: str) -> dict:
     return entities
 
 
+def _is_message_send_button(m: Mark) -> bool:
+    """Strictly matches the message send button, avoiding attachments like 'Send document'."""
+    label = (m.label or "").strip().lower()
+    role = (m.role or "").lower()
+    if any(w in label for w in ["document", "contact", "photo", "video", "location", "file", "media", "audio", "voice", "call", "new"]):
+        return False
+    if label in ("send", "send message", "send msg", "send (enter)"):
+        return True
+    if re.search(r"^\s*send(\s+message)?\s*$", label, re.I):
+        return True
+    return False
+
+
 def rank_marks_for_task(marks: List[Mark], task: str, category: Optional[str] = None) -> List[Mark]:
     """Sorts marks so task-relevant targets (tabs, inputs, buttons, suggestions) appear first."""
     entities = extract_travel_entities(task)
@@ -270,15 +283,21 @@ def rank_marks_for_task(marks: List[Mark], task: str, category: Optional[str] = 
         # Messaging / Chat platform prioritization (WhatsApp, Telegram, etc.):
         is_msg_task = bool(re.search(r"\b(whatsapp|telegram|slack|message|msg|send\s+.*to|chat|text\s+.*to)\b", task or "", re.I))
         if is_msg_task:
-            # 1. Send button gets the highest priority
-            if re.search(r"^\s*send\s*$", label) or ("send" in label and any(r in role for r in ["button", "clickable"])):
+            # 1. Real Send message button gets highest priority
+            if _is_message_send_button(m):
                 return 800
             # 2. Message input box
             if role == "editable" or "type a message" in label:
                 return 600
-            # 3. Search contacts input
-            if "search" in label and role in FILLABLE_ROLES:
+            # 3. Search contacts input ("Search or start new chat")
+            if ("search" in label and role in FILLABLE_ROLES) or "search or start new chat" in label:
                 return 400
+            # 4. Back button / Chats tab (to recover from dialpad or wrong views)
+            if re.search(r"^\s*(back|<|←)\s*$", label) or re.search(r"^\s*chats?\b", label):
+                return 300
+            # 5. Penalize dialpad and non-messaging items on WhatsApp
+            if any(w in label for w in ["send document", "add contact", "new call", "ask meta ai", "go to calls", "enter a phone number", "phone number"]):
+                return -1000
 
         # E-commerce & general search query prioritization:
         if search_q and not has_travel_intent and not is_msg_task:
@@ -947,11 +966,13 @@ CRITICAL INSTRUCTIONS FOR TRAVEL/BOOKING SITES:
         messaging_context = """
 *** CRITICAL MESSAGING / CHAT DIRECTIVE ***
 The user is performing a messaging action (e.g. on WhatsApp, Telegram, or chat platform).
-1. If the target contact or chat is not open, click the contact from the chat list or search for the contact name.
-2. If the message text has not been entered into the chat message box, type the message into the message box.
-3. If the message text is in the message box, or if the Send button (green send arrow, paper airplane, or button labeled 'Send') is visible:
-   YOUR IMMEDIATE ACTION MUST BE TO CLICK THE SEND BUTTON!
-4. NEVER return 'done' while a message draft is sitting in the input box unsent!
+1. If the screen is currently on 'Phone number', dial pad, or 'Calls' view, your IMMEDIATE action is to click 'Back' (<) or 'Chats' tab to return to your chats.
+2. If the target contact or chat is not open, look for the contact in the chat list. If not visible, type the contact name into 'Search or start new chat' to find them.
+3. Once the contact is visible, click the contact to open the conversation.
+4. If the message text has not been entered into the chat message box, type the message into the message box ('Type a message').
+5. If the message text is in the message box, or if the Send button (green send arrow, paper airplane, or button labeled 'Send') is visible:
+   YOUR IMMEDIATE ACTION MUST BE TO CLICK THE SEND BUTTON! NEVER click 'Send document', 'Add contact', or 'New call'!
+6. NEVER return 'done' while a message draft is sitting in the input box unsent!
 """
 
     search_context = ""
@@ -1218,10 +1239,28 @@ def repair_plan(plan: StepResponse, req: AgentStepRequest, tier: str) -> StepRes
     is_messaging = bool(re.search(r"\b(whatsapp|telegram|slack|message|msg|send\s+.*to|chat|text\s+.*to)\b", req.task or "", re.I)) or \
                    bool(req.page_info and req.page_info.url and re.search(r"web\.whatsapp\.com|telegram|slack", req.page_info.url, re.I))
 
+    # WhatsApp recovery: If on Phone number / Calls dial pad screen instead of Chats, recover to Chats
+    is_on_dialpad = bool(
+        req.page_info and req.page_info.url and "web.whatsapp.com" in req.page_info.url and
+        any(re.search(r"\b(enter a phone number|phone number|voice and video calling|go to calls)\b", m.label or "", re.I) for m in req.marks)
+    )
+    if is_messaging and is_on_dialpad:
+        back_or_chats = next((
+            m for m in available
+            if (re.search(r"^\s*(back|<|←)\s*$", m.label or "", re.I) and any(r in (m.role or "").lower() for r in ["button", "clickable"])) or
+               (re.search(r"^\s*chats?\b", m.label or "", re.I) and any(r in (m.role or "").lower() for r in ["button", "clickable", "tab"]))
+        ), None)
+        if back_or_chats:
+            notes.append("On WhatsApp dialpad screen; clicking Back / Chats to return to chats")
+            kind, action.type = "click", "click"
+            action.target = back_or_chats.id
+            action.reasoning = "Exit phone dialpad and return to chats list"
+            target = back_or_chats
+            plan.reasoning = "Return to Chats"
+
     send_btn = next((
         m for m in available
-        if re.search(r"^\s*send\s*$", m.label or "", re.I) or
-           (("send" in (m.label or "").lower() or m.label == "Send") and any(r in (m.role or "").lower() for r in ["button", "clickable", "icon"]))
+        if _is_message_send_button(m)
     ), None) if is_messaging else None
 
     if is_messaging and send_btn:

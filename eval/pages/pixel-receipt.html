@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VisionVault Fixture — Pixel-Only PII</title>
+<link rel="stylesheet" href="fixture.css">
+<style>
+  .receipt {
+    width: 620px; height: 260px;
+    background-image: url("../assets/receipt-card.png");
+    background-size: 620px 260px;
+    background-repeat: no-repeat;
+    border-radius: 8px;
+    position: relative;
+  }
+  /* Ground-truth markers only. Transparent, non-interactive, and carrying no text of their
+     own — they exist so the harness can score the pixel regions without hand-measuring. */
+  .gt-marker { position: absolute; pointer-events: none; }
+</style>
+</head>
+<!--
+  EVALUATION FIXTURE — the DOM blind spot.
+
+  The receipt's personal data exists ONLY as pixels in a CSS background-image. There is no text
+  node, input, attribute or <img> anywhere that contains it, so:
+    • the DOM scanner cannot see it, and
+    • the media heuristic does not fire either (that only covers <img>/<video>/<canvas>).
+  The only stage that can recover it is local OCR. This page is what justifies OCR's latency
+  cost: with OCR disabled, everything on it leaks.
+-->
+<body data-fixture-id="pixel-receipt" data-fixture-kind="pixel-only">
+  <h1>Order confirmation</h1>
+  <p class="sub" data-gt-safe>Your receipt is shown below.</p>
+
+  <div class="card">
+    <div class="receipt" id="receipt"></div>
+    <p class="muted" data-gt-safe>A copy has been kept for your records.</p>
+  </div>
+
+  <div class="card">
+    <h2 data-gt-safe>Need help?</h2>
+    <p data-gt-safe>Our support team can look up any order using the order number above.</p>
+    <div class="nav">
+      <button data-gt-safe data-gt-mark="button">Download PDF</button>
+      <button data-gt-safe data-gt-mark="button">Contact support</button>
+    </div>
+  </div>
+
+  <script>
+    // Place one ground-truth marker per sensitive line, using the exact boxes recorded when
+    // the image was generated (eval/assets/make_receipt.py).
+    fetch('../assets/receipt-boxes.json')
+      .then((r) => r.json())
+      .then((data) => {
+        const host = document.getElementById('receipt');
+        for (const line of data.sensitiveLines) {
+          const marker = document.createElement('div');
+          marker.className = 'gt-marker';
+          marker.setAttribute('data-gt-pii', line.type);
+          marker.style.left = line.x + 'px';
+          marker.style.top = line.y + 'px';
+          marker.style.width = line.w + 'px';
+          marker.style.height = line.h + 'px';
+          host.appendChild(marker);
+        }
+        document.body.setAttribute('data-gt-ready', '1');
+      });
+  </script>
+</body>
+</html>

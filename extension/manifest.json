@@ -3,10 +3,13 @@
   "name": "VisionVault",
   "version": "1.0.0",
   "description": "Local PII redaction + vault + cloud VLM automation on sanitized screens.",
-  "permissions": ["activeTab", "scripting", "tabs", "storage", "sidePanel"],
+  "permissions": ["activeTab", "scripting", "tabs", "storage", "sidePanel", "offscreen"],
   "host_permissions": ["<all_urls>", "file://*/*"],
   "background": {
     "service_worker": "background.js"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
   },
   "side_panel": {
     "default_path": "popup.html"
@@ -18,6 +21,7 @@
     "128": "icon128.png"
   },
   "action": {
+    "default_popup": "popup.html",
     "default_title": "VisionVault",
     "default_icon": {
       "16": "icon16.png",
@@ -29,8 +33,22 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["content.js"],
-      "run_at": "document_idle"
+      "js": ["action-executor.js", "content.js"],
+      "run_at": "document_idle",
+      "all_frames": true
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "lib/*",
+        "models/*",
+        "models/tessdata/*",
+        "vision/*",
+        "offscreen.html",
+        "offscreen.js"
+      ],
+      "matches": ["<all_urls>", "file://*/*"]
     }
   ]
 }

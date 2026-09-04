@@ -1,14 +1,45 @@
-if (window.__vagentLoaded) { /* already loaded */ } else {
+/**
+ * content.js — Content Script for VisionVault
+ *
+ * Runs in EVERY frame of the page (manifest: all_frames: true).
+ *
+ * Responsibilities:
+ * 1. scanForPII(): DOM scan for passwords, autocompletes, PII text regexes, nearby label keywords.
+ * 2. tagInteractiveElements(): tags clickable/typeable elements with deterministic, scan-stable IDs
+ *    and safe (PII-free) labels.
+ * 3. Exposes window.__vagent.scanPage() / executeAction() so the service worker can call into
+ *    each frame individually via chrome.scripting.executeScript({ allFrames: true }).
+ * 4. MutationObserver: debounced DOM change notifications to the service worker.
+ *
+ * Action execution is NOT implemented here. There is exactly one action executor in the
+ * codebase — ActionExecutor.executeAction() in action-executor.js, which is loaded into this
+ * same isolated world by the manifest before content.js. See action-executor.js.
+ */
+
+if (window.__vagentLoaded) {
+  /* already loaded */
+} else {
 window.__vagentLoaded = true;
 
 const markMap = new Map();
+const MAX_DOM_NODES = 2500;
+let domScanInFlight = false;
 
-// ── PII input selectors ──────────────────────────────────────────────────────
+// ── PII Input Selectors ──────────────────────────────────────────────────────
 const PII_INPUT_SELECTORS = [
   'input[type="password"]',
+  'textarea[name*="address" i]',
+  'textarea[name*="about" i]',
+  'textarea[autocomplete="street-address"]',
+  'textarea[placeholder*="address" i]',
+  'input[autocomplete*="cc-"]',
+  'input[name*="cvv" i]',
+  'input[name*="pan" i]',
+  'input[name*="ifsc" i]',
+  'input[name*="passport" i]',
+  'input[name*="account" i]',
   'input[type="email"]',
   'input[type="tel"]',
-  'input[autocomplete*="cc-"]',
   'input[autocomplete="email"]',
   'input[autocomplete*="tel"]',
   'input[autocomplete="name"]',
@@ -21,6 +52,7 @@ const PII_INPUT_SELECTORS = [
   'input[name*="email" i]',
   'input[name*="phone" i]',
   'input[name*="mobile" i]',
+  'input[name*="aadhaar" i]',
   'input[name*="dob" i]',
   'input[name*="birth" i]',
   'input[name*="address" i]',
@@ -31,77 +63,489 @@ const PII_INPUT_SELECTORS = [
   'input[placeholder*="phone" i]',
   'input[placeholder*="password" i]',
   'input[placeholder*="name" i]',
+  'input[placeholder*="aadhaar" i]'
 ];
 
-// ── PII text regexes ─────────────────────────────────────────────────────────
-const EMAIL_RE   = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
-const PHONE_RE   = /(\+?\d[\d\s\-().]{7,}\d)/g;
-const CARD_RE    = /\b(?:\d[ -]*?){13,16}\b/g;
-const SSN_RE     = /\b\d{3}[-\s]?\d{2}[-\s]?\d{4}\b/g;
-const AADHAAR_RE = /\b\d{4}\s?\d{4}\s?\d{4}\b/g;
+// ── PII Text Regexes ─────────────────────────────────────────────────────────
+const EMAIL_RE    = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
+const PHONE_RE    = /(\+?\d[\d\s\-().]{7,}\d)/g;
+const CARD_RE     = /\b(?:\d{4}[- ]?){3}\d{4}\b/g;
+const SSN_RE      = /\b\d{3}[-\s]?\d{2}[-\s]?\d{4}\b/g;
+const AADHAAR_RE  = /\b\d{4}\s?\d{4}\s?\d{4}\b/g;
+const PAN_RE      = /\b[A-Z]{5}[0-9]{4}[A-Z]{1}\b/g;
+const PASSPORT_RE = /\b[A-Z][0-9]{7}\b/g;
+const IFSC_RE     = /\b[A-Z]{4}0[A-Z0-9]{6}\b/g;
+const UPI_RE      = /\b[a-zA-Z0-9.\-_]{2,40}@(okhdfcbank|okaxis|oksbi|okicici|paytm|ybl|ibl|axl|upi)\b/gi;
 
-// ── Safe label whitelist (only these words travel to server) ─────────────────
-const SAFE_LABEL_WHITELIST = [
-  "submit", "next", "continue", "login", "log in", "sign in", "sign up",
-  "search", "send", "cancel", "back", "confirm", "ok", "save", "register",
-  "proceed", "finish", "done", "apply", "update", "create", "delete",
-  "upload", "download", "close", "open", "add", "remove", "edit",
+// ── PII Label Keywords ───────────────────────────────────────────────────────
+const PII_LABEL_KEYWORDS = [
+  // identity
+  "name", "surname", "first name", "last name", "full name", "username", "user id",
+  "aadhaar", "ssn", "social security", "national id", "voter", "passport", "license",
+  "licence", "pan", "tax id", "nino", "date of birth", "dob", "birth", "age", "gender",
+  // credentials
+  "password", "passwd", "passcode", "pin", "otp", "secret", "api key", "token", "key",
+  // contact
+  "email", "e-mail", "phone", "mobile", "telephone", "contact", "address", "street",
+  "postcode", "post code", "zip", "postal", "city", "country",
+  // financial
+  "card", "credit card", "debit card", "cvv", "cvc", "expiry", "account number", "account no",
+  "routing", "ifsc", "iban", "swift", "upi", "salary", "income", "bank",
+  // health / misc sensitive
+  "insurance", "policy number", "medical", "diagnosis", "blood group", "orbital"
 ];
+
+/**
+ * Recursively queries elements including those in open shadow roots.
+ */
+function querySelectorAllDeep(selector, root = document) {
+  const results = [];
+  try {
+    results.push(...root.querySelectorAll(selector));
+  } catch (_) {}
+
+  // Recurse into open shadow roots
+  try {
+    const walker = document.createTreeWalker(
+      root,
+      NodeFilter.SHOW_ELEMENT,
+      null,
+      false
+    );
+    let node = walker.nextNode();
+    while (node) {
+      if (node.shadowRoot) {
+        results.push(...querySelectorAllDeep(selector, node.shadowRoot));
+      }
+      node = walker.nextNode();
+    }
+  } catch (_) {}
+  return results;
+}
+
+function isElementInViewport(el) {
+  if (!el) return false;
+  if (typeof el.checkVisibility === "function") {
+    try {
+      if (!el.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true })) return false;
+    } catch (_) {}
+  } else {
+    const style = window.getComputedStyle(el);
+    if (style.display === "none" || style.visibility === "hidden" || style.opacity === "0") return false;
+  }
+
+  const r = el.getBoundingClientRect();
+  if (r.width < 4 || r.height < 4) return false;
+
+  const vw = window.innerWidth || document.documentElement.clientWidth;
+  const vh = window.innerHeight || document.documentElement.clientHeight;
+  return (
+    r.bottom > 0 &&
+    r.right > 0 &&
+    r.top < vh &&
+    r.left < vw
+  );
+}
+
+/**
+ * A short, PII-free description of a control, used by the planner to choose targets.
+ *
+ * For inputs this must NOT fall back to el.value — that is the user's data, and it would be
+ * transmitted. It uses the field's *identity* instead: its associated <label>, aria-label,
+ * placeholder, title, or name attribute. An empty input previously produced a null label,
+ * which left the planner guessing between identical-looking text fields.
+ */
+function safeLabel(el) {
+  const tag = (el.tagName || "").toLowerCase();
+  const isFormControl = tag === "input" || tag === "textarea" || tag === "select";
+
+  const associatedLabel = () => {
+    try {
+      const byFor = el.id ? document.querySelector(`label[for="${CSS.escape(el.id)}"]`) : null;
+      const wrapping = el.closest ? el.closest("label") : null;
+      const src = byFor || wrapping;
+      return src ? (src.innerText || src.textContent || "") : "";
+    } catch (_) {
+      return "";
+    }
+  };
+
+  const candidates = isFormControl
+    ? [
+        associatedLabel(),
+        el.getAttribute("aria-label"),
+        el.getAttribute("placeholder"),
+        el.getAttribute("title"),
+        el.getAttribute("name"),
+      ]
+    : [
+        el.innerText,
+        el.getAttribute("aria-label"),
+        el.getAttribute("title"),
+        el.getAttribute("placeholder"),
+      ];
+
+  for (const raw of candidates) {
+    let text = (raw || "").trim();
+    if (!text) continue;
+    if (testPII(text)) continue; // never let a detected PII string become a label
+    text = text.replace(/[\r\n\t]+/g, " ").replace(/\s+/g, " ").trim();
+    if (text.length > 50) text = text.substring(0, 50);
+    return text.toLowerCase();
+  }
+  return null;
+}
 
 function rectOf(el) {
   const r = el.getBoundingClientRect();
-  return { x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) };
+  return {
+    x: Math.round(r.left),
+    y: Math.round(r.top),
+    w: Math.round(r.width),
+    h: Math.round(r.height)
+  };
 }
 
-function safeLabel(el) {
-  const text = (el.innerText || el.value || el.getAttribute("aria-label") || "").trim().toLowerCase();
-  if (!text) return null;
-  const match = SAFE_LABEL_WHITELIST.find(w => text === w || text.startsWith(w + " ") || text.endsWith(" " + w));
-  return match || null;
+// ── Deterministic, scan-stable identity ──────────────────────────────────────
+
+/**
+ * Structural path of an element (tag + sibling index chain, capped at 6 levels).
+ * Part of the identity seed so that two visually identical controls stay distinct.
+ */
+function structuralPath(el) {
+  const parts = [];
+  let node = el;
+  let depth = 0;
+  while (node && node.nodeType === 1 && depth < 6) {
+    const parent = node.parentElement;
+    let index = 0;
+    if (parent) {
+      const siblings = parent.children;
+      for (let i = 0; i < siblings.length; i++) {
+        if (siblings[i] === node) { index = i; break; }
+      }
+    }
+    parts.push(`${node.tagName.toLowerCase()}:${index}`);
+    node = parent;
+    depth++;
+  }
+  return parts.join(">");
+}
+
+/**
+ * Identity seed: tag + identifying attributes + document-space geometry.
+ *
+ * Geometry uses DOCUMENT coordinates (viewport rect + scroll offset) bucketed to 4px, so the
+ * seed does not change when the user simply scrolls the page — only when the element actually
+ * moves in the document. This is what makes IDs stable across repeated scans.
+ */
+function identitySeed(el) {
+  const tag = (el.tagName || "div").toLowerCase();
+  const type = (el.getAttribute("type") || "").toLowerCase();
+  const name = el.getAttribute("name") || "";
+  const domId = el.getAttribute("id") || "";
+  const placeholder = el.getAttribute("placeholder") || "";
+  const aria = el.getAttribute("aria-label") || "";
+  const href = (el.getAttribute("href") || "").slice(0, 120);
+  const r = el.getBoundingClientRect();
+  const docX = Math.round((r.left + (window.scrollX || 0)) / 4);
+  const docY = Math.round((r.top + (window.scrollY || 0)) / 4);
+  const docW = Math.round(r.width / 4);
+  const docH = Math.round(r.height / 4);
+  return [
+    framePathKey(),
+    tag, type, name, domId, placeholder, aria, href,
+    structuralPath(el),
+    docX, docY, docW, docH
+  ].join("|");
+}
+
+/** Frame-scoped namespace so identical elements in different frames never collide. */
+function framePathKey() {
+  try {
+    return `${location.origin}${location.pathname}#${window === window.top ? "top" : "frame"}`;
+  } catch (_) {
+    return "frame";
+  }
+}
+
+/** djb2-style 32-bit string hash (same approach used for PII region IDs). */
+function hashString(raw) {
+  let hash = 0;
+  for (let i = 0; i < raw.length; i++) {
+    hash = ((hash << 5) - hash) + raw.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash);
+}
+
+/** Deterministic string ID for a PII region (e.g. "pii_1f3xk9"). */
+function deterministicId(el, prefix = "pii") {
+  return `${prefix}_${hashString(identitySeed(el)).toString(36)}`;
+}
+
+/**
+ * Deterministic POSITIVE INTEGER mark ID for an interactive element.
+ *
+ * Derived from the same identity seed as PII regions, so the same element receives the same
+ * mark ID on every scan of the page. Multi-step automation can therefore target an ID that
+ * came from an earlier scan. Collisions inside one scan are resolved by linear probing.
+ */
+function deterministicMarkId(el, usedIds) {
+  // Keep inside a safe positive int range that survives JSON + Pydantic `int`.
+  let id = (hashString(identitySeed(el)) % 8999999) + 1000;
+  let guard = 0;
+  while (usedIds.has(id) && guard < 64) {
+    id = ((id + 1) % 8999999) + 1000;
+    guard++;
+  }
+  usedIds.add(id);
+  return id;
 }
 
 function testPII(text) {
-  const tests = [EMAIL_RE, PHONE_RE, CARD_RE, SSN_RE, AADHAAR_RE];
+  const tests = [EMAIL_RE, PHONE_RE, CARD_RE, SSN_RE, AADHAAR_RE, PAN_RE, PASSPORT_RE, IFSC_RE, UPI_RE];
   const result = tests.some(re => { re.lastIndex = 0; return re.test(text); });
   tests.forEach(re => { re.lastIndex = 0; });
   return result;
+}
+
+// Keyword matching must respect word boundaries. Plain substring matching fires on innocent
+// words that happen to contain a short keyword — "pin" inside "shipping", "age" inside
+// "message", "pan" inside "company" — and each false hit blacks out a control the planner
+// needs. Attribute names are normalised first so camelCase and snake_case still match:
+// "fullName" -> "full name", "postal_code" -> "postal code".
+const PII_LABEL_PATTERNS = PII_LABEL_KEYWORDS.map(
+  kw => new RegExp("\\b" + kw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\b", "i")
+);
+
+function normalizeForKeywordMatch(text) {
+  return String(text || "")
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/[_\-.]+/g, " ")
+    .replace(/\s+/g, " ")
+    .toLowerCase()
+    .trim();
+}
+
+function matchesPiiKeyword(text) {
+  const t = normalizeForKeywordMatch(text);
+  if (!t) return false;
+  return PII_LABEL_PATTERNS.some(re => re.test(t));
+}
+
+/**
+ * Search and filter boxes hold queries, not personal data, and blacking them out removes the
+ * one control most tasks need. They are excluded even when their placeholder mentions a
+ * sensitive word ("Search by name or email").
+ */
+function isSearchLike(el) {
+  if (!el) return false;
+  const type = (el.getAttribute && el.getAttribute("type") || "").toLowerCase();
+  const role = (el.getAttribute && el.getAttribute("role") || "").toLowerCase();
+  if (type === "search" || role === "searchbox") return true;
+  const ident = normalizeForKeywordMatch(
+    [el.getAttribute("name"), el.getAttribute("id"), el.getAttribute("aria-label")].filter(Boolean).join(" ")
+  );
+  return /\b(search|query|filter|keywords?|lookup|find)\b/.test(ident);
+}
+
+function checkNearbyLabelPII(inputEl) {
+  const labelEl = inputEl.closest("label") ||
+                  (inputEl.id ? document.querySelector(`label[for="${CSS.escape(inputEl.id)}"]`) : null) ||
+                  inputEl.previousElementSibling;
+  const candidates = [
+    labelEl && (labelEl.innerText || labelEl.textContent),
+    inputEl.getAttribute("aria-label"),
+    inputEl.getAttribute("placeholder"),
+    inputEl.getAttribute("name"),
+    inputEl.getAttribute("id"),
+    inputEl.getAttribute("autocomplete"),
+  ];
+  return candidates.some(matchesPiiKeyword);
+}
+
+/**
+ * Values whose sensitivity comes from CONTEXT rather than shape.
+ *
+ * Personal names, street lines and account labels match no regex — a table of customers is
+ * just capitalised words. What marks them sensitive is the column they sit in, or the term
+ * they sit beside. This resolves that context two ways:
+ *
+ *   1. Table cells -> the <th> at the same column index (and any row header).
+ *   2. Definition lists and label/value pairs -> the preceding <dt>/<label>/<strong>/<b>.
+ *
+ * Without this, dashboards leak every name and address they display; the live evaluation
+ * measured exactly that before this rule existed.
+ */
+function findContextLabelledPII() {
+  const hits = [];
+
+  document.querySelectorAll("table").forEach((table) => {
+    const headerCells = Array.from(table.querySelectorAll("thead th, tr:first-child th"));
+    if (!headerCells.length) return;
+    const sensitiveCols = new Set();
+    headerCells.forEach((th, i) => {
+      if (matchesPiiKeyword(th.innerText || th.textContent)) sensitiveCols.add(i);
+    });
+    if (!sensitiveCols.size) return;
+
+    table.querySelectorAll("tr").forEach((row) => {
+      // Header rows label the data; they are not the data. Masking "Email" as though it were
+      // an address hides page structure the planner needs and scores as over-redaction.
+      if (row.closest("thead")) return;
+      const cells = Array.from(row.children).filter((c) => /^td$/i.test(c.tagName));
+      cells.forEach((cell, i) => {
+        if (!sensitiveCols.has(i)) return;
+        const text = (cell.innerText || cell.textContent || "").trim();
+        if (text.length >= 2) hits.push({ el: cell, label: (headerCells[i].innerText || "field").trim().toLowerCase() });
+      });
+    });
+  });
+
+  document.querySelectorAll("dd").forEach((dd) => {
+    const dt = dd.previousElementSibling;
+    if (dt && dt.tagName === "DT" && matchesPiiKeyword(dt.innerText || dt.textContent)) {
+      const text = (dd.innerText || "").trim();
+      if (text.length >= 2) hits.push({ el: dd, label: (dt.innerText || "field").trim().toLowerCase() });
+    }
+  });
+
+  return hits;
+}
+
+/**
+ * Offset of this frame's viewport inside the TOP-LEVEL viewport, in CSS pixels.
+ *
+ * Returns null for cross-origin frames (window.frameElement is inaccessible), which signals
+ * to the orchestrator that this frame's coordinates cannot be mapped onto the top-level
+ * screenshot and must be dropped rather than misplaced.
+ */
+function frameOffsetInTopViewport() {
+  if (window === window.top) return { x: 0, y: 0, isTop: true };
+  let offX = 0;
+  let offY = 0;
+  let win = window;
+  try {
+    while (win !== win.top) {
+      const fe = win.frameElement; // throws SecurityError across origins
+      if (!fe) return null;
+      const r = fe.getBoundingClientRect();
+      const cs = fe.ownerDocument.defaultView.getComputedStyle(fe);
+      offX += r.left + (parseFloat(cs.borderLeftWidth) || 0) + (parseFloat(cs.paddingLeft) || 0);
+      offY += r.top + (parseFloat(cs.borderTopWidth) || 0) + (parseFloat(cs.paddingTop) || 0);
+      win = win.parent;
+    }
+  } catch (_) {
+    return null; // cross-origin ancestor
+  }
+  return { x: Math.round(offX), y: Math.round(offY), isTop: false };
+}
+
+/**
+ * Is this element rendered as a circle or near-circle?
+ *
+ * A profile picture is round on nearly every site that has one; a product thumbnail is not.
+ * Used to decide which small images stay masked when the face model has already had its say.
+ */
+function isCircular(el, rect) {
+  try {
+    const radius = getComputedStyle(el).borderRadius || "";
+    const first = radius.split(/\s|\//)[0] || "";
+    const shorter = Math.min(rect.w || 0, rect.h || 0);
+    if (!shorter) return false;
+    if (first.endsWith("%")) return parseFloat(first) >= 40;
+    if (first.endsWith("px")) return parseFloat(first) >= shorter * 0.4;
+    return false;
+  } catch (_) {
+    return false;
+  }
 }
 
 // ── Phase 1: scan for PII regions ────────────────────────────────────────────
 function scanForPII() {
   const regions = [];
   const seen = new Set();
+  let nodeCount = 0;
 
-  function addRegion(el, type, reason) {
+  function addRegion(el, type, reason, label = null, extra = null) {
     if (!el) return;
     const r = rectOf(el);
     if (r.w < 2 || r.h < 2) return;
     const key = `${r.x},${r.y},${r.w},${r.h}`;
     if (seen.has(key)) return;
     seen.add(key);
-    regions.push({ ...r, type, reason });
+
+    const stableId = deterministicId(el, "pii");
+    regions.push({
+      id: stableId,
+      ...r,
+      box: r,
+      type,
+      sensitive: true,
+      reason,
+      label,
+      ...(extra || {})
+    });
   }
 
-  // Sensitive form fields
-  document.querySelectorAll(PII_INPUT_SELECTORS.join(",")).forEach(el => {
-    addRegion(el, "form_field", "sensitive_input");
+  // 1. Sensitive input fields
+  querySelectorAllDeep(PII_INPUT_SELECTORS.join(",")).forEach(el => {
+    if (isSearchLike(el)) return;
+    addRegion(el, "form_field", "sensitive_input", el.getAttribute("type") || "form_field");
   });
 
-  // PII text nodes
-  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
-  let node;
-  while ((node = walker.nextNode())) {
-    const text = node.nodeValue || "";
-    if (text.trim().length < 4) continue;
-    if (testPII(text)) addRegion(node.parentElement, "text", "pii_text_match");
+  // 2. Form fields with nearby PII label text
+  querySelectorAllDeep("input, textarea, select").forEach(el => {
+    if (isSearchLike(el)) return;
+    if (checkNearbyLabelPII(el)) {
+      addRegion(el, "form_field", "nearby_label_pii", "labeled_pii");
+    }
+  });
+
+  // 2b. Values that are sensitive because of the column/term they sit under
+  findContextLabelledPII().forEach(({ el, label }) => {
+    addRegion(el, "text", "context_labelled_pii", label.slice(0, 30));
+  });
+
+  // 3. Text nodes matching regexes
+  if (document.body) {
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    let node;
+    while ((node = walker.nextNode())) {
+      nodeCount++;
+      if (nodeCount > MAX_DOM_NODES) break;
+      const text = node.nodeValue || "";
+      if (text.trim().length < 4) continue;
+      if (testPII(text)) {
+        addRegion(node.parentElement, "text", "pii_text_match", "regex_pii");
+      }
+    }
   }
 
-  // Images and videos (potential faces)
+  // 4. Media that could hold a face or an identity document.
+  //
+  //    This is the fail-closed default for when no face model is available. When one HAS run,
+  //    detection-orchestrator.js drops these in favour of the model's own boxes — otherwise
+  //    every product photo on a shopping page gets blacked out, which wrecks both the visual
+  //    context the planner needs and the precision of the redaction itself.
+  //
+  //    The markup hints travel with the region so that filter can keep anything the page
+  //    itself describes as a person, whatever the model concluded.
   document.querySelectorAll("img, video, canvas").forEach(el => {
     if (el.offsetParent === null) return;
     const r = rectOf(el);
-    // Skip tiny icons (< 48x48)
-    if (r.w >= 48 && r.h >= 48) addRegion(el, "media", "possible_face_or_media");
+    if (r.w >= 48 && r.h >= 48) {
+      addRegion(el, "media", "possible_face_or_media", "media", {
+        alt: (el.getAttribute("alt") || "").slice(0, 80),
+        className: (typeof el.className === "string" ? el.className : "").slice(0, 80),
+        src: (el.getAttribute("src") || "").slice(0, 120),
+        // Circular is the strongest available signal for "this is a person". Product
+        // thumbnails, logos and category tiles are square or rectangular; profile pictures are
+        // round almost everywhere. Computed here because only the page can see the style.
+        circular: isCircular(el, r),
+      });
+    }
   });
 
   return regions;
@@ -114,379 +558,212 @@ function inferRole(el) {
   const role = (el.getAttribute("role") || "").toLowerCase();
   const aria = (el.getAttribute("aria-label") || "").toLowerCase();
   const placeholder = (el.getAttribute("placeholder") || "").toLowerCase();
-  const dataTestId = (el.getAttribute("data-testid") || "").toLowerCase();
-  const dataQa = (el.getAttribute("data-qa") || "").toLowerCase();
 
   if (tag === "input") {
     if (type === "submit" || type === "button") return "button";
-    if (type === "search" || role === "searchbox" || role === "combobox") return "input:search";
+    if (type === "search" || role === "searchbox") return "input:search";
+    if (type === "checkbox" || role === "checkbox") return "checkbox";
+    if (type === "radio" || role === "radio") return "radio";
     return `input:${type || "text"}`;
   }
   if (tag === "button" || role === "button") return "button";
-  if (tag === "a") return "link";
+  if (tag === "a" || role === "link") return "link";
   if (tag === "select") return "select";
   if (tag === "textarea") return "textarea";
-  if (role === "textbox" || role === "searchbox" || role === "combobox") return "editable";
-  if (el.getAttribute("contenteditable") === "true" || el.getAttribute("contenteditable") === "plaintext-only") return "editable";
-  if (aria.includes("message") || placeholder.includes("message") || dataTestId.includes("compose") || dataQa.includes("message")) return "editable";
-  return "element";
-}
-
-function walkDom(root, visitor) {
-  const stack = [root];
-  const seen = new WeakSet();
-
-  while (stack.length) {
-    const node = stack.pop();
-    if (!node || seen.has(node)) continue;
-    seen.add(node);
-
-    if (node.nodeType === 1) {
-      visitor(node);
-      if (node.shadowRoot) stack.push(node.shadowRoot);
-      const children = Array.from(node.children || []);
-      for (let i = children.length - 1; i >= 0; i--) stack.push(children[i]);
-    }
-  }
-}
-
-function findWhatsAppComposer() {
-  if (!/web\.whatsapp\.com/.test(location.href)) return null;
-  const selectors = [
-    '[data-testid="conversation-compose-box"]',
-    '[data-testid="message-input"]',
-    '[data-qa="message-input"]',
-    '[data-qa="composer"]',
-    'div.selectable-text.copyable-text',
-    'div.selectable-text.copyable-text[contenteditable="true"]',
-    'div[contenteditable="true"]',
-    'div[contenteditable="plaintext-only"]',
-    'div[role="textbox"]',
-    'div[aria-label*="Type a message" i]',
-    'div[aria-label*="message" i]'
-  ];
-
-  for (const sel of selectors) {
-    const el = document.querySelector(sel);
-    if (el) {
-      const r = rectOf(el);
-      if (r.w >= 60 && r.h >= 20) return el;
-    }
-  }
-
-  const candidates = document.querySelectorAll('div[contenteditable="true"], div[contenteditable="plaintext-only"], div[role="textbox"]');
-  for (const el of candidates) {
-    const r = rectOf(el);
-    if (r.w >= 60 && r.h >= 20) return el;
-  }
-
-  return null;
-}
-
-function findWhatsAppSendButton() {
-  if (!/web\.whatsapp\.com/.test(location.href)) return null;
-  const selectors = [
-    '[data-testid="send"]',
-    'button[aria-label*="Send" i]',
-    'span[data-icon="send"]',
-    'div[role="button"][aria-label*="Send" i]',
-    'button[title="Send" i]',
-    'span[title="Send" i]',
-    'div[title="Send" i]'
-  ];
-
-  for (const sel of selectors) {
-    const el = document.querySelector(sel);
-    if (el) {
-      const r = rectOf(el);
-      if (r.w >= 12 && r.h >= 12) return el;
-    }
-  }
-
-  return null;
+  if (role === "combobox" || el.getAttribute("aria-haspopup") === "listbox") return "combobox";
+  if (role === "checkbox" || role === "switch") return "checkbox";
+  if (role === "radio") return "radio";
+  if (role === "textbox" || role === "searchbox") return "editable";
+  if (el.getAttribute("contenteditable") === "true") return "editable";
+  if (aria.includes("message") || placeholder.includes("message")) return "editable";
+  return "clickable";
 }
 
 function tagInteractiveElements() {
   markMap.clear();
   const marks = [];
-  let id = 1;
+  const usedIds = new Set();
   const seen = new WeakSet();
 
-  const directCandidates = document.querySelectorAll(
-    'input:not([type="hidden"]):not([type="file"]), textarea, select, button, [role="button"], [role="link"], [role="searchbox"], [role="combobox"], [role="textbox"], [contenteditable="true"], [contenteditable="plaintext-only"], [contenteditable=""], [aria-label*="message" i], [placeholder*="message" i], [data-testid*="compose" i], [data-testid*="chat" i], [data-qa*="message" i], [data-qa*="chat" i]'
+  const candidates = querySelectorAllDeep(
+    'a, button, input:not([type="hidden"]):not([type="file"]), textarea, select, [role="button"], [role="link"], [role="searchbox"], [role="textbox"], [role="combobox"], [role="checkbox"], [role="radio"], [role="switch"], [role="tab"], [role="menuitem"], [role="option"], [contenteditable="true"], [tabindex="0"], [aria-haspopup="listbox"], [aria-haspopup="true"], .nav-link, .btn, [id*="search" i], [name*="search" i], [name*="keywords" i]'
   );
 
-  directCandidates.forEach((el) => {
+  candidates.forEach((el) => {
     if (!(el instanceof Element) || seen.has(el)) return;
+    if (!isElementInViewport(el)) return; // Viewport-only filtering
     seen.add(el);
 
     const r = rectOf(el);
-    if (r.w < 4 || r.h < 4) return;
+    if (r.w < 6 || r.h < 6) return;
     const role = inferRole(el);
-    if (!role || role === 'element') return;
+    if (!role) return;
 
-    el.setAttribute('data-vagent-mark', String(id));
-    markMap.set(id, el);
-    marks.push({ id, role, box: r, label: safeLabel(el) });
-    id++;
+    // Deterministic ID — stable across repeated scans of the same page.
+    const stableId = deterministicMarkId(el, usedIds);
+    el.setAttribute("data-vagent-mark", String(stableId));
+    markMap.set(stableId, el);
+    markMap.set(String(stableId), el);
+
+    marks.push({
+      id: stableId,
+      role,
+      box: r,
+      label: safeLabel(el)
+    });
   });
-
-  walkDom(document, (el) => {
-    if (!(el instanceof Element) || seen.has(el)) return;
-    seen.add(el);
-
-    const isCandidate =
-      el.matches('button, a[href], input:not([type="hidden"]):not([type="file"]), select, textarea') ||
-      el.matches('[role="button"], [role="link"], [role="searchbox"], [role="combobox"], [role="textbox"]') ||
-      el.matches('[contenteditable="true"], [contenteditable="plaintext-only"], [contenteditable=""], [aria-label*="message" i], [placeholder*="message" i], [data-testid*="compose" i], [data-testid*="chat" i], [data-qa*="message" i], [data-qa*="chat" i]') ||
-      (el.tagName === 'DIV' && (el.getAttribute('contenteditable') === 'true' || el.getAttribute('contenteditable') === 'plaintext-only')) ||
-      (el.tagName === 'DIV' && (el.getAttribute('aria-label') || '').toLowerCase().includes('message'));
-
-    if (!isCandidate) return;
-
-    const r = rectOf(el);
-    if (r.w < 4 || r.h < 4) return;
-    const role = inferRole(el);
-    if (!role || role === 'element') return;
-
-    if (marks.some((m) => m.role === role && Math.abs(m.box.x - r.x) < 2 && Math.abs(m.box.y - r.y) < 2 && Math.abs(m.box.w - r.w) < 2 && Math.abs(m.box.h - r.h) < 2)) return;
-
-    el.setAttribute('data-vagent-mark', String(id));
-    markMap.set(id, el);
-    marks.push({ id, role, box: r, label: safeLabel(el) });
-    id++;
-  });
-
-  if (/web\.whatsapp\.com/.test(location.href)) {
-    const waComposer = findWhatsAppComposer();
-    if (waComposer) {
-      const r = rectOf(waComposer);
-      const composerId = id;
-      waComposer.setAttribute('data-vagent-mark', String(composerId));
-      markMap.set(composerId, waComposer);
-      marks.push({ id: composerId, role: 'editable', box: r, label: 'message' });
-      id++;
-    }
-
-    const waSend = findWhatsAppSendButton();
-    if (waSend) {
-      const r = rectOf(waSend);
-      const sendId = id;
-      waSend.setAttribute('data-vagent-mark', String(sendId));
-      markMap.set(sendId, waSend);
-      marks.push({ id: sendId, role: 'button', box: r, label: 'send' });
-      id++;
-    }
-  }
 
   return marks;
 }
 
-// ── Phase 2: execute actions ──────────────────────────────────────────────────
-async function setEditableText(el, value) {
-  const delay = (ms) => new Promise(r => setTimeout(r, ms));
-  const humanDelay = () => delay(80 + Math.random() * 60);
-
-  el.focus();
-  await delay(60);
-
-  if (el.isContentEditable) {
-    const sel = window.getSelection();
-    const range = document.createRange();
-    range.selectNodeContents(el);
-    sel.removeAllRanges();
-    sel.addRange(range);
-    document.execCommand('delete', false, null);
-    await delay(40);
-
-    for (const char of (value ?? '')) {
-      document.execCommand('insertText', false, char);
-      await humanDelay();
-    }
-
-    el.dispatchEvent(new InputEvent('input', {
-      bubbles: true,
-      cancelable: true,
-      inputType: 'insertText',
-      data: value
-    }));
-    return;
-  }
-
-  const proto = el.tagName === "TEXTAREA" ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
-  const nativeSetter = Object.getOwnPropertyDescriptor(proto, "value")?.set;
-  let current = "";
-  for (const char of (value ?? "")) {
-    current += char;
-    if (nativeSetter) nativeSetter.call(el, current);
-    else el.value = current;
-    el.dispatchEvent(new Event("input", { bubbles: true }));
-    el.dispatchEvent(new KeyboardEvent("keyup", { key: char, bubbles: true }));
-    await humanDelay();
-  }
-  el.dispatchEvent(new Event("change", { bubbles: true }));
+/** Resolves a mark ID to a live element in THIS frame (or null). */
+function resolveMarkElement(targetId) {
+  return (
+    markMap.get(targetId) ||
+    markMap.get(Number(targetId)) ||
+    markMap.get(String(targetId)) ||
+    document.querySelector(`[data-vagent-mark="${CSS.escape(String(targetId))}"]`) ||
+    null
+  );
 }
 
-async function executeAction(action, mark_id, value) {
-  let el = markMap.get(mark_id);
-
-  if (!el && /web\.whatsapp\.com/.test(location.href)) {
-    if (action === 'type') {
-      el = findWhatsAppComposer();
-      if (el) {
-        await setEditableText(el, value || '');
-        return { ok: true };
-      }
-    }
-    if (action === 'click') {
-      el = findWhatsAppSendButton();
-      if (el) {
-        el.click();
-        return { ok: true };
-      }
-    }
+/**
+ * Full scan of THIS frame. Returns regions/marks in this frame's own viewport
+ * coordinates plus the offset needed to map them into the top-level viewport.
+ */
+function scanPage() {
+  if (domScanInFlight) {
+    return { piiRegions: [], marks: [], scanSkipped: true, frameOffset: frameOffsetInTopViewport() };
   }
-
-  if (!el) return { ok: false, error: `mark_id ${mark_id} not found` };
-
+  domScanInFlight = true;
   try {
-    switch (action) {
-      case "press_key":
-        el.focus();
-        el.dispatchEvent(new KeyboardEvent("keydown",  { key: value, code: value === "Enter" ? "Enter" : value, bubbles: true, cancelable: true }));
-        el.dispatchEvent(new KeyboardEvent("keypress", { key: value, code: value === "Enter" ? "Enter" : value, bubbles: true, cancelable: true }));
-        el.dispatchEvent(new KeyboardEvent("keyup",    { key: value, code: value === "Enter" ? "Enter" : value, bubbles: true }));
-        // For non-contenteditable: also submit closest form
-        if ((value === "Enter" || value === "Return") && !el.isContentEditable) {
-          const form = el.closest("form");
-          if (form) {
-            const submitBtn = form.querySelector('[type="submit"]');
-            if (submitBtn) submitBtn.click();
-            else form.submit();
-          }
-        }
-        break;
-
-      case "wait":
-        // value = milliseconds to wait (max 5000)
-        await new Promise(r => setTimeout(r, Math.min(Number(value) || 1000, 5000)));
-        break;
-
-      case "click":
-        el.focus();
-        el.click();
-        break;
-
-      case "type": {
-        await setEditableText(el, value ?? '');
-        break;
-      }
-
-      case "clear":
-        el.focus();
-        el.value = "";
-        el.dispatchEvent(new Event("input",  { bubbles: true }));
-        el.dispatchEvent(new Event("change", { bubbles: true }));
-        break;
-
-      case "select":
-        // For <select> dropdowns — value is the option value or visible text
-        if (el.tagName.toLowerCase() === "select") {
-          const opt = Array.from(el.options).find(
-            o => o.value === value || o.text.toLowerCase() === (value || "").toLowerCase()
-          );
-          if (opt) {
-            el.value = opt.value;
-            el.dispatchEvent(new Event("change", { bubbles: true }));
-          } else {
-            return { ok: false, error: `Option "${value}" not found in select` };
-          }
-        }
-        break;
-
-      case "hover":
-        el.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
-        el.dispatchEvent(new MouseEvent("mouseenter", { bubbles: true }));
-        break;
-
-      case "focus":
-        el.focus();
-        break;
-
-      case "scroll":
-        el.scrollIntoView({ behavior: "smooth", block: "center" });
-        break;
-
-      case "scroll_page": {
-        const amount = Number(value) || 400;
-        const scrollTargets = [
-          document.scrollingElement,
-          document.body,
-          document.documentElement,
-          ...Array.from(document.querySelectorAll('[data-scrollable="true"], [style*="overflow"], [style*="overflow-y"], [style*="overflow:auto"], [style*="overflow-y:auto"]'))
-        ].filter(Boolean);
-
-        let scrolled = false;
-        for (const target of scrollTargets) {
-          try {
-            const before = target.scrollTop || 0;
-            if (typeof target.scrollBy === "function") {
-              target.scrollBy({ top: amount, behavior: "smooth" });
-            } else if (typeof target.scrollTo === "function") {
-              target.scrollTo({ top: before + amount, behavior: "smooth" });
-            } else {
-              target.scrollTop = (target.scrollTop || 0) + amount;
-            }
-            const after = target.scrollTop || 0;
-            if (after !== before || target === document.scrollingElement || target === document.documentElement || target === document.body) {
-              scrolled = true;
-              break;
-            }
-          } catch (_) {}
-        }
-
-        if (!scrolled) {
-          const current = window.scrollY || document.documentElement.scrollTop || 0;
-          window.scrollTo({ top: current + amount, behavior: "smooth" });
-        }
-        break;
-      }
-
-      default:
-        return { ok: false, error: `Unknown action: ${action}` };
-    }
-    return { ok: true };
-  } catch (e) {
-    return { ok: false, error: String(e) };
-  }
-}
-
-// ── Message listener ──────────────────────────────────────────────────────────
-chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-  if (msg.type === "SCAN_PAGE") {
     const piiRegions = scanForPII();
     const marks = tagInteractiveElements();
-    sendResponse({ piiRegions, marks });
+    return {
+      piiRegions,
+      marks,
+      scanSkipped: false,
+      frameOffset: frameOffsetInTopViewport(),
+      frameUrl: location.href.slice(0, 200),
+      isTopFrame: window === window.top
+    };
+  } finally {
+    domScanInFlight = false;
+  }
+}
+
+/**
+ * Executes an action in THIS frame using the single shared ActionExecutor.
+ * Returns { ok, error? } — or { ok:false, notInThisFrame:true } if the mark lives elsewhere.
+ */
+async function executeActionInFrame(payload = {}) {
+  const actionType = (payload.action || payload.type || "").toLowerCase();
+  const targetId = payload.mark_id ?? payload.target;
+  // The executor owns the definition of which actions need a marked element; asking it keeps
+  // the two from drifting apart. The fallback covers the (impossible in practice) case of
+  // this frame having content.js without action-executor.js.
+  const targetless = globalThis.ActionExecutor?.TARGETLESS_ACTIONS ||
+    new Set(["scroll_page", "wait", "done", "dismiss_overlays", "open_search", "probe_query"]);
+
+  // "scroll" with no id is a page scroll, so it needs no element either.
+  const needsElement = !targetless.has(actionType) && !(actionType === "scroll" && targetId == null);
+  if (needsElement && !resolveMarkElement(targetId)) {
+    return { ok: false, notInThisFrame: true, error: `mark_id ${targetId} not found in this frame` };
+  }
+
+  const executor = globalThis.ActionExecutor && globalThis.ActionExecutor.executeAction;
+  if (typeof executor !== "function") {
+    return { ok: false, error: "ActionExecutor not loaded in this frame." };
+  }
+
+  return executor(
+    { type: actionType, target: targetId, value: payload.value },
+    resolveMarkElement
+  );
+}
+
+function getPageInfo() {
+  return {
+    title: document.title.substring(0, 80),
+    url: location.origin + location.pathname,
+    url_path: location.pathname,
+    scroll_y: window.scrollY,
+    page_height: document.body ? document.body.scrollHeight : 0,
+    viewport_height: window.innerHeight,
+    viewport_width: window.innerWidth,
+    device_pixel_ratio: window.devicePixelRatio || 1
+  };
+}
+
+// Exposed to the service worker via chrome.scripting.executeScript({ allFrames: true }).
+window.__vagent = {
+  scanPage,
+  executeAction: executeActionInFrame,
+  getPageInfo,
+  resolveMarkElement
+};
+
+// ── MutationObserver ─────────────────────────────────────────────────────────
+// Only the top frame reports DOM changes; a full re-scan already covers every frame.
+let domMutationDebounce = null;
+if (document.body && window === window.top) {
+  const observer = new MutationObserver(() => {
+    if (domMutationDebounce) clearTimeout(domMutationDebounce);
+    domMutationDebounce = setTimeout(() => {
+      try {
+        if (typeof chrome !== "undefined" && chrome.runtime?.sendMessage) {
+          chrome.runtime.sendMessage({ type: "DOM_CHANGED", url: location.href }).catch(() => {});
+        }
+      } catch (_) {}
+    }, 700);
+  });
+  observer.observe(document.body, { childList: true, subtree: true, attributes: true });
+}
+
+/**
+ * After a "type" action, verify the field actually received the value.
+ * Returns { ok: true } if the field value matches, { ok: false, validationError } otherwise.
+ */
+function checkFieldValue(targetId, expectedValue) {
+  const el = resolveMarkElement(targetId);
+  if (!el) return { ok: false, validationError: "element not found" };
+  const actual = el.value !== undefined ? el.value : (el.textContent || "");
+  if (!actual || actual.trim() === "") {
+    return { ok: false, validationError: "field is empty after type" };
+  }
+  if (expectedValue && actual.trim() !== String(expectedValue).trim()) {
+    return { ok: false, validationError: `expected "${expectedValue}" but field contains "${actual.slice(0, 40)}"` };
+  }
+  return { ok: true };
+}
+
+// ── Message Listeners ─────────────────────────────────────────────────────────
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg.type === "SCAN_PAGE") {
+    sendResponse(scanPage());
     return true;
   }
 
   if (msg.type === "EXECUTE_ACTION") {
-    const { action, mark_id, value } = msg.payload;
-    executeAction(action, mark_id, value).then(result => sendResponse(result));
+    const payload = msg.payload || msg.action || msg;
+    executeActionInFrame(payload).then(res => {
+      // After a type action, verify the field received the value
+      if ((payload.action || payload.type || "").toLowerCase() === "type" && res?.ok) {
+        const check = checkFieldValue(payload.mark_id ?? payload.target, payload.value);
+        if (!check.ok) {
+          res.validationError = check.validationError;
+          // Don't flip ok — the type succeeded mechanically; caller decides how to handle
+        }
+      }
+      sendResponse(res);
+    });
     return true;
   }
 
   if (msg.type === "GET_PAGE_INFO") {
-    sendResponse({
-      title: document.title.substring(0, 80),
-      url: location.origin + location.pathname,
-      url_path: location.pathname,
-      scroll_y: window.scrollY,
-      page_height: document.body.scrollHeight,
-      viewport_height: window.innerHeight,
-    });
+    sendResponse(getPageInfo());
     return true;
   }
 });
 
-} // end __vagentLoaded guard
+} // end guard

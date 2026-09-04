@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VisionVault Fixture — Signup Form</title>
+<link rel="stylesheet" href="fixture.css">
+</head>
+<!--
+  EVALUATION FIXTURE — annotations are ground truth, read by eval/run-full-eval.js:
+    data-gt-pii="<type>"  this element's rendered box MUST be redacted
+    data-gt-safe          this element's box MUST NOT be redacted (measures over-redaction)
+    data-gt-mark="<role>" this element MUST appear in the agent's Set-of-Marks with this role
+-->
+<body data-fixture-id="signup-form" data-fixture-kind="form">
+  <h1>Create your account</h1>
+  <p class="sub" data-gt-safe>Fixture page: a realistic signup form with pre-filled personal data.</p>
+
+  <div class="card">
+    <img class="avatar-lg" src="../assets/face-1.png" alt="Profile photo" data-gt-pii="face" style="margin-bottom:16px">
+
+    <h2 data-gt-safe>Personal information</h2>
+    <div class="row">
+      <div class="field">
+        <label for="fullName">Full name</label>
+        <input type="text" id="fullName" name="name" autocomplete="name" value="Priya Raghavan"
+               data-gt-pii="name" data-gt-mark="input:text">
+      </div>
+      <div class="field">
+        <label for="email">Email address</label>
+        <input type="email" id="email" name="email" autocomplete="email" value="priya.raghavan@examplemail.com"
+               data-gt-pii="email" data-gt-mark="input:email">
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="field">
+        <label for="phone">Phone number</label>
+        <input type="tel" id="phone" name="phone" autocomplete="tel" value="+91 98450 31776"
+               data-gt-pii="phone" data-gt-mark="input:tel">
+      </div>
+      <div class="field">
+        <label for="aadhaar">Aadhaar number</label>
+        <input type="text" id="aadhaar" name="aadhaar" value="4321 8765 2190"
+               data-gt-pii="aadhaar" data-gt-mark="input:text">
+      </div>
+    </div>
+
+    <h2 data-gt-safe>Account security</h2>
+    <div class="row">
+      <div class="field">
+        <label for="username">Username</label>
+        <input type="text" id="username" name="username" autocomplete="username" value="praghavan"
+               data-gt-pii="username" data-gt-mark="input:text">
+      </div>
+      <div class="field">
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" autocomplete="new-password" value="Sunflower!2291"
+               data-gt-pii="password" data-gt-mark="input:password">
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="address">Mailing address</label>
+      <textarea id="address" name="address" rows="2" autocomplete="street-address"
+                data-gt-pii="address" data-gt-mark="textarea">14 Brigade Terrace, Indiranagar, Bengaluru 560038</textarea>
+    </div>
+
+    <h2 data-gt-safe>Contact on file</h2>
+    <p class="pii" data-gt-pii="email">Backup email: p.raghavan.backup@examplemail.com</p>
+    <p class="pii" data-gt-pii="phone">Alternate phone: +91 80 4123 9087</p>
+    <p class="pii" data-gt-pii="card">Card on file: 4539 8842 1176 3320</p>
+
+    <div class="nav" style="margin-top:18px">
+      <button type="button" data-gt-safe data-gt-mark="button">Back</button>
+      <button type="button" class="primary" id="submitBtn" data-gt-safe data-gt-mark="button">Create account</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2 data-gt-safe>Why we ask</h2>
+    <p class="muted" data-gt-safe>
+      Everything above stays on this page. The extension redacts the sensitive regions locally
+      before any screenshot is sent for planning. This paragraph contains no personal data and
+      must remain visible in the redacted image.
+    </p>
+    <a href="#terms" data-gt-safe data-gt-mark="link">Read the terms of service</a>
+  </div>
+</body>
+</html>

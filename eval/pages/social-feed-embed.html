@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Embedded profile card</title>
+<link rel="stylesheet" href="fixture.css">
+<style>body { padding: 12px; background: #fff; }</style>
+</head>
+<!--
+  Same-origin iframe embedded by social-feed.html.
+  Exists to verify multi-frame aggregation: its PII and its interactive controls must appear in
+  the merged scan result, mapped into TOP-LEVEL viewport coordinates.
+-->
+<body data-fixture-frame="social-feed-embed">
+  <div style="display:flex; gap:12px; align-items:center">
+    <img class="avatar" src="../assets/face-4.png" alt="" data-gt-pii="face">
+    <div>
+      <div data-gt-safe><strong>Samuel Adeyemi</strong> &middot; sponsored profile</div>
+      <div class="pii" data-gt-pii="email">samuel.adeyemi@examplemail.com</div>
+      <div class="pii" data-gt-pii="phone">+234 803 447 1120</div>
+    </div>
+  </div>
+  <div class="field" style="margin-top:12px; max-width:320px">
+    <label for="dm">Send a direct message</label>
+    <input type="text" id="dm" name="message" placeholder="Write a message"
+           data-gt-safe data-gt-mark="input:text">
+  </div>
+  <button class="primary" data-gt-safe data-gt-mark="button">Follow profile</button>
+</body>
+</html>

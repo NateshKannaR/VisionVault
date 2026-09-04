@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>VisionVault ML Offscreen Host</title>
+</head>
+<body>
+  <!-- Offline Libraries -->
+  <script src="lib/ort/ort.wasm.min.js"></script>
+  <script src="lib/tesseract/tesseract.min.js"></script>
+
+  <!-- Modular Vision Engine Modules -->
+  <script src="vision/faceDetect.js"></script>
+  <script src="vision/ocrDetect.js"></script>
+  <script src="vision/mergeRegions.js"></script>
+
+  <!-- Offscreen Message Handler & Pipeline Host -->
+  <script src="offscreen.js"></script>
+</body>
+</html>

@@ -1,0 +1,38 @@
+{
+  "width": 620,
+  "height": 260,
+  "sensitiveLines": [
+    {
+      "type": "name",
+      "x": 131,
+      "y": 100,
+      "w": 146,
+      "h": 23,
+      "text": "Priya Raghavan"
+    },
+    {
+      "type": "card",
+      "x": 81,
+      "y": 132,
+      "w": 196,
+      "h": 18,
+      "text": "4539 8842 1176 3320"
+    },
+    {
+      "type": "email",
+      "x": 91,
+      "y": 162,
+      "w": 306,
+      "h": 23,
+      "text": "priya.raghavan@examplemail.com"
+    },
+    {
+      "type": "phone",
+      "x": 91,
+      "y": 194,
+      "w": 156,
+      "h": 18,
+      "text": "+91 98450 31776"
+    }
+  ]
+}

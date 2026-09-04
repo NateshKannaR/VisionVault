@@ -161,7 +161,7 @@
 
     if (msgMatch) {
       result.wantsMessage = true;
-      result.message = msgMatch[1].trim();
+      result.message = msgMatch[1].replace(/\s+messages?$/i, "").trim();
       result.recipient = msgMatch[2].trim();
     } else if (/\b(send|message|msg|text|chat)\b/i.test(text) && /\bto\s+([a-zA-Z0-9_\s]+)/i.test(text)) {
       const rec = text.match(/\bto\s+([a-zA-Z0-9_\s]+?)(?:\s+(?:on|via|in)\s+(?:whatsapp|slack|telegram|teams)|$)/i);

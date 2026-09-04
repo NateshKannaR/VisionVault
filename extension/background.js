@@ -1058,9 +1058,9 @@ async function phaseRun() {
       let plannerSource = "server";
       const t0 = performance.now();
 
-      // For booking tasks, try the deterministic planner first.
-      // The model loops on city pickers; the deterministic planner sequences them correctly.
-      if (session.parsedTask?.wantsBook && deterministic && deterministic.action !== "done") {
+      // For booking or messaging tasks, try the deterministic planner first.
+      // The model loops on city pickers or contact search; the deterministic planner sequences them correctly.
+      if ((session.parsedTask?.wantsBook || session.parsedTask?.wantsMessage) && deterministic && deterministic.action !== "done") {
         resp = deterministic;
         plannerSource = "on-device";
       } else {
@@ -1075,6 +1075,8 @@ async function phaseRun() {
               to_city: session.parsedTask.to,
               date: session.parsedTask.date,
               category: session.parsedTask.category,
+              recipient: session.parsedTask.recipient,
+              message: session.parsedTask.message,
             } : null,
             progress: session.progress,
             image: session.redacted,
@@ -1336,6 +1338,12 @@ async function phaseRun() {
           }
           if (session.parsedTask?.to && valLower.includes(session.parsedTask.to.toLowerCase())) {
             session.progress.toTyped = true;
+          }
+          if (session.parsedTask?.recipient && valLower.includes(session.parsedTask.recipient.toLowerCase())) {
+            session.progress.contactSearched = true;
+          }
+          if (session.parsedTask?.message && valLower.includes(session.parsedTask.message.toLowerCase())) {
+            session.progress.messageTyped = true;
           }
         }
 

@@ -125,6 +125,8 @@ class TaskHints(BaseModel):
     to_city: Optional[str] = None
     date: Optional[str] = None
     category: Optional[str] = None
+    recipient: Optional[str] = None
+    message: Optional[str] = None
 
 class Progress(BaseModel):
     """What the instruction has achieved so far, as observed by the client.
@@ -1272,6 +1274,39 @@ def repair_plan(plan: StepResponse, req: AgentStepRequest, tier: str) -> StepRes
             action.reasoning = "Click Send button to send the message"
             target = send_btn
             plan.reasoning = "Click Send button to send message"
+
+    # Messaging: Contact search interception
+    # If the recipient is known, clicking on the search contacts box or clicking an unrelated contact must TYPE recipient!
+    recipient = (req.task_hints.recipient if req.task_hints and getattr(req.task_hints, "recipient", None) else None)
+    if not recipient and is_messaging:
+        rec_m = re.search(r"\bto\s+([a-zA-Z0-9_\s]+?)(?:\s+(?:on|via|in)\s+(?:whatsapp|slack|telegram)|$)", req.task or "", re.I)
+        if rec_m:
+            recipient = rec_m.group(1).strip()
+
+    if is_messaging and recipient:
+        search_contacts_box = next((
+            m for m in available
+            if ("search or start a new chat" in (m.label or "").lower()) or
+               ("search" in (m.label or "").lower() and any(r in (m.role or "").lower() for r in FILLABLE_ROLES))
+        ), None)
+        if search_contacts_box and kind == "click" and target is not None:
+            t_lbl = (target.label or "").lower()
+            if target.id == search_contacts_box.id or "search" in t_lbl:
+                notes.append(f"Clicking search contacts box does not search; typing recipient '{recipient}' instead")
+                kind, action.type = "type", "type"
+                action.target = search_contacts_box.id
+                action.value = recipient
+                action.reasoning = f"Type recipient '{recipient}' into search contacts box"
+                target = search_contacts_box
+                plan.reasoning = f"Search contact '{recipient}'"
+            elif recipient.lower() not in t_lbl and not any(r in (target.role or "").lower() for r in ["tab", "navigation"]) and not _is_message_send_button(target):
+                notes.append(f"Intercepted click on unrelated '{t_lbl}' when looking for '{recipient}'; typing into search contacts box")
+                kind, action.type = "type", "type"
+                action.target = search_contacts_box.id
+                action.value = recipient
+                action.reasoning = f"Type recipient '{recipient}' into search contacts box"
+                target = search_contacts_box
+                plan.reasoning = f"Search contact '{recipient}'"
 
     # Terminal actions: if still done after guards, return plan.
     if kind in ("done", "", "none", "finish", "stop"):

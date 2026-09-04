@@ -1266,9 +1266,9 @@ def repair_plan(plan: StepResponse, req: AgentStepRequest, tier: str) -> StepRes
     ), None) if is_messaging else None
 
     if is_messaging and send_btn:
-        t_label = (target.label or "").lower() if target else ""
-        if kind in ("done", "", "none", "finish", "stop") or (kind == "click" and target and target.id != send_btn.id and ("draft" in t_label or "message" in t_label)):
-            notes.append(f"Intercepted '{kind}' while Send button is available; clicking Send button to send the message")
+        if kind in ("done", "", "none", "finish", "stop") or (kind == "click" and (target is None or target.id != send_btn.id)):
+            target_desc = (target.label if target and target.label else "") or str(action.target)
+            notes.append(f"Intercepted '{kind}' on '{target_desc}' while Send button is available; clicking Send button to send the message")
             kind, action.type = "click", "click"
             action.target = send_btn.id
             action.reasoning = "Click Send button to send the message"

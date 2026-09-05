@@ -1554,6 +1554,9 @@ async function phaseRun() {
           }
           if (resp.isFilter) {
             session.progress.filterApplied = true;
+            // A control the planner could not find earlier has now been used. Leaving the
+            // "no such control here" note set would have one run report both at once.
+            session.progress.filterUnavailable = false;
           }
         }
 
@@ -1603,6 +1606,9 @@ async function phaseRun() {
           session.progress.filledAny = true;
           if (resp.isFilter || session.parsedTask?.wantsFilter || session.parsedTask?.maxPrice) {
             session.progress.filterApplied = true;
+            // A control the planner could not find earlier has now been used. Leaving the
+            // "no such control here" note set would have one run report both at once.
+            session.progress.filterUnavailable = false;
           }
           if (resp.isSort || session.parsedTask?.wantsSort) {
             session.progress.sortApplied = true;
@@ -1691,6 +1697,9 @@ async function phaseRun() {
           }
           if (resp.isFilter || /\b(filter|filters?)\b/i.test(tLabel) || (session.parsedTask?.maxPrice && new RegExp(`under.*${session.parsedTask.maxPrice}`, "i").test(tLabel))) {
             session.progress.filterApplied = true;
+            // A control the planner could not find earlier has now been used. Leaving the
+            // "no such control here" note set would have one run report both at once.
+            session.progress.filterUnavailable = false;
           }
           if (resp.isSort || /\b(sort|popularity|low\s*to\s*high|high\s*to\s*low)\b/i.test(tLabel)) {
             session.progress.sortApplied = true;

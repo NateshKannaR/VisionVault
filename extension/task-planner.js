@@ -58,15 +58,18 @@
   const TAIL_RE = /\s*(?:,|\band\b|\bthen\b)?\s*(?:please\s+)?(?:can\s+you\s+)?(?:show|display|tell|give|list|find|see)\s+(?:me|us|it)?\s*(?:the\s+)?(?:results?|details?|options?|list|prices?|it|best(?:\s+among\s+them)?)?\s*[.!]?\s*$/i;
 
   // A follow-up clause that is a separate instruction, not part of the query.
-  const CLAUSE_SPLIT_RE = /\s+(?:and|then|,)\s+(?:also\s+)?(?=open|click|select|scroll|show|tell|display|go|buy|add|book|play|read|check|see|view|pick|choose|filter|sort|find|get|checkout|put|apply|set|use|refine|star|fork|clone)/i;
+  const CLAUSE_SPLIT_RE = /\s+(?:and|then|,)\s+(?:also\s+)?(?=open|click|select|scroll|show|tell|display|go|buy|add|book|play|read|check|see|view|pick|choose|filter|sort|find|get|checkout|put|apply|set|use|refine|star|fork|clone|compare|save|analy[sz]e|review|evaluate|summari[sz]e|list|submit|confirm|raise|write|tick|enter|fill|note|report)/i;
 
   const LEAD_RE = /^\s*(?:hey|hi|ok|okay|please|can you|could you|would you|i want to|i want you to|i need to|help me|let's|lets)\s+/i;
 
   // Trailing politeness and punctuation, stripped after the tail clause.
   const POLITE_TAIL_RE = /[\s,.!]*\b(?:please|thanks|thank you|pls|plz)\b[\s,.!]*$/i;
 
-  const SEARCH_RE = /\b(?:search|look)\s+(?:for\s+|up\s+)?(.+)$/i;
-  const SITE_RE = /\b(?:open|go\s+to|goto|visit|navigate\s+to|launch|browse)\s+(.+?)(?=\s+(?:and|then|,)\s+|$)/i;
+  const SEARCH_VERB = "search|seach|serach|searh|sarch|seaarch|serch|look|find|locate|lookup";
+  const SEARCH_RE = new RegExp("\\b(?:" + SEARCH_VERB + ")\\s+(?:for\\s+|up\\s+)?(.+)$", "i");
+  const SITE_RE = new RegExp(
+    "\\b(?:open|go\\s+to|goto|visit|navigate\\s+to|launch|browse)\\s+(.+?)" +
+    "(?=\\s+(?:and|then|,)\\s+|\\s+(?:" + SEARCH_VERB + ")\\b|$)", "i");
   const OPEN_TARGET_RE = /\b(?:open|click|select|choose|tap)\s+(?:on\s+)?(?:the\s+)?(.+?)(?=\s+(?:and|then|,)\s+|$)/i;
 
   function stripQuotes(s) {
@@ -99,7 +102,7 @@
       openTargets: [],
       wantsScroll: /\b(scroll|load more|read more|next page|more results|scroll down)\b/i.test(text),
       wantsFill: /\b(fill|register|sign\s*up|signup|form|checkout|enter my details|apply\s+(?:for|job|loan|form|membership|card|visa))\b/i.test(text),
-      wantsBook: /\b(book|booking|reserve|reservation|order|buy|purchase|ticket|flight|hotel|cab|train|bus|ride)\b/i.test(text),
+      wantsBook: /\b(book|booking|reserve|reservation|order|buy|purchase|tickets?|flights?|hotels?|cabs?|trains?|buses|bus|rides?|flying|stay|stays)\b/i.test(text),
       wantsSearch: false,
       wantsShop: false,
       wantsFilter: /\b(filter|filters?|narrow|refine|sort)\b/i.test(text),
@@ -172,6 +175,18 @@
       }
     }
 
+    // The word "flights" is not by itself a request to book anything. "search for flights to
+    // goa" is an ordinary search; "flights from chennai to goa" is a route, and only a route
+    // (or an explicit booking verb, or a date) means the multi-field booking form is what the
+    // user wants. Recognising travel NOUNS as booking sent plain searches down the booking
+    // flow, where the planner clicks form controls instead of typing a query.
+    const explicitBooking = /\b(book|booking|reserve|reservation|purchase|place\s+(?:an?\s+)?order)\b/i.test(text);
+    const hasRoute = !!(result.from && result.to);
+    if (result.wantsBook && !explicitBooking && !hasRoute && !result.date) {
+      result.wantsBook = false;
+    }
+
+
     // Messaging / Chat task detection:
     // e.g. "send hi to niswan", "message niswan saying hi", "send a message to niswan"
     const msgMatch = text.match(/\b(?:send|message|msg|text|dm)\s+(?:a\s+message\s+(?:saying\s+|that\s+)?|message\s+)?['"]?([^'"]+?)['"]?\s+to\s+([a-zA-Z0-9_\s]+?)(?:\s+(?:on|via|in)\s+(?:whatsapp|slack|telegram|teams)|$)/i) ||
@@ -193,9 +208,15 @@
     const cartKeywords = /\b(add\s+to\s+cart|add\s+to\s+basket|buy\s+now|add\s+it\s+to\s+cart|put\s+(?:it\s+)?in\s+(?:the\s+)?cart)\b/i;
     result.wantsAddToCart = cartKeywords.test(text);
 
-    const priceUnderMatch = text.match(/\b(?:under|below|less\s+than|max(?:imum)?|cheaper\s+than|within|up\s+to)\s*(?:rs\.?|inr|₹|\$)?\s*(\d+[\d,]*)\b/i);
-    const priceOverMatch = text.match(/\b(?:above|over|more\s+than|min(?:imum)?|at\s+least)\s*(?:rs\.?|inr|₹|\$)?\s*(\d+[\d,]*)\b/i);
-    if (priceUnderMatch) result.maxPrice = parseInt(priceUnderMatch[1].replace(/,/g, ""), 10);
+    const priceUnderMatch = text.match(/\b(?:under|below|less\s+than|max(?:imum)?|cheaper\s+than|within|up\s+to)\s*(?:rs\.?|inr|₹|\$)?\s*(\d+(?:[\d,]*)?(?:\.\d+)?)\s*([kKlL])?\b/i);
+    const priceOverMatch = text.match(/\b(?:above|over|more\s+than|min(?:imum)?|at\s+least)\s*(?:rs\.?|inr|₹|\$)?\s*(\d+(?:[\d,]*)?(?:\.\d+)?)\s*([kKlL])?\b/i);
+    // "60k" and "1.5L" are how prices get written in practice. Without the multiplier the
+    // number parsed as sixty rupees, and the stray suffix stayed glued to the product name -
+    // measured, "search best laptop under 60k" put "laptopk" in the search box.
+    const scaleOf = (suffix) => (/^[kK]$/.test(suffix || "") ? 1000 : /^[lL]$/.test(suffix || "") ? 100000 : 1);
+    if (priceUnderMatch) {
+      result.maxPrice = Math.round(parseFloat(priceUnderMatch[1].replace(/,/g, "")) * scaleOf(priceUnderMatch[2]));
+    }
     if (priceOverMatch) result.minPrice = parseInt(priceOverMatch[1].replace(/,/g, ""), 10);
 
     const ratingMatch = text.match(/\b(?:rating\s*(?:of|above|over|at\s*least|min(?:imum)?|\>=?)?\s*|rated\s+)?([1-5](?:\.\d+)?)\s*(?:stars?|\+|\s*and\s*above|\s*or\s*more|\s*rating)\b/i) ||
@@ -318,13 +339,21 @@
         q = q.replace(/\s*(?:and\s+)?(?:also\s+)?(?:open|view|see)\s+(?:the\s+)?(?:issues?|pull\s*requests?|prs?)\b.*/gi, "");
         q = q.replace(/\s*\b(?:from|with)?\s*price\s+(?:under|below|less\s+than|cheaper\s+than|within|up\s+to|above|over|more\s+than)\b.*/gi, "");
         q = q.replace(/\s*\b(?:from\s+)?price\b.*/gi, "");
-        q = q.replace(/\s*\b(?:under|below|less\s+than|cheaper\s+than|within|up\s+to|above|over|more\s+than)\s*(?:rs\.?|inr|₹|\$)?\s*\d+[\d,]*/gi, "");
+        q = q.replace(/\s*\b(?:under|below|less\s+than|cheaper\s+than|within|up\s+to|above|over|more\s+than)\s*(?:rs\.?|inr|₹|\$)?\s*\d+(?:[\d,]*)?(?:\.\d+)?(?:\s*[kKlL])?/gi, "");
         q = q.replace(/\s*\b(?:with\s+)?(?:rating\s*(?:of|above|over|at\s*least|min|\>=)?\s*|rated\s+)[1-5](?:\.\d+)?\s*(?:stars?|\+|\s*and\s*above|\s*rating)?/gi, "");
         q = q.replace(/\s*\b[1-5](?:\.\d+)?\s*stars?\b/gi, "");
         q = q.replace(/\s*\b(?:and\s+)?(?:see|view|pick|choose|find)\s+(?:the\s+)?(?:best|top|cheapest)(?:\s+(?:one|item|product|among\s+them)?)?/gi, "");
       }
       q = stripQuotes(q).replace(/\s+/g, " ").trim();
       q = q.replace(/[\s,;:.\-]+$/, "").trim();
+      // "find the best laptop" should search for a laptop. The superlative is already
+      // captured in wantsBest/wantsCheapest and steers the CHOICE among results; leaving it in
+      // the query narrows the search itself, which is not what the user meant. Stripped only
+      // when something remains, so "find the cheapest" alone still searches for what it says.
+      if (q && (result.wantsBest || result.wantsCheapest)) {
+        const stripped = q.replace(/^(?:the\s+)?(?:best|cheapest|top[- ]?rated|highest[- ]?rated|top)\s+/i, "").trim();
+        if (stripped.length >= 2) q = stripped;
+      }
       if (q && !/^(?:me|it|this|that|results?|them)$/i.test(q)) result.query = q;
     }
 
@@ -337,7 +366,7 @@
     }
 
     // Travel booking route queries are not standard text queries
-    if (result.wantsBook && (result.from || result.to)) {
+    if (result.wantsBook && (result.from && result.to)) {
       result.query = null;
       result.wantsSearch = false;
     }

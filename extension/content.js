@@ -468,6 +468,37 @@ function findContextLabelledPII() {
     }
   });
 
+  // The label/value row, which is how most of the modern web lays out a detail list: two
+  // sibling elements inside a flex or grid row, no <table> and no <dl> anywhere.
+  //
+  // This case matters more than it looks. A personal name matches no regex — "Priya Raghavan"
+  // is two capitalised words — so the only thing marking it as sensitive is the word sitting
+  // beside it. eval/attack-redaction.js caught exactly this: a name displayed this way
+  // survived every enhancement attack on the redacted capture, because nothing had ever
+  // classified it as PII.
+  //
+  // The guards below are what keep this from masking half the page. A label is short, a value
+  // is short, and a row holds a couple of things — prose that happens to contain the word
+  // "name" satisfies none of that.
+  const MAX_LABEL_LEN = 40;
+  const MAX_VALUE_LEN = 90;
+  document.querySelectorAll("div, span, p, li, td").forEach((el) => {
+    const prev = el.previousElementSibling;
+    if (!prev) return;
+    if (el.children.length > 1 || prev.children.length > 1) return;      // leaves, not containers
+    const parent = el.parentElement;
+    if (!parent || parent.children.length > 3) return;                    // a row, not a list
+    const label = (prev.innerText || prev.textContent || "").trim();
+    if (!label || label.length > MAX_LABEL_LEN) return;
+    if (!matchesPiiKeyword(label)) return;
+    const value = (el.innerText || el.textContent || "").trim();
+    if (value.length < 2 || value.length > MAX_VALUE_LEN) return;
+    // The label cell itself is page structure, not data; masking it would hide the very thing
+    // that tells a reader — and the planner — what the field is.
+    if (matchesPiiKeyword(value) && value.length <= MAX_LABEL_LEN) return;
+    hits.push({ el, label: label.toLowerCase().slice(0, 30) });
+  });
+
   return hits;
 }
 

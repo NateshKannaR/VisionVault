@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VisionVault Fixture — PII Gauntlet</title>
+<link rel="stylesheet" href="fixture.css">
+<style>
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-items: start; }
+  .card { border: 1px solid #d8d8d8; border-radius: 8px; padding: 14px 16px; background: #fff; }
+  .card h3 { margin: 0 0 10px; font-size: 14px; letter-spacing: .02em; color: #444; }
+  .row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 14px; }
+  .row .k { color: #666; }
+  .row .v { font-family: Consolas, monospace; }
+  .idcard { width: 640px; max-width: 100%; display: block; border-radius: 8px; }
+  .below { margin-top: 900px; }
+  iframe { width: 100%; height: 170px; border: 1px solid #d8d8d8; border-radius: 8px; }
+  .note { font-size: 12px; color: #777; margin: 4px 0 0; }
+</style>
+</head>
+<!--
+  EVALUATION FIXTURE — every way PII hides on a page, on one page.
+
+  Each section defeats a different shortcut, and a detector can pass any one of them while
+  failing the rest:
+
+    1. DOM text          the easy case; a text-node scan finds it
+    2. Indic script      real Unicode, but the digits are not [0-9] — a detector whose
+                         patterns assume ASCII reports this page as clean
+    3. Pixels            an Aadhaar card as an <img>; there is no text node at all, so only
+                         OCR can reach it. The card carries the number twice, in Latin and in
+                         Devanagari, so English-only OCR is visibly partial rather than
+                         silently so
+    4. A face            the media path, not the text path
+    5. An iframe         a separate document; a scan that only walks the top frame misses it
+    6. Below the fold    only reachable after a scroll, which is where "we scanned the page"
+                         and "we scanned what was on screen" stop being the same claim
+
+  Values here are synthetic. The Aadhaar numbers begin with 2, because a real UIDAI number
+  never begins with 0 or 1 and the detector relies on that to avoid masking order numbers —
+  a fixture using 1234 5678 9012 would be testing the wrong thing.
+-->
+<body>
+<main class="wrap">
+  <h1>Customer Record — Verification Copy</h1>
+  <p class="note">Synthetic data. Every value below is fabricated for evaluation.</p>
+
+  <div class="grid">
+
+    <!-- 1. Plain DOM text, in Latin script. -->
+    <section class="card" id="dom-text">
+      <h3>1 · Identity on file <span class="note">(DOM text)</span></h3>
+      <div class="row"><span class="k">Name</span><span class="v">Priya Raghavan</span></div>
+      <div class="row"><span class="k">Aadhaar</span><span class="v">2345 6789 0123</span></div>
+      <div class="row"><span class="k">Aadhaar (unspaced)</span><span class="v">234567890123</span></div>
+      <div class="row"><span class="k">Aadhaar (hyphenated)</span><span class="v">2345-6789-0123</span></div>
+      <div class="row"><span class="k">VID</span><span class="v">9123 4567 8901 2345</span></div>
+      <div class="row"><span class="k">PAN</span><span class="v">ABCDE1234F</span></div>
+      <div class="row"><span class="k">Passport</span><span class="v">K1234567</span></div>
+      <div class="row"><span class="k">Driving licence</span><span class="v">TN-01-20110012345</span></div>
+      <div class="row"><span class="k">Vehicle</span><span class="v">TN 01 AB 1234</span></div>
+    </section>
+
+    <!-- 2. Financial and contact detail, including a labelled account number. -->
+    <section class="card" id="financial">
+      <h3>2 · Payment and contact <span class="note">(DOM text)</span></h3>
+      <div class="row"><span class="k">Email</span><span class="v">priya.r@example.com</span></div>
+      <div class="row"><span class="k">Mobile</span><span class="v">+91 98765 43210</span></div>
+      <div class="row"><span class="k">Card</span><span class="v">4111 1111 1111 1111</span></div>
+      <div class="row"><span class="k">A/c no</span><span class="v">12345678901234</span></div>
+      <div class="row"><span class="k">IFSC</span><span class="v">HDFC0001234</span></div>
+      <div class="row"><span class="k">UPI</span><span class="v">priya@okhdfcbank</span></div>
+      <div class="row"><span class="k">Address</span><span class="v">19 Anna Salai, Chennai 600002</span></div>
+    </section>
+
+    <!-- 3. The same identifiers in Indic scripts. Real text, non-ASCII digits. -->
+    <section class="card" id="indic">
+      <h3>3 · Same record, Indic numerals <span class="note">(DOM text, non-ASCII digits)</span></h3>
+      <div class="row"><span class="k">आधार (Devanagari)</span><span class="v">२३४५ ६७८९ ०१२३</span></div>
+      <div class="row"><span class="k">मोबाइल</span><span class="v">९८७६५४३२१०</span></div>
+      <div class="row"><span class="k">ஆதார் (Tamil)</span><span class="v">௨௩௪௫ ௬௭௮௯ ௦௧௨௩</span></div>
+      <div class="row"><span class="k">আধার (Bengali)</span><span class="v">২৩৪৫ ৬৭৮৯ ০১২৩</span></div>
+      <p class="note">A detector written in [0-9] reports this section as clean.</p>
+    </section>
+
+    <!-- 4. A face. Exercised through the media path, not the text path. -->
+    <section class="card" id="face">
+      <h3>4 · Photograph on file <span class="note">(face detection)</span></h3>
+      <img src="../assets/face-1.png" alt="" width="160" height="160">
+    </section>
+  </div>
+
+  <!-- 5. PII as pixels only. No text node anywhere carries these values. -->
+  <section class="card" id="pixels" style="margin-top:18px">
+    <h3>5 · Scanned identity document <span class="note">(pixels only — OCR is the only route)</span></h3>
+    <img class="idcard" src="../assets/id-card.png" alt="" width="640" height="300">
+    <p class="note">
+      The number appears twice on this card, in Latin and in Devanagari. English-only OCR
+      recovers the first and not the second.
+    </p>
+  </section>
+
+  <!-- 6. A separate document. A top-frame-only scan never sees it. -->
+  <section class="card" id="framed" style="margin-top:18px">
+    <h3>6 · Embedded third-party panel <span class="note">(iframe — a separate document)</span></h3>
+    <iframe src="pii-gauntlet-frame.html" title="embedded record"></iframe>
+  </section>
+
+  <!-- 7. Off-screen until scrolled. -->
+  <section class="card below" id="lazy">
+    <h3>7 · Below the fold <span class="note">(only on screen after a scroll)</span></h3>
+    <div class="row"><span class="k">Secondary Aadhaar</span><span class="v">8765 4321 0987</span></div>
+    <div class="row"><span class="k">Secondary email</span><span class="v">priya.alt@example.com</span></div>
+    <div class="row"><span class="k">Secondary PAN</span><span class="v">ZYXWV9876E</span></div>
+  </section>
+
+  <!-- Controls, so the page is also usable as an automation target rather than a static wall
+       of text. These carry no PII and must NOT be masked; masking them would be a precision
+       failure that also breaks the agent. -->
+  <section class="card" id="controls" style="margin-top:18px">
+    <h3>Actions <span class="note">(no PII — masking any of these is a precision failure)</span></h3>
+    <button type="button" id="verify">Verify record</button>
+    <button type="button" id="export">Export summary</button>
+    <a href="#dom-text">Back to top</a>
+    <p class="note">Reference number 100000000001 — twelve digits, and not an Aadhaar.</p>
+  </section>
+</main>
+</body>
+</html>

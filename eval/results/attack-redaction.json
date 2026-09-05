@@ -1,0 +1,125 @@
+{
+  "generatedAt": "2026-09-05T16:13:13.612Z",
+  "chrome": "Chrome/152.0.7977.77",
+  "fixtures": [
+    {
+      "fixture": "pii-gauntlet.html",
+      "piiMasked": 40,
+      "attacks": {
+        "as-transmitted": {
+          "chars": 381,
+          "ok": true,
+          "leaked": []
+        },
+        "upscale-2x": {
+          "chars": 338,
+          "ok": true,
+          "leaked": []
+        },
+        "upscale-4x": {
+          "chars": 344,
+          "ok": true,
+          "leaked": []
+        },
+        "contrast-stretch": {
+          "chars": 338,
+          "ok": true,
+          "leaked": []
+        },
+        "extreme-gain": {
+          "chars": 310,
+          "ok": true,
+          "leaked": []
+        },
+        "invert": {
+          "chars": 337,
+          "ok": true,
+          "leaked": []
+        }
+      },
+      "leaks": [],
+      "metaLeaks": [],
+      "recoveredSample": "Customer Record — Verification Copy Synthetic data. Every value below is fabricated for evaluation. 1- Identity on file (DOM text) 2. Payment and contact (DOM text) ‘Aadhaar Mobile Aadhaar (unspaced) Card ‘Aadhaar (hyphenated) Alcno vip IFSC PAN uP Driving licence Vehicle 3 - Same record, Indic numerals (DOM text, non- detection) ASCII digits) ATER (Devanagari) lange ASM (Tamil)"
+    },
+    {
+      "fixture": "pixel-receipt.html",
+      "piiMasked": 4,
+      "attacks": {
+        "as-transmitted": {
+          "chars": 294,
+          "ok": true,
+          "leaked": []
+        },
+        "upscale-2x": {
+          "chars": 302,
+          "ok": true,
+          "leaked": []
+        },
+        "upscale-4x": {
+          "chars": 306,
+          "ok": true,
+          "leaked": []
+        },
+        "contrast-stretch": {
+          "chars": 302,
+          "ok": true,
+          "leaked": []
+        },
+        "extreme-gain": {
+          "chars": 224,
+          "ok": true,
+          "leaked": []
+        },
+        "invert": {
+          "chars": 302,
+          "ok": true,
+          "leaked": []
+        }
+      },
+      "leaks": [],
+      "metaLeaks": [],
+      "recoveredSample": "a Order confirmation Your receipt is shown below. PAYMENT RECEIPT Order A-77120 - 14 Mar Billed to: Cr”? ii _ _ _ a: ca: Phone: Thank you for your purchase. A copy has been kept for your records. Need help? Our support team can look up any order using the order number above. Download PDF Contact support v"
+    },
+    {
+      "fixture": "signup-form.html",
+      "piiMasked": 13,
+      "attacks": {
+        "as-transmitted": {
+          "chars": 120,
+          "ok": true,
+          "leaked": []
+        },
+        "upscale-2x": {
+          "chars": 120,
+          "ok": true,
+          "leaked": []
+        },
+        "upscale-4x": {
+          "chars": 119,
+          "ok": true,
+          "leaked": []
+        },
+        "contrast-stretch": {
+          "chars": 120,
+          "ok": true,
+          "leaked": []
+        },
+        "extreme-gain": {
+          "chars": 95,
+          "ok": true,
+          "leaked": []
+        },
+        "invert": {
+          "chars": 120,
+          "ok": true,
+          "leaked": []
+        }
+      },
+      "leaks": [],
+      "metaLeaks": [],
+      "recoveredSample": "Create your account i intormation Full name Email address Phone number Aadhaar number Account security Username Password"
+    }
+  ],
+  "pass": 10,
+  "fail": 0
+}

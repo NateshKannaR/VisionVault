@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Embedded record</title>
+<link rel="stylesheet" href="fixture.css">
+<style>
+  body { margin: 0; padding: 12px 14px; font: 14px/1.5 system-ui, sans-serif; }
+  .row { display: flex; justify-content: space-between; padding: 3px 0; }
+  .k { color: #666; }
+  .v { font-family: Consolas, monospace; }
+  h4 { margin: 0 0 8px; font-size: 13px; color: #444; }
+</style>
+</head>
+<!--
+  The iframe half of the gauntlet. A scanner that walks only the top document finds nothing
+  here, and reports the parent page as fully covered while these values sit on screen.
+  Values are synthetic and deliberately different from the parent's, so a partial result shows
+  up as a specific miss rather than as a duplicate that could be explained away.
+-->
+<body>
+  <h4>Billing partner record</h4>
+  <div class="row"><span class="k">Account holder</span><span class="v">Ravi Menon</span></div>
+  <div class="row"><span class="k">Aadhaar</span><span class="v">7654 3210 9876</span></div>
+  <div class="row"><span class="k">Email</span><span class="v">ravi.menon@example.net</span></div>
+  <div class="row"><span class="k">Mobile</span><span class="v">+91 91234 56780</span></div>
+  <div class="row"><span class="k">IFSC</span><span class="v">ICIC0004321</span></div>
+</body>
+</html>

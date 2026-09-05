@@ -113,12 +113,22 @@
     { label: "labelled_value", regex: LABELLED_VALUE_RE, valueGroup: 2 }
   ];
 
+  // Recognition languages, most-likely first. Devanagari covers Hindi and Marathi, which is
+  // where an Indian document is most likely to print an identifier in non-Latin digits.
+  // A language whose traineddata is missing makes createWorker throw, taking OCR down
+  // entirely, so initOCRWorker falls back to English alone rather than losing the stage.
+  const OCR_LANGUAGES = "eng+hin";
+  const OCR_FALLBACK_LANGUAGE = "eng";
+
   // Chosen from the measurements in the file header. Do not lower it without re-running
   // eval/ocr-tuning.js — small rasters silently return zero regions.
   const DEFAULT_MAX_DIMENSION = 1280;
 
   let tesseractWorker = null;
   let initPromise = null;
+  // Which languages the worker actually came up with, so callers and tests can tell a
+  // Devanagari-capable build from one that quietly fell back to English.
+  let activeLanguages = null;
 
   /**
    * Initializes the offline Tesseract.js worker using locally bundled assets.
@@ -142,7 +152,17 @@
       const corePath = assetUrl("lib/tesseract/");
       const langPath = assetUrl("models/tessdata");
 
-      const worker = await Tesseract.createWorker("eng", 1, {
+      // Devanagari is a second recognition language, not a replacement. An Aadhaar printed on
+      // a card in Devanagari is invisible to an English-only model: it is not that the digits
+      // are misread, it is that the engine has no glyphs for them and returns nothing, so the
+      // page reports clean. Normalising Indic digits (see normalizeDigits) fixes the DOM path
+      // but cannot help here — there is no text to normalise until Tesseract produces some.
+      //
+      // The cost is real: a second language roughly doubles recognition time. That is
+      // affordable now only because detection-orchestrator caches the vision result against
+      // the captured pixels, so it is paid once per distinct screen rather than once per
+      // agent step. If that cache is ever removed, revisit this.
+      const options = {
         workerPath,
         corePath,
         langPath,
@@ -153,10 +173,26 @@
         workerBlobURL: false,
         gzip: true,
         logger: () => {} // quiet logger
-      });
+      };
+
+      // Degrade, do not fail. If hin.traineddata is absent or unreadable, createWorker rejects
+      // and — without this — the whole OCR stage goes down, taking English detection with it.
+      // Losing Devanagari coverage is a gap; losing OCR entirely is a leak.
+      let worker;
+      let activeLangs = OCR_LANGUAGES;
+      try {
+        worker = await Tesseract.createWorker(OCR_LANGUAGES, 1, options);
+      } catch (langErr) {
+        if (OCR_LANGUAGES === OCR_FALLBACK_LANGUAGE) throw langErr;
+        console.warn(`[vision] OCR language set "${OCR_LANGUAGES}" unavailable (${langErr && langErr.message || langErr}); ` +
+                     `falling back to "${OCR_FALLBACK_LANGUAGE}". Text in Devanagari will not be read.`);
+        activeLangs = OCR_FALLBACK_LANGUAGE;
+        worker = await Tesseract.createWorker(OCR_FALLBACK_LANGUAGE, 1, options);
+      }
 
       tesseractWorker = worker;
-      console.log("[vision] Tesseract OCR worker initialized offline successfully.");
+      activeLanguages = activeLangs;
+      console.log(`[vision] Tesseract OCR worker initialized offline (${activeLangs}).`);
       return tesseractWorker;
     })();
 
@@ -445,7 +481,11 @@
     initOCRWorker,
     detectOCR,
     findPiiInText,
-    PII_PATTERNS
+    normalizeDigits,
+    PII_PATTERNS,
+    OCR_LANGUAGES,
+    /** Null until the worker has been initialised. */
+    activeLanguages: () => activeLanguages
   };
 
   global.OCRDetector = OCRDetector;

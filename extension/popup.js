@@ -878,6 +878,232 @@ $("clearHistory")?.addEventListener("click", () => {
   });
 });
 
+// ── Dictation ────────────────────────────────────────────────────────────────
+//
+// Typing a whole instruction into a side panel is the slowest part of using this thing, so the
+// task box takes speech as well. Push-to-talk rather than always-listening: the recogniser
+// runs only while the user has asked for it, and stops the moment they stop asking.
+//
+// One thing is said out loud rather than hidden, because this extension has no business being
+// quiet about it: Chrome's SpeechRecognition is a NETWORK service. The audio goes to Google to
+// be transcribed. That is a different trust boundary from everything else here — page content,
+// captures and vault values never leave the device — and the panel says so while the
+// microphone is live, next to the button that turned it on.
+//
+// Nothing about this touches the redaction path. A dictated task is just text in the same box.
+
+const Recognizer = window.SpeechRecognition || window.webkitSpeechRecognition || null;
+let recognition = null;
+let recognising = false;
+// Text already in the box when dictation started, so speech appends rather than replaces.
+let dictationBase = "";
+
+function setMicLive(live) {
+  recognising = live;
+  const btn = $("micBtn");
+  const note = $("micNote");
+  if (btn) {
+    btn.classList.toggle("is-live", live);
+    btn.setAttribute("aria-label", live ? "Stop dictating" : "Dictate the task");
+    btn.title = live ? "Stop dictating" : "Dictate the task";
+  }
+  if (note) note.hidden = !live;
+}
+
+function stopDictation() {
+  if (recognition && recognising) {
+    try { recognition.stop(); } catch (_) {}
+  }
+  setMicLive(false);
+}
+
+function startDictation() {
+  if (!Recognizer || recognising) return;
+
+  recognition = new Recognizer();
+  recognition.lang = navigator.language || "en-IN";
+  // Interim results make the box fill as the user speaks, which is what tells them it is
+  // working; without it the panel looks frozen for the length of the sentence.
+  recognition.interimResults = true;
+  recognition.continuous = false;
+  recognition.maxAlternatives = 1;
+
+  dictationBase = (taskEl.value || "").trim();
+
+  recognition.onstart = () => setMicLive(true);
+
+  recognition.onresult = (event) => {
+    let text = "";
+    for (let i = 0; i < event.results.length; i++) text += event.results[i][0].transcript;
+    const joined = (dictationBase ? dictationBase + " " : "") + text.trim();
+    // maxlength on the textarea does not apply to programmatic writes, so the cap is applied
+    // here or a long dictation would silently exceed what the task field accepts.
+    taskEl.value = joined.slice(0, 240);
+    const c = $("charCount");
+    if (c) c.textContent = taskEl.value.length;
+  };
+
+  recognition.onerror = (event) => {
+    const err = event.error;
+    const message =
+      err === "not-allowed" || err === "service-not-allowed"
+        ? "Microphone blocked. Allow it for this extension in Chrome's site settings."
+        : err === "no-speech"
+          ? "Didn't catch anything — try again."
+          : err === "network"
+            ? "Speech recognition needs a network connection."
+            : `Dictation stopped (${err}).`;
+    showStatus("statusMsg", err === "no-speech" ? "info" : "warn", esc(message));
+    setMicLive(false);
+  };
+
+  recognition.onend = () => setMicLive(false);
+
+  try {
+    recognition.start();
+  } catch (err) {
+    setMicLive(false);
+    console.warn("[dictation] could not start:", err && err.message);
+  }
+}
+
+// The button only appears where it can actually do something. A browser with no recogniser
+// gets the typed field it already had, rather than a control that fails when pressed.
+if (Recognizer && $("micBtn")) {
+  $("micBtn").hidden = false;
+  $("micBtn").addEventListener("click", () => (recognising ? stopDictation() : startDictation()));
+}
+
+document.addEventListener("keydown", (e) => {
+  if ((e.ctrlKey || e.metaKey) && (e.key === "m" || e.key === "M")) {
+    if (!Recognizer) return;
+    e.preventDefault();
+    recognising ? stopDictation() : startDictation();
+  }
+  // Escape abandons dictation without submitting anything.
+  if (e.key === "Escape" && recognising) stopDictation();
+});
+
+// ── Privacy: the transmission log ────────────────────────────────────────────
+//
+// Every other panel asks to be believed. This one shows the evidence: the exact bytes of every
+// request, the redacted image as it was sent, and — where a personal value was involved — the
+// field NAME the model asked for, with no value beside it.
+//
+// Rendering deliberately shows the raw payload rather than a summary of it. A summary is
+// another thing to trust; the payload is the thing itself.
+
+function fmtBytes(n) {
+  if (!n) return "0 B";
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(2)} MB`;
+}
+
+function fmtClock(iso) {
+  try {
+    const d = new Date(iso);
+    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  } catch (_) { return ""; }
+}
+
+function renderAudit(entries, summary) {
+  const listEl = $("auditList");
+  if (!listEl) return;
+
+  $("auditCount").textContent = summary.count || 0;
+  $("auditBytes").textContent = fmtBytes(summary.bytes || 0);
+  const dests = summary.destinations || [];
+  let destLabel = "none";
+  if (dests.length === 1) {
+    try { destLabel = new URL(dests[0]).host; } catch (_) { destLabel = dests[0]; }
+  } else if (dests.length > 1) {
+    destLabel = `${dests.length} hosts`;
+  }
+  $("auditDest").textContent = destLabel;
+  $("auditDest").title = dests.join("\n") || "nothing transmitted";
+
+  if (!entries.length) {
+    listEl.innerHTML = '<p class="hint" style="padding:12px 0">' +
+      "Nothing has been transmitted yet. Run a task and every request will appear here.</p>";
+    return;
+  }
+
+  listEl.innerHTML = entries.map((e, i) => {
+    const err = e.outcome === "error";
+    // The vault line only appears when there was one, so its presence is itself information.
+    const vault = e.vaultFieldRequested
+      ? `<div class="audit-vault">
+           <strong>Vault field requested:</strong>
+           <code>${esc(e.vaultFieldRequested)}</code>
+           <span style="color:var(--text-muted)">— the name only. The value was filled in on
+           this device and appears nowhere in the payload below.</span>
+         </div>`
+      : "";
+    const img = e.image
+      ? `<img class="audit-img" src="${esc(e.image)}" alt="the redacted capture as it was transmitted">
+         <p class="audit-caption">The image exactly as sent. Masked before transmission, not after.</p>`
+      : (e.imageDropped
+          ? '<p class="audit-caption">Image not kept — only the most recent few are stored, to bound disk use.</p>'
+          : "");
+
+    return `<details class="audit-entry${err ? " is-error" : ""}" data-i="${i}">
+      <summary class="audit-head">
+        <span class="audit-when">${esc(fmtClock(e.at))}</span>
+        <span class="audit-task">${esc(e.task || "(no task)")}</span>
+        <span class="audit-size">${esc(fmtBytes(e.bytes))}</span>
+        <svg class="ic audit-caret" viewBox="0 0 24 24"><use href="#i-arrow-down"/></svg>
+      </summary>
+      <div class="audit-body">
+        <dl class="audit-kv">
+          <dt>Sent to</dt><dd>${esc(e.url)}</dd>
+          <dt>Step</dt><dd>${esc(String(e.step ?? "-"))}</dd>
+          <dt>Payload</dt><dd>${esc(fmtBytes(e.bytes))} (${esc(fmtBytes(e.imageBytes))} of it the redacted image)</dd>
+          <dt>Elements described</dt><dd>${esc(String(e.marks || 0))}</dd>
+          <dt>Round trip</dt><dd>${e.durationMs ? esc(e.durationMs) + " ms" : "-"}</dd>
+          <dt>Answered by</dt><dd>${esc(e.tier || "-")}</dd>
+          <dt>Outcome</dt><dd>${err ? esc(e.error || "error") : "ok"}</dd>
+        </dl>
+        ${vault}
+        ${img}
+        <p class="audit-caption">The complete request body, as transmitted:</p>
+        <pre class="audit-payload">${esc(e.body || "")}</pre>
+      </div>
+    </details>`;
+  }).join("");
+}
+
+async function loadAudit() {
+  chrome.runtime.sendMessage({ type: "GET_AUDIT_LOG" }, (res) => {
+    renderAudit(res?.entries || [], res?.summary || {});
+  });
+}
+
+document.querySelectorAll(".tab").forEach((btn) => {
+  if (btn.dataset.tab === "privacy") btn.addEventListener("click", loadAudit);
+});
+
+$("clearAudit")?.addEventListener("click", () => {
+  chrome.runtime.sendMessage({ type: "CLEAR_AUDIT_LOG" }, () => {
+    renderAudit([], { count: 0, bytes: 0, destinations: [] });
+  });
+});
+
+$("exportAudit")?.addEventListener("click", () => {
+  chrome.runtime.sendMessage({ type: "EXPORT_AUDIT_LOG" }, (res) => {
+    if (!res?.json) return;
+    // A blob URL rather than a data: URL: the log can run to megabytes, and a data: URL that
+    // size is refused by the downloads API.
+    const blob = new Blob([res.json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    chrome.downloads.download({
+      url,
+      filename: `visionvault-transmission-log-${new Date().toISOString().slice(0, 10)}.json`,
+      saveAs: true,
+    }, () => setTimeout(() => URL.revokeObjectURL(url), 60000));
+  });
+});
+
 // ── Live updates from the service worker ──────────────────────────────────────
 chrome.runtime.onMessage.addListener((msg) => {
   if (msg.type !== "AGENT_UPDATE") return;

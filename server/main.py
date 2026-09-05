@@ -931,12 +931,19 @@ def _rank_ollama_models(models: List[dict]) -> List[str]:
         # Priority 1: Other vision models (minicpm-v, llava)
         # Priority 2: General instruction models
         # Priority 3: Coder or embedding models
-        if re.search(r"qwen.*vl|qwen", name, re.I):
+        #
+        # The coder/embedding test comes FIRST, and that ordering is the whole point. It used
+        # to sit in the elif chain below the Qwen test, so "qwen2.5-coder:14b" matched `qwen`,
+        # was ranked top, and got picked ahead of qwen2.5:1.5b-instruct. Measured on a live
+        # run: 54.6s, 28.4s and 33.7s for three consecutive steps, against a 30s client
+        # timeout — so the agent got nothing back at all while a perfectly good small model
+        # sat unused. A model trained to write code is also the wrong tool for reading a page.
+        if re.search(r"coder|embed|\bcode\b", name, re.I):
+            priority = 3
+        elif re.search(r"qwen.*vl|qwen", name, re.I):
             priority = 0
         elif re.search(r"minicpm|llava|vision|vl\b", name, re.I):
             priority = 1
-        elif re.search(r"coder|embed|code", name, re.I):
-            priority = 3
         else:
             priority = 2
         return (priority, billions or size / 1e9, name)
@@ -962,17 +969,27 @@ def ollama_model(force: bool = False) -> Optional[str]:
         _ollama_state["model"] = None
         return None
 
-    preferred = os.getenv("OLLAMA_MODEL", "qwen2.5-vl:7b").strip()
+    preferred = os.getenv("OLLAMA_MODEL", "qwen2.5:3b-instruct").strip()
+
+    # A model trained to write code is the wrong tool for reading a page, and the ones people
+    # have installed locally are usually the largest thing on the machine. Both fuzzy paths
+    # below match on a family prefix, so without this filter "qwen2.5-vl:7b" happily resolves
+    # to "qwen2.5-coder:14b" merely because both start with "qwen2.5" — which is what happened
+    # here, at 28-55s per step against a 30s client timeout. An exact request is still
+    # honoured: if someone names a coder model outright, that is their decision to make.
+    WRONG_TOOL_RE = re.compile(r"coder|embed|\bcode\b", re.I)
+    usable = [n for n in names if not WRONG_TOOL_RE.search(n)] or names
+
     chosen = None
     if preferred:
         exact = next((n for n in names if n.lower() == preferred.lower()), None)
-        prefix = next((n for n in names if n.lower().startswith(preferred.split(":")[0].lower())), None)
-        fuzzy = next((n for n in names if any(p in n.lower() for p in preferred.lower().split(":") if len(p) >= 3)), None)
+        prefix = next((n for n in usable if n.lower().startswith(preferred.split(":")[0].lower())), None)
+        fuzzy = next((n for n in usable if any(p in n.lower() for p in preferred.lower().split(":") if len(p) >= 3)), None)
         chosen = exact or prefix or fuzzy
 
     # Prioritize any Qwen model from the tags if preferred didn't match directly
     if not chosen:
-        chosen = next((n for n in names if "qwen" in n.lower()), None)
+        chosen = next((n for n in usable if "qwen" in n.lower()), None)
 
     if not chosen:
         ranked = _rank_ollama_models(models)

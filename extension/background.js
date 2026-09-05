@@ -15,7 +15,7 @@ const DEFAULT_SERVER_URL = "http://127.0.0.1:8000/api/agent/step";
 // detection-orchestrator.js -> capture + local ML + fail-closed redaction
 // NOTE: action-executor.js is deliberately NOT imported here. It is a content script
 // (see manifest.json) because it needs a DOM; the service worker has none.
-importScripts("./vault.js", "./task-planner.js", "./agent-guard.js", "./detection-orchestrator.js");
+importScripts("./vault.js", "./task-planner.js", "./agent-guard.js", "./detection-orchestrator.js", "./audit-log.js");
 
 // Pre-initialize offscreen document for local ML vision models
 (async () => {
@@ -407,6 +407,9 @@ async function callServer(payload, serverUrl) {
   const ctrl = new AbortController();
   inFlightPlanRequest = ctrl;
   const tid = setTimeout(() => ctrl.abort(), 30000);
+  // Filled in once the request body exists; stays null if we never got as far as sending
+  // anything, so the log records transmissions and not intentions.
+  let auditContext = null;
   try {
     const targetUrl = serverUrl.includes("/plan-action") || serverUrl.includes("/api/agent/step")
       ? serverUrl
@@ -431,12 +434,25 @@ async function callServer(payload, serverUrl) {
     };
 
     const streamUrl = targetUrl.replace(/\/api\/agent\/step\/?$/, "/api/agent/step/stream");
+    // Serialised once and reused, so what the audit log records is literally the string that
+    // was transmitted rather than a re-serialisation that could differ from it.
+    const serialisedBody = JSON.stringify(bodyData);
+    const sentAt = Date.now();
+    auditContext = {
+      url: streamUrl,
+      task: payload.task,
+      body: serialisedBody,
+      image: bodyData.redactedImage,
+      marks: (bodyData.marks || []).length,
+      step: bodyData.step,
+    };
     const res = await fetch(streamUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json", "Accept": "text/event-stream" },
-      body: JSON.stringify(bodyData),
+      body: serialisedBody,
       signal: ctrl.signal,
     });
+    auditContext.durationMs = Date.now() - sentAt;
     if (!res.ok) throw new Error("Server " + res.status);
 
     // If server returned SSE, consume the stream and pick the last `data:` event
@@ -468,6 +484,12 @@ async function callServer(payload, serverUrl) {
 
     // Normalize StepResponse { reasoning, action: { type, target, value, use_vault_field } }
     if (raw.action && typeof raw.action === "object") {
+      if (auditContext) {
+        auditContext.tier = raw.tier || null;
+        // A NAME, never a value. Recording it is what makes the vault indirection checkable
+        // by the person it protects instead of only by whoever reads this file.
+        auditContext.vaultField = raw.action.use_vault_field || null;
+      }
       return {
         action: raw.action.type || "done",
         mark_id: raw.action.target,
@@ -479,9 +501,20 @@ async function callServer(payload, serverUrl) {
       };
     }
     return raw;
+  } catch (err) {
+    // A failed transmission is still a transmission: the bytes left the machine even if
+    // nothing useful came back, so it belongs in the log.
+    if (auditContext) { auditContext.outcome = "error"; auditContext.error = err && err.message; }
+    throw err;
   } finally {
     clearTimeout(tid);
     if (inFlightPlanRequest === ctrl) inFlightPlanRequest = null;
+    // Deliberately not awaited: the log must never delay or fail a run. Nothing downstream
+    // depends on it having been written.
+    if (auditContext) {
+      AuditLog.record(auditContext).catch((e) =>
+        console.warn("[audit] entry not recorded:", e && e.message));
+    }
   }
 }
 
@@ -1951,6 +1984,25 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
   if (msg.type === "CLEAR_TASK_HISTORY") {
     chrome.storage.local.set({ taskHistory: [] }).then(() => sendResponse({ ok: true }));
+    return true;
+  }
+
+  // The transmission log. Read-only from the panel's point of view: entries are written only
+  // by callServer, so nothing the UI does can add to or alter the record of what was sent.
+  if (msg.type === "GET_AUDIT_LOG") {
+    Promise.all([AuditLog.list(), AuditLog.summary()])
+      .then(([entries, summary]) => sendResponse({ ok: true, entries, summary }))
+      .catch((err) => sendResponse({ ok: false, error: String(err && err.message || err) }));
+    return true;
+  }
+  if (msg.type === "CLEAR_AUDIT_LOG") {
+    AuditLog.clear().then(() => sendResponse({ ok: true }));
+    return true;
+  }
+  if (msg.type === "EXPORT_AUDIT_LOG") {
+    AuditLog.exportJson()
+      .then((json) => sendResponse({ ok: true, json }))
+      .catch((err) => sendResponse({ ok: false, error: String(err && err.message || err) }));
     return true;
   }
 });

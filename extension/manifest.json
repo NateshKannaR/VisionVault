@@ -3,8 +3,20 @@
   "name": "VisionVault",
   "version": "1.0.0",
   "description": "Local PII redaction + vault + cloud VLM automation on sanitized screens.",
-  "permissions": ["activeTab", "scripting", "tabs", "storage", "sidePanel", "offscreen", "debugger"],
-  "host_permissions": ["<all_urls>", "file://*/*"],
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "tabs",
+    "storage",
+    "sidePanel",
+    "offscreen",
+    "debugger",
+    "downloads"
+  ],
+  "host_permissions": [
+    "<all_urls>",
+    "file://*/*"
+  ],
   "background": {
     "service_worker": "background.js"
   },
@@ -32,8 +44,13 @@
   },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
-      "js": ["action-executor.js", "content.js"],
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "action-executor.js",
+        "content.js"
+      ],
       "run_at": "document_idle",
       "all_frames": true
     }
@@ -48,7 +65,10 @@
         "offscreen.html",
         "offscreen.js"
       ],
-      "matches": ["<all_urls>", "file://*/*"]
+      "matches": [
+        "<all_urls>",
+        "file://*/*"
+      ]
     }
   ]
 }

@@ -475,3 +475,205 @@ select {
   animation: shake 0.35s ease-in-out;
 }
 
+
+/* ── Privacy: the transmission log ──────────────────────────────────────────
+   The panel where the extension stops asking to be believed. Three totals first,
+   because "how much left this machine" is the question people actually have; the
+   per-request detail is underneath for anyone who wants to check the answer. */
+
+.audit-summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  overflow: hidden;
+  margin: 10px 0 12px;
+}
+.audit-stat {
+  background: var(--surface);
+  padding: 12px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.audit-stat-n {
+  font-size: 19px;
+  font-weight: 650;
+  letter-spacing: -.01em;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.audit-stat-k { font-size: 11px; color: var(--text-faint); }
+
+.audit-lede {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-muted);
+  background: var(--safe-soft);
+  border-left: 2px solid var(--safe);
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  padding: 9px 11px;
+  margin: 0 0 4px;
+}
+
+.audit-entry {
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  background: var(--surface);
+  margin-bottom: 8px;
+  overflow: hidden;
+}
+.audit-entry.is-error { border-color: var(--danger); }
+
+/* The whole header is the disclosure control, so the entry opens wherever it is clicked. */
+.audit-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 11px;
+  background: none;
+  border: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.audit-head:hover { background: var(--surface-2); }
+.audit-head:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+.audit-when { font-size: 11px; color: var(--text-faint); font-variant-numeric: tabular-nums; }
+.audit-task {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.audit-size { font-size: 11px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.audit-caret { color: var(--text-faint); transition: transform .15s ease; flex: none; }
+.audit-entry[open] .audit-caret { transform: rotate(180deg); }
+
+.audit-body { padding: 0 11px 11px; border-top: 1px solid var(--border); }
+
+.audit-kv {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 3px 10px;
+  font-size: 11.5px;
+  margin: 9px 0;
+}
+.audit-kv dt { color: var(--text-faint); }
+.audit-kv dd { margin: 0; color: var(--text); font-variant-numeric: tabular-nums; word-break: break-word; }
+
+/* The vault indirection, called out rather than buried in the payload: the model asked for a
+   field by NAME and the value never left this device. It is the single most important line in
+   the panel, so it does not look like the rest of the table. */
+.audit-vault {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 11.5px;
+  background: var(--accent-soft);
+  border-radius: var(--r-sm);
+  padding: 7px 9px;
+  margin: 8px 0;
+}
+.audit-vault code {
+  font-family: ui-monospace, Consolas, monospace;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+
+.audit-img {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  display: block;
+  margin: 8px 0 4px;
+  background: var(--surface-2);
+}
+
+.audit-payload {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 10.5px;
+  line-height: 1.45;
+  color: var(--text-muted);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 8px 9px;
+  margin: 6px 0 0;
+  max-height: 180px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.audit-caption { font-size: 11px; color: var(--text-faint); margin: 2px 0 0; }
+
+/* ── Dictation ──────────────────────────────────────────────────────────────
+   The mic sits inside the field but clear of the resize grip, and is only shown when the
+   browser actually has a recogniser — an affordance that cannot work is worse than none. */
+
+.task-wrap { position: relative; }
+.task-wrap textarea { padding-right: 40px; }
+
+.mic-btn {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background .12s ease, color .12s ease, border-color .12s ease;
+}
+.mic-btn:hover { background: var(--surface-2); color: var(--text); }
+.mic-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* Recording is a state the user must not be able to miss, so it is colour AND motion. */
+.mic-btn.is-live {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+  animation: micPulse 1.4s ease-in-out infinite;
+}
+@keyframes micPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(176, 35, 24, .45); }
+  50%      { box-shadow: 0 0 0 5px rgba(176, 35, 24, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mic-btn.is-live { animation: none; }
+}
+
+.mic-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--warn);
+  background: var(--warn-soft);
+  border-radius: var(--r-sm);
+  padding: 8px 10px;
+  margin: 8px 0 0;
+}
+.mic-note .ic { flex: none; margin-top: 1px; }
+.mic-note strong { color: var(--warn); }

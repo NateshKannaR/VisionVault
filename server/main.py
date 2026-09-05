@@ -446,6 +446,22 @@ def robust_json_parse(text: str) -> Optional[dict]:
                     return json.loads(fixed_keys)
                 except Exception:
                     pass
+    # Truncated JSON recovery: extract fields if closing braces were cut off
+    t_match = re.search(r'"type"\s*:\s*"([^"]+)"', text)
+    if t_match:
+        act_type = t_match.group(1)
+        target_match = re.search(r'"target"\s*:\s*(\d+)', text)
+        value_match = re.search(r'"value"\s*:\s*"([^"]*)"', text)
+        reason_match = re.search(r'"reasoning"\s*:\s*"([^"]*)"', text)
+        target_val = int(target_match.group(1)) if target_match else None
+        return {
+            "reasoning": reason_match.group(1) if reason_match else "Extracted action from response",
+            "action": {
+                "type": act_type,
+                "target": target_val,
+                "value": value_match.group(1) if value_match else None,
+            },
+        }
     return None
 
 # ── Tier circuit breaker ─────────────────────────────────────────────────────
@@ -1067,7 +1083,7 @@ def plan_with_ollama(req: "AgentStepRequest") -> Optional[StepResponse]:
         "format": "json",
         "stream": False,
         "keep_alive": OLLAMA_KEEP_ALIVE,
-        "options": {"temperature": 0.1, "num_predict": 140, "num_ctx": 4096},
+        "options": {"temperature": 0.1, "num_predict": 300, "num_ctx": 4096},
         "messages": messages,
     }
 
@@ -1083,7 +1099,7 @@ def plan_with_ollama(req: "AgentStepRequest") -> Optional[StepResponse]:
         content = (data.get("message") or {}).get("content", "")
         parsed = robust_json_parse(content)
         if not parsed or not isinstance(parsed, dict):
-            print(f"[server] Ollama ({model}) attempt {attempt}: unparseable output ({elapsed:.1f}s)")
+            print(f"[server] Ollama ({model}) attempt {attempt}: unparseable output ({elapsed:.1f}s): {repr(content[:120])}")
             continue
         act = parsed.get("action") or {}
         reasoning = parsed.get("reasoning") or f"Local {model} plan"

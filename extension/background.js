@@ -176,12 +176,13 @@ async function getSettings() {
       redactMode: "black",
       serverUrl: DEFAULT_SERVER_URL,
       confirmPolicy: "risky",
+      plannerMode: "fast",
       // Latency / coverage trade-off, surfaced in the side panel.
       //   enableOCR       ~1.4s per scan; the only thing that reads text baked into images,
-      //                   canvases and other non-DOM pixels. On by default.
+      //                   canvases and other non-DOM pixels. Off by default for speed.
       //   enableFaceDetection ~35ms per scan. Cheap; on by default.
-      // With OCR off, a scan costs roughly 130ms and falls back to DOM + face coverage.
-      enableOCR: true,
+      // With OCR off, a scan costs roughly 80ms and falls back to DOM + face coverage.
+      enableOCR: false,
       enableFaceDetection: true,
       // Clear consent walls and modal dialogs before acting. They intercept every click
       // underneath them, so leaving one up makes the agent look broken on much of the web.
@@ -585,7 +586,7 @@ async function phaseScan(task) {
       navigated: false, searched: false, opened: [], scrolled: false,
       queryLanded: false, querySubmitted: false, filledAny: false,
       searchOpenAttempts: 0, siteSearchUrlTried: false, fillScrolls: 0,
-      bookingStep: 0, fromTyped: false, toTyped: false,
+      bookingStep: 0, fromTyped: false, toTyped: false, bookingCompleted: false,
     },
     // Supervises the planner for this task; recreated per scan so a new task starts clean.
     guard: null,
@@ -1058,9 +1059,16 @@ async function phaseRun() {
       let plannerSource = "server";
       const t0 = performance.now();
 
-      // For booking or messaging tasks, try the deterministic planner first.
-      // The model loops on city pickers or contact search; the deterministic planner sequences them correctly.
-      if ((session.parsedTask?.wantsBook || session.parsedTask?.wantsMessage) && deterministic && deterministic.action !== "done") {
+      const settings = session.settings || (await getSettings());
+      const mode = settings.plannerMode || "fast";
+      const forceServer = mode === "server";
+
+      // Ultra-Fast On-Device Routing:
+      // If fast/auto mode is active and the on-device planner has an action, execute immediately (<50ms)
+      if (!forceServer && deterministic && deterministic.action && deterministic.action !== "done") {
+        resp = deterministic;
+        plannerSource = "on-device";
+      } else if (mode === "fast" && deterministic) {
         resp = deterministic;
         plannerSource = "on-device";
       } else {
@@ -1077,6 +1085,20 @@ async function phaseRun() {
               category: session.parsedTask.category,
               recipient: session.parsedTask.recipient,
               message: session.parsedTask.message,
+              wants_shop: session.parsedTask.wantsShop,
+              wants_filter: session.parsedTask.wantsFilter,
+              wants_add_to_cart: session.parsedTask.wantsAddToCart,
+              max_price: session.parsedTask.maxPrice,
+              min_rating: session.parsedTask.minRating,
+              wants_best: session.parsedTask.wantsBest,
+              wants_star: session.parsedTask.wantsStar,
+              wants_fork: session.parsedTask.wantsFork,
+              wants_clone: session.parsedTask.wantsClone,
+              wants_issue: session.parsedTask.wantsIssue,
+              wants_pr: session.parsedTask.wantsPR,
+              wants_non_stop: session.parsedTask.wantsNonStop,
+              wants_sort: session.parsedTask.wantsSort,
+              sort: session.parsedTask.sort,
             } : null,
             progress: session.progress,
             image: session.redacted,
@@ -1270,7 +1292,7 @@ async function phaseRun() {
           { ok: false, error: "Typing timed out." });
 
         let typedOk = !!exec?.ok;
-        const isSearch = !fieldKey && !!session.parsedTask?.query;
+        const isSearch = !fieldKey && !session.parsedTask?.wantsBook && !!session.parsedTask?.query;
 
         // A search: let it commit, re-read the page, then check whether the query actually
         // landed. Only that check may set `queryLanded`, which is what `done` is judged
@@ -1345,6 +1367,9 @@ async function phaseRun() {
           if (session.parsedTask?.message && valLower.includes(session.parsedTask.message.toLowerCase())) {
             session.progress.messageTyped = true;
           }
+          if (resp.isFilter) {
+            session.progress.filterApplied = true;
+          }
         }
 
         session.actionLog.push({
@@ -1388,7 +1413,16 @@ async function phaseRun() {
           { ok: false, error: "select timed out." });
         noteResult(session, !!exec?.ok);
         guard.record("select", resp.mark_id, resp.value, !!exec?.ok);
-        if (exec?.ok) { session.filledIds.push(resp.mark_id); session.progress.filledAny = true; }
+        if (exec?.ok) {
+          session.filledIds.push(resp.mark_id);
+          session.progress.filledAny = true;
+          if (resp.isFilter || session.parsedTask?.wantsFilter || session.parsedTask?.maxPrice) {
+            session.progress.filterApplied = true;
+          }
+          if (resp.isSort || session.parsedTask?.wantsSort) {
+            session.progress.sortApplied = true;
+          }
+        }
         session.actionLog.push({ action: "select", value: resp.value, mark_id: resp.mark_id, serverMs, ok: !!exec?.ok, error: exec?.ok ? undefined : exec?.error });
         notifyPopup({
           type: exec?.ok ? "filled" : "failed",
@@ -1466,6 +1500,43 @@ async function phaseRun() {
           }
           if (session.parsedTask?.recipient && tLabel.includes(session.parsedTask.recipient.toLowerCase())) {
             session.progress.contactOpened = true;
+          }
+          if (resp.isAddToCart || /\b(add\s*to\s*cart|add\s*to\s*basket|buy\s*now)\b/i.test(tLabel)) {
+            session.progress.cartAdded = true;
+          }
+          if (resp.isFilter || /\b(filter|filters?)\b/i.test(tLabel) || (session.parsedTask?.maxPrice && new RegExp(`under.*${session.parsedTask.maxPrice}`, "i").test(tLabel))) {
+            session.progress.filterApplied = true;
+          }
+          if (resp.isSort || /\b(sort|popularity|low\s*to\s*high|high\s*to\s*low)\b/i.test(tLabel)) {
+            session.progress.sortApplied = true;
+          }
+          if (resp.isNonStop || /\b(non[\s-]*stop|0\s*stops?|direct)\b/i.test(tLabel)) {
+            session.progress.nonStopFiltered = true;
+          }
+          if (resp.isBookingSearch) {
+            session.progress.bookingCompleted = true;
+            session.progress.filledAny = true;
+          }
+          if (resp.isProductSelection) {
+            session.progress.productOpened = true;
+          }
+          if (resp.isStar || /\bstar\b/i.test(tLabel)) {
+            session.progress.starred = true;
+          }
+          if (resp.isFork || /\bfork\b/i.test(tLabel)) {
+            session.progress.forked = true;
+          }
+          if (resp.isClone || /\b(clone|code)\b/i.test(tLabel)) {
+            session.progress.cloned = true;
+          }
+          if (resp.isIssue || /\bissues\b/i.test(tLabel)) {
+            session.progress.issueOpened = true;
+          }
+          if (resp.isPR || /\bpull\s*requests?\b/i.test(tLabel)) {
+            session.progress.prOpened = true;
+          }
+          if (resp.isRepoSelection) {
+            session.progress.repoOpened = true;
           }
         }
         session.actionLog.push({ action: "click", mark_id: resp.mark_id, serverMs, ok: clickOk, error: clickOk ? undefined : exec?.error });

@@ -127,6 +127,20 @@ class TaskHints(BaseModel):
     category: Optional[str] = None
     recipient: Optional[str] = None
     message: Optional[str] = None
+    wants_shop: Optional[bool] = None
+    wants_filter: Optional[bool] = None
+    wants_add_to_cart: Optional[bool] = None
+    max_price: Optional[float] = None
+    min_rating: Optional[float] = None
+    wants_best: Optional[bool] = None
+    wants_star: Optional[bool] = None
+    wants_fork: Optional[bool] = None
+    wants_clone: Optional[bool] = None
+    wants_issue: Optional[bool] = None
+    wants_pr: Optional[bool] = None
+    wants_non_stop: Optional[bool] = None
+    wants_sort: Optional[bool] = None
+    sort: Optional[str] = None
 
 class Progress(BaseModel):
     """What the instruction has achieved so far, as observed by the client.
@@ -144,6 +158,9 @@ class Progress(BaseModel):
     from_typed: bool = Field(default=False, alias="fromTyped")
     to_typed: bool = Field(default=False, alias="toTyped")
     booking_step: int = Field(default=0, alias="bookingStep")
+    cart_added: bool = Field(default=False, alias="cartAdded")
+    product_opened: bool = Field(default=False, alias="productOpened")
+    filter_applied: bool = Field(default=False, alias="filterApplied")
 
     model_config = {"populate_by_name": True, "extra": "ignore"}
 
@@ -182,6 +199,22 @@ def describe_hints(hints: Optional[TaskHints], task: str = "") -> str:
             '  If you type into a search box, use EXACTLY this string. Do not add the rest of\n'
             '  the sentence: "and show me", "please", and similar words are how the user talks\n'
             '  to you, not part of what they want searched.' % hints.search_query
+        )
+    if hints.wants_add_to_cart or hints.wants_shop or hints.wants_filter:
+        crit = []
+        if hints.max_price:
+            crit.append(f"budget <= ₹{int(hints.max_price)}")
+        if hints.min_rating:
+            crit.append(f"rating >= {hints.min_rating}")
+        if hints.wants_best:
+            crit.append("pick best among them")
+        if hints.wants_filter:
+            crit.append("apply price filter")
+        crit_str = f" with criteria: {', '.join(crit)}" if crit else ""
+        lines.append(
+            f"E-COMMERCE GOAL: Search for '{hints.search_query or 'product'}'{crit_str}.\n"
+            + ("On results: apply requested price filter and select matching product.\n" if hints.wants_filter else "On results: select and open the highest-rated product matching constraints.\n")
+            + ("On product page: click 'Add to Cart' and finish." if hints.wants_add_to_cart else ("Stop once filter is applied or product opened." if hints.wants_filter else "Stop once product is opened."))
         )
     if hints.open_targets:
         lines.append("AFTER SEARCHING, the user asked to open: %s" % ", ".join(hints.open_targets))
@@ -261,10 +294,11 @@ def _is_message_send_button(m: Mark) -> bool:
     return False
 
 
-def rank_marks_for_task(marks: List[Mark], task: str, category: Optional[str] = None) -> List[Mark]:
+def rank_marks_for_task(marks: List[Mark], task: str, category: Optional[str] = None, task_hints: Optional[TaskHints] = None, progress: Optional[Progress] = None) -> List[Mark]:
     """Sorts marks so task-relevant targets (tabs, inputs, buttons, suggestions) appear first."""
     entities = extract_travel_entities(task)
     search_q = extract_search_query(task)
+    wants_add_to_cart = bool(task_hints and task_hints.wants_add_to_cart) or bool(re.search(r"\b(add\s+to\s+cart|add\s+to\s+basket|buy\s+now)\b", task or "", re.I))
 
     has_travel_intent = bool(
         category or
@@ -303,14 +337,33 @@ def rank_marks_for_task(marks: List[Mark], task: str, category: Optional[str] = 
 
         # E-commerce & general search query prioritization:
         if search_q and not has_travel_intent and not is_msg_task:
-            # 1. Heavily boost actual search inputs
-            if _is_search_mark(m) and role in FILLABLE_ROLES:
-                return 500
-            # 2. Search submit buttons
-            if any(w in label for w in ["search", "find", "go"]) and any(w in role for w in ["button", "submit", "clickable"]):
-                return 200
-            # 3. Penalize common hallucination / distractor targets when search has not landed
-            if re.search(r"\b(sign\s*in|sign\s*up|log\s*in|accounts?|profile|register|bestsellers?|best\s*sellers?|trending|todays?\s*deals?|deals?|customer\s*service|help|prime|sell|registry|gift\s*cards?|cart|basket|orders?|returns?)\b", label):
+            # If user wants to add to cart, heavily boost Add to Cart buttons
+            if wants_add_to_cart and any(w in label for w in ["add to cart", "add to basket", "buy now"]):
+                return 800
+
+            query_landed = bool(progress and progress.query_landed)
+            if not query_landed:
+                # 1. Heavily boost actual search inputs
+                if _is_search_mark(m) and role in FILLABLE_ROLES:
+                    return 500
+                # 2. Search submit buttons
+                if any(w in label for w in ["search", "find", "go"]) and any(w in role for w in ["button", "submit", "clickable"]):
+                    return 200
+            else:
+                # If filter is requested and not yet applied, boost price filter dropdowns and controls
+                filter_applied = bool(progress and getattr(progress, "filter_applied", False))
+                if (task_hints and (task_hints.wants_filter or task_hints.max_price)) and not filter_applied:
+                    if role in SELECT_ROLES or any(w in label for w in ["min", "max", "to", "price", "filter", "under", "₹"]):
+                        score += 450
+                # Boost candidate product links on results page
+                if role in ["link", "clickable"] and len(label) > 15:
+                    score += 250
+
+            # 3. Penalize common hallucination / distractor targets
+            distractor_re = r"\b(sign\s*in|sign\s*up|log\s*in|accounts?|profile|register|bestsellers?|best\s*sellers?|trending|todays?\s*deals?|deals?|customer\s*service|help|prime|sell|registry|gift\s*cards?|orders?|returns?)\b"
+            if not wants_add_to_cart:
+                distractor_re = r"\b(sign\s*in|sign\s*up|log\s*in|accounts?|profile|register|bestsellers?|best\s*sellers?|trending|todays?\s*deals?|deals?|customer\s*service|help|prime|sell|registry|gift\s*cards?|cart|basket|orders?|returns?)\b"
+            if re.search(distractor_re, label):
                 return -1000
 
         # Anti-hallucination Category Guard:
@@ -363,7 +416,7 @@ def marks_for_prompt(req: "AgentStepRequest", with_boxes: bool) -> List[dict]:
     limit = 45
     available = [m for m in req.marks if m.id not in (req.filled_mark_ids or [])]
     cat = req.task_hints.category if req.task_hints else None
-    ranked = rank_marks_for_task(available, req.task, cat)
+    ranked = rank_marks_for_task(available, req.task, cat, req.task_hints, req.progress)
     out = []
     for m in ranked:
         entry = {"id": m.id, "role": m.role, "label": (m.label or "")[:60]}
@@ -393,6 +446,10 @@ def describe_progress(progress: Optional["Progress"]) -> str:
         done.append("scroll the page")
     if progress.filled_any:
         done.append("fill at least one form field")
+    if getattr(progress, "product_opened", False):
+        done.append("select/open product")
+    if getattr(progress, "cart_added", False):
+        done.append("add product to cart")
     if progress.opened:
         done.append("open: " + ", ".join(progress.opened))
     return ("PROGRESS SO FAR:\n"
@@ -427,32 +484,33 @@ def describe_page(page_info: Optional[PageInfo]) -> str:
 def robust_json_parse(text: str) -> Optional[dict]:
     if not text:
         return None
+    data = None
     try:
         data = json.loads(text)
-        if isinstance(data, dict):
-            if not data or not data.get("action"):
-                return {
-                    "reasoning": data.get("reasoning", "Task complete or no further UI action needed"),
-                    "action": {"type": "done", "target": None, "value": None}
-                }
-            return data
     except Exception:
         pass
-    match = re.search(r"\{.*\}", text, re.DOTALL)
-    if match:
-        snippet = match.group(0)
-        try:
-            return json.loads(snippet)
-        except Exception:
+    if not isinstance(data, dict):
+        match = re.search(r"\{.*\}", text, re.DOTALL)
+        if match:
+            snippet = match.group(0)
             try:
-                cleaned = snippet.replace("'", '"')
-                return json.loads(cleaned)
+                data = json.loads(snippet)
             except Exception:
                 try:
-                    fixed_keys = re.sub(r'([{,]\s*)([a-zA-Z0-9_]+)\s*:', r'\1"\2":', snippet)
-                    return json.loads(fixed_keys)
+                    cleaned = snippet.replace("'", '"')
+                    data = json.loads(cleaned)
                 except Exception:
-                    pass
+                    try:
+                        fixed_keys = re.sub(r'([{,]\s*)([a-zA-Z0-9_]+)\s*:', r'\1"\2":', snippet)
+                        data = json.loads(fixed_keys)
+                    except Exception:
+                        pass
+    if isinstance(data, dict):
+        if not data.get("action"):
+            data["action"] = {"type": "done", "target": None, "value": None}
+        elif isinstance(data["action"], str):
+            data["action"] = {"type": data["action"], "target": None, "value": None}
+        return data
 
     # Truncated JSON recovery: extract fields if closing braces were cut off
     t_match = re.search(r'"type"\s*:\s*"([^"]+)"', text)
@@ -1118,6 +1176,8 @@ def plan_with_ollama(req: "AgentStepRequest") -> Optional[StepResponse]:
             print(f"[server] Ollama ({model}) attempt {attempt}: unparseable output ({elapsed:.1f}s): {repr(content[:120])}")
             continue
         act = parsed.get("action") or {}
+        if isinstance(act, str):
+            act = {"type": act}
         reasoning = parsed.get("reasoning") or f"Local {model} plan"
         print(f"[server] [OLLAMA:{model}] Action: {act.get('type')} (target: {act.get('target')}) - {reasoning} ({elapsed:.1f}s)")
         return StepResponse(

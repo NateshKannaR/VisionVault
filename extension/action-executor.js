@@ -732,17 +732,17 @@
     if (targetEl.readOnly || (targetEl.tagName !== "INPUT" && targetEl.tagName !== "TEXTAREA" && !targetEl.isContentEditable)) {
       await realisticClick(targetEl, "Open Field");
       let realInput = null;
-      for (let attempt = 0; attempt < 12; attempt++) {
-        await delay(80);
+      for (let attempt = 0; attempt < 20; attempt++) {
+        await delay(100);
         const active = document.activeElement;
         if (active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA") && !active.readOnly && isVisible(active)) {
           realInput = active;
           break;
         }
         const opened = document.querySelector(
-          '.react-autosuggest__input, input:focus, [role="combobox"] input, input[placeholder*="From" i], input[placeholder*="To" i], input[placeholder*="City" i], input[placeholder*="Airport" i], input[placeholder*="Search" i]'
+          '.react-autosuggest__input, [class*="autoSuggest" i] input, input:focus, [role="combobox"] input, input[placeholder*="From" i], input[placeholder*="To" i], input[placeholder*="City" i], input[placeholder*="Airport" i], input[placeholder*="Search" i]'
         );
-        if (opened && isVisible(opened)) {
+        if (opened && isVisible(opened) && !opened.readOnly) {
           realInput = opened;
           break;
         }
@@ -822,12 +822,17 @@
       return true;
     }
 
-    const proto = targetEl.tagName === "TEXTAREA" ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
-    const nativeSetter = Object.getOwnPropertyDescriptor(proto, "value")?.set;
+    const isInput = targetEl.tagName === "INPUT";
+    const isTextarea = targetEl.tagName === "TEXTAREA";
+    const proto = isTextarea ? HTMLTextAreaElement.prototype : (isInput ? HTMLInputElement.prototype : null);
+    const nativeSetter = proto ? Object.getOwnPropertyDescriptor(proto, "value")?.set : null;
     const setValue = (v) => {
       const prev = targetEl.value;
-      if (nativeSetter) nativeSetter.call(targetEl, v);
-      else targetEl.value = v;
+      if (nativeSetter) {
+        try { nativeSetter.call(targetEl, v); } catch (_) { targetEl.value = v; }
+      } else {
+        try { targetEl.value = v; } catch (_) {}
+      }
 
       // React 16+ tracks input value changes via _valueTracker.
       // If we don't update its internal cache to the previous value,
@@ -965,13 +970,13 @@
           // Autocomplete/city-picker: after typing, wait for a suggestion dropdown and
           // click the first matching option. This is what MakeMyTrip, Goibibo, etc. need.
           // A search box submits; a city picker needs a suggestion click.
-          const isAutocomplete = el.getAttribute("autocomplete") !== "off" &&
-            (el.getAttribute("role") === "combobox" ||
-             el.closest('[role="combobox"]') ||
-             el.getAttribute("aria-autocomplete") ||
-             /city|origin|destination|from|to|source|depart|arriv/i.test(
-               el.getAttribute("placeholder") || el.getAttribute("name") || el.getAttribute("aria-label") || el.id || el.textContent || ""
-             ) || !!document.querySelector('.react-autosuggest__suggestions-list, [role="listbox"], .suggestion-item'));
+          const isAutocomplete = el.getAttribute("role") === "combobox" ||
+            el.closest('[role="combobox"]') ||
+            el.getAttribute("aria-autocomplete") ||
+            /react-autosuggest|autosuggest|city|airport|suggest/i.test((el.className || "") + " " + (el.id || "")) ||
+            /city|origin|destination|from|to|source|depart|arriv/i.test(
+              el.getAttribute("placeholder") || el.getAttribute("name") || el.getAttribute("aria-label") || el.id || el.textContent || ""
+            ) || !!document.querySelector('.react-autosuggest__suggestions-list, [role="listbox"], .suggestion-item');
 
           if (isAutocomplete && value) {
             // Wait for dropdown to appear
@@ -1017,11 +1022,22 @@
 
         case "select":
           if (el && el.tagName && el.tagName.toLowerCase() === "select") {
+            const rawVal = String(value || "").toLowerCase().trim();
+            const normDigits = rawVal.replace(/[^0-9]/g, "");
             const opt = Array.from(el.options).find(
-              (o) => o.value === value || o.text.toLowerCase() === (value || "").toLowerCase()
+              (o) => o.value === value ||
+                     o.text.toLowerCase() === rawVal ||
+                     (normDigits && o.value.replace(/[^0-9]/g, "") === normDigits) ||
+                     (normDigits && o.text.replace(/[^0-9]/g, "") === normDigits)
             );
             if (opt) {
-              el.value = opt.value;
+              const nativeSetter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")?.set;
+              if (nativeSetter) {
+                nativeSetter.call(el, opt.value);
+              } else {
+                el.value = opt.value;
+              }
+              el.dispatchEvent(new Event("input", { bubbles: true }));
               el.dispatchEvent(new Event("change", { bubbles: true }));
               return { ok: true };
             }

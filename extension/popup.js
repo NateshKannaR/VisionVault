@@ -317,10 +317,11 @@ $("togglePassword").addEventListener("click", (e) => {
 async function loadSettings() {
   const { settings } = await chrome.storage.local.get("settings");
   const s = settings || {};
+  if ($("s-plannerMode")) $("s-plannerMode").value = s.plannerMode || "fast";
   $("s-redactMode").value = s.redactMode || "black";
   $("s-confirmPolicy").value = s.confirmPolicy || "risky";
   $("s-serverUrl").value = s.serverUrl || "http://127.0.0.1:8000/api/agent/step";
-  const ocrOn = s.enableOCR !== false;
+  const ocrOn = s.enableOCR === true; // Default fast (OCR false) unless explicitly enabled
   const faceOn = s.enableFaceDetection !== false;
   $("s-visionDepth").value = ocrOn ? "full" : (faceOn ? "fast" : "dom");
   $("s-dismissOverlays").checked = s.dismissOverlays !== false;
@@ -330,6 +331,7 @@ loadSettings();
 $("saveSettings").addEventListener("click", async () => {
   const depth = $("s-visionDepth").value;
   const settings = {
+    plannerMode: $("s-plannerMode") ? $("s-plannerMode").value : "fast",
     redactMode: $("s-redactMode").value,
     confirmPolicy: $("s-confirmPolicy").value,
     serverUrl: $("s-serverUrl").value.trim(),

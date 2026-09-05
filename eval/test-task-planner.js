@@ -194,6 +194,284 @@ const waDialpadStep = TaskPlanner.planNextAction({
 is(waDialpadStep.action, 'click', 'recovers from dialpad by clicking Back');
 is(waDialpadStep.mark_id, 22, 'targets Back button');
 
+// ── E-Commerce: Amazon complex search, filter, best product, add to cart ───────────────────
+console.log('\nE-Commerce: Amazon multi-step shopping pipeline\n');
+const ecomTask = 'go to amazon and search for headphones under 6000 with rating 3.5 and see the best among them and add to cart';
+const ecomParsed = TaskPlanner.parseTask(ecomTask);
+
+is(ecomParsed.site, 'amazon', 'site is amazon');
+is(ecomParsed.siteUrl, 'https://www.amazon.in', 'siteUrl is amazon.in');
+is(ecomParsed.query, 'headphones', 'query cleanly extracted as headphones');
+is(ecomParsed.maxPrice, 6000, 'maxPrice is 6000');
+is(ecomParsed.minRating, 3.5, 'minRating is 3.5');
+is(ecomParsed.wantsBest, true, 'wantsBest is true');
+is(ecomParsed.wantsAddToCart, true, 'wantsAddToCart is true');
+is(ecomParsed.date, null, 'date is null (not confused with rating)');
+
+// Step 1: Navigation
+const shopStep1 = TaskPlanner.planNextAction({
+  task: ecomTask,
+  marks: [{ id: 1, role: 'link', label: 'Home' }],
+  filledIds: [],
+  pageInfo: { url: 'https://www.google.com' },
+  progress: {},
+});
+is(shopStep1.action, 'navigate', 'shop step 1 navigates to Amazon');
+is(shopStep1.value, 'https://www.amazon.in', 'navigates to amazon.in');
+
+// Step 2: Search
+const shopStep2 = TaskPlanner.planNextAction({
+  task: ecomTask,
+  marks: [
+    { id: 10, role: 'input:search', label: 'Search Amazon.in' },
+    { id: 11, role: 'button', label: 'Go' },
+  ],
+  filledIds: [],
+  pageInfo: { url: 'https://www.amazon.in' },
+  progress: { navigated: true },
+});
+is(shopStep2.action, 'type', 'shop step 2 types query into search box');
+is(shopStep2.value, 'headphones', 'types clean query "headphones" (not whole sentence)');
+is(shopStep2.mark_id, 10, 'targets search box');
+
+// Step 3: Selection of best product on results page
+const shopStep3 = TaskPlanner.planNextAction({
+  task: ecomTask,
+  marks: [
+    { id: 50, role: 'link', label: 'Best Sellers' },
+    { id: 51, role: 'link', label: 'Sony WH-1000XM4 Noise Cancelling 4.7 stars ₹19,990' }, // over budget
+    { id: 52, role: 'link', label: 'Generic Cheap Earbuds 2.8 stars ₹499' }, // below rating 3.5
+    { id: 53, role: 'link', label: 'Noise Two Wireless On Ear Headphones 3.6 stars ₹1,699' }, // valid
+    { id: 54, role: 'link', label: 'boAt Rockerz 450 Bluetooth On Ear Headphones 4.2 stars ₹1,499' }, // best valid
+  ],
+  filledIds: [],
+  pageInfo: { url: 'https://www.amazon.in/s?k=headphones' },
+  progress: { navigated: true, searched: true, queryLanded: true },
+});
+is(shopStep3.action, 'click', 'shop step 3 selects product');
+is(shopStep3.mark_id, 54, 'selects boAt Rockerz 450 (highest rating under budget)');
+
+// Step 4: Add to cart on product page
+const shopStep4 = TaskPlanner.planNextAction({
+  task: ecomTask,
+  marks: [
+    { id: 60, role: 'heading', label: 'boAt Rockerz 450' },
+    { id: 61, role: 'button', label: 'Add to Cart' },
+    { id: 62, role: 'button', label: 'Buy Now' },
+  ],
+  filledIds: [],
+  pageInfo: { url: 'https://www.amazon.in/dp/B07PR1CL3S' },
+  progress: { navigated: true, searched: true, queryLanded: true, productOpened: true },
+});
+is(shopStep4.action, 'click', 'shop step 4 clicks Add to Cart button');
+is(shopStep4.mark_id, 61, 'targets Add to Cart button');
+
+// Step 5: Finished after cart confirmation
+const shopStep5 = TaskPlanner.planNextAction({
+  task: ecomTask,
+  marks: [
+    { id: 70, role: 'heading', label: 'Added to Cart' },
+    { id: 71, role: 'button', label: 'Proceed to checkout' },
+  ],
+  filledIds: [],
+  pageInfo: { url: 'https://www.amazon.in/cart' },
+  progress: { navigated: true, searched: true, queryLanded: true, productOpened: true, cartAdded: true },
+});
+is(shopStep5.action, 'done', 'shop step 5 completes with done after cartAdded');
+
+// ── E-Commerce: Flipkart search & filter pipeline ───────────────────
+console.log('\nE-Commerce: Flipkart search & filter pipeline\n');
+const fkTask = 'go to flipkart and search for headsets and apply filter from price under 6000';
+const fkParsed = TaskPlanner.parseTask(fkTask);
+
+is(fkParsed.site, 'flipkart', 'site is flipkart');
+is(fkParsed.siteUrl, 'https://www.flipkart.com', 'siteUrl is flipkart.com');
+is(fkParsed.query, 'headsets', 'query cleanly extracted as headsets');
+is(fkParsed.maxPrice, 6000, 'maxPrice is 6000');
+is(fkParsed.wantsFilter, true, 'wantsFilter is true');
+is(fkParsed.wantsFill, false, 'wantsFill is false (not mistaken for form fill)');
+
+// Step 1: Search on Flipkart
+const fkStep2 = TaskPlanner.planNextAction({
+  task: fkTask,
+  marks: [
+    { id: 10, role: 'input:text', label: 'Search for Products, Brands and More' },
+    { id: 11, role: 'button', label: 'Search' },
+  ],
+  filledIds: [],
+  pageInfo: { url: 'https://www.flipkart.com' },
+  progress: { navigated: true },
+});
+is(fkStep2.action, 'type', 'fk step 2 types clean query into search box');
+is(fkStep2.value, 'headsets', 'types "headsets" (not "headsets and apply filter from price")');
+
+// Step 2: Apply Max Price filter
+const fkStep3 = TaskPlanner.planNextAction({
+  task: fkTask,
+  marks: [
+    { id: 20, role: 'select', label: 'Min' },
+    { id: 21, role: 'select', label: '₹4000+' },
+    { id: 22, role: 'link', label: 'boAt Rockerz 450 ₹1,499' },
+  ],
+  filledIds: [],
+  pageInfo: { url: 'https://www.flipkart.com/search?q=headsets' },
+  progress: { navigated: true, searched: true, queryLanded: true },
+});
+is(fkStep3.action, 'select', 'fk step 3 selects max price filter');
+is(fkStep3.mark_id, 21, 'targets max price select dropdown');
+is(fkStep3.value, '6000', 'selects value 6000');
+
+// Step 3: Done after filter is applied
+const fkStep4 = TaskPlanner.planNextAction({
+  task: fkTask,
+  marks: [
+    { id: 20, role: 'select', label: 'Min' },
+    { id: 21, role: 'select', label: '₹6000' },
+  ],
+  filledIds: [],
+  pageInfo: { url: 'https://www.flipkart.com/search?q=headsets' },
+  progress: { navigated: true, searched: true, queryLanded: true, filterApplied: true },
+});
+is(fkStep4.action, 'done', 'fk step 4 completes with done after filter applied');
+
+// ── GitHub Automation Pipeline ───────────────────────────────────────────
+console.log('\nGitHub: Search, Open, Star, and Tab Navigation pipeline\n');
+const ghTask = 'go to github and search for vision-agent and star it';
+const ghParsed = TaskPlanner.parseTask(ghTask);
+
+is(ghParsed.site, 'github', 'site is github');
+is(ghParsed.siteUrl, 'https://github.com', 'siteUrl is github.com');
+is(ghParsed.query, 'vision-agent', 'query cleanly extracted as vision-agent');
+is(ghParsed.wantsStar, true, 'wantsStar is true');
+is(ghParsed.wantsFork, false, 'wantsFork is false');
+
+// Step 1: Navigate to GitHub
+const ghStep1 = TaskPlanner.planNextAction({
+  task: ghTask,
+  marks: [],
+  filledIds: [],
+  pageInfo: { url: 'https://www.google.com' },
+  progress: {},
+});
+is(ghStep1.action, 'navigate', 'gh step 1 navigates to GitHub');
+is(ghStep1.value, 'https://github.com', 'navigates to https://github.com');
+
+// Step 2: Search for repository on GitHub
+const ghStep2 = TaskPlanner.planNextAction({
+  task: ghTask,
+  marks: [
+    { id: 301, role: 'button', label: 'Search or jump to...' },
+    { id: 302, role: 'input:search', label: 'Search or jump to...' },
+  ],
+  filledIds: [],
+  pageInfo: { url: 'https://github.com' },
+  progress: { navigated: true },
+});
+is(ghStep2.action, 'type', 'gh step 2 types query into search box');
+is(ghStep2.value, 'vision-agent', 'types "vision-agent"');
+is(ghStep2.mark_id, 302, 'targets search box');
+
+// Step 3: Select repository from search results
+const ghStep3 = TaskPlanner.planNextAction({
+  task: ghTask,
+  marks: [
+    { id: 310, role: 'link', label: 'Repositories' },
+    { id: 311, role: 'link', label: 'NateshKannaR/vision-agent' },
+    { id: 312, role: 'link', label: 'other/unrelated' },
+  ],
+  filledIds: [],
+  pageInfo: { url: 'https://github.com/search?q=vision-agent' },
+  progress: { navigated: true, searched: true, queryLanded: true },
+});
+is(ghStep3.action, 'click', 'gh step 3 clicks repository link');
+is(ghStep3.mark_id, 311, 'targets matching repo "NateshKannaR/vision-agent"');
+
+// Step 4: Click Star on repository page
+const ghStep4 = TaskPlanner.planNextAction({
+  task: ghTask,
+  marks: [
+    { id: 320, role: 'button', label: 'Star' },
+    { id: 321, role: 'button', label: 'Fork' },
+    { id: 322, role: 'tab', label: 'Issues' },
+    { id: 323, role: 'tab', label: 'Pull requests' },
+    { id: 324, role: 'button', label: 'Code' },
+  ],
+  filledIds: [],
+  pageInfo: { url: 'https://github.com/NateshKannaR/vision-agent' },
+  progress: { navigated: true, searched: true, queryLanded: true, repoOpened: true },
+});
+is(ghStep4.action, 'click', 'gh step 4 clicks Star button');
+is(ghStep4.mark_id, 320, 'targets Star button');
+
+// Step 5: Finished after starring
+const ghStep5 = TaskPlanner.planNextAction({
+  task: ghTask,
+  marks: [
+    { id: 320, role: 'button', label: 'Starred' },
+  ],
+  filledIds: [],
+  pageInfo: { url: 'https://github.com/NateshKannaR/vision-agent' },
+  progress: { navigated: true, searched: true, queryLanded: true, repoOpened: true, starred: true },
+});
+is(ghStep5.action, 'done', 'gh step 5 completes with done after starred');
+
+// GitHub: Issues & PR tabs
+const prTask = 'open langchain on github and view pull requests';
+const prParsed = TaskPlanner.parseTask(prTask);
+is(prParsed.site, 'github', 'pr task site is github');
+is(prParsed.query, 'langchain', 'query is langchain');
+is(prParsed.wantsPR, true, 'wantsPR is true');
+
+const prStep = TaskPlanner.planNextAction({
+  task: prTask,
+  marks: [
+    { id: 330, role: 'button', label: 'Star' },
+    { id: 331, role: 'link', label: 'Issues' },
+    { id: 332, role: 'link', label: 'Pull requests' },
+  ],
+  filledIds: [],
+  pageInfo: { url: 'https://github.com/hwchase17/langchain' },
+  progress: { navigated: true, searched: true, queryLanded: true, repoOpened: true },
+});
+is(prStep.action, 'click', 'clicks Pull requests tab');
+is(prStep.mark_id, 332, 'targets Pull requests link');
+
+// ── MakeMyTrip: Non-Stop Flight Filter ────────────────────────────────────
+console.log('\nMakeMyTrip: Non-Stop flight filtering\n');
+const travelTask = 'go to makemytrip and search flights from delhi to mumbai non stop';
+const travelParsed = TaskPlanner.parseTask(travelTask);
+is(travelParsed.from, 'delhi', 'from city is delhi');
+is(travelParsed.to, 'mumbai', 'to city is mumbai');
+is(travelParsed.wantsNonStop, true, 'wantsNonStop is true');
+
+const travelStep6 = TaskPlanner.planBookingStep(travelParsed, [
+  { id: 401, role: 'checkbox', label: 'Non Stop' },
+  { id: 402, role: 'checkbox', label: '1 Stop' },
+], new Set(), { bookingStep: 6, fromTyped: true, toTyped: true });
+
+is(travelStep6.action, 'click', 'clicks Non Stop filter checkbox');
+is(travelStep6.mark_id, 401, 'targets Non Stop filter checkbox mark');
+
+// ── E-Commerce: Sorting ───────────────────────────────────────────────────
+console.log('\nE-Commerce: Sorting pipeline\n');
+const sortTask = 'go to amazon and search for gaming mouse and sort by price low to high';
+const sortParsed = TaskPlanner.parseTask(sortTask);
+is(sortParsed.query, 'gaming mouse', 'query cleanly extracted as gaming mouse');
+is(sortParsed.wantsSort, true, 'wantsSort is true');
+is(sortParsed.sort, 'price_asc', 'sort is price_asc');
+
+const sortStep = TaskPlanner.planNextAction({
+  task: sortTask,
+  marks: [
+    { id: 501, role: 'select', label: 'Sort by:' },
+  ],
+  filledIds: [],
+  pageInfo: { url: 'https://www.amazon.in/s?k=gaming+mouse' },
+  progress: { navigated: true, searched: true, queryLanded: true },
+});
+is(sortStep.action, 'select', 'selects sort option');
+is(sortStep.mark_id, 501, 'targets sort select');
+is(sortStep.value, 'price-asc-rank', 'selects price-asc-rank');
 
 console.log('\n' + '='.repeat(60));
 if (failures.length) {
@@ -201,4 +479,5 @@ if (failures.length) {
   process.exit(1);
 }
 console.log(`All ${checks} task-planner checks passed.`);
+
 

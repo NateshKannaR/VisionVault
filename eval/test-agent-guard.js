@@ -453,6 +453,132 @@ test('semantic loop detection catches repeated clicks on same label with shiftin
   assert.ok(v3.stop || v3.substituted, 'repeated semantic clicks must be blocked');
 });
 
+test('e-commerce add to cart task refuses done when search landed but cartAdded is false', () => {
+  const task = 'go to amazon and search for headphones under 6000 with rating 3.5 and see the best among them and add to cart';
+  const parsed = TaskPlanner.parseTask(task);
+  const guard = AgentGuard.createGuard(parsed);
+  const marks = [{ id: 61, role: 'button', label: 'Add to Cart' }];
+
+  // Planner proposes done prematurely on search results
+  const v = guard.review({ action: 'done', reasoning: 'Search query landed' }, {
+    marks,
+    pageInfo: { url: 'https://www.amazon.in/s?k=headphones' },
+    progress: { navigated: true, searched: true, queryLanded: true, cartAdded: false },
+    deterministic: { action: 'click', mark_id: 61, reasoning: 'Click Add to Cart' },
+    task,
+  });
+  // Guard must NOT accept done; it must substitute the pending action
+  assert.notStrictEqual(v.action.action, 'done', 'premature done on add-to-cart task must be refused');
+});
+
+test('e-commerce add to cart task accepts done once cartAdded is true', () => {
+  const task = 'go to amazon and search for headphones under 6000 with rating 3.5 and see the best among them and add to cart';
+  const parsed = TaskPlanner.parseTask(task);
+  const guard = AgentGuard.createGuard(parsed);
+
+  const v = guard.review({ action: 'done', reasoning: 'Item added to cart' }, {
+    marks: [{ id: 70, role: 'heading', label: 'Added to Cart' }],
+    pageInfo: { url: 'https://www.amazon.in/cart' },
+    progress: { navigated: true, searched: true, queryLanded: true, productOpened: true, cartAdded: true },
+    task,
+  });
+  assert.strictEqual(v.action.action, 'done', 'done is accepted after cartAdded is true');
+});
+
+test('e-commerce filter task refuses done when query landed but filterApplied is false', () => {
+  const task = 'go to flipkart and search for headsets and apply filter from price under 6000';
+  const parsed = TaskPlanner.parseTask(task);
+  const guard = AgentGuard.createGuard(parsed);
+
+  const marks = [
+    { id: 20, role: 'select', label: 'Min' },
+    { id: 21, role: 'select', label: '₹4000+' },
+  ];
+
+  const v = guard.review({ action: 'done', reasoning: 'Search landed' }, {
+    marks,
+    pageInfo: { url: 'https://www.flipkart.com/search?q=headsets' },
+    progress: { navigated: true, searched: true, queryLanded: true, filterApplied: false },
+    deterministic: { action: 'select', mark_id: 21, value: '6000' },
+    task,
+  });
+  assert.notStrictEqual(v.action.action, 'done', 'premature done on filter task must be refused');
+});
+
+test('e-commerce filter task accepts done once filterApplied is true', () => {
+  const task = 'go to flipkart and search for headsets and apply filter from price under 6000';
+  const parsed = TaskPlanner.parseTask(task);
+  const guard = AgentGuard.createGuard(parsed);
+
+  const v = guard.review({ action: 'done', reasoning: 'Filter applied' }, {
+    marks: [{ id: 20, role: 'select', label: 'Min' }],
+    pageInfo: { url: 'https://www.flipkart.com/search?q=headsets' },
+    progress: { navigated: true, searched: true, queryLanded: true, filterApplied: true },
+    task,
+  });
+  assert.strictEqual(v.action.action, 'done', 'done is accepted once filterApplied is true');
+});
+
+test('github star task refuses premature done before repo is starred', () => {
+  const task = 'go to github and search for vision-agent and star it';
+  const parsed = TaskPlanner.parseTask(task);
+  const guard = AgentGuard.createGuard(parsed);
+
+  const v = guard.review({ action: 'done', reasoning: 'Repo opened' }, {
+    marks: [{ id: 320, role: 'button', label: 'Star' }],
+    pageInfo: { url: 'https://github.com/NateshKannaR/vision-agent' },
+    progress: { navigated: true, searched: true, queryLanded: true, repoOpened: true, starred: false },
+    deterministic: { action: 'click', mark_id: 320, isStar: true },
+    task,
+  });
+  assert.notStrictEqual(v.action.action, 'done', 'premature done on star task must be refused');
+  assert.strictEqual(v.action.action, 'click');
+});
+
+test('github star task accepts done once starred is true', () => {
+  const task = 'go to github and search for vision-agent and star it';
+  const parsed = TaskPlanner.parseTask(task);
+  const guard = AgentGuard.createGuard(parsed);
+
+  const v = guard.review({ action: 'done', reasoning: 'Starred' }, {
+    marks: [{ id: 320, role: 'button', label: 'Starred' }],
+    pageInfo: { url: 'https://github.com/NateshKannaR/vision-agent' },
+    progress: { navigated: true, searched: true, queryLanded: true, repoOpened: true, starred: true },
+    task,
+  });
+  assert.strictEqual(v.action.action, 'done', 'done accepted once starred');
+});
+
+test('makemytrip non-stop flight task refuses done before non-stop filter applied', () => {
+  const task = 'go to makemytrip and search flights from delhi to mumbai non stop';
+  const parsed = TaskPlanner.parseTask(task);
+  const guard = AgentGuard.createGuard(parsed);
+
+  const v = guard.review({ action: 'done', reasoning: 'Searched flights' }, {
+    marks: [{ id: 401, role: 'checkbox', label: 'Non Stop' }],
+    pageInfo: { url: 'https://www.makemytrip.com/flight/search' },
+    progress: { navigated: true, bookingStep: 6, fromTyped: true, toTyped: true, filledAny: true, nonStopFiltered: false },
+    deterministic: { action: 'click', mark_id: 401, isNonStop: true },
+    task,
+  });
+  assert.notStrictEqual(v.action.action, 'done', 'premature done on non-stop flight task must be refused');
+});
+
+test('sorting task refuses done before sortApplied is true', () => {
+  const task = 'go to amazon and search for gaming mouse and sort by price low to high';
+  const parsed = TaskPlanner.parseTask(task);
+  const guard = AgentGuard.createGuard(parsed);
+
+  const v = guard.review({ action: 'done', reasoning: 'Search landed' }, {
+    marks: [{ id: 501, role: 'select', label: 'Sort by:' }],
+    pageInfo: { url: 'https://www.amazon.in/s?k=gaming+mouse' },
+    progress: { navigated: true, searched: true, queryLanded: true, sortApplied: false },
+    deterministic: { action: 'select', mark_id: 501, value: 'price-asc-rank' },
+    task,
+  });
+  assert.notStrictEqual(v.action.action, 'done', 'premature done on sort task must be refused');
+});
+
 console.log(`\n${passed} passed, ${failed} failed\n`);
 process.exit(failed ? 1 : 0);
 

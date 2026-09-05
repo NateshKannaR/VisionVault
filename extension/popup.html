@@ -382,6 +382,18 @@
   <!-- ── SETTINGS ───────────────────────────────────────────────────────── -->
   <section id="panel-settings" class="panel" role="tabpanel" tabindex="0">
     <div class="field">
+      <label class="field-label" for="s-plannerMode">Automation speed / Planner</label>
+      <select class="input" id="s-plannerMode">
+        <option value="fast">⚡ Fast On-Device (Sub-second execution, zero server lag)</option>
+        <option value="auto">⚡ Hybrid (On-Device first, VLM fallback)</option>
+        <option value="server">🧠 Server VLM Only (Ollama / Cloud)</option>
+      </select>
+      <p class="hint">
+        Fast On-Device executes searches, price filters, form fills, and cart actions on-device in &lt;100ms with zero model lag. Server VLM calls local Ollama or cloud models (~5–15s per step).
+      </p>
+    </div>
+
+    <div class="field">
       <label class="field-label" for="s-redactMode">Redaction style</label>
       <select class="input" id="s-redactMode">
         <option value="black">Solid black — highest assurance</option>

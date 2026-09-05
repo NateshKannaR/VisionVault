@@ -69,10 +69,19 @@
     // Booking tasks: queryLanded is meaningless (no single search box).
     // Progress is judged by filledAny + navigated instead.
     if (parsed.wantsBook) {
-      return p.filledAny || false;
+      if (parsed.wantsNonStop && !p.nonStopFiltered) return false;
+      return p.filledAny || p.bookingCompleted || false;
     }
 
     if (parsed.query && !p.queryLanded) return false;
+    if (parsed.wantsFilter && !p.filterApplied && !p.sortApplied && !p.nonStopFiltered) return false;
+    if (parsed.wantsSort && !p.sortApplied) return false;
+    if (parsed.wantsAddToCart && !p.cartAdded) return false;
+    if (parsed.wantsStar && !p.starred) return false;
+    if (parsed.wantsFork && !p.forked) return false;
+    if (parsed.wantsClone && !p.cloned) return false;
+    if (parsed.wantsIssue && !p.issueOpened) return false;
+    if (parsed.wantsPR && !p.prOpened) return false;
     if ((parsed.openTargets || []).length) {
       const opened = p.opened || [];
       if (!parsed.openTargets.every((t) => opened.includes(t))) return false;
@@ -80,7 +89,6 @@
     if (parsed.wantsScroll && !p.scrolled) return false;
     if (parsed.wantsFill && !p.filledAny) return false;
     if (parsed.wantsMessage && !p.messageSent) return false;
-    if (parsed.wantsBook) return false;
     return true;
   }
 
@@ -96,7 +104,20 @@
    */
   function goalFullyVerified(parsed, progress) {
     if (!parsed || parsed.wantsFill || parsed.wantsBook) return false;
-    const hasVerifiableIntent = !!parsed.query || (parsed.openTargets || []).length > 0 || parsed.wantsScroll || (parsed.wantsMessage && progress?.messageSent);
+    if (parsed.wantsFilter && !progress?.filterApplied && !progress?.sortApplied) return false;
+    if (parsed.wantsSort && !progress?.sortApplied) return false;
+    if (parsed.wantsAddToCart && !progress?.cartAdded) return false;
+    if (parsed.wantsStar && !progress?.starred) return false;
+    if (parsed.wantsFork && !progress?.forked) return false;
+    if (parsed.wantsClone && !progress?.cloned) return false;
+    if (parsed.wantsIssue && !progress?.issueOpened) return false;
+    if (parsed.wantsPR && !progress?.prOpened) return false;
+    const hasVerifiableIntent = !!parsed.query || (parsed.openTargets || []).length > 0 || parsed.wantsScroll ||
+      (parsed.wantsMessage && progress?.messageSent) || (parsed.wantsAddToCart && progress?.cartAdded) ||
+      (parsed.wantsFilter && (progress?.filterApplied || progress?.sortApplied)) ||
+      (parsed.wantsStar && progress?.starred) || (parsed.wantsFork && progress?.forked) ||
+      (parsed.wantsClone && progress?.cloned) || (parsed.wantsIssue && progress?.issueOpened) ||
+      (parsed.wantsPR && progress?.prOpened);
     if (!hasVerifiableIntent) return false;
     return goalSatisfied(parsed, progress);
   }
@@ -105,7 +126,21 @@
   function describeRemaining(parsed, progress) {
     const p = progress || {};
     const left = [];
+    if (parsed?.wantsBook) {
+      if (!p.filledAny && !p.bookingCompleted) left.push("search flights");
+      if (parsed?.wantsNonStop && !p.nonStopFiltered) left.push("filter non-stop flights");
+      return left.join(", ");
+    }
     if (parsed?.query && !p.queryLanded) left.push(`search for "${parsed.query}"`);
+    if (parsed?.wantsFilter && !p.filterApplied && !p.sortApplied) left.push("apply filter");
+    if (parsed?.wantsSort && !p.sortApplied) left.push("apply sorting");
+    if (parsed?.wantsAddToCart && !p.cartAdded) left.push("add item to cart");
+    if (parsed?.wantsStar && !p.starred) left.push("star the repository");
+    if (parsed?.wantsFork && !p.forked) left.push("fork the repository");
+    if (parsed?.wantsClone && !p.cloned) left.push("open clone options");
+    if (parsed?.wantsIssue && !p.issueOpened) left.push("open issues tab");
+    if (parsed?.wantsPR && !p.prOpened) left.push("open pull requests tab");
+    if (parsed?.wantsNonStop && !p.nonStopFiltered) left.push("filter non-stop flights");
     for (const t of parsed?.openTargets || []) if (!(p.opened || []).includes(t)) left.push(`open "${t}"`);
     if (parsed?.wantsScroll && !p.scrolled) left.push("scroll the page");
     if (parsed?.wantsFill && !p.filledAny) left.push("fill the form");
@@ -151,6 +186,15 @@
     const bits = [];
     if (p.navigated && parsed?.site) bits.push(`opened ${parsed.site}`);
     if (p.queryLanded && parsed?.query) bits.push(`searched for "${parsed.query}"`);
+    if (p.filterApplied) bits.push("applied filter");
+    if (p.sortApplied) bits.push("applied sorting");
+    if (p.cartAdded) bits.push("added item to cart");
+    if (p.starred) bits.push("starred repository");
+    if (p.forked) bits.push("forked repository");
+    if (p.cloned) bits.push("opened clone options");
+    if (p.issueOpened) bits.push("opened issues");
+    if (p.prOpened) bits.push("opened pull requests");
+    if (p.nonStopFiltered) bits.push("filtered non-stop flights");
     if ((p.opened || []).length) bits.push(`opened ${p.opened.length} item(s)`);
     if (p.scrolled) bits.push("scrolled the page");
     return bits.length ? `Done — ${bits.join(", ")}.` : "Done.";

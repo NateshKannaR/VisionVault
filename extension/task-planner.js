@@ -55,10 +55,10 @@
 
   // Conversational tail: "... and show me", "... then tell me the results", "... please".
   // These describe what the user wants to SEE, not what to type into a search box.
-  const TAIL_RE = /\s*(?:,|\band\b|\bthen\b)?\s*(?:please\s+)?(?:can\s+you\s+)?(?:show|display|tell|give|list|find)\s+(?:me|us|it)?\s*(?:the\s+)?(?:results?|details?|options?|list|prices?|it)?\s*[.!]?\s*$/i;
+  const TAIL_RE = /\s*(?:,|\band\b|\bthen\b)?\s*(?:please\s+)?(?:can\s+you\s+)?(?:show|display|tell|give|list|find|see)\s+(?:me|us|it)?\s*(?:the\s+)?(?:results?|details?|options?|list|prices?|it|best(?:\s+among\s+them)?)?\s*[.!]?\s*$/i;
 
   // A follow-up clause that is a separate instruction, not part of the query.
-  const CLAUSE_SPLIT_RE = /\s+(?:and|then|,)\s+(?:also\s+)?(?=open|click|select|scroll|show|tell|display|go|buy|add|book|play|read|check)/i;
+  const CLAUSE_SPLIT_RE = /\s+(?:and|then|,)\s+(?:also\s+)?(?=open|click|select|scroll|show|tell|display|go|buy|add|book|play|read|check|see|view|pick|choose|filter|sort|find|get|checkout|put|apply|set|use|refine|star|fork|clone)/i;
 
   const LEAD_RE = /^\s*(?:hey|hi|ok|okay|please|can you|could you|would you|i want to|i want you to|i need to|help me|let's|lets)\s+/i;
 
@@ -85,7 +85,7 @@
 
   /**
    * Turns an instruction into structure.
-   * @returns {{raw, site, siteUrl, query, openTargets, wantsScroll, wantsFill, wantsSearch}}
+   * @returns {{raw, site, siteUrl, query, openTargets, wantsScroll, wantsFill, wantsSearch, wantsShop, wantsAddToCart, maxPrice, minPrice, minRating, wantsBest, wantsCheapest}}
    */
   function parseTask(raw) {
     const original = String(raw || "").trim();
@@ -98,9 +98,23 @@
       query: null,
       openTargets: [],
       wantsScroll: /\b(scroll|load more|read more|next page|more results|scroll down)\b/i.test(text),
-      wantsFill: /\b(fill|register|sign\s*up|signup|form|apply|checkout|enter my details)\b/i.test(text),
+      wantsFill: /\b(fill|register|sign\s*up|signup|form|checkout|enter my details|apply\s+(?:for|job|loan|form|membership|card|visa))\b/i.test(text),
       wantsBook: /\b(book|booking|reserve|reservation|order|buy|purchase|ticket|flight|hotel|cab|train|bus|ride)\b/i.test(text),
       wantsSearch: false,
+      wantsShop: false,
+      wantsFilter: /\b(filter|filters?|narrow|refine|sort)\b/i.test(text),
+      wantsAddToCart: false,
+      maxPrice: null,
+      minPrice: null,
+      minRating: null,
+      wantsBest: false,
+      wantsCheapest: false,
+      // GitHub intents
+      wantsStar: false,
+      wantsFork: false,
+      wantsIssue: false,
+      wantsPR: false,
+      wantsClone: false,
       // Extracted travel/booking parameters
       category: null,
       from: null,
@@ -109,6 +123,10 @@
       passengers: null,
       travelClass: null,
       tripType: null, // "one-way", "round-trip"
+      wantsNonStop: false,
+      // Sorting
+      wantsSort: false,
+      sort: null,
     };
 
     const isTravel = result.wantsBook ||
@@ -148,7 +166,7 @@
         if (result[key]) {
           result[key] = result[key]
             .replace(/^(?:the|a|an)\s+/i, "")
-            .replace(/\s+(?:flights?|tickets?|cabs?|bus|trains?|hotels?)$/i, "")
+            .replace(/\s+(?:flights?|tickets?|cabs?|bus|trains?|hotels?|non[\s-]*stop|direct)$/i, "")
             .trim();
         }
       }
@@ -171,10 +189,28 @@
       }
     }
 
-    // Date: "on 15 jan", "on 2025-01-15", "tomorrow", "next monday"
-    const dateMatch = text.match(/\bon\s+([\w\s,]+?)(?:\s+(?:for|with|and|,|$))/i) ||
-                      text.match(/\b(tomorrow|today|next\s+\w+|\d{1,2}[\s/-]\w+[\s/-]?\d{0,4})\b/i);
-    if (dateMatch) result.date = dateMatch[1].trim();
+    // E-commerce & Shopping task detection:
+    const cartKeywords = /\b(add\s+to\s+cart|add\s+to\s+basket|buy\s+now|add\s+it\s+to\s+cart|put\s+(?:it\s+)?in\s+(?:the\s+)?cart)\b/i;
+    result.wantsAddToCart = cartKeywords.test(text);
+
+    const priceUnderMatch = text.match(/\b(?:under|below|less\s+than|max(?:imum)?|cheaper\s+than|within|up\s+to)\s*(?:rs\.?|inr|₹|\$)?\s*(\d+[\d,]*)\b/i);
+    const priceOverMatch = text.match(/\b(?:above|over|more\s+than|min(?:imum)?|at\s+least)\s*(?:rs\.?|inr|₹|\$)?\s*(\d+[\d,]*)\b/i);
+    if (priceUnderMatch) result.maxPrice = parseInt(priceUnderMatch[1].replace(/,/g, ""), 10);
+    if (priceOverMatch) result.minPrice = parseInt(priceOverMatch[1].replace(/,/g, ""), 10);
+
+    const ratingMatch = text.match(/\b(?:rating\s*(?:of|above|over|at\s*least|min(?:imum)?|\>=?)?\s*|rated\s+)?([1-5](?:\.\d+)?)\s*(?:stars?|\+|\s*and\s*above|\s*or\s*more|\s*rating)\b/i) ||
+                        text.match(/\b(?:with\s+)?rating\s+([1-5](?:\.\d+)?)\b/i);
+    if (ratingMatch) result.minRating = parseFloat(ratingMatch[1]);
+
+    result.wantsBest = /\b(best|top\s*rated|highest\s*rated|top\s*pick|top\s*one)\b/i.test(text);
+    result.wantsCheapest = /\b(cheapest|lowest\s*price|most\s*affordable)\b/i.test(text);
+
+    // Date: only check if travel or explicit month keywords are present
+    if (isTravel || /\b(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|oct|nov|dec)\b/i.test(text)) {
+      const dateMatch = text.match(/\bon\s+([\w\s,]+?)(?:\s+(?:for|with|and|,|$))/i) ||
+                        text.match(/\b(tomorrow|today|next\s+\w+|\d{1,2}[\s/-]\w+[\s/-]?\d{0,4})\b/i);
+      if (dateMatch) result.date = dateMatch[1].trim();
+    }
 
     // Passengers: "for 2", "2 passengers", "2 adults"
     const passMatch = text.match(/\bfor\s+(\d+)\b|\b(\d+)\s+(?:passenger|adult|person|people|travell?er)/i);
@@ -189,18 +225,82 @@
     if (/\bround\s*trip\b|\breturn\b/i.test(text)) result.tripType = "round-trip";
     else if (/\bone\s*way\b/i.test(text)) result.tripType = "one-way";
 
+    if (/\b(non[\s-]*stop|direct\s*flights?|direct)\b/i.test(text)) {
+      result.wantsNonStop = true;
+      result.wantsFilter = true;
+    }
+
+    // Sorting detection:
+    if (/\b(low\s+to\s+high|cheapest\s+first|price\s*:\s*low|price\s+low)\b/i.test(text)) {
+      result.wantsSort = true;
+      result.sort = "price_asc";
+      result.wantsFilter = true;
+    } else if (/\b(high\s+to\s+low|expensive\s+first|price\s*:\s*high|price\s+high)\b/i.test(text)) {
+      result.wantsSort = true;
+      result.sort = "price_desc";
+      result.wantsFilter = true;
+    } else if (/\b(customer\s*ratings?|highest\s*rated|top\s*rated)\b/i.test(text)) {
+      result.wantsSort = true;
+      result.sort = "rating";
+      result.wantsFilter = true;
+    } else if (/\b(popularity|most\s*popular|bestselling)\b/i.test(text)) {
+      result.wantsSort = true;
+      result.sort = "popularity";
+      result.wantsFilter = true;
+    } else if (/\b(newest|latest)\b/i.test(text)) {
+      result.wantsSort = true;
+      result.sort = "newest";
+      result.wantsFilter = true;
+    }
+
     // 1. Site to open first
     const siteMatch = text.match(SITE_RE);
     if (siteMatch) {
       const candidate = stripQuotes(siteMatch[1]);
       const looksLikeSite = !/\b(result|link|item|product|tab|menu|first|second|third|top)\b/i.test(candidate);
-      const url = looksLikeSite ? siteUrlFor(candidate) : null;
+      const onSiteInner = candidate.match(/^(.+?)\s+(?:on|in|at)\s+([a-z0-9-]+)$/i);
+      let siteName = candidate;
+      let targetPrefix = null;
+      if (onSiteInner && KNOWN_SITES[onSiteInner[2].toLowerCase()]) {
+        targetPrefix = onSiteInner[1].trim();
+        siteName = onSiteInner[2].toLowerCase();
+      }
+
+      const url = looksLikeSite ? siteUrlFor(siteName) : null;
       if (url) {
-        result.site = candidate.toLowerCase();
+        result.site = siteName.toLowerCase();
         result.siteUrl = url;
+        if (targetPrefix && !result.query) {
+          result.query = targetPrefix;
+        }
         text = (text.slice(0, siteMatch.index) + " " + text.slice(siteMatch.index + siteMatch[0].length)).trim();
         text = text.replace(/^\s*(?:and|then|,)\s+/i, "").trim();
       }
+    }
+
+    if (!result.site) {
+      const onSiteMatch = text.match(/\b(?:on|in|at)\s+(github|amazon|flipkart|makemytrip|whatsapp|youtube|wikipedia)\b/i);
+      if (onSiteMatch) {
+        const candidate = onSiteMatch[1].toLowerCase();
+        result.site = candidate;
+        result.siteUrl = siteUrlFor(candidate);
+      }
+    }
+
+    // GitHub intent detection:
+    const isGitHub = (result.site && /github/i.test(result.site)) || /\bgithub\b/i.test(text);
+    if (isGitHub || /\b(star\s+(?:the\s+)?(?:repo|repository|it)|stargaze)\b/i.test(text)) {
+      result.wantsStar = /\b(star|stargaze)\b/i.test(text) && !/\b([1-5]\s*stars?|star\s*rating)\b/i.test(text);
+      result.wantsFork = /\bfork\b/i.test(text);
+      result.wantsIssue = /\b(issues?|bug\s*report)\b/i.test(text);
+      result.wantsPR = /\b(pull\s*requests?|prs?)\b/i.test(text);
+      result.wantsClone = /\b(clone|copy\s*url|git\s*clone)\b/i.test(text);
+    }
+
+    const ecomSite = (result.site && /amazon|flipkart|myntra|ebay|meesho|walmart|target|bestbuy/i.test(result.site)) ||
+                     /amazon|flipkart|myntra|ebay/i.test(text);
+    if (ecomSite || result.wantsAddToCart || result.maxPrice || result.minRating || result.wantsBest || result.wantsCheapest) {
+      result.wantsShop = true;
     }
 
     // 2. Search query
@@ -211,9 +311,35 @@
       q = q.split(CLAUSE_SPLIT_RE)[0];
       q = q.replace(TAIL_RE, "");
       q = q.replace(POLITE_TAIL_RE, "");
+      if (result.wantsShop || result.wantsFilter || result.wantsStar || result.wantsFork || result.wantsClone || result.wantsIssue || result.wantsPR) {
+        q = q.replace(/\s*(?:and\s+)?(?:also\s+)?(?:apply|set|put|use)?\s*(?:a\s+)?(?:filters?|refine)\s+(?:from|for|by|on|with|to)?\s*(?:the\s+)?(?:price)?\b.*/gi, "");
+        q = q.replace(/\s*(?:and\s+)?(?:also\s+)?sort\s+(?:by\s+)?(?:the\s+)?\b.*/gi, "");
+        q = q.replace(/\s*(?:and\s+)?(?:also\s+)?(?:star|fork|clone)\s+(?:the\s+)?(?:repo|repository|it)?\b.*/gi, "");
+        q = q.replace(/\s*(?:and\s+)?(?:also\s+)?(?:open|view|see)\s+(?:the\s+)?(?:issues?|pull\s*requests?|prs?)\b.*/gi, "");
+        q = q.replace(/\s*\b(?:from|with)?\s*price\s+(?:under|below|less\s+than|cheaper\s+than|within|up\s+to|above|over|more\s+than)\b.*/gi, "");
+        q = q.replace(/\s*\b(?:from\s+)?price\b.*/gi, "");
+        q = q.replace(/\s*\b(?:under|below|less\s+than|cheaper\s+than|within|up\s+to|above|over|more\s+than)\s*(?:rs\.?|inr|₹|\$)?\s*\d+[\d,]*/gi, "");
+        q = q.replace(/\s*\b(?:with\s+)?(?:rating\s*(?:of|above|over|at\s*least|min|\>=)?\s*|rated\s+)[1-5](?:\.\d+)?\s*(?:stars?|\+|\s*and\s*above|\s*rating)?/gi, "");
+        q = q.replace(/\s*\b[1-5](?:\.\d+)?\s*stars?\b/gi, "");
+        q = q.replace(/\s*\b(?:and\s+)?(?:see|view|pick|choose|find)\s+(?:the\s+)?(?:best|top|cheapest)(?:\s+(?:one|item|product|among\s+them)?)?/gi, "");
+      }
       q = stripQuotes(q).replace(/\s+/g, " ").trim();
       q = q.replace(/[\s,;:.\-]+$/, "").trim();
       if (q && !/^(?:me|it|this|that|results?|them)$/i.test(q)) result.query = q;
+    }
+
+    // If no explicit search query found on GitHub, check for repository/target extraction
+    if (!result.query && (isGitHub || result.site === "github")) {
+      const repoMatch = text.match(/\b(?:star|fork|clone|open|repo|repository)\s+([a-zA-Z0-9_\-\.\/]+)(?:\s+(?:on|in|at)\s+github|$)/i);
+      if (repoMatch && !/^(the|a|an|it|this|that|repo|repository)$/i.test(repoMatch[1])) {
+        result.query = repoMatch[1].trim();
+      }
+    }
+
+    // Travel booking route queries are not standard text queries
+    if (result.wantsBook && (result.from || result.to)) {
+      result.query = null;
+      result.wantsSearch = false;
     }
 
     // 3. Explicit open targets
@@ -327,7 +453,7 @@
     // 2. Booking/travel flow — deterministic city-picker sequence.
     //    The model cannot reliably handle autocomplete pickers, so we drive this ourselves.
     if (parsed.wantsBook && (parsed.from || parsed.to)) {
-      const bookPlan = planBookingStep(parsed, available, done, progress);
+      const bookPlan = planBookingStep(parsed, available, done, progress, state.pageInfo);
       if (bookPlan) return bookPlan;
     }
 
@@ -385,6 +511,26 @@
           return { action: "type", mark_id: searchChat.id, value: parsed.recipient, reasoning: `Search for contact "${parsed.recipient}"` };
         }
       }
+    }
+
+    // 2c. GitHub flow (Search repo, open repo, star, fork, issues, PRs, clone)
+    const isGitHubSite = (parsed.site && /github/i.test(parsed.site)) || /github\.com/i.test(url || "");
+    if (isGitHubSite || parsed.wantsStar || parsed.wantsFork || parsed.wantsIssue || parsed.wantsPR || parsed.wantsClone) {
+      const gitPlan = planGitHubStep(parsed, available, done, progress, state.pageInfo);
+      if (gitPlan) return gitPlan;
+    }
+
+    // 2d. YouTube flow (Search video, play video)
+    const isYouTubeSite = (parsed.site && /youtube/i.test(parsed.site)) || /youtube\.com/i.test(url || "");
+    if (isYouTubeSite) {
+      const ytPlan = planYouTubeStep(parsed, available, done, progress, state.pageInfo);
+      if (ytPlan) return ytPlan;
+    }
+
+    // 2e. Shopping / E-commerce flow (Amazon, Flipkart, etc.)
+    if (parsed.wantsShop || parsed.wantsAddToCart || isShoppingSite(url)) {
+      const shopPlan = planShoppingStep(parsed, available, done, progress, state.pageInfo);
+      if (shopPlan) return shopPlan;
     }
 
     // 3. Run the search, once.
@@ -453,7 +599,7 @@
    * (suggestion dropdowns appear/disappear). We track progress via bookingStep
    * in the progress object.
    */
-  function planBookingStep(parsed, available, done, progress) {
+  function planBookingStep(parsed, available, done, progress, pageInfo) {
     const step = progress.bookingStep || 0;
     const norm = (s) => (s || "").toLowerCase();
 
@@ -461,14 +607,14 @@
     const isFromField = (m) => /\b(from|origin|source|departure|departing|flying from|from city)\b/i.test(m.label || "");
     const isToField = (m) => /\b(to|destination|arrival|arriving|flying to|to city)\b/i.test(m.label || "");
     const isSearchBtn = (m) => /\b(search|find|search flights|search buses|search trains|get flights)\b/i.test(m.label || "") &&
-                               (m.role === "button" || m.role === "clickable" || m.role === "input:submit");
+                               (m.role === "button" || m.role === "clickable" || m.role === "input:submit" || m.role === "link");
     const isFlightsTab = (m) => /\bflights?\b/i.test(m.label || "") && !/\b(hotels?|packages?|homestays?)\b/i.test(m.label || "") && (m.role === "link" || m.role === "button" || m.role === "clickable");
     const isSuggestion = (m) => !/\b(hotels?|homestays?|villas?|resorts?)\b/i.test(m.label || "") &&
                                  (/\b(suggestion|option|result|item|listitem)\b/i.test(m.role || "") ||
                                   (m.role === "link" && (m.label || "").length > 2 && (m.label || "").length < 60));
 
     // Step 0: Ensure we are on the flights page
-    const currentUrl = progress.currentUrl || "";
+    const currentUrl = (pageInfo && pageInfo.url) || progress.currentUrl || "";
     const isWrongTravelPage = /\/(hotels|cabs|activities|tours|railways|trains|bus-tickets|buses|holidays|homestays)/i.test(currentUrl);
     if (isWrongTravelPage) {
       return { action: "navigate", value: "https://www.makemytrip.com/flights/", reasoning: "Navigate back to Flights section" };
@@ -578,21 +724,491 @@
     }
 
     // Step 5: Click Search button
-    if (progress.fromTyped && progress.toTyped) {
+    if (progress.fromTyped && progress.toTyped && step <= 5) {
       const searchBtn = available.find(isSearchBtn);
       if (searchBtn) {
         progress.bookingStep = 6;
-        return { action: "click", mark_id: searchBtn.id, reasoning: "Click Search to find flights" };
+        progress.bookingCompleted = true;
+        return { action: "click", mark_id: searchBtn.id, isBookingSearch: true, reasoning: "Click Search to find flights" };
+      }
+    }
+
+    // Step 6: On search results page, if wantsNonStop or wantsCheapest, apply filter
+    if (progress.bookingStep >= 6 || /flight-review|flight\/review|flight\/search|flight-list/i.test(currentUrl)) {
+      if (parsed.wantsNonStop && !progress.nonStopFiltered) {
+        const nonStopFilter = available.find(m => {
+          const l = (m.label || "").toLowerCase();
+          return (m.role === "checkbox" || m.role === "clickable" || m.role === "button" || m.role === "link") &&
+                 /\b(non[\s-]*stop|0\s*stops?|direct)\b/i.test(l);
+        });
+        if (nonStopFilter) {
+          progress.nonStopFiltered = true;
+          return { action: "click", mark_id: nonStopFilter.id, isNonStop: true, reasoning: "Filter for non-stop flights" };
+        }
+      }
+      if (progress.bookingStep >= 6 && (!parsed.openTargets || parsed.openTargets.length === 0)) {
+        return { action: "done", reasoning: "Flight search completed" + (progress.nonStopFiltered ? " with non-stop filter applied" : "") };
       }
     }
 
     return null; // fall through to model
   }
 
+  /**
+   * Deterministic step planner for GitHub workflows.
+   *
+   * Supports:
+   *   - Search repository or code
+   *   - Open repository from search results
+   *   - Star repository (with detection of already-starred state)
+   *   - Fork repository
+   *   - Switch to Issues tab
+   *   - Switch to Pull requests tab
+   *   - Open Code / clone options
+   */
+  function planGitHubStep(parsed, available, done, progress, pageInfo) {
+    const url = (pageInfo && pageInfo.url) || "";
+    const isRepoPage = /github\.com\/[^\/]+\/[^\/]+/i.test(url) &&
+                       !/github\.com\/(search|explore|topics|trending|settings|login|signup|features|pricing|organizations|notifications)(?:\/|$)/i.test(url);
+    const isSearchPage = /github\.com\/search/i.test(url);
+
+    // 0. Completed conditions
+    if (parsed.wantsStar && progress.starred) {
+      return { action: "done", reasoning: "Repository starred successfully." };
+    }
+    if (parsed.wantsFork && progress.forked) {
+      return { action: "done", reasoning: "Repository forked successfully." };
+    }
+    if (parsed.wantsIssue && progress.issueOpened) {
+      return { action: "done", reasoning: "Issues tab opened successfully." };
+    }
+    if (parsed.wantsPR && progress.prOpened) {
+      return { action: "done", reasoning: "Pull requests tab opened successfully." };
+    }
+    if (parsed.wantsClone && progress.cloned) {
+      return { action: "done", reasoning: "Clone options opened successfully." };
+    }
+    if (progress.repoOpened && !parsed.wantsStar && !parsed.wantsFork && !parsed.wantsIssue && !parsed.wantsPR && !parsed.wantsClone && (!parsed.openTargets || parsed.openTargets.length === 0)) {
+      return { action: "done", reasoning: "Repository opened successfully." };
+    }
+
+    // 1. Actions on Repository Page
+    if (isRepoPage || progress.repoOpened) {
+      // Star action
+      if (parsed.wantsStar && !progress.starred) {
+        const alreadyStarred = available.find(m => {
+          const l = (m.label || "").trim().toLowerCase();
+          return (m.role === "button" || m.role === "clickable") && /\b(unstar|starred)\b/i.test(l);
+        });
+        if (alreadyStarred) {
+          progress.starred = true;
+          return { action: "done", reasoning: "Repository is already starred." };
+        }
+
+        const starBtn = available.find(m => {
+          const l = (m.label || "").trim().toLowerCase();
+          if (m.role !== "button" && m.role !== "clickable") return false;
+          if (/\b(unstar|starred|stargazers?|starring|history)\b/i.test(l)) return false;
+          return /^\s*star\b/i.test(l) || /star this repository/i.test(l) || l === "star";
+        });
+        if (starBtn) {
+          progress.starred = true;
+          return { action: "click", mark_id: starBtn.id, isStar: true, reasoning: "Click Star button to star this repository" };
+        }
+      }
+
+      // Fork action
+      if (parsed.wantsFork && !progress.forked) {
+        const forkBtn = available.find(m => {
+          const l = (m.label || "").trim().toLowerCase();
+          return (m.role === "button" || m.role === "clickable" || m.role === "link") &&
+                 (/\bfork\b/i.test(l) && !/\bforks\b/i.test(l));
+        });
+        if (forkBtn) {
+          progress.forked = true;
+          return { action: "click", mark_id: forkBtn.id, isFork: true, reasoning: "Click Fork button to fork repository" };
+        }
+      }
+
+      // Issues tab
+      if (parsed.wantsIssue && !progress.issueOpened) {
+        if (/\/issues/i.test(url)) {
+          progress.issueOpened = true;
+          return { action: "done", reasoning: "On Issues page." };
+        }
+        const issuesTab = available.find(m => {
+          const l = (m.label || "").trim().toLowerCase();
+          return (m.role === "link" || m.role === "tab" || m.role === "clickable") &&
+                 (/\bissues\b/i.test(l) && !/\b(new issue|closed issues|label)\b/i.test(l));
+        });
+        if (issuesTab) {
+          progress.issueOpened = true;
+          return { action: "click", mark_id: issuesTab.id, isIssue: true, reasoning: "Click Issues tab" };
+        }
+      }
+
+      // Pull Requests tab
+      if (parsed.wantsPR && !progress.prOpened) {
+        if (/\/pulls/i.test(url)) {
+          progress.prOpened = true;
+          return { action: "done", reasoning: "On Pull requests page." };
+        }
+        const prTab = available.find(m => {
+          const l = (m.label || "").trim().toLowerCase();
+          return (m.role === "link" || m.role === "tab" || m.role === "clickable") &&
+                 /\bpull\s*requests?\b/i.test(l);
+        });
+        if (prTab) {
+          progress.prOpened = true;
+          return { action: "click", mark_id: prTab.id, isPR: true, reasoning: "Click Pull requests tab" };
+        }
+      }
+
+      // Clone / Code button
+      if (parsed.wantsClone && !progress.cloned) {
+        const codeBtn = available.find(m => {
+          const l = (m.label || "").trim().toLowerCase();
+          return (m.role === "button" || m.role === "clickable") &&
+                 (/\b(code|clone)\b/i.test(l) && !/\b(view code|browse code)\b/i.test(l));
+        });
+        if (codeBtn) {
+          progress.cloned = true;
+          return { action: "click", mark_id: codeBtn.id, isClone: true, reasoning: "Click Code button to view clone URLs" };
+        }
+      }
+    }
+
+    // 2. Select matching repository on Search Results Page
+    if (isSearchPage || progress.searched || progress.queryLanded) {
+      if (!progress.repoOpened) {
+        const queryTerm = (parsed.query || "").toLowerCase();
+        const words = queryTerm.split(/[\s/]+/).filter(w => w.length > 1);
+
+        const repoLink = available.find(m => {
+          if (m.role !== "link" && m.role !== "clickable") return false;
+          const l = (m.label || "").toLowerCase();
+          if (l.length < 3 || l.length > 80) return false;
+          if (/\b(repositories|code|commits|issues|discussions|packages|marketplace|topics|wikis|users|sort|filter|sponsor|sign|jump to|next|prev)\b/i.test(l)) return false;
+          if (words.length > 0 && words.some(w => l.includes(w))) return true;
+          return false;
+        });
+
+        if (repoLink) {
+          progress.repoOpened = true;
+          return { action: "click", mark_id: repoLink.id, isRepoSelection: true, reasoning: `Open repository "${repoLink.label}"` };
+        }
+      }
+    }
+
+    // 3. Search for query on GitHub
+    if (parsed.query && !progress.searched) {
+      const searchBox = available.find(m => isSearchBox(m) || (FILLABLE_ROLES.has(m.role) && /search|jump to/i.test(m.label || "")));
+      if (searchBox) {
+        return { action: "type", mark_id: searchBox.id, value: parsed.query, reasoning: `Search GitHub for "${parsed.query}"` };
+      }
+
+      const searchBtn = available.find(m => {
+        const l = (m.label || "").toLowerCase();
+        return (m.role === "button" || m.role === "clickable") &&
+               (/search or jump to|type \/ to search|search\b/i.test(l));
+      });
+      if (searchBtn && !progress.searchOpened) {
+        progress.searchOpened = true;
+        return { action: "click", mark_id: searchBtn.id, reasoning: "Click GitHub search button to open search bar" };
+      }
+
+      const anyFillable = available.find(m => FILLABLE_ROLES.has(m.role));
+      if (anyFillable) {
+        return { action: "type", mark_id: anyFillable.id, value: parsed.query, reasoning: `Search GitHub for "${parsed.query}"` };
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Deterministic step planner for YouTube workflows.
+   */
+  function planYouTubeStep(parsed, available, done, progress, pageInfo) {
+    const url = (pageInfo && pageInfo.url) || "";
+    const isWatchPage = /youtube\.com\/watch/i.test(url);
+
+    if (isWatchPage || progress.videoOpened) {
+      return { action: "done", reasoning: "Playing YouTube video." };
+    }
+
+    if (progress.searched || progress.queryLanded || /youtube\.com\/results/i.test(url)) {
+      const videoLink = available.find(m => {
+        if (m.role !== "link" && m.role !== "clickable") return false;
+        const l = (m.label || "").toLowerCase();
+        if (l.length < 8) return false;
+        if (/\b(home|explore|subscriptions|library|history|shorts|filters?|subscribers?|views?|ago|nav|menu)\b/i.test(l)) return false;
+        return true;
+      });
+      if (videoLink) {
+        progress.videoOpened = true;
+        return { action: "click", mark_id: videoLink.id, reasoning: `Click video: "${videoLink.label.slice(0, 60)}"` };
+      }
+    }
+
+    if (parsed.query && !progress.searched) {
+      const searchBox = available.find(m => isSearchBox(m) || (FILLABLE_ROLES.has(m.role) && /search/i.test(m.label || "")));
+      if (searchBox) {
+        return { action: "type", mark_id: searchBox.id, value: parsed.query, reasoning: `Search YouTube for "${parsed.query}"` };
+      }
+    }
+
+    return null;
+  }
+
+  function isShoppingSite(url) {
+    return /amazon\.|flipkart\.|myntra\.|ebay\.|meesho\.|walmart\.|target\.|bestbuy\./i.test(url || "");
+  }
+
+  function planShoppingStep(parsed, available, done, progress, pageInfo) {
+    const url = (pageInfo && pageInfo.url) || "";
+    const title = (pageInfo && pageInfo.title) || "";
+
+    const isAddToCartBtn = (m) => {
+      const l = (m.label || "").toLowerCase();
+      if (/view\s*cart|items?\s*in\s*cart|go\s*to\s*cart|shopping\s*cart/i.test(l)) return false;
+      return (
+        (m.role === "button" || m.role === "clickable" || m.role === "input:submit") &&
+        /\b(add\s*to\s*cart|add\s*to\s*basket|buy\s*now)\b/i.test(l)
+      );
+    };
+
+    // Substep 0: Cart confirmation / Done
+    if (progress.cartAdded) {
+      return { action: "done", reasoning: "Item successfully added to cart" };
+    }
+
+    // If explicit open targets or product were already opened and user did not ask to add to cart, done
+    if (!parsed.wantsAddToCart && (
+      (parsed.openTargets && parsed.openTargets.length > 0 && parsed.openTargets.every((t) => (progress.opened || []).includes(t))) ||
+      progress.productOpened ||
+      (progress.opened && progress.opened.length > 0)
+    )) {
+      return { action: "done", reasoning: "Target item opened as requested." };
+    }
+
+    const isCartConfirmation = available.some((m) =>
+      /added\s+to\s+cart|added\s+to\s+basket|proceed\s+to\s+checkout|item\s+added|cart\s+subtotal/i.test(m.label || "")
+    ) || /added to cart|cart/i.test(title);
+
+    if (progress.cartClicked && isCartConfirmation) {
+      progress.cartAdded = true;
+      return { action: "done", reasoning: "Verified item added to cart" };
+    }
+
+    // Substep 1: If Add to Cart button is visible on a product page or after product selection
+    const isProductPage = progress.productOpened || /amazon\..+\/(?:dp|gp\/product|gp\/aw\/d)\/|flipkart\..+\/p\//i.test(url);
+    const addBtn = available.find(isAddToCartBtn);
+    if (addBtn && (isProductPage || (parsed.wantsAddToCart && (progress.searched || progress.queryLanded)))) {
+      progress.cartClicked = true;
+      progress.cartAdded = true;
+      return { action: "click", mark_id: addBtn.id, isAddToCart: true, reasoning: `Click "${addBtn.label || "Add to Cart"}" button` };
+    }
+
+    // Substep 1b: If on product page and wantsAddToCart but Add to Cart button not in viewport yet, scroll down!
+    if (isProductPage && parsed.wantsAddToCart && !progress.cartAdded) {
+      if ((progress.productScrolls || 0) < 5) {
+        progress.productScrolls = (progress.productScrolls || 0) + 1;
+        return { action: "scroll_page", value: 650, reasoning: "Scroll down to bring Add to Cart button into view" };
+      }
+    }
+
+    // Substep 2: If we have not searched yet, type query into search box
+    if (parsed.query && !progress.searched) {
+      const searchBox = available.find(isSearchBox) || available.find((m) => FILLABLE_ROLES.has(m.role));
+      if (searchBox) {
+        return { action: "type", mark_id: searchBox.id, value: parsed.query, reasoning: `Search for "${parsed.query}"` };
+      }
+    }
+
+    // Substep 2.5: Apply filter on search results page if requested
+    if ((progress.searched || progress.queryLanded) && (parsed.wantsFilter || parsed.maxPrice || parsed.minPrice) && !progress.filterApplied) {
+      if (parsed.maxPrice) {
+        const selectEls = available.filter(m => m.role === "select" || m.role === "combobox");
+        let maxSelect = selectEls.find(m => /\b(max|to|\₹|high|upper)\b/i.test(m.label || ""));
+        if (!maxSelect && selectEls.length >= 2) {
+          maxSelect = selectEls[1]; // In Min -> Max pairs on Flipkart, the second select is Max
+        } else if (!maxSelect && selectEls.length === 1 && /\bprice\b/i.test(selectEls[0].label || "")) {
+          maxSelect = selectEls[0];
+        }
+        if (maxSelect) {
+          progress.filterApplied = true;
+          return {
+            action: "select",
+            mark_id: maxSelect.id,
+            value: String(parsed.maxPrice),
+            isFilter: true,
+            reasoning: `Apply price filter under ₹${parsed.maxPrice}`,
+          };
+        }
+
+        const priceRe = new RegExp(`(?:under|below|less\\s+than|up\\s+to)\\s*(?:₹|rs\\.?|inr)?\\s*${parsed.maxPrice}`, "i");
+        const filterBtn = available.find(m => (m.role === "link" || m.role === "button" || m.role === "clickable" || m.role === "checkbox") && priceRe.test(m.label || ""));
+        if (filterBtn) {
+          progress.filterApplied = true;
+          return {
+            action: "click",
+            mark_id: filterBtn.id,
+            isFilter: true,
+            reasoning: `Click price filter: "${filterBtn.label}"`,
+          };
+        }
+
+        const maxInput = available.find(m => FILLABLE_ROLES.has(m.role) && (/\b(high|max|upper)\s*price\b|\bhigh-price\b|\bmaxprice\b/i.test(m.label || "")));
+        if (maxInput) {
+          progress.filterApplied = true;
+          return {
+            action: "type",
+            mark_id: maxInput.id,
+            value: String(parsed.maxPrice),
+            isFilter: true,
+            reasoning: `Enter max price ₹${parsed.maxPrice}`,
+          };
+        }
+      }
+      progress.filterApplied = true;
+    }
+
+    // Substep 2.8: Apply sorting on search results page if requested
+    if ((progress.searched || progress.queryLanded) && parsed.wantsSort && !progress.sortApplied) {
+      const sortAsc = parsed.sort === "price_asc";
+      const sortDesc = parsed.sort === "price_desc";
+      const sortRating = parsed.sort === "rating";
+      const sortPop = parsed.sort === "popularity";
+
+      const sortSelect = available.find(m => (m.role === "select" || m.role === "combobox") && /sort/i.test(m.label || ""));
+      if (sortSelect) {
+        progress.sortApplied = true;
+        const val = sortAsc ? "price-asc-rank" : (sortDesc ? "price-desc-rank" : (sortRating ? "review-rank" : "popularity-rank"));
+        return {
+          action: "select",
+          mark_id: sortSelect.id,
+          value: val,
+          isSort: true,
+          reasoning: `Sort results by ${parsed.sort || "price"}`,
+        };
+      }
+
+      const sortTab = available.find(m => {
+        const l = (m.label || "").toLowerCase();
+        if (m.role !== "link" && m.role !== "button" && m.role !== "clickable" && m.role !== "tab") return false;
+        if (sortAsc && (/low\s*to\s*high/i.test(l) || /price\s*--\s*low/i.test(l))) return true;
+        if (sortDesc && (/high\s*to\s*low/i.test(l) || /price\s*--\s*high/i.test(l))) return true;
+        if (sortRating && (/rating/i.test(l) || /customer\s*rating/i.test(l))) return true;
+        if (sortPop && /popularity/i.test(l)) return true;
+        return false;
+      });
+      if (sortTab) {
+        progress.sortApplied = true;
+        return {
+          action: "click",
+          mark_id: sortTab.id,
+          isSort: true,
+          reasoning: `Click sort option: "${sortTab.label}"`,
+        };
+      }
+      progress.sortApplied = true;
+    }
+
+    // If filter or sort was applied and user didn't ask to add to cart or pick/open specific products, complete task
+    if ((progress.filterApplied || progress.sortApplied) && (progress.searched || progress.queryLanded) && !parsed.wantsAddToCart && !parsed.wantsBest && (!parsed.openTargets || parsed.openTargets.length === 0)) {
+      return { action: "done", reasoning: "Search completed with filters/sorting applied." };
+    }
+
+    // Substep 3: Product evaluation and selection on search results page
+    if (progress.searched || progress.queryLanded) {
+      if (!progress.productOpened && !progress.cartAdded) {
+        const isProductCandidate = (m) => {
+          if (m.role !== "link" && m.role !== "clickable") return false;
+          const l = (m.label || "").toLowerCase();
+          if (l.length < 10) return false;
+          if (/\b(sign\s*in|account|returns|orders|customer\s*service|prime|todays?\s*deals|bestsellers|best\s*sellers|registry|sell|gift\s*cards|feedback|help|privacy|terms|skip\s*to|next|previous|page\s*\d+|cookie|explore|see\s*more|filter|sort\s*by|menu|nav)\b/i.test(l)) {
+            return false;
+          }
+          return true;
+        };
+
+        const candidates = available.filter(isProductCandidate);
+        if (candidates.length > 0) {
+          const scoreCandidate = (c) => {
+            const l = (c.label || "").toLowerCase();
+            let score = 100;
+
+            if (parsed.query) {
+              const words = parsed.query.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+              for (const w of words) {
+                if (l.includes(w)) score += 50;
+              }
+            }
+
+            // Price parsing: ₹1,699 or rs. 1699 or 1699
+            const priceM = l.match(/(?:₹|rs\.?|inr|\$)\s*([\d,]+)/i);
+            const price = priceM ? parseInt(priceM[1].replace(/,/g, ""), 10) : null;
+            if (price !== null) {
+              if (parsed.maxPrice && price > parsed.maxPrice) {
+                score -= 500;
+              } else if (parsed.maxPrice && price <= parsed.maxPrice) {
+                score += 150;
+                if (parsed.wantsCheapest) score += (parsed.maxPrice - price) / 10;
+              }
+              if (parsed.minPrice && price < parsed.minPrice) {
+                score -= 300;
+              }
+            }
+
+            // Rating parsing: 3.6 out of 5, 4.2 stars, 3.6
+            const ratingM = l.match(/([1-5](?:\.\d+)?)\s*(?:out of 5|\★|stars?)/i) || l.match(/\b([1-5]\.\d)\b/);
+            const rating = ratingM ? parseFloat(ratingM[1]) : null;
+            if (rating !== null) {
+              if (parsed.minRating && rating < parsed.minRating) {
+                score -= 500;
+              } else {
+                score += rating * 40;
+              }
+            }
+
+            if (l.includes("sponsored")) score -= 30;
+            return score;
+          };
+
+          candidates.sort((a, b) => scoreCandidate(b) - scoreCandidate(a));
+          const best = candidates[0];
+          if (best && scoreCandidate(best) > 0) {
+            progress.productOpened = true;
+            return {
+              action: "click",
+              mark_id: best.id,
+              isProductSelection: true,
+              openTarget: best.label,
+              reasoning: `Select best matching product: "${best.label.slice(0, 60)}"`,
+            };
+          }
+        }
+      }
+    }
+
+    return null;
+  }
+
   function describeCompletion(parsed, progress) {
     const bits = [];
     if (progress.navigated && parsed.site) bits.push(`opened ${parsed.site}`);
     if (progress.searched && parsed.query) bits.push(`searched for "${parsed.query}"`);
+    if (progress.filterApplied) bits.push("applied filter");
+    if (progress.sortApplied) bits.push("applied sorting");
+    if (progress.cartAdded) bits.push("added item to cart");
+    if (progress.starred) bits.push("starred repository");
+    if (progress.forked) bits.push("forked repository");
+    if (progress.cloned) bits.push("opened clone options");
+    if (progress.issueOpened) bits.push("opened issues");
+    if (progress.prOpened) bits.push("opened pull requests");
+    if (progress.nonStopFiltered) bits.push("filtered non-stop flights");
+    if (progress.videoOpened) bits.push("opened video");
     if ((progress.opened || []).length) bits.push(`opened ${progress.opened.length} item(s)`);
     if (progress.scrolled) bits.push("scrolled the page");
     return bits.length ? `Task complete — ${bits.join(", ")}.` : "Nothing further to do for this task.";
@@ -600,6 +1216,7 @@
 
   const TaskPlanner = {
     parseTask, planNextAction, alreadyOnSite, siteUrlFor, vaultKeyForLabel, KNOWN_SITES,
+    isShoppingSite, planShoppingStep, planGitHubStep, planBookingStep, planYouTubeStep,
   };
 
   global.TaskPlanner = TaskPlanner;

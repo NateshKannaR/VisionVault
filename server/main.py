@@ -35,7 +35,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 # Load environment variables from .env
-load_dotenv()
+load_dotenv(Path(__file__).parent / ".env", override=True)
 
 app = FastAPI(title="VisionVault Privacy Agent Server")
 
@@ -485,7 +485,14 @@ def robust_json_parse(text: str) -> Optional[dict]:
     if not text:
         return None
     try:
-        return json.loads(text)
+        data = json.loads(text)
+        if isinstance(data, dict):
+            if not data or not data.get("action"):
+                return {
+                    "reasoning": data.get("reasoning", "Task complete or no further UI action needed"),
+                    "action": {"type": "done", "target": None, "value": None}
+                }
+            return data
     except Exception:
         pass
     match = re.search(r"\{.*\}", text, re.DOTALL)
@@ -503,6 +510,30 @@ def robust_json_parse(text: str) -> Optional[dict]:
                     return json.loads(fixed_keys)
                 except Exception:
                     pass
+
+    # Truncated JSON recovery: extract fields if closing braces were cut off
+    t_match = re.search(r'"type"\s*:\s*"([^"]+)"', text)
+    if t_match:
+        act_type = t_match.group(1)
+        target_match = re.search(r'"target"\s*:\s*(\d+)', text)
+        value_match = re.search(r'"value"\s*:\s*"([^"]*)"', text)
+        reason_match = re.search(r'"reasoning"\s*:\s*"([^"]*)"', text)
+        target_val = int(target_match.group(1)) if target_match else None
+        return {
+            "reasoning": reason_match.group(1) if reason_match else "Extracted action from response",
+            "action": {
+                "type": act_type,
+                "target": target_val,
+                "value": value_match.group(1) if value_match else None,
+            },
+        }
+
+    # Empty or stalled JSON recovery
+    if text.strip() in ('{"', '{', '{}', '{\n}', '{"}', '{\n\n}'):
+        return {
+            "reasoning": "Task complete or no further UI action needed",
+            "action": {"type": "done", "target": None, "value": None},
+        }
     return None
 
 # ── Tier circuit breaker ─────────────────────────────────────────────────────
@@ -1315,7 +1346,7 @@ def warm_ollama() -> None:
     threading.Thread(target=run, daemon=True).start()
 
 
-def ollama_generate(system: str, user: str, num_predict: int = 160, attempts: int = 2,
+def ollama_generate(system: str, user: str, num_predict: int = 300, attempts: int = 2,
                     deadline: Optional[float] = None) -> Optional[dict]:
     """A JSON object from the local model, within whatever time is left.
 
@@ -1332,13 +1363,14 @@ def ollama_generate(system: str, user: str, num_predict: int = 160, attempts: in
         "format": "json",
         "stream": False,
         "keep_alive": OLLAMA_KEEP_ALIVE,
-        "options": {"temperature": 0.1, "num_predict": num_predict, "num_ctx": 4096},
+        "options": {"temperature": 0.1, "num_predict": num_predict, "num_ctx": 8192},
         "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
     }
     # One retry only, and only if there is time for it. A second full generation on a slow
     # local model costs more than the deterministic tier below would take to answer perfectly
     # well.
     for attempt in range(1, attempts + 1):
+        t0 = time.time()
         timeout = OLLAMA_TIMEOUT
         if deadline is not None:
             timeout = min(timeout, max(0.0, deadline - time.time()))
@@ -1353,7 +1385,8 @@ def ollama_generate(system: str, user: str, num_predict: int = 160, attempts: in
         parsed = robust_json_parse(content)
         if parsed and isinstance(parsed, dict):
             return parsed
-        print(f"[server] Ollama ({model}) attempt {attempt}: unparseable output")
+        print(f"[server] Ollama ({model}) attempt {attempt}: unparseable output "
+              f"({time.time() - t0:.1f}s): {repr(content[:120])}")
     return None
 
 
@@ -1378,8 +1411,13 @@ def plan_with_ollama(req: "AgentStepRequest", deadline: Optional[float] = None) 
     if req.findings:
         prompt += "\n\n" + describe_findings(req.findings, limit_items=6)[:1500]
 
+    # The "already satisfied" clause earns its place: without it a small model asked to act on
+    # a page where the milestone is already met invents an action rather than admitting there
+    # is nothing to do, and the run wanders.
     parsed = ollama_generate(
-        "You output ONE strict JSON object and nothing else. Keep \"reasoning\" under 12 words.",
+        "You output ONE strict JSON object and nothing else. "
+        "If the task goal is already completed or satisfied, return action type \"done\". "
+        "Keep \"reasoning\" under 12 words.",
         prompt, deadline=deadline)
     if not parsed:
         return None

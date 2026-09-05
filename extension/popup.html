@@ -314,8 +314,23 @@
         <span>Approval required</span>
       </div>
       <div class="gate-body" id="confirmText"></div>
+
+      <!--
+        Modify, hidden until asked for.
+
+        Approve/Reject is a poor choice when the action is nearly right - the wrong quantity,
+        the wrong search term - because rejecting throws away the whole run to fix one field.
+        Editing the value is the third answer people actually want, and it is only offered for
+        actions that HAVE a value to edit; there is nothing to modify about a bare click.
+      -->
+      <div class="gate-form" id="confirmEditWrap" hidden>
+        <label class="field-label" for="confirmEditValue">Value to use instead</label>
+        <input class="input" id="confirmEditValue" type="text" />
+      </div>
+
       <div class="gate-actions">
         <button class="btn btn-danger" id="confirmYes">Approve &amp; continue</button>
+        <button class="btn btn-ghost" id="confirmEdit">Modify</button>
         <button class="btn btn-ghost" id="confirmNo">Reject</button>
       </div>
     </div>

@@ -2162,6 +2162,13 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
   if (msg.type === "CONFIRM") {
+    // A value the user edited in the gate replaces the planner's, on the SAME target. The
+    // target itself is not changed: the guard approved this element, and letting the panel
+    // redirect an approved action elsewhere would make the approval meaningless.
+    if (session?.lastAction && msg.payload && typeof msg.payload.value === "string") {
+      session.lastAction.value = msg.payload.value;
+      console.log("[agent] approved with an edited value");
+    }
     if (!session?.lastAction) {
       sendResponse({ ok: false, error: "There is no action waiting for approval any more." });
       return true;

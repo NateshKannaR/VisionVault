@@ -825,6 +825,14 @@ function handleStepResult(r) {
       `<strong>${esc(String(r.action.action || "click").toUpperCase())}</strong> on element #${esc(r.action.mark_id)}` +
       (r.action.reasoning ? `<br>${esc(r.action.reasoning)}` : "") +
       (r.confirmReason ? `<br><span style="color:var(--text-muted)">Why you are being asked: ${esc(r.confirmReason)}</span>` : "");
+    // Modify is only meaningful where there is a value to change. A bare click has nothing
+    // to edit, so offering the control would be a dead end.
+    pendingConfirmValue = r.action.value != null ? String(r.action.value) : null;
+    const editable = pendingConfirmValue !== null;
+    $("confirmEdit").hidden = !editable;
+    $("confirmEditWrap").hidden = true;
+    if (editable) $("confirmEditValue").value = pendingConfirmValue;
+
     showStatus("statusMsg", "warn", "Approval required before this click is dispatched.");
     return;
   }
@@ -902,6 +910,41 @@ $("inputPromptSkip").addEventListener("click", () => {
 });
 
 // ── Approval gate ─────────────────────────────────────────────────────────────
+//
+// Three answers, not two. Approve/Reject forces the whole run to be abandoned to fix one
+// field - the wrong quantity, a search term that is nearly right - when what the person wants
+// is to correct it and carry on. Modify is that third answer.
+//
+// The edited value goes to the SAME pending action; the target the guard approved is not
+// changed, so this cannot be used to redirect an approved click somewhere else.
+let pendingConfirmValue = null;
+
+$("confirmEdit").addEventListener("click", () => {
+  const wrap = $("confirmEditWrap");
+  const input = $("confirmEditValue");
+  if (wrap.hidden) {
+    wrap.hidden = false;
+    input.focus();
+    input.select();
+    $("confirmEdit").textContent = "Use this value";
+    return;
+  }
+  // Second press: send the edit, then execute.
+  const value = input.value;
+  confirmWrap.hidden = true;
+  $("confirmEdit").textContent = "Modify";
+  setRunning(true);
+  setLiveStep("Executing with your value…");
+  chrome.runtime.sendMessage({ type: "CONFIRM", payload: { value } }, (res) => {
+    setRunning(false);
+    if (!res || !res.ok) {
+      showStatus("statusMsg", "error", esc(res?.error || "The modified action failed."));
+      return;
+    }
+    handleStepResult(res.result);
+  });
+});
+
 $("confirmYes").addEventListener("click", () => {
   confirmWrap.hidden = true;
   showStatus("statusMsg", "info", "Executing the approved action…");
@@ -919,6 +962,8 @@ $("confirmYes").addEventListener("click", () => {
 
 $("confirmNo").addEventListener("click", () => {
   confirmWrap.hidden = true;
+  $("confirmEditWrap").hidden = true;
+  $("confirmEdit").textContent = "Modify";
   chrome.runtime.sendMessage({ type: "REJECT" });
   showStatus("statusMsg", "warn", "Action rejected. The agent stopped there.");
 });

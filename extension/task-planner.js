@@ -360,6 +360,20 @@
         const stripped = q.replace(/^(?:the\s+)?(?:best|cheapest|top[- ]?rated|highest[- ]?rated|top)\s+/i, "").trim();
         if (stripped.length >= 2) q = stripped;
       }
+      // A search box takes a noun phrase, not a sentence.
+      //
+      // A long natural instruction defeats clause splitting - there is always one more way to
+      // join two thoughts - and what survived was the rest of the paragraph. Measured on
+      // seven-step instructions: "React roles, narrow the list to 5 - 8 years experience..."
+      // and "the transaction history for \"MG Road\", set Category to..." went into the search
+      // box whole. Cutting at the first comma and capping the length costs nothing on a real
+      // query, which is two or three words, and rescues every one of those.
+      if (q) {
+        q = q.split(/\s*[,;]\s*/)[0].trim();
+        const words = q.split(/\s+/);
+        if (words.length > 8) q = words.slice(0, 8).join(" ");
+        q = q.replace(/\s+(?:and|then|or|with|for|to|from|by|in|on)$/i, "").trim();
+      }
       if (q && !/^(?:me|it|this|that|results?|them)$/i.test(q)) result.query = q;
     }
 

@@ -554,6 +554,7 @@ scanBtn.addEventListener("click", () => {
   runBtn.hidden = true;
   previewWrap.hidden = true;
   statsGrid.hidden = true;
+  if ($("scoreCard")) $("scoreCard").hidden = true;
   timingWrap.hidden = true;
   confirmWrap.hidden = true;
   inputPromptWrap.hidden = true;
@@ -608,6 +609,54 @@ function autoAgentMode() {
   return !el || el.checked;
 }
 
+/**
+ * The privacy scorecard for the scan that just ran.
+ *
+ * Every figure is a count from this scan. The headline is 100% for a structural reason rather
+ * than a measured one, and the note says so: redaction is fail-closed, so a frame carrying an
+ * unmasked detection is never transmitted. The alternative to 100% is not a lower percentage,
+ * it is a request that did not happen - which is what the blocked state shows instead.
+ *
+ * Deliberately not a rating out of a hundred invented for a demo. A figure nobody can
+ * reproduce is worse than no figure, because it invites trust it has not earned.
+ */
+function renderScorecard(d) {
+  const card = $("scoreCard");
+  if (!card) return;
+  card.hidden = false;
+
+  const found = d.piiCount || 0;
+  const blocked = d.redactionOk === false;
+
+  const badge = $("scoreBadge");
+  badge.classList.toggle("is-blocked", blocked);
+  badge.textContent = blocked ? "blocked" : "100%";
+
+  $("score-found").textContent = found;
+  $("score-masked").textContent = blocked ? "0" : found;
+  $("score-sent").textContent = "0";
+
+  // Which detector found what. Worth showing because the three disagree usefully: OCR finding
+  // regions the DOM did not is the case for its cost, and a face count of zero on a page full
+  // of photographs is a signal the model did not run.
+  const b = d.sourceBreakdown || {};
+  const chips = [
+    { cls: "dom",  n: b.dom || 0,         label: "from the page text" },
+    { cls: "face", n: b.vision_face || 0, label: "faces" },
+    { cls: "ocr",  n: b.vision_ocr || 0,  label: "read from pixels" },
+  ].filter((c) => c.n > 0);
+  $("scoreSources").innerHTML = chips.length
+    ? chips.map((c) => `<span class="score-src ${c.cls}"><b>${c.n}</b> ${esc(c.label)}</span>`).join("")
+    : '<span class="score-src">nothing sensitive on this screen</span>';
+
+  $("scoreNote").textContent = blocked
+    ? "Redaction could not be verified, so nothing was transmitted at all."
+    : found > 0
+      ? "Masked on this device before anything left it. Redaction is fail-closed: a frame with "
+        + "an unmasked detection is not sent, so the alternative to 100% is no request at all."
+      : "Nothing sensitive was detected on this screen. The same pipeline still ran.";
+}
+
 /** Paints a scan result into the panel. Shared by the Scan button and the run-time recovery. */
 function renderScan(d, announce) {
   if (!d) return;
@@ -618,6 +667,7 @@ function renderScan(d, announce) {
 
   renderRegions(d.regions, d.viewport);
 
+  renderScorecard(d);
   setStat("s-pii", d.piiCount);
   setStat("s-marks", d.markCount);
   setStat("s-total", (d.timings?.total || 0) + "ms");

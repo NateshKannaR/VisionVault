@@ -988,3 +988,58 @@ kbd {
 
 .auto-toggle { margin-top: 10px; user-select: none; }
 .auto-toggle input { accent-color: var(--accent); }
+
+/* ── Privacy scorecard ───────────────────────────────────────────────────────
+   Counts from the scan that just ran, not a rating. The headline reads 100% because
+   redaction is fail-closed: a frame with an unmasked detection is not transmitted, so the
+   alternative to 100% is a request that never happened. */
+
+.scorecard {
+  border: 1px solid rgba(47, 214, 160, .26);
+  border-radius: var(--r);
+  background: linear-gradient(150deg, rgba(47, 214, 160, .09), rgba(47, 214, 160, .03));
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  padding: 12px 13px;
+  margin-bottom: 12px;
+}
+.score-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #7ce8c0;
+  margin-bottom: 10px;
+}
+.score-badge {
+  margin-left: auto;
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #7ce8c0;
+  letter-spacing: -.01em;
+}
+.score-badge.is-blocked { color: var(--danger); font-size: 12.5px; }
+
+.score-rows { display: flex; flex-direction: column; gap: 5px; }
+.score-row { display: flex; align-items: baseline; justify-content: space-between; font-size: 11.5px; }
+.score-k { color: var(--text-muted); }
+.score-v { color: var(--text); font-variant-numeric: tabular-nums; font-weight: 560; }
+.score-v.ok { color: #7ce8c0; }
+
+.score-sources { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 9px; }
+.score-src {
+  font-size: 10.5px;
+  padding: 2px 7px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, .04);
+  color: var(--text-muted);
+}
+.score-src b { font-weight: 620; color: var(--text); }
+.score-src.dom  { border-color: rgba(61, 125, 255, .35); }
+.score-src.face { border-color: rgba(217, 110, 192, .35); }
+.score-src.ocr  { border-color: rgba(245, 181, 68, .35); }
+
+.score-note { font-size: 10.5px; line-height: 1.5; color: var(--text-faint); margin: 9px 0 0; }

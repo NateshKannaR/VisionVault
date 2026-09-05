@@ -240,6 +240,40 @@
     </figure>
 
     <!-- Metrics -->
+    <!--
+      The privacy scorecard.
+
+      Deliberately NOT a number out of a hundred. A score invented for a demo is worse than no
+      score, because it invites the reader to trust a figure nobody can reproduce. Every line
+      here is a count taken from the scan that just ran, and the headline is 100% for a
+      structural reason worth saying out loud: redaction is fail-closed, so a frame with any
+      unmasked detection is never transmitted at all. The alternative to 100% is not 94%, it
+      is a request that did not happen.
+    -->
+    <div class="scorecard" id="scoreCard" hidden>
+      <div class="score-head">
+        <svg class="ic" viewBox="0 0 24 24"><use href="#i-shield"/></svg>
+        <span>Privacy on this screen</span>
+        <span class="score-badge" id="scoreBadge">100%</span>
+      </div>
+      <div class="score-rows">
+        <div class="score-row">
+          <span class="score-k">Sensitive regions found</span>
+          <span class="score-v" id="score-found">0</span>
+        </div>
+        <div class="score-row">
+          <span class="score-k">Masked before transmission</span>
+          <span class="score-v ok" id="score-masked">0</span>
+        </div>
+        <div class="score-row">
+          <span class="score-k">Personal values transmitted</span>
+          <span class="score-v ok" id="score-sent">0</span>
+        </div>
+      </div>
+      <div class="score-sources" id="scoreSources"></div>
+      <p class="score-note" id="scoreNote"></p>
+    </div>
+
     <div class="metrics" id="statsGrid" hidden>
       <div class="metric">
         <svg class="ic metric-ic" viewBox="0 0 24 24"><use href="#i-lock"/></svg>

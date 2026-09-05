@@ -251,6 +251,7 @@ Some pages cannot be automated, and saying so is more useful than trying harder:
 | Consequential actions need a human | risk-gated click confirmation (below) |
 | The claim is checkable, not just stated | every outbound request is recorded on-device by [`extension/audit-log.js`](extension/audit-log.js) — the exact bytes, the redacted image as sent, and the vault field *name* asked for — and shown in the panel's Privacy tab. Written inside `callServer()` from the same string handed to `fetch()`, so it is what was sent, not a reconstruction |
 | Redaction is verified by attacking it | [`eval/attack-redaction.js`](eval/attack-redaction.js) takes the transmitted frame and tries to read the data back out — upscaling, contrast stretch, extreme gain, inversion, and PNG metadata |
+| Element labels cannot smuggle PII, including values with no shape | `safeLabel()` screens by pattern, which a personal name defeats — "Ananya Sridharan" is two capitalised words. `scanForPII()` now records *which elements* it judged sensitive, and `tagInteractiveElements()` drops the label of any mark inside one. Found by [`eval/workflows.js`](eval/workflows.js): two employee names reached the server verbatim while the image was masked correctly |
 | An identifier in Devanagari is still an identifier | Indic digits are normalised to ASCII before matching, one code point per code point so redaction boxes stay aligned; Devanagari is a second OCR recognition language, since an English-only model returns nothing for it and the page then looks clean |
 
 ### Click confirmation — the exact policy
@@ -399,6 +400,28 @@ Set `VV_CHROME` if Chrome is not at the default path.
 Results that cannot be automated can be hand-recorded — copy
 `eval/results/manual-eval.example.json` to `manual-eval.json`, fill it in, and re-run the
 generator. Every row in the report is labelled `AUTOMATED` or `MANUAL`.
+
+### Multi-step workflows across domains
+
+```bash
+node eval/workflows.js                    # every workflow
+node eval/workflows.js --only travel,banking
+```
+
+Nine workflows over the fixtures in [`eval/pages/`](eval/pages/) — e-commerce, travel, jobs,
+banking, healthcare, government services, an enterprise dashboard, a signup form, and the PII
+gauntlet. Each runs one instruction a person would actually type and measures two things that
+are deliberately different in kind:
+
+- **Did it get there** — checked by a predicate evaluated *in the page* after the run, never
+  from the agent's own progress flags. An agent that believes it succeeded while the page
+  disagrees is precisely the failure this catches.
+- **Did anything leak** — every outbound request body is read off the wire and searched for the
+  ground-truth values the fixture plants (`data-vv-sensitive`), including partial matches: eight
+  consecutive digits of an Aadhaar is a leak even when the formatting differs.
+
+Results are written to `eval/results/workflows.json`. Workflows that fail are reported as
+failing; nothing here retries until it passes.
 
 ### Verifying behaviour and the privacy invariants
 

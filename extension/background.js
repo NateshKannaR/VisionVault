@@ -178,11 +178,18 @@ async function getSettings() {
       confirmPolicy: "risky",
       plannerMode: "fast",
       // Latency / coverage trade-off, surfaced in the side panel.
-      //   enableOCR       ~1.4s per scan; the only thing that reads text baked into images,
-      //                   canvases and other non-DOM pixels. Off by default for speed.
+      //   enableOCR       the only thing that reads text baked into images, canvases and
+      //                   other non-DOM pixels. ON by default: measured on the bundled
+      //                   fixtures, turning it off drops a pixel-rendered receipt from 3
+      //                   detected PII regions to 0, and the demo page from 13 to 10. Those
+      //                   are not near-misses, they are unredacted personal data leaving the
+      //                   machine, and no latency saving justifies that.
+      //                   The cost used to be ~1.5s on every scan. It is now paid once per
+      //                   distinct screen: detection-orchestrator caches the vision result
+      //                   against a hash of the captured pixels, so the re-scan after each
+      //                   action is served from cache unless the page actually changed.
       //   enableFaceDetection ~35ms per scan. Cheap; on by default.
-      // With OCR off, a scan costs roughly 80ms and falls back to DOM + face coverage.
-      enableOCR: false,
+      enableOCR: true,
       enableFaceDetection: true,
       // Clear consent walls and modal dialogs before acting. They intercept every click
       // underneath them, so leaving one up makes the agent look broken on much of the web.
@@ -623,6 +630,10 @@ async function phaseScan(task) {
     ocrInference: timings.ocrInference || 0,
     merge: timings.merge || 0,
     redact: timings.redact || 0,
+    // True when the face/OCR result came from the vision cache rather than the models. Tests
+    // assert on this rather than inferring a cache hit from a low number, which would also be
+    // satisfied by the models silently not running.
+    cached: timings.cached === true,
   };
 
   return {

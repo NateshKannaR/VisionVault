@@ -1,0 +1,335 @@
+{
+  "generatedAt": "2026-09-05T15:49:07.365Z",
+  "chrome": "Chrome/152.0.7977.77",
+  "platform": "win32 x64",
+  "cpu": "AMD Ryzen 5 5600H with Radeon Graphics         ",
+  "cpuCount": 12,
+  "repeats": 8,
+  "footprint": {
+    "totalMB": 22.47,
+    "fileCount": 34,
+    "groupsMB": {
+      "extension code": 0.42,
+      "icons & images": 0.01,
+      "ONNX runtime (WASM)": 12.15,
+      "OCR engine (WASM)": 6.78,
+      "OCR language data": 1.89,
+      "face model (ONNX)": 1.21
+    }
+  },
+  "idleHeap": {
+    "service worker": 0.78,
+    "offscreen (vision models)": 5.35
+  },
+  "perFixture": [
+    {
+      "fixture": "signup-form.html",
+      "label": "form (DOM-heavy)",
+      "scans": 8,
+      "piiRegions": 13,
+      "marks": 14,
+      "totalP50": 70,
+      "totalP95": 1805,
+      "coldScans": 1,
+      "coldP50": 1805,
+      "warmScans": 7,
+      "warmP50": 70,
+      "stages": {
+        "total": {
+          "p50": 70,
+          "p95": 1805
+        },
+        "wallClock": {
+          "p50": 748,
+          "p95": 2471
+        },
+        "scan": {
+          "p50": 43,
+          "p95": 51
+        },
+        "screenshot": {
+          "p50": 43,
+          "p95": 51
+        },
+        "visionInference": {
+          "p50": 1662,
+          "p95": 1662
+        },
+        "faceInference": {
+          "p50": 55,
+          "p95": 55
+        },
+        "ocrInference": {
+          "p50": 1641,
+          "p95": 1641
+        },
+        "merge": {
+          "p50": 1,
+          "p95": 1
+        },
+        "redact": {
+          "p50": 25,
+          "p95": 86
+        }
+      }
+    },
+    {
+      "fixture": "social-feed.html",
+      "label": "feed (faces)",
+      "scans": 8,
+      "piiRegions": 12,
+      "marks": 5,
+      "totalP50": 79,
+      "totalP95": 1671,
+      "coldScans": 1,
+      "coldP50": 1671,
+      "warmScans": 7,
+      "warmP50": 79,
+      "stages": {
+        "total": {
+          "p50": 79,
+          "p95": 1671
+        },
+        "wallClock": {
+          "p50": 771,
+          "p95": 2337
+        },
+        "scan": {
+          "p50": 46,
+          "p95": 358
+        },
+        "screenshot": {
+          "p50": 46,
+          "p95": 358
+        },
+        "visionInference": {
+          "p50": 1596,
+          "p95": 1596
+        },
+        "faceInference": {
+          "p50": 33,
+          "p95": 33
+        },
+        "ocrInference": {
+          "p50": 1585,
+          "p95": 1585
+        },
+        "merge": {
+          "p50": 0,
+          "p95": 0
+        },
+        "redact": {
+          "p50": 27,
+          "p95": 37
+        }
+      }
+    },
+    {
+      "fixture": "pixel-receipt.html",
+      "label": "receipt (OCR-only)",
+      "scans": 8,
+      "piiRegions": 3,
+      "marks": 2,
+      "totalP50": 75,
+      "totalP95": 1889,
+      "coldScans": 1,
+      "coldP50": 1889,
+      "warmScans": 7,
+      "warmP50": 75,
+      "stages": {
+        "total": {
+          "p50": 75,
+          "p95": 1889
+        },
+        "wallClock": {
+          "p50": 750,
+          "p95": 1174
+        },
+        "scan": {
+          "p50": 44,
+          "p95": 360
+        },
+        "screenshot": {
+          "p50": 44,
+          "p95": 360
+        },
+        "visionInference": {
+          "p50": 1498,
+          "p95": 1498
+        },
+        "faceInference": {
+          "p50": 26,
+          "p95": 26
+        },
+        "ocrInference": {
+          "p50": 1488,
+          "p95": 1488
+        },
+        "merge": {
+          "p50": 0,
+          "p95": 0
+        },
+        "redact": {
+          "p50": 29,
+          "p95": 34
+        }
+      }
+    },
+    {
+      "fixture": "admin-dashboard.html",
+      "label": "dashboard (table-heavy)",
+      "scans": 8,
+      "piiRegions": 22,
+      "marks": 10,
+      "totalP50": 82,
+      "totalP95": 1711,
+      "coldScans": 1,
+      "coldP50": 1711,
+      "warmScans": 7,
+      "warmP50": 82,
+      "stages": {
+        "total": {
+          "p50": 82,
+          "p95": 1711
+        },
+        "wallClock": {
+          "p50": 758,
+          "p95": 2379
+        },
+        "scan": {
+          "p50": 50,
+          "p95": 357
+        },
+        "screenshot": {
+          "p50": 50,
+          "p95": 357
+        },
+        "visionInference": {
+          "p50": 1632,
+          "p95": 1632
+        },
+        "faceInference": {
+          "p50": 30,
+          "p95": 30
+        },
+        "ocrInference": {
+          "p50": 1622,
+          "p95": 1622
+        },
+        "merge": {
+          "p50": 0,
+          "p95": 0
+        },
+        "redact": {
+          "p50": 27,
+          "p95": 29
+        }
+      }
+    },
+    {
+      "fixture": "ecommerce-checkout.html",
+      "label": "checkout (mixed)",
+      "scans": 8,
+      "piiRegions": 9,
+      "marks": 6,
+      "totalP50": 70,
+      "totalP95": 1847,
+      "coldScans": 1,
+      "coldP50": 1847,
+      "warmScans": 7,
+      "warmP50": 70,
+      "stages": {
+        "total": {
+          "p50": 70,
+          "p95": 1847
+        },
+        "wallClock": {
+          "p50": 750,
+          "p95": 1217
+        },
+        "scan": {
+          "p50": 43,
+          "p95": 361
+        },
+        "screenshot": {
+          "p50": 43,
+          "p95": 361
+        },
+        "visionInference": {
+          "p50": 1459,
+          "p95": 1459
+        },
+        "faceInference": {
+          "p50": 25,
+          "p95": 25
+        },
+        "ocrInference": {
+          "p50": 1445,
+          "p95": 1445
+        },
+        "merge": {
+          "p50": 0,
+          "p95": 0
+        },
+        "redact": {
+          "p50": 27,
+          "p95": 28
+        }
+      }
+    }
+  ],
+  "stages": {
+    "screenshot": {
+      "p50": 46,
+      "p95": 358,
+      "samples": 40
+    },
+    "scan": {
+      "p50": 46,
+      "p95": 358,
+      "samples": 40
+    },
+    "faceInference": {
+      "p50": 30,
+      "p95": 55,
+      "samples": 40
+    },
+    "ocrInference": {
+      "p50": 1585,
+      "p95": 1641,
+      "samples": 40
+    },
+    "visionInference": {
+      "p50": 1596,
+      "p95": 1662,
+      "samples": 40
+    },
+    "merge": {
+      "p50": 0,
+      "p95": 1,
+      "samples": 40
+    },
+    "redact": {
+      "p50": 27,
+      "p95": 34,
+      "samples": 40
+    },
+    "total": {
+      "p50": 76,
+      "p95": 1805,
+      "samples": 40
+    }
+  },
+  "peakHeapMB": 11.34,
+  "idleTotalMB": 6.14,
+  "wire": {
+    "requests": 0,
+    "note": "no request bodies observed — local planner answered without network"
+  },
+  "scanCostMs": {
+    "coldP50": 1805,
+    "warmP50": 75,
+    "blendedP50": 76,
+    "blendedP95": 1805
+  }
+}

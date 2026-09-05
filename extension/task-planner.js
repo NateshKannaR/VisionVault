@@ -697,7 +697,6 @@
       // First check if a suggestion dropdown is open from a previous type
       const suggestion = pickCitySuggestion(parsed.from);
       if (suggestion) {
-        progress.fromTyped = true;
         progress.bookingStep = 2;
         return { action: "click", mark_id: suggestion.id, reasoning: `Select origin: ${parsed.from}` };
       }
@@ -716,7 +715,6 @@
         return isSuggestion(m);
       });
       if (suggestion) {
-        progress.fromTyped = true;
         progress.bookingStep = 3;
         return { action: "click", mark_id: suggestion.id, reasoning: `Select origin city suggestion` };
       }
@@ -727,7 +725,6 @@
     if (!progress.toTyped && parsed.to) {
       const suggestion = pickCitySuggestion(parsed.to);
       if (suggestion) {
-        progress.toTyped = true;
         progress.bookingStep = 4;
         return { action: "click", mark_id: suggestion.id, reasoning: `Select destination: ${parsed.to}` };
       }
@@ -746,7 +743,6 @@
         return isSuggestion(m);
       });
       if (suggestion) {
-        progress.toTyped = true;
         progress.bookingStep = 5;
         return { action: "click", mark_id: suggestion.id, reasoning: `Select destination city suggestion` };
       }
@@ -757,7 +753,6 @@
       const searchBtn = available.find(isSearchBtn);
       if (searchBtn) {
         progress.bookingStep = 6;
-        progress.bookingCompleted = true;
         return { action: "click", mark_id: searchBtn.id, isBookingSearch: true, reasoning: "Click Search to find flights" };
       }
     }
@@ -771,7 +766,6 @@
                  /\b(non[\s-]*stop|0\s*stops?|direct)\b/i.test(l);
         });
         if (nonStopFilter) {
-          progress.nonStopFiltered = true;
           return { action: "click", mark_id: nonStopFilter.id, isNonStop: true, reasoning: "Filter for non-stop flights" };
         }
       }
@@ -841,7 +835,6 @@
           return /^\s*star\b/i.test(l) || /star this repository/i.test(l) || l === "star";
         });
         if (starBtn) {
-          progress.starred = true;
           return { action: "click", mark_id: starBtn.id, isStar: true, reasoning: "Click Star button to star this repository" };
         }
       }
@@ -854,7 +847,6 @@
                  (/\bfork\b/i.test(l) && !/\bforks\b/i.test(l));
         });
         if (forkBtn) {
-          progress.forked = true;
           return { action: "click", mark_id: forkBtn.id, isFork: true, reasoning: "Click Fork button to fork repository" };
         }
       }
@@ -871,7 +863,6 @@
                  (/\bissues\b/i.test(l) && !/\b(new issue|closed issues|label)\b/i.test(l));
         });
         if (issuesTab) {
-          progress.issueOpened = true;
           return { action: "click", mark_id: issuesTab.id, isIssue: true, reasoning: "Click Issues tab" };
         }
       }
@@ -888,7 +879,6 @@
                  /\bpull\s*requests?\b/i.test(l);
         });
         if (prTab) {
-          progress.prOpened = true;
           return { action: "click", mark_id: prTab.id, isPR: true, reasoning: "Click Pull requests tab" };
         }
       }
@@ -901,7 +891,6 @@
                  (/\b(code|clone)\b/i.test(l) && !/\b(view code|browse code)\b/i.test(l));
         });
         if (codeBtn) {
-          progress.cloned = true;
           return { action: "click", mark_id: codeBtn.id, isClone: true, reasoning: "Click Code button to view clone URLs" };
         }
       }
@@ -923,7 +912,6 @@
         });
 
         if (repoLink) {
-          progress.repoOpened = true;
           return { action: "click", mark_id: repoLink.id, isRepoSelection: true, reasoning: `Open repository "${repoLink.label}"` };
         }
       }
@@ -1089,7 +1077,6 @@
           maxSelect = selectEls[0];
         }
         if (maxSelect) {
-          progress.filterApplied = true;
           return {
             action: "select",
             mark_id: maxSelect.id,
@@ -1102,7 +1089,6 @@
         const priceRe = new RegExp(`(?:under|below|less\\s+than|up\\s+to)\\s*(?:₹|rs\\.?|inr)?\\s*${parsed.maxPrice}`, "i");
         const filterBtn = available.find(m => (m.role === "link" || m.role === "button" || m.role === "clickable" || m.role === "checkbox") && priceRe.test(m.label || ""));
         if (filterBtn) {
-          progress.filterApplied = true;
           return {
             action: "click",
             mark_id: filterBtn.id,
@@ -1113,7 +1099,6 @@
 
         const maxInput = available.find(m => FILLABLE_ROLES.has(m.role) && (/\b(high|max|upper)\s*price\b|\bhigh-price\b|\bmaxprice\b/i.test(m.label || "")));
         if (maxInput) {
-          progress.filterApplied = true;
           return {
             action: "type",
             mark_id: maxInput.id,
@@ -1123,7 +1108,10 @@
           };
         }
       }
-      progress.filterApplied = true;
+      // No control on this page can express the constraint. Recorded as
+      // unavailable rather than applied: the loop must stop retrying, but
+      // nothing may report a filter it never used.
+      progress.filterUnavailable = true;
     }
 
     // Substep 2.8: Apply sorting on search results page if requested
@@ -1135,7 +1123,6 @@
 
       const sortSelect = available.find(m => (m.role === "select" || m.role === "combobox") && /sort/i.test(m.label || ""));
       if (sortSelect) {
-        progress.sortApplied = true;
         const val = sortAsc ? "price-asc-rank" : (sortDesc ? "price-desc-rank" : (sortRating ? "review-rank" : "popularity-rank"));
         return {
           action: "select",
@@ -1156,7 +1143,6 @@
         return false;
       });
       if (sortTab) {
-        progress.sortApplied = true;
         return {
           action: "click",
           mark_id: sortTab.id,
@@ -1179,13 +1165,59 @@
           if (m.role !== "link" && m.role !== "clickable") return false;
           const l = (m.label || "").toLowerCase();
           if (l.length < 10) return false;
-          if (/\b(sign\s*in|account|returns|orders|customer\s*service|prime|todays?\s*deals|bestsellers|best\s*sellers|registry|sell|gift\s*cards|feedback|help|privacy|terms|skip\s*to|next|previous|page\s*\d+|cookie|explore|see\s*more|filter|sort\s*by|menu|nav)\b/i.test(l)) {
+          if (/\b(sign\s*in|account|returns|orders|customer\s*service|customer\s*care|prime|todays?\s*deals|bestsellers|best\s*sellers|registry|sell|sellers?|selling|become\s+a|advertise|download\s+app|track\s+order|gift\s*cards|feedback|help|privacy|terms|skip\s*to|next|previous|page\s*\d+|cookie|explore|see\s*more|filter|sort\s*by|menu|nav)\b/i.test(l)) {
             return false;
           }
           return true;
         };
 
-        const candidates = available.filter(isProductCandidate);
+        // A product has to look like one. Site chrome that survives the exclusion list above
+        // still scored the full baseline, so with no real product among the visible marks the
+        // highest scorer was whatever link happened to be there - observed on Flipkart, where
+        // "become a seller" was clicked as the best matching laptop.
+        //
+        // Evidence means a price, or a word from what the user searched for. Applied only when
+        // there IS a query to match against; a bare "open the first result" has nothing to
+        // compare and falls back to the ordering the page gave.
+        const queryWords = (parsed.query || "").toLowerCase().split(/\s+/).filter((w) => w.length > 2);
+        const hasProductEvidence = (c) => {
+          const l = (c.label || "").toLowerCase();
+          if (/(?:₹|rs\.?|inr|\$)\s*[\d,]+/i.test(l)) return true;
+          return queryWords.some((w) => l.includes(w));
+        };
+
+        const candidates = queryWords.length
+          ? available.filter(isProductCandidate).filter(hasProductEvidence)
+          : available.filter(isProductCandidate);
+
+        // Nothing product-shaped on screen yet, on a page that is meant to be full of them.
+        //
+        // Marks are viewport-only, and deliberately so: the screenshot is the viewport, and a
+        // mark for something off-screen would carry coordinates that do not map onto the image
+        // the redaction was painted on. The consequence is that a results page shows the agent
+        // its header and navigation, and the products sit below the fold. Measured on a
+        // Flipkart laptop search: 83 links on the page, 28 of them carrying a price, and 16
+        // marks - none of which was a product.
+        //
+        // So scroll and look again. Bounded, because a page that never yields a product is a
+        // page this agent cannot shop on, and saying so beats scrolling to the footer.
+        // Only when the instruction actually wants an item. "search for iqoo neo 6 and show
+        // me" is finished when the results are on screen; scrolling for a product it never
+        // asked to open would turn a completed task into a tour of the page.
+        const wantsAnItem = parsed.wantsAddToCart || parsed.wantsBest || parsed.wantsCheapest ||
+                            parsed.maxPrice != null || parsed.minPrice != null ||
+                            parsed.minRating != null || (parsed.openTargets || []).length > 0;
+
+        if (candidates.length === 0 && wantsAnItem && (progress.searched || progress.queryLanded) &&
+            (progress.productScrolls || 0) < 3) {
+          progress.productScrolls = (progress.productScrolls || 0) + 1;
+          return {
+            action: "scroll_page",
+            value: 700,
+            reasoning: "No products in view yet; scrolling to bring the results into the viewport",
+          };
+        }
+
         if (candidates.length > 0) {
           const scoreCandidate = (c) => {
             const l = (c.label || "").toLowerCase();
@@ -1231,7 +1263,6 @@
           candidates.sort((a, b) => scoreCandidate(b) - scoreCandidate(a));
           const best = candidates[0];
           if (best && scoreCandidate(best) > 0) {
-            progress.productOpened = true;
             return {
               action: "click",
               mark_id: best.id,

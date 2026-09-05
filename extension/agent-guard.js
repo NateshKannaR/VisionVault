@@ -138,7 +138,10 @@
     // many sites that have none.
     const hasConstraint = parsed.maxPrice != null || parsed.minPrice != null || parsed.minRating != null ||
                           parsed.wantsBest || parsed.wantsCheapest;
-    if (hasConstraint && !p.filterApplied && !p.sortApplied &&
+    // filterUnavailable means the planner looked and this page offers no control that can
+    // express the constraint. That is a real answer, not a success - but holding the run open
+    // for a control that does not exist would loop forever, so it counts as settled.
+    if (hasConstraint && !p.filterApplied && !p.sortApplied && !p.filterUnavailable &&
         !p.productOpened && !(p.opened || []).length && !p.cartAdded) {
       return false;
     }

@@ -52,8 +52,9 @@
       email beside it, which does not.
 
   Every person, company, identifier and figure here is fabricated. The Aadhaar-style number
-  in the background-check notice begins with 2 because UIDAI numbers never begin with 0 or 1,
-  and a fixture using 1234 5678 9012 would be testing a pattern no real number matches.
+  in the identity-verification block begins with 2 because UIDAI numbers never begin with 0
+  or 1, and a fixture starting one 1234 would be testing a pattern no real number matches.
+  The PAN on record follows the real 5-letter / 4-digit / 1-letter shape for the same reason.
 -->
 
 <style>
@@ -799,6 +800,13 @@
                   <span class="hint">Added 14 Jan 2026 · verified</span>
                 </span>
               </div>
+            </div>
+            <!-- The Aadhaar sits beside the PAN because the notice above says the two are
+                 matched. It begins with 2: UIDAI numbers never begin with 0 or 1. -->
+            <div class="field" style="gap:4px;margin-bottom:16px">
+              <span style="font-size:13px;font-weight:600;color:#344054">Aadhaar linked to this PAN</span>
+              <span class="mono" data-vv-sensitive="aadhaar">2847 5193 6620</span>
+              <span class="hint">Shared only with the background-check vendor, never with the hiring team.</span>
             </div>
             <label class="consent" for="ap-consent">
               <input type="checkbox" id="ap-consent" name="consent">

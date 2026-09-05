@@ -558,6 +558,11 @@ function scanForPII() {
 
   function addRegion(el, type, reason, label = null, extra = null) {
     if (!el) return;
+    // Remember WHICH element was judged sensitive, not just the rectangle. The rectangle is
+    // enough to paint over the pixels; it is not enough to stop the same text being sent as
+    // an element label in the marks array, which is a second, unredacted channel to the same
+    // server. See suppressLabelsInside.
+    if (type === "text") sensitiveTextEls.add(el);
     const r = rectOf(el);
     if (r.w < 2 || r.h < 2) return;
     const key = `${r.x},${r.y},${r.w},${r.h}`;
@@ -693,11 +698,17 @@ function tagInteractiveElements() {
     markMap.set(stableId, el);
     markMap.set(String(stableId), el);
 
+    // A label is only safe to transmit if the scan did not just decide this element's text
+    // was personal data. Dropping it costs the planner a little context on that one control;
+    // sending it would put the value on the wire in clear text next to the image that was
+    // carefully masked to hide it.
+    const label = isInsideSensitiveText(el) ? null : safeLabel(el);
+
     marks.push({
       id: stableId,
       role,
       box: r,
-      label: safeLabel(el)
+      label
     });
   });
 
@@ -719,12 +730,42 @@ function resolveMarkElement(targetId) {
  * Full scan of THIS frame. Returns regions/marks in this frame's own viewport
  * coordinates plus the offset needed to map them into the top-level viewport.
  */
+// Elements whose TEXT this scan judged sensitive. Rebuilt every scan, because the page and
+// the judgement both change.
+//
+// This exists because of a leak found by eval/workflows.js on the enterprise dashboard: two
+// employee names reached the server verbatim while the image was masked correctly. A personal
+// name matches no pattern - "Ananya Sridharan" is two capitalised words - so safeLabel's regex
+// screen passes it, and it travelled as the label of the link wrapping the table cell. The
+// pixels were covered and the text was sent anyway.
+let sensitiveTextEls = new Set();
+
+/**
+ * Whether an element's visible text was judged sensitive by this scan.
+ *
+ * Checks the element, its ancestors and its descendants: a mark is often the <a> inside a
+ * sensitive <td>, and sometimes the <td> containing a sensitive <span>.
+ */
+function isInsideSensitiveText(el) {
+  if (!el || !sensitiveTextEls.size) return false;
+  for (let n = el; n && n.nodeType === 1; n = n.parentElement) {
+    if (sensitiveTextEls.has(n)) return true;
+  }
+  for (const s of sensitiveTextEls) {
+    if (el.contains && el.contains(s)) return true;
+  }
+  return false;
+}
+
 function scanPage() {
   if (domScanInFlight) {
     return { piiRegions: [], marks: [], scanSkipped: true, frameOffset: frameOffsetInTopViewport() };
   }
   domScanInFlight = true;
   try {
+    // Order matters: scanForPII populates sensitiveTextEls, and tagInteractiveElements reads
+    // it to decide which labels may leave the device.
+    sensitiveTextEls = new Set();
     const piiRegions = scanForPII();
     const marks = tagInteractiveElements();
     return {

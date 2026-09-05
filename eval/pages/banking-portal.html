@@ -920,7 +920,7 @@
           </div>
 
           <div class="actions">
-            <button type="button" class="btn primary" id="review-dispute"
+            <button type="submit" class="btn primary" id="review-dispute"
                     data-vv-safe="1" data-gt-safe data-gt-mark="button">Review dispute</button>
             <button type="button" class="btn" id="clear-dispute"
                     data-vv-safe="1" data-gt-safe data-gt-mark="button">Clear form</button>
@@ -1074,7 +1074,10 @@
     return wrap;
   }
 
-  document.getElementById('review-dispute').addEventListener('click', function () {
+  /* Bound to the form's submit event, not the button's click, so the real submit <button>
+     drives step 6 whether it is clicked or reached by pressing Enter in a text field. */
+  document.getElementById('dispute').addEventListener('submit', function (e) {
+    e.preventDefault();
     var reasonSel = document.getElementById('dispute-reason');
     var cardSel = document.getElementById('dispute-card');
     reviewBody.textContent = '';

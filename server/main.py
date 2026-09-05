@@ -428,7 +428,14 @@ def robust_json_parse(text: str) -> Optional[dict]:
     if not text:
         return None
     try:
-        return json.loads(text)
+        data = json.loads(text)
+        if isinstance(data, dict):
+            if not data or not data.get("action"):
+                return {
+                    "reasoning": data.get("reasoning", "Task complete or no further UI action needed"),
+                    "action": {"type": "done", "target": None, "value": None}
+                }
+            return data
     except Exception:
         pass
     match = re.search(r"\{.*\}", text, re.DOTALL)
@@ -446,6 +453,7 @@ def robust_json_parse(text: str) -> Optional[dict]:
                     return json.loads(fixed_keys)
                 except Exception:
                     pass
+
     # Truncated JSON recovery: extract fields if closing braces were cut off
     t_match = re.search(r'"type"\s*:\s*"([^"]+)"', text)
     if t_match:
@@ -461,6 +469,13 @@ def robust_json_parse(text: str) -> Optional[dict]:
                 "target": target_val,
                 "value": value_match.group(1) if value_match else None,
             },
+        }
+
+    # Empty or stalled JSON recovery
+    if text.strip() in ('{"', '{', '{}', '{\n}', '{"}', '{\n\n}'):
+        return {
+            "reasoning": "Task complete or no further UI action needed",
+            "action": {"type": "done", "target": None, "value": None},
         }
     return None
 
@@ -1069,6 +1084,7 @@ def plan_with_ollama(req: "AgentStepRequest") -> Optional[StepResponse]:
     messages = [
         {"role": "system",
          "content": "You output ONE strict JSON object and nothing else. "
+                    "If the task goal is already completed or satisfied, return action type \"done\". "
                     "Keep \"reasoning\" under 12 words."},
     ]
     user_msg: Dict[str, Any] = {"role": "user", "content": build_planner_prompt(req, marks_summary)}
@@ -1083,7 +1099,7 @@ def plan_with_ollama(req: "AgentStepRequest") -> Optional[StepResponse]:
         "format": "json",
         "stream": False,
         "keep_alive": OLLAMA_KEEP_ALIVE,
-        "options": {"temperature": 0.1, "num_predict": 300, "num_ctx": 4096},
+        "options": {"temperature": 0.1, "num_predict": 300, "num_ctx": 8192},
         "messages": messages,
     }
 

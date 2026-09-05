@@ -56,6 +56,56 @@
     return `${url}#${y}#${n}#${completed}`;
   }
 
+  // "the first result", "the top one", "the best match" — a target defined by POSITION rather
+  // than by name. The user cannot know what it will be called, so no label can ever match it.
+  const ORDINAL_TARGET_RE =
+    /^(?:the\s+)?(?:very\s+)?(?:first|1st|second|2nd|third|3rd|top|best|cheapest|last|next|one|item|product|result|link|option|match|thing|it)\b|\b(?:result|one|item|product|match|option)$/i;
+
+  /**
+   * Whether an open target the instruction named has actually been opened.
+   *
+   * The exact-match test this replaces (`opened.includes(t)`) could not pass for the most
+   * common phrasing there is. "open the first result" records openTargets:["first result"],
+   * while `opened` records the label of what was clicked — "hurricane running shoes for men".
+   * Those never match, so a completed task looked outstanding and the agent kept clicking.
+   * Observed on Flipkart: the first result was opened correctly at step 3, and the run then
+   * wandered through the mega-menu for seven more steps before the stall detector stopped it.
+   *
+   * Two rules, in order:
+   *   Positional target   satisfied by anything having been opened. `productOpened` is the
+   *                       stronger signal where the page identified itself as a product.
+   *   Named target        matched loosely in both directions, because a user types "nike
+   *                       shoes" and the page says "Nike Revolution 6 Running Shoes".
+   */
+  function openTargetMet(target, progress) {
+    const p = progress || {};
+    const opened = p.opened || [];
+    const t = String(target || "").trim().toLowerCase();
+    if (!t) return true;
+
+    // Outcome, not intent. `opened` is appended in background.js only after an action has
+    // actually executed, so it means something was opened. `productOpened` looks like the same
+    // signal and is not: task-planner sets it while DECIDING to click a product, before the
+    // click runs, and reads it back in the same step. Trusting it here made the guard call a
+    // run complete on the search-results page with nothing opened at all — the opposite
+    // failure to the one this function was written to fix, and the worse of the two, because
+    // over-running is visible and stopping early looks like success.
+    if (ORDINAL_TARGET_RE.test(t)) return opened.length > 0;
+
+    const norm = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    const nt = norm(t);
+    if (!nt) return opened.length > 0;
+    return opened.some((o) => {
+      const no = norm(o);
+      if (!no) return false;
+      if (no.includes(nt) || nt.includes(no)) return true;
+      // Every significant word of the request present in the label. "nike shoes" is met by
+      // "Nike Revolution 6 Running Shoes"; "adidas shoes" is not.
+      const words = nt.split(" ").filter((w) => w.length > 2);
+      return words.length > 0 && words.every((w) => no.includes(w));
+    });
+  }
+
   /**
    * Has the user's instruction actually been carried out?
    *
@@ -83,8 +133,7 @@
     if (parsed.wantsIssue && !p.issueOpened) return false;
     if (parsed.wantsPR && !p.prOpened) return false;
     if ((parsed.openTargets || []).length) {
-      const opened = p.opened || [];
-      if (!parsed.openTargets.every((t) => opened.includes(t))) return false;
+      if (!parsed.openTargets.every((t) => openTargetMet(t, p))) return false;
     }
     if (parsed.wantsScroll && !p.scrolled) return false;
     if (parsed.wantsFill && !p.filledAny) return false;
@@ -141,7 +190,7 @@
     if (parsed?.wantsIssue && !p.issueOpened) left.push("open issues tab");
     if (parsed?.wantsPR && !p.prOpened) left.push("open pull requests tab");
     if (parsed?.wantsNonStop && !p.nonStopFiltered) left.push("filter non-stop flights");
-    for (const t of parsed?.openTargets || []) if (!(p.opened || []).includes(t)) left.push(`open "${t}"`);
+    for (const t of parsed?.openTargets || []) if (!openTargetMet(t, p)) left.push(`open "${t}"`);
     if (parsed?.wantsScroll && !p.scrolled) left.push("scroll the page");
     if (parsed?.wantsFill && !p.filledAny) left.push("fill the form");
     if (parsed?.wantsMessage && !p.messageSent) left.push(`send message to ${parsed.recipient || "recipient"}`);
@@ -448,6 +497,7 @@
   const AgentGuard = {
     createGuard,
     goalSatisfied,
+    openTargetMet,
     goalFullyVerified,
     describeCompletion,
     describeRemaining,

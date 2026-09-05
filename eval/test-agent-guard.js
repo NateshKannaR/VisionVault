@@ -579,6 +579,66 @@ test('sorting task refuses done before sortApplied is true', () => {
   assert.notStrictEqual(v.action.action, 'done', 'premature done on sort task must be refused');
 });
 
+
+// -- Open targets: what "the first result" actually means ---------------------
+//
+// The failure these pin was observed live on Flipkart. The agent navigated, searched, and
+// opened the first result correctly in three steps - and then kept clicking for seven more,
+// because "first result" never literally appears in the list of things it opened. A completed
+// task looked outstanding, which is the exact shape of "it does the task then goes wrong".
+
+test('a positional target is met by having opened anything', () => {
+  for (const phrase of ['first result', 'the first result', 'top result', 'the best one',
+                        'first one', 'the cheapest one']) {
+    assert.strictEqual(
+      AgentGuard.openTargetMet(phrase, { opened: ['hurricane running shoes for men'] }), true,
+      `"${phrase}" should be satisfied by having opened a product`);
+  }
+});
+
+test('productOpened alone does NOT satisfy a positional target', () => {
+  // productOpened is set by task-planner while DECIDING to click a product, before the click
+  // executes, and read back in the same step. Treating it as an outcome made the guard end a
+  // run on the search-results page with nothing opened. `opened` is the real outcome: it is
+  // appended only after an action has actually run.
+  assert.strictEqual(AgentGuard.openTargetMet('first result', { opened: [], productOpened: true }), false,
+    'an intent flag must not be mistaken for an outcome');
+});
+
+test('a positional target is NOT met when nothing was opened', () => {
+  assert.strictEqual(AgentGuard.openTargetMet('first result', { opened: [] }), false);
+});
+
+test('a named target matches the page label loosely', () => {
+  const p = { opened: ['Nike Revolution 6 Running Shoes'] };
+  assert.strictEqual(AgentGuard.openTargetMet('nike shoes', p), true, 'every word present');
+  assert.strictEqual(AgentGuard.openTargetMet('Nike Revolution 6 Running Shoes', p), true, 'exact');
+  assert.strictEqual(AgentGuard.openTargetMet('adidas shoes', p), false, 'a different brand must not match');
+});
+
+test('the whole task is complete once the first result is open', () => {
+  const task = 'go to flipkart and search for running shoes and open the first result';
+  const parsed = TaskPlanner.parseTask(task);
+  assert.deepStrictEqual(parsed.openTargets, ['first result'], 'precondition: target parses as positional');
+
+  const progress = {
+    navigated: true, searched: true, queryLanded: true, querySubmitted: true,
+    opened: ['hurricane running shoes for men'], productOpened: true,
+  };
+  assert.strictEqual(AgentGuard.goalSatisfied(parsed, progress), true,
+    'the instruction was carried out; the run must be allowed to end');
+  assert.strictEqual(AgentGuard.describeRemaining(parsed, progress), '',
+    'nothing should be reported as outstanding');
+});
+
+test('the task is NOT complete while only the search has landed', () => {
+  const task = 'go to flipkart and search for running shoes and open the first result';
+  const parsed = TaskPlanner.parseTask(task);
+  const progress = { navigated: true, searched: true, queryLanded: true, opened: [] };
+  assert.strictEqual(AgentGuard.goalSatisfied(parsed, progress), false,
+    'the open step is genuinely outstanding here');
+});
+
 console.log(`\n${passed} passed, ${failed} failed\n`);
 process.exit(failed ? 1 : 0);
 

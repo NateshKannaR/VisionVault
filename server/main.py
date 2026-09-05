@@ -7,6 +7,7 @@ import base64
 import io
 import json
 import os
+import sys
 import re
 import threading
 import time
@@ -1778,6 +1779,213 @@ def health():
         # Tiers currently rested by the circuit breaker, and how long until they are retried.
         "cooldowns": tier_status(),
     }
+
+# ---------------------------------------------------------------------------
+# Decomposition: a paragraph in, short instructions out.
+#
+# The client's parseTask is a clause splitter, and a good one, but it is a rules engine: it
+# reads "search for X and do Y" and nothing wider. Given a real instruction - "I need a new
+# work laptop from VoltCart: run the laptop search, narrow the results to machines under
+# 70,000 with 16 GB RAM, sort what survives by rating, open the best one and save it" - it
+# returns either nothing or a fragment of the sentence, and the very first action is already
+# wrong. Measured across seven such instructions: two produced no query at all, the rest
+# produced sentence fragments, and the runs reached one of seven stages or none.
+#
+# Patching the rules does not fix this. There is always one more way to join two thoughts.
+# What the rules ARE good at is carrying out a short instruction, so this endpoint turns the
+# paragraph into several short instructions and lets them do that repeatedly.
+#
+# Each milestone therefore carries a `sub_task` phrased the way parseTask already understands.
+# That is the whole design: no new execution path, no second planner, just the existing one
+# asked an easier question seven times.
+
+
+def _console_safe(text: str) -> str:
+    """Text this process can actually print.
+
+    A Windows console is cp1252 and cannot encode the rupee sign, which appears in roughly
+    every Indian price. print() raising UnicodeEncodeError inside a request handler turns a
+    logging line into a 500, so the endpoint failed on exactly the instructions it exists to
+    handle. Only the log is transliterated; the response keeps the original characters."""
+    enc = getattr(sys.stdout, "encoding", None) or "utf-8"
+    try:
+        text.encode(enc)
+        return text
+    except (UnicodeEncodeError, LookupError):
+        return text.encode("ascii", "replace").decode("ascii")
+
+
+class Milestone(BaseModel):
+    id: int
+    title: str
+    # Deliberately phrased for parseTask: an imperative starting with a verb it knows.
+    sub_task: str
+
+
+class PlanRequest(BaseModel):
+    task: str
+    page_info: Optional[PageInfo] = None
+
+
+class PlanResponse(BaseModel):
+    goal: str
+    milestones: List[Milestone]
+    tier: Optional[str] = None
+
+
+PLAN_PROMPT = """Break a browser instruction into the fewest ordered steps that carry it out.
+
+INSTRUCTION: "{task}"
+
+Rules:
+- Between 2 and 7 steps. Fewer is better. Never invent work the instruction did not ask for.
+- Each step's "sub_task" must be a SHORT imperative a simple parser can read, starting with
+  one of: search for, filter by, sort by, open, click, fill, scroll, add to cart, compare.
+- Put the thing being searched for directly after "search for" and nothing else.
+- Keep numbers exactly as written (under 70000, 16 GB, rating 4).
+
+Return ONLY this JSON:
+{{"goal":"<one line>","milestones":[{{"id":1,"title":"<short>","sub_task":"<short imperative>"}}]}}"""
+
+
+# Verbs that begin a new instruction. Same idea as the client's clause splitter, kept here so
+# the fallback does not depend on the client having got that far.
+_PLAN_CLAUSE_RE = re.compile(
+    r"(?:\s*[,;.]\s*|\s+(?:and(?:\s+then)?|then|after that|finally|next)\s+)"
+    r"(?=(?:search|find|look|filter|narrow|sort|rank|open|click|select|choose|pick|show|"
+    r"compare|add|put|fill|enter|type|scroll|save|submit|apply|set|book|review|check)\b)",
+    re.I,
+)
+
+
+# Phrasings people use that the client's parser does not read, mapped onto ones it does.
+# "run the laptop search" carries a perfectly clear intent and yields no query at all, so the
+# milestone was declared complete without searching. Splitting a paragraph is not enough; the
+# pieces have to be sentences the parser was built for.
+_REPHRASE = [
+    (re.compile(r"^(?:run|do|perform|start)\s+(?:the\s+|a\s+)?(.+?)\s+search\b.*$", re.I), r"search for \1"),
+    (re.compile(r"^(?:run|do|perform|start)\s+(?:the\s+|a\s+)?search\s+for\s+(.+)$", re.I), r"search for \1"),
+    (re.compile(r"^narrow\s+(?:the\s+)?(?:results?|list|fares?|options?)\s+(?:to|down to|with)\s+(.+)$", re.I), r"filter by \1"),
+    (re.compile(r"^(?:re-?)?sort\s+(?:what survives|the results?|them|the list|the fares?)\s+by\s+(.+)$", re.I), r"sort by \1"),
+    (re.compile(r"^open\s+the\s+detail\s+page\s+of\s+(.+)$", re.I), r"open \1"),
+    (re.compile(r"^(?:hit|press|tap)\s+(.+)$", re.I), r"click \1"),
+]
+
+
+def _as_imperative(part: str) -> str:
+    """The same instruction, phrased the way the client's parser reads."""
+    text = part.strip()
+    for pattern, repl in _REPHRASE:
+        if pattern.match(text):
+            return pattern.sub(repl, text).strip()
+    return text
+
+
+def _rules_plan(task: str) -> List[Milestone]:
+    """Decomposition without a model, so the endpoint always answers.
+
+    Weaker than the model - it cannot rephrase, only split - but a split paragraph still gives
+    the client several short instructions instead of one impossible one."""
+    text = (task or "").strip()
+    parts = [p.strip(" ,;.") for p in _PLAN_CLAUSE_RE.split(text) if p and p.strip(" ,;.")]
+    if not parts:
+        parts = [text]
+    out: List[Milestone] = []
+    for i, part in enumerate(parts[:7], start=1):
+        # A leading narrative clause ("I need a new work laptop from VoltCart:") is context,
+        # not a step; the colon is where the instruction usually starts.
+        if ":" in part and i == 1 and len(part.split(":")[0].split()) > 3:
+            part = part.split(":", 1)[1].strip() or part
+        out.append(Milestone(id=i, title=part[:60], sub_task=_as_imperative(part)[:160]))
+    return out
+
+
+def plan_with_model(task: str) -> Optional[List[Milestone]]:
+    """One model call. Decomposition is asked once per run, not once per step, so it can
+    afford the local model's latency in a way the per-step planner cannot."""
+    model = ollama_model()
+    if not model:
+        return None
+    payload = {
+        "model": model,
+        "format": "json",
+        "stream": False,
+        "keep_alive": OLLAMA_KEEP_ALIVE,
+        "options": {"temperature": 0.1, "num_predict": 400, "num_ctx": 4096},
+        "messages": [
+            {"role": "system", "content": "You output ONE strict JSON object and nothing else."},
+            {"role": "user", "content": PLAN_PROMPT.format(task=task)},
+        ],
+    }
+    data = _http_json(f"{OLLAMA_HOST}/api/chat", payload, min(OLLAMA_TIMEOUT, 40.0))
+    if not data:
+        return None
+    parsed = robust_json_parse((data.get("message") or {}).get("content", ""))
+    if not parsed or not isinstance(parsed, dict):
+        return None
+    raw = parsed.get("milestones")
+    if not isinstance(raw, list) or not raw:
+        return None
+    out: List[Milestone] = []
+    for i, m in enumerate(raw[:7], start=1):
+        if not isinstance(m, dict):
+            continue
+        sub = str(m.get("sub_task") or m.get("title") or "").strip()
+        if not sub:
+            continue
+        out.append(Milestone(id=i, title=str(m.get("title") or sub)[:60], sub_task=sub[:160]))
+    return out or None
+
+
+@app.post("/api/agent/plan", response_model=PlanResponse)
+def agent_plan(req: PlanRequest):
+    task = (req.task or "").strip()
+    if not task:
+        raise HTTPException(status_code=400, detail="task is required")
+
+    # A short instruction is already the thing the client's parser reads well, and asking a
+    # model to "improve" it makes it worse: given "go to flipkart search best laptop under 60k
+    # filter by rating" the local model answered with the single milestone "open browser and
+    # navigate to flipkart.com", losing the query, the budget and the filter in one step.
+    #
+    # Decomposition exists for paragraphs. Anything a person would type in one breath goes
+    # through untouched, which also spares it a model round trip it does not need.
+    words = task.split()
+    looks_short = len(words) <= 14 and not re.search(r"[,;:]|\.\s+\S", task)
+    if looks_short:
+        print(_console_safe(f"[server] [PLAN:passthrough] short instruction, left as one step: {task[:70]}"))
+        return PlanResponse(
+            goal=task[:160],
+            milestones=[Milestone(id=1, title=task[:60], sub_task=task[:160])],
+            tier="passthrough",
+        )
+
+    tier = "rules"
+    milestones: Optional[List[Milestone]] = None
+    if tier_available("ollama"):
+        try:
+            milestones = plan_with_model(task)
+            if milestones:
+                tier = "ollama"
+        except Exception as err:  # a decomposition failure must not fail the run
+            print(f"[server] plan: model tier failed ({err}); falling back to rules")
+
+    # A model that answers with a single milestone has restated the instruction, not
+    # decomposed it - the 3B did exactly that on a sixty-word task. Where the rules can
+    # find more clauses than the model found steps, the rules are the better answer:
+    # several short instructions beat one long one, however it was arrived at.
+    rules = _rules_plan(task)
+    if not milestones or (len(milestones) < 2 and len(rules) > 1):
+        if milestones and len(rules) > len(milestones):
+            print(f"[server] plan: model returned {len(milestones)}, rules found {len(rules)}; using rules")
+        milestones = rules
+        tier = "rules"
+
+    print(_console_safe(f"[server] [PLAN:{tier}] {len(milestones)} milestone(s) for: {task[:70]}"))
+    for m in milestones:
+        print(_console_safe(f"[server]    {m.id}. {m.sub_task}"))
+    return PlanResponse(goal=task[:160], milestones=milestones, tier=tier)
+
 
 @app.post("/api/agent/step", response_model=StepResponse)
 async def agent_step(req: AgentStepRequest):

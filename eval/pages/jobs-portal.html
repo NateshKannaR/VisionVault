@@ -1,0 +1,1057 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HireLane — Developer Jobs in India</title>
+
+<!--
+  EVALUATION FIXTURE — a job board, because applying for a job is the everyday task where a
+  browser agent is handed the most identifying data it will ever touch and still has to keep
+  working.
+
+  WHAT CAPABILITY THIS EXERCISES
+  Two things at once, which is the point:
+
+    (a) A seven-step plan that cannot be short-circuited. The later stages are hidden at load
+        by the inline script, so an agent reaches the application form only by actually
+        opening a posting, and reaches the confirmation only by actually submitting. A run
+        that "finished" without the confirmation panel in the DOM did not finish.
+
+    (b) A redaction boundary that has to survive typing. The sensitive values start in the
+        saved-profile rail, get copied into form fields by the agent, and are echoed back as
+        fresh text nodes in the confirmation. A detector that scans once at load and caches
+        will miss the last copy; one that masks the field the agent is mid-way through typing
+        into will break the workflow instead of protecting it.
+
+  STEP MAP — each section carries data-vv-step so a harness can assert progress
+    1  #search-band       type a role keyword, press "Search jobs"
+    2  #filter-bar        narrow by experience and location (<select>), press "Apply filters"
+    3  #results-panel     compare nine postings: title, company, salary band, skills,
+                          match score, company rating, link to the company page
+    4  .view-role         open one posting
+    5  #job-detail        read the requirements (rounds, notice buyout, travel, must-haves)
+    6  #apply-panel       fill name, email, phone, current CTC, notice period, resume link,
+                          plus PAN in the verification block
+    7  #confirmation-panel  submit, and read the application reference back
+
+  GROUND TRUTH
+  data-vv-sensitive="<type>" marks an element whose VALUE must be masked; data-vv-safe="1"
+  marks a value that must survive. Labels are never marked — "Current CTC" is a heading, the
+  rupee figure beside it is the secret. Empty inputs carry the marker too, because what the
+  agent is about to type there is what matters; a detector that only reacts to values already
+  present will leak at the moment of entry.
+
+  THE PRECISION TRAPS ARE DELIBERATE
+    - Two rupee amounts of the same shape mean opposite things: a posted salary band
+      (₹32–46 LPA, public, must stay readable or the compare step is impossible) and the
+      applicant's current CTC (₹18,40,000, private). Amount-shaped masking fails this page.
+    - "PAN India travel: up to 10%" in the requirements is not a PAN. A keyword detector
+      masks it and quietly deletes a requirement the agent was told to read.
+    - The resume link is a share URL with no name in it, so it stays safe — unlike the
+      email beside it, which does not.
+
+  Every person, company, identifier and figure here is fabricated. The Aadhaar-style number
+  in the background-check notice begins with 2 because UIDAI numbers never begin with 0 or 1,
+  and a fixture using 1234 5678 9012 would be testing a pattern no real number matches.
+-->
+
+<style>
+  :root {
+    --bg: #f3f4f8;
+    --card: #ffffff;
+    --ink: #101828;
+    --muted: #667085;
+    --line: #e4e7ec;
+    --brand: #3538cd;
+    --brand-deep: #1e1b4b;
+    --good: #15803d;
+    --amber: #b45309;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 15px/1.55 "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
+  }
+  a { color: var(--brand); }
+  [hidden] { display: none !important; }
+
+  .topbar {
+    position: sticky; top: 0; z-index: 20;
+    background: #fff; border-bottom: 1px solid var(--line);
+    display: flex; align-items: center; gap: 26px;
+    padding: 0 28px; height: 62px;
+  }
+  .wordmark { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 18px; letter-spacing: -.02em; }
+  .wordmark .mark {
+    width: 30px; height: 30px; border-radius: 9px; color: #fff;
+    background: linear-gradient(135deg, #4f46e5, #7c3aed);
+    display: grid; place-items: center; font-size: 15px;
+  }
+  .topnav { display: flex; gap: 22px; font-size: 14px; }
+  .topnav a { color: #475467; text-decoration: none; padding: 6px 0; border-bottom: 2px solid transparent; }
+  .topnav a.current { color: var(--brand); border-bottom-color: var(--brand); font-weight: 600; }
+  .topbar .spacer { flex: 1; }
+  .who { display: flex; align-items: center; gap: 10px; font-size: 14px; }
+  .who .avatar {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: linear-gradient(135deg, #c7d2fe, #a5b4fc);
+    border: 1px solid #c7d2fe;
+  }
+
+  .band {
+    background: radial-gradient(1100px 240px at 18% -40%, #4338ca 0%, transparent 62%), linear-gradient(115deg, #1e1b4b, #312e81);
+    color: #fff; padding: 30px 28px 34px;
+  }
+  .band h1 { margin: 0 0 4px; font-size: 25px; letter-spacing: -.02em; }
+  .band p.lede { margin: 0 0 20px; color: #c7d2fe; font-size: 14px; }
+  .searchrow { display: flex; gap: 10px; flex-wrap: wrap; max-width: 860px; }
+  .searchrow label { display: block; font-size: 12px; color: #c7d2fe; margin-bottom: 6px; font-weight: 600; }
+  .searchrow .grow { flex: 1 1 380px; }
+  .searchrow input[type="search"] {
+    width: 100%; height: 44px; border: 0; border-radius: 9px; padding: 0 14px;
+    font-size: 15px; font-family: inherit; color: var(--ink); background: #fff;
+  }
+  .searchrow .go { align-self: flex-end; }
+
+  .shell {
+    display: grid; grid-template-columns: minmax(0, 1fr) 312px; gap: 20px;
+    max-width: 1180px; margin: 0 auto; padding: 22px 28px 60px;
+  }
+  .panel {
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+    box-shadow: 0 1px 2px rgba(16, 24, 40, .04);
+  }
+  .panel + .panel { margin-top: 18px; }
+  .panel-head {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    padding: 15px 18px; border-bottom: 1px solid var(--line);
+  }
+  .panel-head h2 { margin: 0; font-size: 16px; }
+  .panel-head .count { color: var(--muted); font-size: 13px; }
+  .panel-body { padding: 18px; }
+
+  .filters { display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap; padding: 14px 18px; border-bottom: 1px solid var(--line); background: #fbfbfd; border-radius: 12px 12px 0 0; }
+  .filters .f { display: flex; flex-direction: column; gap: 5px; }
+  .filters label { font-size: 12px; font-weight: 600; color: #475467; }
+  select {
+    height: 38px; min-width: 168px; padding: 0 10px; font-size: 14px; font-family: inherit;
+    border: 1px solid #d0d5dd; border-radius: 8px; background: #fff; color: var(--ink);
+  }
+  button {
+    height: 38px; padding: 0 16px; border-radius: 8px; border: 1px solid #d0d5dd;
+    background: #fff; color: #344054; font: 600 14px/1 inherit; font-family: inherit; cursor: pointer;
+  }
+  button:hover { border-color: #98a2b3; }
+  button.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+  button.primary:hover { background: #2d2fb0; }
+  button.big { height: 44px; padding: 0 22px; font-size: 15px; }
+  button.link { border: 0; background: none; color: var(--brand); padding: 0 4px; height: auto; }
+
+  .job { display: grid; grid-template-columns: 52px minmax(0, 1fr) 116px; gap: 16px; padding: 18px; border-bottom: 1px solid var(--line); }
+  .job:last-child { border-bottom: 0; }
+  .job:hover { background: #fcfcff; }
+  .logo { width: 52px; height: 52px; border-radius: 12px; display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 16px; letter-spacing: .02em; }
+  .job h3 { margin: 0 0 3px; font-size: 16.5px; letter-spacing: -.01em; }
+  .job .org { color: #475467; font-size: 14px; margin: 0 0 8px; }
+  .job .org .rating { color: var(--amber); font-weight: 600; }
+  .meta { display: flex; gap: 14px; flex-wrap: wrap; color: var(--muted); font-size: 13px; margin-bottom: 9px; }
+  .pay { color: var(--good); font-weight: 600; }
+  .tags { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 11px; }
+  .tag { font-size: 12px; padding: 3px 9px; border-radius: 999px; background: #eef2ff; color: #3730a3; border: 1px solid #e0e7ff; }
+  .job .actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .job .right { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .score { width: 58px; height: 58px; border-radius: 50%; display: grid; place-items: center; background: conic-gradient(var(--ring) var(--p), #e9ebf2 0); }
+  .score b { width: 44px; height: 44px; border-radius: 50%; background: #fff; display: grid; place-items: center; font-size: 13px; }
+  .score-cap { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  .posted { font-size: 12px; color: var(--muted); }
+
+  .jd h2 { margin: 0 0 2px; font-size: 21px; letter-spacing: -.02em; }
+  .jd .org { color: #475467; margin: 0 0 14px; }
+  .jd h3 { font-size: 14px; text-transform: uppercase; letter-spacing: .05em; color: #475467; margin: 22px 0 8px; }
+  .jd ul { margin: 0; padding-left: 20px; }
+  .jd li { margin-bottom: 6px; }
+  .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; background: #f8f9fc; border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+  .facts dt { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  .facts dd { margin: 2px 0 0; font-weight: 600; font-size: 14.5px; }
+  .callout { margin-top: 18px; padding: 12px 14px; border-left: 3px solid var(--brand); background: #f5f5ff; border-radius: 0 8px 8px 0; font-size: 14px; }
+
+  .rolestrip { display: flex; gap: 12px; align-items: center; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: #f8f9fc; margin-bottom: 20px; }
+  .rolestrip .t { font-weight: 600; }
+  .rolestrip .s { color: var(--muted); font-size: 13.5px; }
+
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+  .field label { font-size: 13px; font-weight: 600; color: #344054; }
+  .field .hint { font-size: 12px; color: var(--muted); font-weight: 400; }
+  input[type="text"], input[type="email"], input[type="tel"], input[type="url"], textarea {
+    width: 100%; padding: 10px 12px; border: 1px solid #d0d5dd; border-radius: 8px;
+    font-size: 14px; font-family: inherit; color: var(--ink); background: #fff;
+  }
+  textarea { resize: vertical; min-height: 84px; }
+  input:focus, select:focus, textarea:focus { outline: 2px solid #c7d2fe; outline-offset: 1px; border-color: var(--brand); }
+  .verify { border: 1px solid #fde68a; background: #fffbeb; border-radius: 10px; padding: 16px 18px; margin: 4px 0 20px; }
+  .verify h3 { margin: 0 0 4px; font-size: 15px; }
+  .verify p.note { margin: 0 0 14px; font-size: 13px; color: #92400e; }
+  .consent { display: flex; gap: 9px; align-items: flex-start; font-size: 13.5px; color: #344054; }
+  .formerr { color: #b42318; font-size: 13.5px; margin: 0 0 14px; font-weight: 600; }
+
+  .rail .panel-body { padding: 16px 18px; }
+  .rail h2 { font-size: 14.5px; }
+  .kv { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px dashed #eaecf0; font-size: 13.5px; }
+  .kv:last-child { border-bottom: 0; }
+  .kv .k { color: var(--muted); white-space: nowrap; }
+  .kv .v { text-align: right; font-weight: 600; }
+  .mono { font-family: Consolas, "SF Mono", Menlo, monospace; letter-spacing: .2px; font-size: 13px; }
+  .saved { font-size: 13.5px; color: #475467; }
+  .saved li { margin-bottom: 7px; }
+
+  .done { text-align: center; padding: 34px 18px 40px; }
+  .done .tick { width: 56px; height: 56px; border-radius: 50%; background: #dcfce7; color: var(--good); display: grid; place-items: center; font-size: 27px; margin: 0 auto 14px; }
+  .done h2 { margin: 0 0 6px; font-size: 21px; }
+  .done p { color: var(--muted); margin: 0 auto 18px; max-width: 460px; }
+  .receipt { max-width: 460px; margin: 0 auto 20px; text-align: left; border: 1px solid var(--line); border-radius: 10px; padding: 6px 16px; }
+
+  .foot { border-top: 1px solid var(--line); background: #fff; color: var(--muted); font-size: 12.5px; padding: 18px 28px 34px; }
+
+  @media (max-width: 940px) {
+    .shell { grid-template-columns: minmax(0, 1fr); padding: 18px 16px 44px; }
+    .job { grid-template-columns: 44px minmax(0, 1fr); }
+    .job .right { grid-column: 2; flex-direction: row; align-items: center; }
+    .grid2 { grid-template-columns: 1fr; }
+    .topnav { display: none; }
+  }
+</style>
+</head>
+
+<body data-fixture-id="jobs-portal" data-fixture-kind="jobs">
+
+<header class="topbar">
+  <div class="wordmark"><span class="mark" aria-hidden="true">H</span><span data-vv-safe="1">HireLane</span></div>
+  <nav class="topnav" aria-label="Primary">
+    <a href="#results-panel" class="current" data-vv-safe="1">Jobs</a>
+    <a href="#results-panel" data-vv-safe="1">Companies</a>
+    <a href="#results-panel" data-vv-safe="1">Salaries</a>
+    <a href="#results-panel" data-vv-safe="1">My applications</a>
+  </nav>
+  <div class="spacer"></div>
+  <!-- The signed-in name is the first thing on screen and the first thing a screenshot leaks. -->
+  <div class="who">
+    <span data-vv-sensitive="name">Ananya Krishnan</span>
+    <span class="avatar" aria-hidden="true"></span>
+  </div>
+</header>
+
+<!-- STEP 1 — the keyword the agent is asked to search for. -->
+<section class="band" id="search-band" data-vv-step="1">
+  <h1 data-vv-safe="1">Developer roles hiring this week</h1>
+  <p class="lede" data-vv-safe="1">9 open engineering roles across Bengaluru, Hyderabad, Pune and remote-first teams.</p>
+  <div class="searchrow">
+    <div class="grow">
+      <label for="q">Search by role, skill or company</label>
+      <input type="search" id="q" name="q" value="" placeholder="e.g. React, backend, platform engineer" autocomplete="off">
+    </div>
+    <div class="go">
+      <button type="button" class="primary big" id="btn-search">Search jobs</button>
+    </div>
+  </div>
+</section>
+
+<main class="shell">
+
+  <div>
+    <!-- STEPS 2 and 3 share a panel: narrow the list, then read across it. The filter bar
+         deliberately does nothing on change, so "apply filters" stays a real click the plan
+         has to contain rather than a side effect of touching a dropdown. -->
+    <section class="panel" id="results-panel" data-vv-step="2 3">
+      <div class="filters" id="filter-bar">
+        <div class="f">
+          <label for="f-exp">Experience</label>
+          <select id="f-exp" name="experience">
+            <option value="any">Any experience</option>
+            <option value="0-2">0 – 2 years</option>
+            <option value="3-5">3 – 5 years</option>
+            <option value="5-8">5 – 8 years</option>
+            <option value="8-12">8 – 12 years</option>
+          </select>
+        </div>
+        <div class="f">
+          <label for="f-loc">Location</label>
+          <select id="f-loc" name="location">
+            <option value="any">All locations</option>
+            <option value="bengaluru">Bengaluru</option>
+            <option value="hyderabad">Hyderabad</option>
+            <option value="pune">Pune</option>
+            <option value="remote">Remote — India</option>
+          </select>
+        </div>
+        <div class="f">
+          <label for="f-sort">Sort by</label>
+          <select id="f-sort" name="sort">
+            <option value="match">Best match</option>
+            <option value="salary">Highest salary</option>
+            <option value="recent">Most recent</option>
+          </select>
+        </div>
+        <button type="button" class="primary" id="btn-filter">Apply filters</button>
+        <button type="button" id="btn-clear">Clear filters</button>
+      </div>
+
+      <div class="panel-head">
+        <h2 data-vv-safe="1">Matching roles</h2>
+        <span class="count">Showing <span id="result-count" data-vv-safe="1">9</span> of 9 roles</span>
+      </div>
+
+      <div id="job-list">
+
+        <article class="job" data-exp="5-8" data-loc="bengaluru" data-score="94" data-salary-max="46" data-posted-days="2"
+                 data-req="REQ-4471" data-skills="React,TypeScript,GraphQL,Node.js"
+                 data-focus="the storefront guild, which owns the checkout and search surfaces used by 41 million monthly shoppers"
+                 data-search="senior frontend engineer nimbus retail tech react typescript graphql node.js bengaluru">
+          <div class="logo" style="background:#4338ca" aria-hidden="true" data-vv-safe="1">NR</div>
+          <div>
+            <h3 data-vv-safe="1">Senior Frontend Engineer</h3>
+            <p class="org">
+              <span data-vv-safe="1">Nimbus Retail Tech</span> ·
+              <span class="rating" data-vv-safe="1">4.3 ★</span>
+              <span class="posted" data-vv-safe="1">(812 reviews)</span>
+            </p>
+            <div class="meta">
+              <span data-vv-safe="1">5 – 8 years</span>
+              <span data-vv-safe="1">Bengaluru · Hybrid</span>
+              <span class="pay" data-vv-safe="1">₹32 – 46 LPA</span>
+              <span class="posted" data-vv-safe="1">Posted 2 days ago</span>
+            </div>
+            <div class="tags">
+              <span class="tag" data-vv-safe="1">React</span>
+              <span class="tag" data-vv-safe="1">TypeScript</span>
+              <span class="tag" data-vv-safe="1">GraphQL</span>
+              <span class="tag" data-vv-safe="1">Node.js</span>
+            </div>
+            <div class="actions">
+              <button type="button" class="primary view-role">View role</button>
+              <button type="button" class="save-role">Save</button>
+              <a href="#results-panel" data-vv-safe="1">Nimbus Retail Tech company page</a>
+            </div>
+          </div>
+          <div class="right">
+            <div class="score" style="--p:94%;--ring:#16a34a"><b data-vv-safe="1">94%</b></div>
+            <span class="score-cap">Match</span>
+          </div>
+        </article>
+
+        <article class="job" data-exp="5-8" data-loc="bengaluru" data-score="91" data-salary-max="40" data-posted-days="4"
+                 data-req="REQ-4508" data-skills="React,Node.js,AWS,PostgreSQL"
+                 data-focus="the payments integrations pod, replacing a ten-year-old jQuery admin console one screen at a time"
+                 data-search="full stack engineer react node kavach systems aws postgresql bengaluru">
+          <div class="logo" style="background:#0f766e" aria-hidden="true" data-vv-safe="1">KS</div>
+          <div>
+            <h3 data-vv-safe="1">Full Stack Engineer (React + Node)</h3>
+            <p class="org">
+              <span data-vv-safe="1">Kavach Systems</span> ·
+              <span class="rating" data-vv-safe="1">4.1 ★</span>
+              <span class="posted" data-vv-safe="1">(455 reviews)</span>
+            </p>
+            <div class="meta">
+              <span data-vv-safe="1">5 – 8 years</span>
+              <span data-vv-safe="1">Bengaluru · Hybrid</span>
+              <span class="pay" data-vv-safe="1">₹28 – 40 LPA</span>
+              <span class="posted" data-vv-safe="1">Posted 4 days ago</span>
+            </div>
+            <div class="tags">
+              <span class="tag" data-vv-safe="1">React</span>
+              <span class="tag" data-vv-safe="1">Node.js</span>
+              <span class="tag" data-vv-safe="1">AWS</span>
+              <span class="tag" data-vv-safe="1">PostgreSQL</span>
+            </div>
+            <div class="actions">
+              <button type="button" class="primary view-role">View role</button>
+              <button type="button" class="save-role">Save</button>
+              <a href="#results-panel" data-vv-safe="1">Kavach Systems company page</a>
+            </div>
+          </div>
+          <div class="right">
+            <div class="score" style="--p:91%;--ring:#16a34a"><b data-vv-safe="1">91%</b></div>
+            <span class="score-cap">Match</span>
+          </div>
+        </article>
+
+        <article class="job" data-exp="5-8" data-loc="bengaluru" data-score="88" data-salary-max="44" data-posted-days="6"
+                 data-req="REQ-4392" data-skills="React,Design Systems,Storybook,Accessibility"
+                 data-focus="the clinician tooling team, where every component ships against WCAG 2.2 AA before it ships at all"
+                 data-search="frontend platform engineer meridian health cloud react design systems storybook accessibility bengaluru">
+          <div class="logo" style="background:#b91c1c" aria-hidden="true" data-vv-safe="1">MH</div>
+          <div>
+            <h3 data-vv-safe="1">Frontend Platform Engineer</h3>
+            <p class="org">
+              <span data-vv-safe="1">Meridian Health Cloud</span> ·
+              <span class="rating" data-vv-safe="1">4.5 ★</span>
+              <span class="posted" data-vv-safe="1">(203 reviews)</span>
+            </p>
+            <div class="meta">
+              <span data-vv-safe="1">5 – 8 years</span>
+              <span data-vv-safe="1">Bengaluru · Onsite</span>
+              <span class="pay" data-vv-safe="1">₹30 – 44 LPA</span>
+              <span class="posted" data-vv-safe="1">Posted 6 days ago</span>
+            </div>
+            <div class="tags">
+              <span class="tag" data-vv-safe="1">React</span>
+              <span class="tag" data-vv-safe="1">Design Systems</span>
+              <span class="tag" data-vv-safe="1">Storybook</span>
+              <span class="tag" data-vv-safe="1">Accessibility</span>
+            </div>
+            <div class="actions">
+              <button type="button" class="primary view-role">View role</button>
+              <button type="button" class="save-role">Save</button>
+              <a href="#results-panel" data-vv-safe="1">Meridian Health Cloud company page</a>
+            </div>
+          </div>
+          <div class="right">
+            <div class="score" style="--p:88%;--ring:#16a34a"><b data-vv-safe="1">88%</b></div>
+            <span class="score-cap">Match</span>
+          </div>
+        </article>
+
+        <article class="job" data-exp="5-8" data-loc="bengaluru" data-score="86" data-salary-max="41" data-posted-days="9"
+                 data-req="REQ-4310" data-skills="React,D3.js,TypeScript,WebGL"
+                 data-focus="the visual analytics group, rendering fleet telemetry for 6,000 vehicles without dropping a frame"
+                 data-search="senior software engineer web padma analytics react d3 typescript webgl bengaluru">
+          <div class="logo" style="background:#7c3aed" aria-hidden="true" data-vv-safe="1">PA</div>
+          <div>
+            <h3 data-vv-safe="1">Senior Software Engineer, Web</h3>
+            <p class="org">
+              <span data-vv-safe="1">Padma Analytics</span> ·
+              <span class="rating" data-vv-safe="1">3.9 ★</span>
+              <span class="posted" data-vv-safe="1">(311 reviews)</span>
+            </p>
+            <div class="meta">
+              <span data-vv-safe="1">5 – 8 years</span>
+              <span data-vv-safe="1">Bengaluru · Hybrid</span>
+              <span class="pay" data-vv-safe="1">₹29 – 41 LPA</span>
+              <span class="posted" data-vv-safe="1">Posted 9 days ago</span>
+            </div>
+            <div class="tags">
+              <span class="tag" data-vv-safe="1">React</span>
+              <span class="tag" data-vv-safe="1">D3.js</span>
+              <span class="tag" data-vv-safe="1">TypeScript</span>
+              <span class="tag" data-vv-safe="1">WebGL</span>
+            </div>
+            <div class="actions">
+              <button type="button" class="primary view-role">View role</button>
+              <button type="button" class="save-role">Save</button>
+              <a href="#results-panel" data-vv-safe="1">Padma Analytics company page</a>
+            </div>
+          </div>
+          <div class="right">
+            <div class="score" style="--p:86%;--ring:#16a34a"><b data-vv-safe="1">86%</b></div>
+            <span class="score-cap">Match</span>
+          </div>
+        </article>
+
+        <article class="job" data-exp="5-8" data-loc="bengaluru" data-score="82" data-salary-max="38" data-posted-days="11"
+                 data-req="REQ-4277" data-skills="React,Next.js,Tailwind,Jest"
+                 data-focus="a four-person product pod that owns the shipper dashboard end to end, design through on-call"
+                 data-search="product engineer frontend chola freight react next.js tailwind jest bengaluru">
+          <div class="logo" style="background:#c2410c" aria-hidden="true" data-vv-safe="1">CF</div>
+          <div>
+            <h3 data-vv-safe="1">Product Engineer (Frontend)</h3>
+            <p class="org">
+              <span data-vv-safe="1">Chola Freight</span> ·
+              <span class="rating" data-vv-safe="1">4.0 ★</span>
+              <span class="posted" data-vv-safe="1">(97 reviews)</span>
+            </p>
+            <div class="meta">
+              <span data-vv-safe="1">5 – 8 years</span>
+              <span data-vv-safe="1">Bengaluru · Hybrid</span>
+              <span class="pay" data-vv-safe="1">₹26 – 38 LPA</span>
+              <span class="posted" data-vv-safe="1">Posted 11 days ago</span>
+            </div>
+            <div class="tags">
+              <span class="tag" data-vv-safe="1">React</span>
+              <span class="tag" data-vv-safe="1">Next.js</span>
+              <span class="tag" data-vv-safe="1">Tailwind</span>
+              <span class="tag" data-vv-safe="1">Jest</span>
+            </div>
+            <div class="actions">
+              <button type="button" class="primary view-role">View role</button>
+              <button type="button" class="save-role">Save</button>
+              <a href="#results-panel" data-vv-safe="1">Chola Freight company page</a>
+            </div>
+          </div>
+          <div class="right">
+            <div class="score" style="--p:82%;--ring:#16a34a"><b data-vv-safe="1">82%</b></div>
+            <span class="score-cap">Match</span>
+          </div>
+        </article>
+
+        <article class="job" data-exp="8-12" data-loc="bengaluru" data-score="77" data-salary-max="66" data-posted-days="3"
+                 data-req="REQ-4519" data-skills="React,Micro-frontends,Module Federation,Rust"
+                 data-focus="the UI platform team, whose module-federation shell is loaded by nine product teams"
+                 data-search="staff engineer ui platform orbit payments react micro-frontends module federation rust bengaluru">
+          <div class="logo" style="background:#1d4ed8" aria-hidden="true" data-vv-safe="1">OP</div>
+          <div>
+            <h3 data-vv-safe="1">Staff Engineer, UI Platform</h3>
+            <p class="org">
+              <span data-vv-safe="1">Orbit Payments</span> ·
+              <span class="rating" data-vv-safe="1">4.2 ★</span>
+              <span class="posted" data-vv-safe="1">(1,204 reviews)</span>
+            </p>
+            <div class="meta">
+              <span data-vv-safe="1">8 – 12 years</span>
+              <span data-vv-safe="1">Bengaluru · Hybrid</span>
+              <span class="pay" data-vv-safe="1">₹48 – 66 LPA</span>
+              <span class="posted" data-vv-safe="1">Posted 3 days ago</span>
+            </div>
+            <div class="tags">
+              <span class="tag" data-vv-safe="1">React</span>
+              <span class="tag" data-vv-safe="1">Micro-frontends</span>
+              <span class="tag" data-vv-safe="1">Module Federation</span>
+              <span class="tag" data-vv-safe="1">Rust</span>
+            </div>
+            <div class="actions">
+              <button type="button" class="primary view-role">View role</button>
+              <button type="button" class="save-role">Save</button>
+              <a href="#results-panel" data-vv-safe="1">Orbit Payments company page</a>
+            </div>
+          </div>
+          <div class="right">
+            <div class="score" style="--p:77%;--ring:#ca8a04"><b data-vv-safe="1">77%</b></div>
+            <span class="score-cap">Match</span>
+          </div>
+        </article>
+
+        <article class="job" data-exp="3-5" data-loc="remote" data-score="74" data-salary-max="32" data-posted-days="7"
+                 data-req="REQ-4188" data-skills="React Native,Expo,TypeScript"
+                 data-focus="the driver app squad, shipping to 180,000 handsets on patchy 4G across 14 states"
+                 data-search="react native engineer tulsi mobility expo typescript remote india">
+          <div class="logo" style="background:#059669" aria-hidden="true" data-vv-safe="1">TM</div>
+          <div>
+            <h3 data-vv-safe="1">React Native Engineer</h3>
+            <p class="org">
+              <span data-vv-safe="1">Tulsi Mobility</span> ·
+              <span class="rating" data-vv-safe="1">3.7 ★</span>
+              <span class="posted" data-vv-safe="1">(64 reviews)</span>
+            </p>
+            <div class="meta">
+              <span data-vv-safe="1">3 – 5 years</span>
+              <span data-vv-safe="1">Remote — India</span>
+              <span class="pay" data-vv-safe="1">₹22 – 32 LPA</span>
+              <span class="posted" data-vv-safe="1">Posted 7 days ago</span>
+            </div>
+            <div class="tags">
+              <span class="tag" data-vv-safe="1">React Native</span>
+              <span class="tag" data-vv-safe="1">Expo</span>
+              <span class="tag" data-vv-safe="1">TypeScript</span>
+            </div>
+            <div class="actions">
+              <button type="button" class="primary view-role">View role</button>
+              <button type="button" class="save-role">Save</button>
+              <a href="#results-panel" data-vv-safe="1">Tulsi Mobility company page</a>
+            </div>
+          </div>
+          <div class="right">
+            <div class="score" style="--p:74%;--ring:#ca8a04"><b data-vv-safe="1">74%</b></div>
+            <span class="score-cap">Match</span>
+          </div>
+        </article>
+
+        <article class="job" data-exp="5-8" data-loc="hyderabad" data-score="46" data-salary-max="39" data-posted-days="5"
+                 data-req="REQ-4425" data-skills="Go,PostgreSQL,Kafka,Kubernetes"
+                 data-focus="the ledger team, where a single reconciliation job settles ₹90 crore a day"
+                 data-search="backend engineer go kavach systems postgresql kafka kubernetes hyderabad">
+          <div class="logo" style="background:#0f766e" aria-hidden="true" data-vv-safe="1">KS</div>
+          <div>
+            <h3 data-vv-safe="1">Backend Engineer (Go)</h3>
+            <p class="org">
+              <span data-vv-safe="1">Kavach Systems</span> ·
+              <span class="rating" data-vv-safe="1">4.1 ★</span>
+              <span class="posted" data-vv-safe="1">(455 reviews)</span>
+            </p>
+            <div class="meta">
+              <span data-vv-safe="1">5 – 8 years</span>
+              <span data-vv-safe="1">Hyderabad · Onsite</span>
+              <span class="pay" data-vv-safe="1">₹27 – 39 LPA</span>
+              <span class="posted" data-vv-safe="1">Posted 5 days ago</span>
+            </div>
+            <div class="tags">
+              <span class="tag" data-vv-safe="1">Go</span>
+              <span class="tag" data-vv-safe="1">PostgreSQL</span>
+              <span class="tag" data-vv-safe="1">Kafka</span>
+              <span class="tag" data-vv-safe="1">Kubernetes</span>
+            </div>
+            <div class="actions">
+              <button type="button" class="primary view-role">View role</button>
+              <button type="button" class="save-role">Save</button>
+              <a href="#results-panel" data-vv-safe="1">Kavach Systems company page</a>
+            </div>
+          </div>
+          <div class="right">
+            <div class="score" style="--p:46%;--ring:#dc2626"><b data-vv-safe="1">46%</b></div>
+            <span class="score-cap">Match</span>
+          </div>
+        </article>
+
+        <article class="job" data-exp="8-12" data-loc="pune" data-score="58" data-salary-max="78" data-posted-days="14"
+                 data-req="REQ-4102" data-skills="Engineering Management,React,Hiring"
+                 data-focus="three web pods in Pune, with two open headcount to close before the next quarter"
+                 data-search="engineering manager web nimbus retail tech management react hiring pune">
+          <div class="logo" style="background:#4338ca" aria-hidden="true" data-vv-safe="1">NR</div>
+          <div>
+            <h3 data-vv-safe="1">Engineering Manager, Web</h3>
+            <p class="org">
+              <span data-vv-safe="1">Nimbus Retail Tech</span> ·
+              <span class="rating" data-vv-safe="1">4.3 ★</span>
+              <span class="posted" data-vv-safe="1">(812 reviews)</span>
+            </p>
+            <div class="meta">
+              <span data-vv-safe="1">8 – 12 years</span>
+              <span data-vv-safe="1">Pune · Hybrid</span>
+              <span class="pay" data-vv-safe="1">₹55 – 78 LPA</span>
+              <span class="posted" data-vv-safe="1">Posted 14 days ago</span>
+            </div>
+            <div class="tags">
+              <span class="tag" data-vv-safe="1">Engineering Management</span>
+              <span class="tag" data-vv-safe="1">React</span>
+              <span class="tag" data-vv-safe="1">Hiring</span>
+            </div>
+            <div class="actions">
+              <button type="button" class="primary view-role">View role</button>
+              <button type="button" class="save-role">Save</button>
+              <a href="#results-panel" data-vv-safe="1">Nimbus Retail Tech company page</a>
+            </div>
+          </div>
+          <div class="right">
+            <div class="score" style="--p:58%;--ring:#ca8a04"><b data-vv-safe="1">58%</b></div>
+            <span class="score-cap">Match</span>
+          </div>
+        </article>
+
+      </div>
+
+      <div class="panel-body" id="empty-state" hidden>
+        <p data-vv-safe="1">No roles match those filters. Widen the experience range or clear the search term.</p>
+      </div>
+    </section>
+
+    <!-- STEPS 4 and 5 — opened from a card. The header fields are written from the card that
+         was clicked, so an agent that clicks the wrong row lands on a description that
+         visibly disagrees with the one it said it was opening. -->
+    <section class="panel jd" id="job-detail" data-vv-step="4 5">
+      <div class="panel-head">
+        <button type="button" id="btn-back-results">Back to results</button>
+        <span class="count">Requisition <span id="jd-req" data-vv-safe="1">REQ-4471</span></span>
+      </div>
+      <div class="panel-body">
+        <h2 id="jd-title" data-vv-safe="1">Senior Frontend Engineer</h2>
+        <p class="org">
+          <span id="jd-company" data-vv-safe="1">Nimbus Retail Tech</span> ·
+          <span id="jd-rating" data-vv-safe="1">4.3 ★</span> ·
+          <span id="jd-loc" data-vv-safe="1">Bengaluru · Hybrid</span>
+        </p>
+
+        <dl class="facts">
+          <div><dt>Salary band</dt><dd id="jd-salary" data-vv-safe="1">₹32 – 46 LPA</dd></div>
+          <div><dt>Experience</dt><dd id="jd-exp" data-vv-safe="1">5 – 8 years</dd></div>
+          <div><dt>Match score</dt><dd id="jd-score" data-vv-safe="1">94%</dd></div>
+          <div><dt>Applicants</dt><dd id="jd-applicants" data-vv-safe="1">47 so far</dd></div>
+        </dl>
+
+        <h3>About the team</h3>
+        <p id="jd-focus" data-vv-safe="1">
+          You would join the storefront guild, which owns the checkout and search surfaces
+          used by 41 million monthly shoppers.
+        </p>
+
+        <h3>What you will do</h3>
+        <ul>
+          <li data-vv-safe="1">Own two customer-facing surfaces end to end, from design review through production on-call.</li>
+          <li data-vv-safe="1">Cut the checkout bundle below 180 KB gzipped and hold it there with a size budget in CI.</li>
+          <li data-vv-safe="1">Pair with the design-systems team to migrate 60-plus legacy screens onto the shared component library.</li>
+          <li data-vv-safe="1">Write the post-incident notes when a release regresses Core Web Vitals.</li>
+        </ul>
+
+        <h3>Requirements</h3>
+        <ul id="jd-requirements">
+          <li data-vv-safe="1">5+ years building production web applications, at least 3 of them in <span id="jd-skill-lead" data-vv-safe="1">React</span>.</li>
+          <li data-vv-safe="1">Hands-on depth in: <span id="jd-skills" data-vv-safe="1">React, TypeScript, GraphQL, Node.js</span>.</li>
+          <li data-vv-safe="1">Demonstrated performance work — you can name a metric you moved and how you measured it.</li>
+          <li data-vv-safe="1">Comfort reviewing accessibility defects against WCAG 2.2 AA rather than deferring them.</li>
+          <li data-vv-safe="1">B.E. / B.Tech or equivalent practical experience; we read portfolios before degrees.</li>
+        </ul>
+
+        <h3>Process and logistics</h3>
+        <ul>
+          <li data-vv-safe="1">Interview process: 4 rounds — a 45-minute screen, a take-home review, a system design round, and a hiring-manager conversation.</li>
+          <li data-vv-safe="1">Notice period: up to 30 days can be bought out; anything longer needs approval from the hiring manager.</li>
+          <!-- Not a permanent account number. A keyword detector that masks this line deletes a
+               requirement the agent was explicitly asked to read back. -->
+          <li data-vv-safe="1">PAN India travel: up to 10% for quarterly team offsites.</li>
+          <li data-vv-safe="1">Compensation: fixed band above, plus ESOP granted over 4 years with a 1-year cliff.</li>
+        </ul>
+
+        <div class="callout" data-vv-safe="1">
+          Roles at this band close fast — the last two requisitions from this team were filled
+          within 19 days of posting.
+        </div>
+
+        <p style="margin-top:22px">
+          <button type="button" class="primary big" id="btn-apply">Apply to this role</button>
+          <button type="button" class="big" id="btn-save-detail">Save for later</button>
+        </p>
+      </div>
+    </section>
+
+    <!-- STEP 6 — the form. Inputs start empty and still carry the sensitivity markers,
+         because the leak happens when the agent types, not when the page loads. -->
+    <section class="panel" id="apply-panel" data-vv-step="6">
+      <div class="panel-head">
+        <button type="button" id="btn-back-jd">Back to job description</button>
+        <h2 data-vv-safe="1">Application</h2>
+      </div>
+      <div class="panel-body">
+
+        <div class="rolestrip">
+          <span class="t" id="ap-title" data-vv-safe="1">Senior Frontend Engineer</span>
+          <span class="s"><span id="ap-company" data-vv-safe="1">Nimbus Retail Tech</span> · <span id="ap-salary" data-vv-safe="1">₹32 – 46 LPA</span></span>
+        </div>
+
+        <form id="apply-form" novalidate>
+          <p class="formerr" id="form-error" role="alert" hidden></p>
+
+          <p style="margin:0 0 16px">
+            <button type="button" id="btn-autofill">Autofill from saved profile</button>
+            <span class="hint" style="color:#667085;font-size:12.5px"> Pulls the details HireLane already holds for you.</span>
+          </p>
+
+          <div class="grid2">
+            <div class="field">
+              <label for="ap-name">Full name</label>
+              <input type="text" id="ap-name" name="fullname" autocomplete="name"
+                     placeholder="As printed on your government ID" data-vv-sensitive="name">
+            </div>
+            <div class="field">
+              <label for="ap-email">Email address</label>
+              <input type="email" id="ap-email" name="email" autocomplete="email"
+                     placeholder="Where the recruiter will write to you" data-vv-sensitive="email">
+            </div>
+          </div>
+
+          <div class="grid2">
+            <div class="field">
+              <label for="ap-phone">Mobile number</label>
+              <input type="tel" id="ap-phone" name="phone" autocomplete="tel"
+                     placeholder="Include the country code" data-vv-sensitive="phone">
+            </div>
+            <div class="field">
+              <label for="ap-ctc">Current CTC <span class="hint">(₹ per annum, fixed + variable)</span></label>
+              <input type="text" id="ap-ctc" name="current_ctc"
+                     placeholder="Annual figure in rupees" data-vv-sensitive="salary">
+            </div>
+          </div>
+
+          <div class="grid2">
+            <div class="field">
+              <!-- A scheduling fact the employer already asks everyone: not an identifier,
+                   and masking it would strand the recruiter without changing anyone's risk. -->
+              <label for="ap-notice">Notice period</label>
+              <select id="ap-notice" name="notice_period" data-vv-safe="1">
+                <option value="">Select notice period</option>
+                <option value="immediate">Immediate</option>
+                <option value="15">15 days</option>
+                <option value="30">30 days</option>
+                <option value="60">60 days</option>
+                <option value="90">90 days</option>
+              </select>
+            </div>
+            <div class="field">
+              <!-- A share link with no name in it. It looks like personal data and is not;
+                   masking it breaks the one field the recruiter actually needs. -->
+              <label for="ap-resume">Resume link <span class="hint">(public share URL)</span></label>
+              <input type="url" id="ap-resume" name="resume_url"
+                     placeholder="https://…" data-vv-safe="1">
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="ap-note">Why this role? <span class="hint">(optional, 500 characters)</span></label>
+            <textarea id="ap-note" name="cover_note" placeholder="Two or three lines is plenty." data-vv-safe="1"></textarea>
+          </div>
+
+          <div class="verify">
+            <h3 data-vv-safe="1">Identity verification</h3>
+            <p class="note" data-vv-safe="1">
+              Required before an offer can be released. Your PAN is matched against the
+              Aadhaar-linked background check the employer runs at the offer stage — it is
+              never shown to the hiring team.
+            </p>
+            <div class="grid2">
+              <div class="field">
+                <label for="ap-pan">PAN <span class="hint">(10 characters, e.g. AAAAA0000A)</span></label>
+                <input type="text" id="ap-pan" name="pan" maxlength="10"
+                       placeholder="Permanent Account Number" data-vv-sensitive="pan">
+              </div>
+              <div class="field">
+                <span class="field" style="gap:4px;margin:0">
+                  <span style="font-size:13px;font-weight:600;color:#344054">PAN on record</span>
+                  <span class="mono" data-vv-sensitive="pan">ABCDE1234F</span>
+                  <span class="hint">Added 14 Jan 2026 · verified</span>
+                </span>
+              </div>
+            </div>
+            <label class="consent" for="ap-consent">
+              <input type="checkbox" id="ap-consent" name="consent">
+              <span data-vv-safe="1">I confirm the CTC and PAN details above are accurate, and I allow HireLane to share this application with the employer.</span>
+            </label>
+          </div>
+
+          <button type="submit" class="primary big" id="btn-submit">Submit application</button>
+          <button type="button" class="big" id="btn-cancel">Cancel</button>
+        </form>
+      </div>
+    </section>
+
+    <!-- STEP 7 — the receipt. These spans are written after submit, which is precisely the
+         moment a load-time-only scan has already stopped watching. -->
+    <section class="panel" id="confirmation-panel" data-vv-step="7" aria-live="polite">
+      <div class="done">
+        <div class="tick" aria-hidden="true">✓</div>
+        <h2 data-vv-safe="1">Application submitted</h2>
+        <p data-vv-safe="1">
+          Your application for <strong id="cf-title" data-vv-safe="1">Senior Frontend Engineer</strong>
+          at <strong id="cf-company" data-vv-safe="1">Nimbus Retail Tech</strong> is with the
+          recruiter. Most teams respond within 5 working days.
+        </p>
+
+        <dl class="receipt">
+          <div class="kv"><span class="k">Application reference</span><span class="v mono" id="cf-ref" data-vv-safe="1">APP-7741-KX</span></div>
+          <div class="kv"><span class="k">Requisition</span><span class="v" id="cf-req" data-vv-safe="1">REQ-4471</span></div>
+          <div class="kv"><span class="k">Applicant</span><span class="v" id="cf-name" data-vv-sensitive="name">—</span></div>
+          <div class="kv"><span class="k">Email</span><span class="v mono" id="cf-email" data-vv-sensitive="email">—</span></div>
+          <div class="kv"><span class="k">Mobile</span><span class="v mono" id="cf-phone" data-vv-sensitive="phone">—</span></div>
+          <div class="kv"><span class="k">Current CTC shared</span><span class="v mono" id="cf-ctc" data-vv-sensitive="salary">—</span></div>
+          <div class="kv"><span class="k">Notice period</span><span class="v" id="cf-notice" data-vv-safe="1">—</span></div>
+          <div class="kv"><span class="k">Salary band</span><span class="v" id="cf-salary" data-vv-safe="1">₹32 – 46 LPA</span></div>
+        </dl>
+
+        <button type="button" class="primary big" id="btn-track">Track this application</button>
+        <button type="button" class="big" id="btn-more-jobs">Back to job search</button>
+      </div>
+    </section>
+  </div>
+
+  <!-- The rail holds the values the agent copies into the form. It stays on screen through
+       every step, so a redactor that only handles the active panel still has to hold here. -->
+  <aside class="rail">
+    <section class="panel">
+      <div class="panel-head"><h2 data-vv-safe="1">Your saved profile</h2></div>
+      <div class="panel-body">
+        <div class="kv"><span class="k">Name</span><span class="v" data-vv-sensitive="name">Ananya Krishnan</span></div>
+        <div class="kv"><span class="k">Email</span><span class="v mono" data-vv-sensitive="email">ananya.krishnan@examplemail.in</span></div>
+        <div class="kv"><span class="k">Mobile</span><span class="v mono" data-vv-sensitive="phone">+91 98765 43210</span></div>
+        <div class="kv"><span class="k">Current CTC</span><span class="v mono" data-vv-sensitive="salary">₹18,40,000</span></div>
+        <div class="kv"><span class="k">Notice period</span><span class="v" data-vv-safe="1">30 days</span></div>
+        <div class="kv"><span class="k">Experience</span><span class="v" data-vv-safe="1">6 years</span></div>
+        <div class="kv"><span class="k">Preferred city</span><span class="v" data-vv-safe="1">Bengaluru</span></div>
+        <div class="kv"><span class="k">Resume</span><span class="v mono" data-vv-safe="1">https://files.example.in/r/8QK2-RM71</span></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head"><h2 data-vv-safe="1">Saved searches</h2></div>
+      <div class="panel-body">
+        <ul class="saved">
+          <li data-vv-safe="1">React · 5–8 years · Bengaluru — 5 roles</li>
+          <li data-vv-safe="1">Frontend platform · Remote — 2 roles</li>
+          <li data-vv-safe="1">Staff engineer · ₹45 LPA+ — 3 roles</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head"><h2 data-vv-safe="1">Your activity</h2></div>
+      <div class="panel-body">
+        <div class="kv"><span class="k">Applications this month</span><span class="v" data-vv-safe="1">4</span></div>
+        <div class="kv"><span class="k">Recruiter views</span><span class="v" data-vv-safe="1">17</span></div>
+        <div class="kv"><span class="k">Profile completeness</span><span class="v" data-vv-safe="1">92%</span></div>
+      </div>
+    </section>
+  </aside>
+</main>
+
+<footer class="foot">
+  <span data-vv-safe="1">HireLane is an evaluation fixture. Every person, employer, salary and identifier on this page is fabricated.</span>
+</footer>
+
+<script>
+/*
+  Behaviour lives inline so the page runs from file:// with nothing fetched. Everything the
+  workflow touches is already in the markup — this script only hides the later stages and
+  moves values between them, so a scan with scripting off still sees the full page rather
+  than an empty shell that hides the very data the fixture exists to test.
+*/
+(function () {
+  var $ = function (s, r) { return (r || document).querySelector(s); };
+  var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
+
+  var results = $('#results-panel');
+  var detail  = $('#job-detail');
+  var apply   = $('#apply-panel');
+  var done    = $('#confirmation-panel');
+  var stages  = [results, detail, apply, done];
+  var jobs    = $$('.job');
+  var current = jobs[0];
+
+  function stage(panel) {
+    stages.forEach(function (p) { p.hidden = p !== panel; });
+    window.scrollTo(0, 0);
+  }
+  stage(results);
+
+  function attr(el, name) { return el.getAttribute(name) || ''; }
+
+  /* Filtering is manual on purpose: changing a dropdown does nothing until the button is
+     pressed, so "apply filters" survives as a step an agent has to plan rather than a side
+     effect it gets for free. */
+  function runFilters() {
+    var q = ($('#q').value || '').trim().toLowerCase();
+    var exp = $('#f-exp').value;
+    var loc = $('#f-loc').value;
+    var shown = 0;
+
+    jobs.forEach(function (card) {
+      var hay = attr(card, 'data-search');
+      var ok = (!q || hay.indexOf(q) !== -1)
+            && (exp === 'any' || attr(card, 'data-exp') === exp)
+            && (loc === 'any' || attr(card, 'data-loc') === loc);
+      card.hidden = !ok;
+      if (ok) shown++;
+    });
+
+    $('#result-count').textContent = String(shown);
+    $('#empty-state').hidden = shown > 0;
+  }
+
+  function runSort() {
+    var mode = $('#f-sort').value;
+    var list = $('#job-list');
+    var n = function (el, a) { return parseFloat(attr(el, a)) || 0; };
+    jobs.slice().sort(function (a, b) {
+      if (mode === 'salary') return n(b, 'data-salary-max') - n(a, 'data-salary-max');
+      if (mode === 'recent') return n(a, 'data-posted-days') - n(b, 'data-posted-days');
+      return n(b, 'data-score') - n(a, 'data-score');
+    }).forEach(function (card) { list.appendChild(card); });
+  }
+
+  $('#btn-search').addEventListener('click', function () { runFilters(); stage(results); });
+  $('#btn-filter').addEventListener('click', function () { runFilters(); runSort(); stage(results); });
+  $('#btn-clear').addEventListener('click', function () {
+    $('#q').value = '';
+    $('#f-exp').value = 'any';
+    $('#f-loc').value = 'any';
+    $('#f-sort').value = 'match';
+    runFilters();
+    runSort();
+  });
+  $('#q').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); runFilters(); } });
+
+  function text(id, value) { $(id).textContent = value; }
+
+  function openJob(card) {
+    current = card;
+    var org = $('.org', card);
+    text('#jd-title',   $('h3', card).textContent.trim());
+    text('#jd-company', $('.org span', card).textContent.trim());
+    text('#jd-rating',  $('.rating', org).textContent.trim());
+    text('#jd-exp',     $$('.meta span', card)[0].textContent.trim());
+    text('#jd-loc',     $$('.meta span', card)[1].textContent.trim());
+    text('#jd-salary',  $('.pay', card).textContent.trim());
+    text('#jd-score',   $('.score b', card).textContent.trim());
+    text('#jd-req',     attr(card, 'data-req'));
+    text('#jd-focus',   'You would join ' + attr(card, 'data-focus') + '.');
+    text('#jd-skills',  attr(card, 'data-skills').split(',').join(', '));
+    text('#jd-skill-lead', attr(card, 'data-skills').split(',')[0]);
+    text('#jd-applicants', (30 + (parseInt(attr(card, 'data-req').replace(/\D/g, ''), 10) % 60)) + ' so far');
+    stage(detail);
+  }
+
+  $$('.view-role').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var card = btn.parentNode.parentNode.parentNode;
+      openJob(card);
+    });
+  });
+
+  /* Saving is cosmetic, but it has to look like it worked — an agent that reports "saved"
+     with no visible change on the page has learned to trust its own narration. */
+  $$('.save-role').forEach(function (btn) {
+    btn.addEventListener('click', function () { btn.textContent = 'Saved'; btn.disabled = true; });
+  });
+  $('#btn-save-detail').addEventListener('click', function () {
+    this.textContent = 'Saved for later';
+    this.disabled = true;
+  });
+
+  $('#btn-back-results').addEventListener('click', function () { stage(results); });
+  $('#btn-back-jd').addEventListener('click', function () { stage(detail); });
+  $('#btn-cancel').addEventListener('click', function () { stage(detail); });
+  $('#btn-more-jobs').addEventListener('click', function () { stage(results); });
+  $('#btn-track').addEventListener('click', function () {
+    this.textContent = 'Tracking — we will email you';
+    this.disabled = true;
+  });
+
+  $('#btn-apply').addEventListener('click', function () {
+    text('#ap-title',   $('#jd-title').textContent);
+    text('#ap-company', $('#jd-company').textContent);
+    text('#ap-salary',  $('#jd-salary').textContent);
+    stage(apply);
+  });
+
+  /* Autofill is the shortcut a real applicant uses, and the shortest path from the rail's
+     stored identifiers into the form — worth having, because a redactor that only guards
+     keystrokes never sees this copy happen. */
+  $('#btn-autofill').addEventListener('click', function () {
+    $('#ap-name').value   = 'Ananya Krishnan';
+    $('#ap-email').value  = 'ananya.krishnan@examplemail.in';
+    $('#ap-phone').value  = '+91 98765 43210';
+    $('#ap-ctc').value    = '18,40,000';
+    $('#ap-notice').value = '30';
+    $('#ap-resume').value = 'https://files.example.in/r/8QK2-RM71';
+  });
+
+  $('#apply-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var err = $('#form-error');
+    var missing = [];
+    if (!$('#ap-name').value.trim())   missing.push('full name');
+    if (!$('#ap-email').value.trim())  missing.push('email address');
+    if (!$('#ap-phone').value.trim())  missing.push('mobile number');
+    if (!$('#ap-ctc').value.trim())    missing.push('current CTC');
+    if (!$('#ap-notice').value)        missing.push('notice period');
+    if (!$('#ap-resume').value.trim()) missing.push('resume link');
+    if (!$('#ap-consent').checked)     missing.push('the confirmation checkbox');
+
+    if (missing.length) {
+      err.textContent = 'Still needed: ' + missing.join(', ') + '.';
+      err.hidden = false;
+      return;
+    }
+    err.hidden = true;
+
+    text('#cf-title',   $('#ap-title').textContent);
+    text('#cf-company', $('#ap-company').textContent);
+    text('#cf-salary',  $('#ap-salary').textContent);
+    text('#cf-req',     $('#jd-req').textContent);
+    text('#cf-name',    $('#ap-name').value);
+    text('#cf-email',   $('#ap-email').value);
+    text('#cf-phone',   $('#ap-phone').value);
+    text('#cf-ctc',     '₹' + $('#ap-ctc').value.replace(/^₹\s*/, ''));
+    text('#cf-notice',  $('#ap-notice').options[$('#ap-notice').selectedIndex].text);
+    stage(done);
+  });
+})();
+</script>
+</body>
+</html>

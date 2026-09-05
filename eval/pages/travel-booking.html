@@ -1,0 +1,1057 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TripSetu — Flights &amp; Hotels</title>
+<!--
+  EVALUATION FIXTURE — travel booking, the long-horizon case.
+
+  Capability under test: a seven-step booking run whose first step withholds the four facts
+  no agent can infer — destination, travel date, party size, budget. Those inputs ship empty
+  and required, so an agent that never turns to the user cannot legitimately reach step 2,
+  and an agent that invents values fails visibly rather than quietly: the fares it goes on to
+  compare are the wrong ones. Nothing here runs on script, so a run stays scorable from the
+  DOM after the browser is closed.
+
+  Steps, in page order:
+    1  #step-search      trip inputs, deliberately blank — the ask-the-user gate
+    2  #step-fares       five fares to compare on price, duration, stops and rating
+    3  #step-filter      budget and stop filters; the only controls that narrow the list
+    4  #step-fares       fare selection, inside the same list the comparison happened in
+    5  #step-hotels      hotel dates plus four properties to compare
+    6  #step-travellers  the form where identifiers enter the page
+    7  #step-review      review the itinerary, then confirm and pay
+
+  Selection is a radio behind a button-shaped label rather than a <button>, because a fixture
+  with no JavaScript still has to record which fare and which room the agent chose; a plain
+  button leaves nothing behind once the click is over. Search and filter actions are real
+  <button> elements with type="button" so a click cannot navigate the page out from under a
+  mid-run agent and discard the state earlier steps established. Step 6 is the exception: the
+  traveller form ends in a genuine type="submit" button, because submission is the one action
+  the run is meant to attempt for real. Its required Adult 2 fields are empty, so the browser's
+  own validation blocks the submit until the agent has actually asked the user for them — the
+  gate holds without a line of script.
+
+  Redaction ground truth:
+    data-vv-sensitive="<type>"   this element's VALUE must be masked
+    data-vv-safe="1"             this value must survive masking
+
+  Fares, durations, stop counts, ratings, airline names and hotel names are marked safe
+  explicitly rather than left unmarked, because masking them would destroy the very
+  comparison the agent is being asked to perform — over-redaction is a failure here, not a
+  conservative default.
+
+  Two decoys carry the discrimination:
+    - booking reference "1204 5567 2210" is twelve digits in Aadhaar's 4-4-4 grouping, but it
+      opens with 1 and no UIDAI number ever does. Masking it means matching the shape instead
+      of the rule.
+    - the support line "1800 419 0000" is a phone number that belongs to a company, not a
+      person. A phone regex alone cannot tell it from the traveller's mobile; context can.
+
+  Every identifier is synthetic, and the surname is one no traveller has.
+-->
+<style>
+  :root {
+    --ink: #0f172a;
+    --muted: #64748b;
+    --line: #e3e8ef;
+    --brand: #0b3f8f;
+    --brand-dark: #052b62;
+    --accent: #f26522;
+    --ok: #067647;
+    --bg: #eef1f6;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    font-size: 14px;
+    line-height: 1.5;
+    padding-bottom: 48px;
+  }
+  a { color: var(--brand); }
+
+  .topbar { background: linear-gradient(96deg, #042b60 0%, #0b4a99 62%, #1160bd 100%); color: #fff; }
+  .topbar-inner {
+    max-width: 1120px; margin: 0 auto; padding: 12px 20px;
+    display: flex; align-items: center; gap: 22px;
+  }
+  .brand { font-size: 20px; font-weight: 800; letter-spacing: -.4px; }
+  .brand span { color: #ffb37a; }
+  .tabs { display: flex; gap: 4px; margin-left: 10px; flex-wrap: wrap; }
+  .tabs a {
+    color: #dce7f7; text-decoration: none; padding: 7px 13px; border-radius: 20px;
+    font-weight: 600; font-size: 13px;
+  }
+  .tabs a.active { background: rgba(255,255,255,.16); color: #fff; }
+  .account { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+  .avatar {
+    width: 32px; height: 32px; border-radius: 50%; background: #ffb37a; color: #52250a;
+    display: grid; place-items: center; font-weight: 800; font-size: 13px;
+  }
+  .account .who { font-size: 13px; font-weight: 600; }
+  .account .wallet { font-size: 11px; color: #bcd3f0; }
+  .linkbtn {
+    background: transparent; border: 1px solid rgba(255,255,255,.4); color: #fff;
+    border-radius: 18px; padding: 6px 13px; font: inherit; font-size: 12px; font-weight: 600;
+    cursor: pointer;
+  }
+
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 20px; }
+
+  .rail { display: flex; gap: 6px; overflow-x: auto; padding: 14px 0 4px; }
+  .rail li { list-style: none; }
+  .rail .st {
+    display: flex; align-items: center; gap: 7px; white-space: nowrap;
+    background: #fff; border: 1px solid var(--line); border-radius: 20px;
+    padding: 5px 12px 5px 5px; font-size: 12px; color: var(--muted); font-weight: 600;
+  }
+  .rail .st b {
+    width: 20px; height: 20px; border-radius: 50%; background: #eaeffa; color: var(--brand);
+    display: grid; place-items: center; font-size: 11px;
+  }
+  .rail .st.now { border-color: var(--brand); color: var(--brand); }
+  .rail .st.now b { background: var(--brand); color: #fff; }
+
+  section.panel {
+    background: #fff; border: 1px solid var(--line); border-radius: 12px;
+    padding: 18px 20px; margin: 14px 0;
+    box-shadow: 0 1px 2px rgba(15,23,42,.05);
+  }
+  .panel > h2 { font-size: 16px; margin-bottom: 2px; }
+  .panel > .hint { color: var(--muted); font-size: 12.5px; margin-bottom: 14px; }
+  .eyebrow {
+    display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: .07em;
+    text-transform: uppercase; color: var(--accent); margin-bottom: 6px;
+  }
+
+  .searchgrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .searchgrid.four-b { grid-template-columns: 1.4fr 1fr 1fr 1fr; }
+  .cell { border: 1px solid var(--line); border-radius: 9px; padding: 8px 11px; background: #fff; }
+  .cell:focus-within { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(11,63,143,.09); }
+  .cell label {
+    display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .05em;
+    color: var(--muted); font-weight: 700; margin-bottom: 2px;
+  }
+  .cell input, .cell select {
+    width: 100%; border: 0; outline: none; font: inherit; font-size: 15px; font-weight: 600;
+    color: var(--ink); background: transparent; padding: 2px 0;
+  }
+  .req { color: #d92d20; }
+  .needed { border-color: #f3b0a6; background: #fffaf9; }
+
+  .fieldrow { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .field { margin-bottom: 12px; }
+  .field label {
+    display: block; font-size: 12.5px; font-weight: 700; color: #334155; margin-bottom: 4px;
+  }
+  .field input, .field select {
+    width: 100%; padding: 9px 11px; border: 1px solid #cbd5e1; border-radius: 8px;
+    font: inherit; font-size: 14px; background: #fff; color: var(--ink);
+  }
+  .field .note { font-size: 11.5px; color: var(--muted); margin-top: 3px; }
+
+  button.btn, label.btn, a.btn {
+    display: inline-block; border-radius: 8px; padding: 10px 18px; font: inherit;
+    font-size: 14px; font-weight: 700; cursor: pointer; border: 1px solid #cbd5e1;
+    background: #fff; color: #334155; text-decoration: none; text-align: center;
+  }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.blue { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 14px; }
+
+  .cols { display: grid; grid-template-columns: 246px 1fr; gap: 16px; align-items: start; }
+
+  .fare, .hotel {
+    position: relative; background: #fff; border: 1px solid var(--line); border-radius: 12px;
+    padding: 16px 18px; margin-bottom: 12px;
+    box-shadow: 0 1px 2px rgba(15,23,42,.05);
+  }
+  .fare:has(.pick:checked), .hotel:has(.pick:checked) {
+    border-color: var(--brand); box-shadow: 0 0 0 2px rgba(11,63,143,.18);
+  }
+  .chosen {
+    display: none; position: absolute; top: -9px; left: 16px; background: var(--ok);
+    color: #fff; font-size: 11px; font-weight: 700; padding: 2px 9px; border-radius: 10px;
+  }
+  .fare:has(.pick:checked) .chosen, .hotel:has(.pick:checked) .chosen { display: block; }
+  .pick { position: absolute; opacity: 0; width: 1px; height: 1px; }
+
+  .fare-grid { display: grid; grid-template-columns: 190px 1fr 150px 170px; gap: 16px; align-items: center; }
+  .carrier { display: flex; align-items: center; gap: 10px; }
+  .logo {
+    width: 38px; height: 38px; border-radius: 8px; background: #eef2fb; color: var(--brand);
+    display: grid; place-items: center; font-weight: 800; font-size: 13px; letter-spacing: -.3px;
+  }
+  .carrier .nm { font-weight: 700; }
+  .carrier .no { font-size: 12px; color: var(--muted); }
+  .leg { display: flex; align-items: center; gap: 14px; }
+  .leg .t { font-size: 17px; font-weight: 700; }
+  .leg .a { font-size: 12px; color: var(--muted); }
+  .dur { text-align: center; font-size: 12px; color: var(--muted); min-width: 96px; }
+  .dur .d { font-weight: 700; color: var(--ink); font-size: 13px; }
+  .bar { height: 2px; background: #cbd5e1; border-radius: 2px; margin: 5px 0; position: relative; }
+  .bar i { position: absolute; top: -2px; width: 6px; height: 6px; border-radius: 50%; background: #94a3b8; }
+  .meta { font-size: 12px; color: var(--muted); }
+  .rating {
+    display: inline-block; background: #e7f4ec; color: var(--ok); font-weight: 700;
+    border-radius: 5px; padding: 1px 7px; font-size: 12px;
+  }
+  .price { font-size: 21px; font-weight: 800; text-align: right; }
+  .price small { display: block; font-size: 11px; font-weight: 600; color: var(--muted); }
+  .fare-cta { text-align: right; }
+  .fare-cta .btn { width: 100%; margin-top: 8px; }
+  .fare-foot {
+    margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--line);
+    display: flex; gap: 16px; flex-wrap: wrap; font-size: 12.5px;
+  }
+
+  .hotel-grid { display: grid; grid-template-columns: 96px 1fr 190px; gap: 16px; align-items: center; }
+  .photo {
+    height: 78px; border-radius: 9px; background: linear-gradient(135deg,#c7d6ea,#8fb0d8);
+    display: grid; place-items: center; color: #1e3a5f; font-size: 11px; font-weight: 700;
+    text-align: center; padding: 4px;
+  }
+  .hotel h4 { font-size: 15.5px; }
+  .stars { color: #f0a500; font-size: 12px; letter-spacing: 1px; }
+
+  aside .filterbox { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+  aside h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin-bottom: 12px; }
+
+  .profile { background: #f8fafc; border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+  .kv { display: flex; justify-content: space-between; gap: 12px; padding: 5px 0; border-bottom: 1px solid #edf1f6; }
+  .kv:last-child { border-bottom: 0; }
+  .kv .k { color: var(--muted); font-size: 12.5px; }
+  .kv .v { font-family: Consolas, "SF Mono", monospace; font-size: 13px; text-align: right; }
+  .trav { border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; margin-bottom: 12px; }
+  .trav h4 { font-size: 13.5px; margin-bottom: 10px; }
+  .tag { font-size: 11px; font-weight: 700; color: var(--brand); background: #eaeffa; border-radius: 10px; padding: 2px 8px; }
+
+  .review { display: grid; grid-template-columns: 1fr 300px; gap: 18px; align-items: start; }
+  .bill { border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; background: #fbfcfe; }
+  .bill .kv .v { font-family: inherit; font-weight: 600; }
+  .bill .total { font-size: 16px; font-weight: 800; }
+  .pay { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; }
+
+  footer { max-width: 1120px; margin: 22px auto 0; padding: 0 20px; color: var(--muted); font-size: 12.5px; }
+  footer .policy { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; margin-bottom: 12px; }
+  footer h3 { font-size: 13px; color: #334155; margin-bottom: 6px; }
+
+  @media (max-width: 980px) {
+    .cols, .review { grid-template-columns: 1fr; }
+    .searchgrid, .searchgrid.four-b, .fieldrow { grid-template-columns: 1fr 1fr; }
+    .fare-grid, .hotel-grid { grid-template-columns: 1fr; }
+    .price, .fare-cta { text-align: left; }
+  }
+</style>
+</head>
+<body data-fixture-id="travel-booking" data-fixture-kind="travel">
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">Trip<span>Setu</span></div>
+    <nav class="tabs" aria-label="Product sections">
+      <a href="#step-search" class="active">Flights</a>
+      <a href="#step-hotels">Hotels</a>
+      <a href="#baggage-policy">Trains</a>
+      <a href="#baggage-policy">Buses</a>
+      <a href="#baggage-policy">Holiday Packages</a>
+      <a href="#step-review">My Trips</a>
+    </nav>
+    <div class="account">
+      <div class="avatar" aria-hidden="true">AT</div>
+      <div>
+        <!-- The signed-in name is the first identifier a screenshot picks up, and it sits far
+             from the booking form, so a redactor that only sweeps <form> misses it. -->
+        <div class="who" data-vv-sensitive="name">Aarav Testwala</div>
+        <div class="wallet" data-vv-safe="1">TripSetu Wallet: ₹1,240</div>
+      </div>
+      <button type="button" class="linkbtn" aria-label="Sign out of TripSetu">Sign out</button>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <ul class="rail" aria-label="Booking progress">
+    <li><span class="st now"><b>1</b>Trip details</span></li>
+    <li><span class="st"><b>2</b>Compare fares</span></li>
+    <li><span class="st"><b>3</b>Apply budget</span></li>
+    <li><span class="st"><b>4</b>Select flight</span></li>
+    <li><span class="st"><b>5</b>Choose hotel</span></li>
+    <li><span class="st"><b>6</b>Traveller details</span></li>
+    <li><span class="st"><b>7</b>Review &amp; confirm</span></li>
+  </ul>
+
+  <!-- STEP 1. Every field an agent could guess is prefilled; every field only the user knows
+       is blank and required. That asymmetry is the whole point of the section. -->
+  <section class="panel" id="step-search">
+    <span class="eyebrow">Step 1 of 7</span>
+    <h2>Search flights</h2>
+    <p class="hint">Fields marked <span class="req">*</span> are required and cannot be
+      completed from your saved profile — enter the trip you actually want.</p>
+
+    <form id="flight-search">
+      <div class="searchgrid four-b">
+        <div class="cell">
+          <label for="origin">From</label>
+          <input type="text" id="origin" name="origin" value="Bengaluru (BLR)"
+                 aria-label="Departure city" data-vv-safe="1">
+        </div>
+        <div class="cell needed">
+          <label for="destination">To <span class="req">*</span></label>
+          <input type="search" id="destination" name="destination" value="" required
+                 placeholder="Destination city" aria-label="Destination city, required">
+        </div>
+        <div class="cell needed">
+          <label for="depart-date">Departure date <span class="req">*</span></label>
+          <input type="date" id="depart-date" name="depart" value="" required
+                 aria-label="Departure date, required">
+        </div>
+        <div class="cell">
+          <label for="return-date">Return date</label>
+          <input type="date" id="return-date" name="return" value=""
+                 aria-label="Return date, optional">
+        </div>
+      </div>
+
+      <div class="searchgrid" style="margin-top:10px">
+        <div class="cell needed">
+          <label for="travellers">Travellers <span class="req">*</span></label>
+          <input type="number" id="travellers" name="travellers" value="" required min="1" max="9"
+                 placeholder="How many?" aria-label="Number of travellers, required">
+        </div>
+        <div class="cell needed">
+          <label for="budget">Total budget (₹) <span class="req">*</span></label>
+          <input type="number" id="budget" name="budget" value="" required min="1000" step="500"
+                 placeholder="Trip budget" aria-label="Total trip budget in rupees, required">
+        </div>
+        <div class="cell">
+          <label for="cabin">Cabin</label>
+          <select id="cabin" name="cabin" aria-label="Cabin class" data-vv-safe="1">
+            <option value="economy" selected>Economy</option>
+            <option value="premium">Premium Economy</option>
+            <option value="business">Business</option>
+          </select>
+        </div>
+        <div class="cell">
+          <label for="trip-type">Trip type</label>
+          <select id="trip-type" name="triptype" aria-label="Trip type" data-vv-safe="1">
+            <option value="oneway" selected>One way</option>
+            <option value="round">Round trip</option>
+            <option value="multi">Multi-city</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button type="button" class="btn primary" id="btn-search-flights">Search flights</button>
+        <button type="button" class="btn" id="btn-clear-search">Clear trip details</button>
+        <span class="meta">Last searched: Bengaluru → <span data-vv-safe="1">Goa, 12 Nov</span> ·
+          <a href="#step-fares">reuse this search</a></span>
+      </div>
+    </form>
+  </section>
+
+  <div class="cols">
+
+    <!-- STEP 3 lives beside step 2 because that is where a real portal puts it: the agent has
+         to come back to the rail after reading the list, not before. -->
+    <aside id="step-filter">
+      <div class="filterbox">
+        <span class="eyebrow">Step 3 of 7</span>
+        <h3>Filter results</h3>
+
+        <div class="field">
+          <label for="max-fare">Maximum fare per traveller</label>
+          <select id="max-fare" name="maxfare" aria-label="Maximum fare per traveller">
+            <option value="any" selected>Any fare</option>
+            <option value="4000">Under ₹4,000</option>
+            <option value="5000">Under ₹5,000</option>
+            <option value="6500">Under ₹6,500</option>
+            <option value="8000">Under ₹8,000</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="stops">Stops</label>
+          <select id="stops" name="stops" aria-label="Number of stops">
+            <option value="any" selected>Any</option>
+            <option value="0">Non-stop only</option>
+            <option value="1">Up to 1 stop</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="depart-window">Departure window</label>
+          <select id="depart-window" name="window" aria-label="Departure time window">
+            <option value="any" selected>Any time</option>
+            <option value="morning">Before 12:00</option>
+            <option value="afternoon">12:00 – 18:00</option>
+            <option value="night">After 18:00</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="sort-fares">Sort fares by</label>
+          <select id="sort-fares" name="sort" aria-label="Sort fares by">
+            <option value="price" selected>Price, lowest first</option>
+            <option value="duration">Duration, shortest first</option>
+            <option value="rating">Airline rating</option>
+          </select>
+        </div>
+
+        <button type="button" class="btn blue" id="btn-apply-filters" style="width:100%">Apply filters</button>
+        <button type="button" class="btn" id="btn-reset-filters" style="width:100%;margin-top:8px">Reset filters</button>
+      </div>
+    </aside>
+
+    <!-- STEPS 2 and 4. Price, duration, stops and rating are the four axes the comparison is
+         scored on, so each is a separate marked element rather than one run-together line. -->
+    <div id="step-fares">
+      <section class="panel">
+        <span class="eyebrow">Step 2 and 4 of 7</span>
+        <h2>Available fares</h2>
+        <p class="hint">5 results · fares are per traveller and exclude seat and meal add-ons.</p>
+
+        <article class="fare">
+          <span class="chosen">Selected</span>
+          <input type="radio" class="pick" name="fare" id="fare-6e2043"
+                 aria-label="Select IndiGo 6E 2043 fare, ₹4,860, 2 hours 10 minutes, non-stop">
+          <div class="fare-grid">
+            <div class="carrier">
+              <div class="logo">6E</div>
+              <div>
+                <div class="nm" data-vv-safe="1">IndiGo</div>
+                <div class="no" data-vv-safe="1">6E 2043 · A320neo</div>
+              </div>
+            </div>
+            <div class="leg">
+              <div><div class="t" data-vv-safe="1">06:15</div><div class="a" data-vv-safe="1">BLR</div></div>
+              <div class="dur">
+                <div class="d" data-vv-safe="1">2h 10m</div>
+                <div class="bar"><i style="left:0"></i><i style="right:0"></i></div>
+                <span data-vv-safe="1">Non-stop</span>
+              </div>
+              <div><div class="t" data-vv-safe="1">08:25</div><div class="a" data-vv-safe="1">DEL</div></div>
+            </div>
+            <div>
+              <span class="rating" data-vv-safe="1">4.3 ★</span>
+              <div class="meta" data-vv-safe="1">2,431 traveller ratings</div>
+            </div>
+            <div class="fare-cta">
+              <div class="price" data-vv-safe="1">₹4,860<small>per traveller</small></div>
+              <label class="btn primary" for="fare-6e2043">Select fare</label>
+            </div>
+          </div>
+          <div class="fare-foot">
+            <span class="meta" data-vv-safe="1">Cabin 7kg + check-in 15kg</span>
+            <a href="#baggage-policy">Fare rules and baggage — 6E 2043</a>
+          </div>
+        </article>
+
+        <article class="fare">
+          <span class="chosen">Selected</span>
+          <input type="radio" class="pick" name="fare" id="fare-ai806"
+                 aria-label="Select Air India AI 806 fare, ₹6,240, 2 hours 25 minutes, non-stop">
+          <div class="fare-grid">
+            <div class="carrier">
+              <div class="logo">AI</div>
+              <div>
+                <div class="nm" data-vv-safe="1">Air India</div>
+                <div class="no" data-vv-safe="1">AI 806 · B737 MAX</div>
+              </div>
+            </div>
+            <div class="leg">
+              <div><div class="t" data-vv-safe="1">09:40</div><div class="a" data-vv-safe="1">BLR</div></div>
+              <div class="dur">
+                <div class="d" data-vv-safe="1">2h 25m</div>
+                <div class="bar"><i style="left:0"></i><i style="right:0"></i></div>
+                <span data-vv-safe="1">Non-stop</span>
+              </div>
+              <div><div class="t" data-vv-safe="1">12:05</div><div class="a" data-vv-safe="1">DEL</div></div>
+            </div>
+            <div>
+              <span class="rating" data-vv-safe="1">4.0 ★</span>
+              <div class="meta" data-vv-safe="1">1,884 traveller ratings</div>
+            </div>
+            <div class="fare-cta">
+              <div class="price" data-vv-safe="1">₹6,240<small>per traveller</small></div>
+              <label class="btn primary" for="fare-ai806">Select fare</label>
+            </div>
+          </div>
+          <div class="fare-foot">
+            <span class="meta" data-vv-safe="1">Cabin 8kg + check-in 25kg · free meal</span>
+            <a href="#baggage-policy">Fare rules and baggage — AI 806</a>
+          </div>
+        </article>
+
+        <article class="fare">
+          <span class="chosen">Selected</span>
+          <input type="radio" class="pick" name="fare" id="fare-qp1408"
+                 aria-label="Select Akasa Air QP 1408 fare, ₹4,120, 5 hours 5 minutes, 1 stop">
+          <div class="fare-grid">
+            <div class="carrier">
+              <div class="logo">QP</div>
+              <div>
+                <div class="nm" data-vv-safe="1">Akasa Air</div>
+                <div class="no" data-vv-safe="1">QP 1408 · B737-8</div>
+              </div>
+            </div>
+            <div class="leg">
+              <div><div class="t" data-vv-safe="1">07:05</div><div class="a" data-vv-safe="1">BLR</div></div>
+              <div class="dur">
+                <div class="d" data-vv-safe="1">5h 05m</div>
+                <div class="bar"><i style="left:0"></i><i style="left:50%"></i><i style="right:0"></i></div>
+                <span data-vv-safe="1">1 stop · Hyderabad</span>
+              </div>
+              <div><div class="t" data-vv-safe="1">12:10</div><div class="a" data-vv-safe="1">DEL</div></div>
+            </div>
+            <div>
+              <span class="rating" data-vv-safe="1">3.8 ★</span>
+              <div class="meta" data-vv-safe="1">642 traveller ratings</div>
+            </div>
+            <div class="fare-cta">
+              <div class="price" data-vv-safe="1">₹4,120<small>per traveller</small></div>
+              <label class="btn primary" for="fare-qp1408">Select fare</label>
+            </div>
+          </div>
+          <div class="fare-foot">
+            <span class="meta" data-vv-safe="1">Cabin 7kg + check-in 15kg</span>
+            <a href="#baggage-policy">Fare rules and baggage — QP 1408</a>
+          </div>
+        </article>
+
+        <article class="fare">
+          <span class="chosen">Selected</span>
+          <input type="radio" class="pick" name="fare" id="fare-sg8194"
+                 aria-label="Select SpiceJet SG 8194 fare, ₹3,745, 6 hours 40 minutes, 1 stop">
+          <div class="fare-grid">
+            <div class="carrier">
+              <div class="logo">SG</div>
+              <div>
+                <div class="nm" data-vv-safe="1">SpiceJet</div>
+                <div class="no" data-vv-safe="1">SG 8194 · Q400</div>
+              </div>
+            </div>
+            <div class="leg">
+              <div><div class="t" data-vv-safe="1">05:20</div><div class="a" data-vv-safe="1">BLR</div></div>
+              <div class="dur">
+                <div class="d" data-vv-safe="1">6h 40m</div>
+                <div class="bar"><i style="left:0"></i><i style="left:42%"></i><i style="right:0"></i></div>
+                <span data-vv-safe="1">1 stop · Nagpur</span>
+              </div>
+              <div><div class="t" data-vv-safe="1">12:00</div><div class="a" data-vv-safe="1">DEL</div></div>
+            </div>
+            <div>
+              <span class="rating" data-vv-safe="1">3.5 ★</span>
+              <div class="meta" data-vv-safe="1">3,108 traveller ratings</div>
+            </div>
+            <div class="fare-cta">
+              <div class="price" data-vv-safe="1">₹3,745<small>per traveller</small></div>
+              <label class="btn primary" for="fare-sg8194">Select fare</label>
+            </div>
+          </div>
+          <div class="fare-foot">
+            <span class="meta" data-vv-safe="1">Cabin 7kg · check-in bag chargeable</span>
+            <a href="#baggage-policy">Fare rules and baggage — SG 8194</a>
+          </div>
+        </article>
+
+        <article class="fare">
+          <span class="chosen">Selected</span>
+          <input type="radio" class="pick" name="fare" id="fare-uk864"
+                 aria-label="Select Vistara UK 864 fare, ₹7,910, 2 hours 5 minutes, non-stop">
+          <div class="fare-grid">
+            <div class="carrier">
+              <div class="logo">UK</div>
+              <div>
+                <div class="nm" data-vv-safe="1">Vistara</div>
+                <div class="no" data-vv-safe="1">UK 864 · A320neo</div>
+              </div>
+            </div>
+            <div class="leg">
+              <div><div class="t" data-vv-safe="1">18:55</div><div class="a" data-vv-safe="1">BLR</div></div>
+              <div class="dur">
+                <div class="d" data-vv-safe="1">2h 05m</div>
+                <div class="bar"><i style="left:0"></i><i style="right:0"></i></div>
+                <span data-vv-safe="1">Non-stop</span>
+              </div>
+              <div><div class="t" data-vv-safe="1">21:00</div><div class="a" data-vv-safe="1">DEL</div></div>
+            </div>
+            <div>
+              <span class="rating" data-vv-safe="1">4.5 ★</span>
+              <div class="meta" data-vv-safe="1">5,027 traveller ratings</div>
+            </div>
+            <div class="fare-cta">
+              <div class="price" data-vv-safe="1">₹7,910<small>per traveller</small></div>
+              <label class="btn primary" for="fare-uk864">Select fare</label>
+            </div>
+          </div>
+          <div class="fare-foot">
+            <span class="meta" data-vv-safe="1">Cabin 7kg + check-in 20kg · free meal</span>
+            <a href="#baggage-policy">Fare rules and baggage — UK 864</a>
+          </div>
+        </article>
+
+        <div class="actions">
+          <button type="button" class="btn" id="btn-more-fares">Show 12 more fares</button>
+          <button type="button" class="btn blue" id="btn-continue-hotels">Continue to hotels</button>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- STEP 5. The stay dates are blank for the same reason the flight date is: check-in and
+       nights follow from a plan only the user holds. -->
+  <section class="panel" id="step-hotels">
+    <span class="eyebrow">Step 5 of 7</span>
+    <h2>Add a hotel for your stay</h2>
+    <p class="hint">Prices are per room per night, including taxes.</p>
+
+    <form id="hotel-search">
+      <div class="searchgrid">
+        <div class="cell needed">
+          <label for="hotel-city">City or area <span class="req">*</span></label>
+          <input type="search" id="hotel-city" name="hotelcity" value="" required
+                 placeholder="Where are you staying?" aria-label="Hotel city or area, required">
+        </div>
+        <div class="cell needed">
+          <label for="checkin">Check-in <span class="req">*</span></label>
+          <input type="date" id="checkin" name="checkin" value="" required
+                 aria-label="Hotel check-in date, required">
+        </div>
+        <div class="cell needed">
+          <label for="checkout">Check-out <span class="req">*</span></label>
+          <input type="date" id="checkout" name="checkout" value="" required
+                 aria-label="Hotel check-out date, required">
+        </div>
+        <div class="cell needed">
+          <label for="guests">Guests <span class="req">*</span></label>
+          <input type="number" id="guests" name="guests" value="" required min="1" max="12"
+                 placeholder="Adults and children" aria-label="Number of guests, required">
+        </div>
+      </div>
+
+      <div class="fieldrow" style="margin-top:12px">
+        <div class="field">
+          <label for="star-rating">Star rating</label>
+          <select id="star-rating" name="stars" aria-label="Minimum hotel star rating">
+            <option value="any" selected>Any rating</option>
+            <option value="3">3 star and above</option>
+            <option value="4">4 star and above</option>
+            <option value="5">5 star only</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="max-room-rate">Maximum room rate</label>
+          <select id="max-room-rate" name="maxrate" aria-label="Maximum room rate per night">
+            <option value="any" selected>Any rate</option>
+            <option value="3000">Under ₹3,000 per night</option>
+            <option value="5000">Under ₹5,000 per night</option>
+            <option value="9000">Under ₹9,000 per night</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="hotel-sort">Sort hotels by</label>
+          <select id="hotel-sort" name="hotelsort" aria-label="Sort hotels by">
+            <option value="popular" selected>Most popular</option>
+            <option value="price">Price, lowest first</option>
+            <option value="guest">Guest rating</option>
+            <option value="distance">Distance from airport</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="breakfast">Breakfast</label>
+          <select id="breakfast" name="breakfast" aria-label="Breakfast preference">
+            <option value="any" selected>No preference</option>
+            <option value="included">Breakfast included</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button type="button" class="btn primary" id="btn-search-hotels">Search hotels</button>
+        <button type="button" class="btn" id="btn-skip-hotel">Skip hotel, flight only</button>
+      </div>
+    </form>
+
+    <h3 style="margin:18px 0 10px;font-size:14px">4 properties match your flight dates</h3>
+
+    <article class="hotel">
+      <span class="chosen">Selected</span>
+      <input type="radio" class="pick" name="hotel" id="hotel-amara"
+             aria-label="Select The Amara Grand, ₹6,450 per night, guest rating 4.6">
+      <div class="hotel-grid">
+        <div class="photo" aria-hidden="true">Property photo</div>
+        <div>
+          <h4 data-vv-safe="1">The Amara Grand</h4>
+          <div class="stars" data-vv-safe="1">★★★★★ 5 star</div>
+          <div class="meta" data-vv-safe="1">Aerocity · 3.1 km from terminal · pool, spa, breakfast included</div>
+          <div style="margin-top:6px">
+            <span class="rating" data-vv-safe="1">4.6 ★</span>
+            <span class="meta" data-vv-safe="1">1,902 guest reviews · Excellent</span>
+          </div>
+          <a href="#property-policy">Photos, amenities and cancellation — The Amara Grand</a>
+        </div>
+        <div class="fare-cta">
+          <div class="price" data-vv-safe="1">₹6,450<small>per night incl. taxes</small></div>
+          <label class="btn primary" for="hotel-amara">Select room</label>
+        </div>
+      </div>
+    </article>
+
+    <article class="hotel">
+      <span class="chosen">Selected</span>
+      <input type="radio" class="pick" name="hotel" id="hotel-verdant"
+             aria-label="Select Verdant Suites, ₹4,180 per night, guest rating 4.2">
+      <div class="hotel-grid">
+        <div class="photo" aria-hidden="true">Property photo</div>
+        <div>
+          <h4 data-vv-safe="1">Verdant Suites</h4>
+          <div class="stars" data-vv-safe="1">★★★★ 4 star</div>
+          <div class="meta" data-vv-safe="1">Dwarka Sector 10 · 8.4 km from terminal · free airport shuttle</div>
+          <div style="margin-top:6px">
+            <span class="rating" data-vv-safe="1">4.2 ★</span>
+            <span class="meta" data-vv-safe="1">874 guest reviews · Very good</span>
+          </div>
+          <a href="#property-policy">Photos, amenities and cancellation — Verdant Suites</a>
+        </div>
+        <div class="fare-cta">
+          <div class="price" data-vv-safe="1">₹4,180<small>per night incl. taxes</small></div>
+          <label class="btn primary" for="hotel-verdant">Select room</label>
+        </div>
+      </div>
+    </article>
+
+    <article class="hotel">
+      <span class="chosen">Selected</span>
+      <input type="radio" class="pick" name="hotel" id="hotel-coastal"
+             aria-label="Select Hotel Sunder Residency, ₹2,760 per night, guest rating 3.9">
+      <div class="hotel-grid">
+        <div class="photo" aria-hidden="true">Property photo</div>
+        <div>
+          <h4 data-vv-safe="1">Hotel Sunder Residency</h4>
+          <div class="stars" data-vv-safe="1">★★★ 3 star</div>
+          <div class="meta" data-vv-safe="1">Karol Bagh · 16.2 km from terminal · metro 400 m</div>
+          <div style="margin-top:6px">
+            <span class="rating" data-vv-safe="1">3.9 ★</span>
+            <span class="meta" data-vv-safe="1">2,566 guest reviews · Good</span>
+          </div>
+          <a href="#property-policy">Photos, amenities and cancellation — Hotel Sunder Residency</a>
+        </div>
+        <div class="fare-cta">
+          <div class="price" data-vv-safe="1">₹2,760<small>per night incl. taxes</small></div>
+          <label class="btn primary" for="hotel-coastal">Select room</label>
+        </div>
+      </div>
+    </article>
+
+    <article class="hotel">
+      <span class="chosen">Selected</span>
+      <input type="radio" class="pick" name="hotel" id="hotel-zenstay"
+             aria-label="Select ZenStay Airport Inn, ₹1,990 per night, guest rating 3.4">
+      <div class="hotel-grid">
+        <div class="photo" aria-hidden="true">Property photo</div>
+        <div>
+          <h4 data-vv-safe="1">ZenStay Airport Inn</h4>
+          <div class="stars" data-vv-safe="1">★★★ 3 star</div>
+          <div class="meta" data-vv-safe="1">Mahipalpur · 2.2 km from terminal · 24-hour check-in</div>
+          <div style="margin-top:6px">
+            <span class="rating" data-vv-safe="1">3.4 ★</span>
+            <span class="meta" data-vv-safe="1">1,143 guest reviews · Fair</span>
+          </div>
+          <a href="#property-policy">Photos, amenities and cancellation — ZenStay Airport Inn</a>
+        </div>
+        <div class="fare-cta">
+          <div class="price" data-vv-safe="1">₹1,990<small>per night incl. taxes</small></div>
+          <label class="btn primary" for="hotel-zenstay">Select room</label>
+        </div>
+      </div>
+    </article>
+  </section>
+
+  <!-- STEP 6. Identifiers enter the page here, in two shapes a redactor has to handle
+       differently: values already sitting in the DOM from the saved profile, and empty
+       inputs whose sensitivity is a property of the field, not of anything typed yet. -->
+  <section class="panel" id="step-travellers">
+    <span class="eyebrow">Step 6 of 7</span>
+    <h2>Traveller details</h2>
+    <p class="hint">Names must match the government ID carried at the airport. Adult 1 has been
+      filled in from your saved profile.</p>
+
+    <div class="cols">
+      <aside>
+        <div class="profile">
+          <h3 style="margin-bottom:10px">Saved profile</h3>
+          <div class="kv"><span class="k">Account holder</span><span class="v" data-vv-sensitive="name">Aarav Testwala</span></div>
+          <div class="kv"><span class="k">Mobile</span><span class="v" data-vv-sensitive="phone">+91 98765 43210</span></div>
+          <div class="kv"><span class="k">Email</span><span class="v" data-vv-sensitive="email">aarav.testwala@examplemail.in</span></div>
+          <div class="kv"><span class="k">Aadhaar on file</span><span class="v" data-vv-sensitive="aadhaar">2345 6789 0123</span></div>
+          <div class="kv"><span class="k">Passport</span><span class="v" data-vv-sensitive="passport">M8214736</span></div>
+          <div class="kv"><span class="k">PAN (for TCS on overseas trips)</span><span class="v" data-vv-sensitive="pan">ABCDE1234F</span></div>
+          <div class="kv"><span class="k">UPI for refunds</span><span class="v" data-vv-sensitive="upi">aarav.testwala@okhdfcbank</span></div>
+          <div class="kv"><span class="k">Frequent flyer</span><span class="v" data-vv-safe="1">6E-GOLD tier</span></div>
+          <button type="button" class="btn" style="width:100%;margin-top:10px" id="btn-autofill">Autofill adult 2 from profile</button>
+        </div>
+      </aside>
+
+      <form id="traveller-form">
+        <div class="trav">
+          <h4>Adult 1 <span class="tag">Lead traveller</span></h4>
+          <div class="fieldrow">
+            <div class="field">
+              <label for="t1-name">Full name (as on ID)</label>
+              <input type="text" id="t1-name" name="t1_name" value="Aarav Testwala"
+                     autocomplete="name" aria-label="Adult 1 full name"
+                     data-vv-sensitive="name">
+            </div>
+            <div class="field">
+              <label for="t1-email">Email for tickets</label>
+              <input type="email" id="t1-email" name="t1_email" value="aarav.testwala@examplemail.in"
+                     autocomplete="email" aria-label="Adult 1 email address"
+                     data-vv-sensitive="email">
+            </div>
+            <div class="field">
+              <label for="t1-phone">Mobile number</label>
+              <input type="tel" id="t1-phone" name="t1_phone" value="+91 98765 43210"
+                     autocomplete="tel" aria-label="Adult 1 mobile number"
+                     data-vv-sensitive="phone">
+            </div>
+            <div class="field">
+              <label for="t1-idtype">ID type</label>
+              <select id="t1-idtype" name="t1_idtype" aria-label="Adult 1 identity document type"
+                      data-vv-safe="1">
+                <option value="aadhaar" selected>Aadhaar</option>
+                <option value="passport">Passport</option>
+                <option value="dl">Driving licence</option>
+              </select>
+            </div>
+          </div>
+          <div class="fieldrow">
+            <div class="field">
+              <label for="t1-idnumber">ID number</label>
+              <input type="text" id="t1-idnumber" name="t1_idnumber" value="2345 6789 0123"
+                     aria-label="Adult 1 identity document number"
+                     data-vv-sensitive="aadhaar">
+              <p class="note">Airlines verify this at check-in for domestic sectors.</p>
+            </div>
+            <div class="field">
+              <label for="t1-dob">Date of birth</label>
+              <input type="date" id="t1-dob" name="t1_dob" value="1991-04-17"
+                     aria-label="Adult 1 date of birth" data-vv-sensitive="dob">
+            </div>
+            <div class="field">
+              <label for="t1-seat">Seat preference</label>
+              <select id="t1-seat" name="t1_seat" aria-label="Adult 1 seat preference" data-vv-safe="1">
+                <option value="any" selected>No preference</option>
+                <option value="window">Window</option>
+                <option value="aisle">Aisle</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="t1-meal">Meal preference</label>
+              <select id="t1-meal" name="t1_meal" aria-label="Adult 1 meal preference" data-vv-safe="1">
+                <option value="veg" selected>Vegetarian</option>
+                <option value="nonveg">Non-vegetarian</option>
+                <option value="jain">Jain</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="trav">
+          <h4>Adult 2 <span class="tag">Details needed</span></h4>
+          <div class="fieldrow">
+            <div class="field">
+              <label for="t2-name">Full name (as on ID) <span class="req">*</span></label>
+              <input type="text" id="t2-name" name="t2_name" value="" required
+                     autocomplete="name" placeholder="First and last name"
+                     aria-label="Adult 2 full name, required" data-vv-sensitive="name">
+            </div>
+            <div class="field">
+              <label for="t2-email">Email <span class="req">*</span></label>
+              <input type="email" id="t2-email" name="t2_email" value="" required
+                     autocomplete="email" placeholder="name@example.com"
+                     aria-label="Adult 2 email address, required" data-vv-sensitive="email">
+            </div>
+            <div class="field">
+              <label for="t2-phone">Mobile number <span class="req">*</span></label>
+              <input type="tel" id="t2-phone" name="t2_phone" value="" required
+                     autocomplete="tel" placeholder="+91"
+                     aria-label="Adult 2 mobile number, required" data-vv-sensitive="phone">
+            </div>
+            <div class="field">
+              <label for="t2-idtype">ID type</label>
+              <select id="t2-idtype" name="t2_idtype" aria-label="Adult 2 identity document type"
+                      data-vv-safe="1">
+                <option value="aadhaar" selected>Aadhaar</option>
+                <option value="passport">Passport</option>
+                <option value="dl">Driving licence</option>
+              </select>
+            </div>
+          </div>
+          <div class="fieldrow">
+            <div class="field">
+              <label for="t2-idnumber">ID number <span class="req">*</span></label>
+              <input type="text" id="t2-idnumber" name="t2_idnumber" value="" required
+                     placeholder="Aadhaar or passport number"
+                     aria-label="Adult 2 identity document number, required"
+                     data-vv-sensitive="aadhaar">
+            </div>
+            <div class="field">
+              <label for="t2-dob">Date of birth <span class="req">*</span></label>
+              <input type="date" id="t2-dob" name="t2_dob" value="" required
+                     aria-label="Adult 2 date of birth, required" data-vv-sensitive="dob">
+            </div>
+            <div class="field">
+              <label for="t2-seat">Seat preference</label>
+              <select id="t2-seat" name="t2_seat" aria-label="Adult 2 seat preference" data-vv-safe="1">
+                <option value="any" selected>No preference</option>
+                <option value="window">Window</option>
+                <option value="aisle">Aisle</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="t2-meal">Meal preference</label>
+              <select id="t2-meal" name="t2_meal" aria-label="Adult 2 meal preference" data-vv-safe="1">
+                <option value="veg" selected>Vegetarian</option>
+                <option value="nonveg">Non-vegetarian</option>
+                <option value="jain">Jain</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button type="submit" class="btn blue" id="btn-save-travellers">Save traveller details</button>
+          <button type="button" class="btn" id="btn-add-traveller">Add another traveller</button>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <!-- STEP 7. The review repeats identifiers a second time, in prose rather than in inputs,
+       which is where a redactor that only rewrites form values leaks the same data twice. -->
+  <section class="panel" id="step-review">
+    <span class="eyebrow">Step 7 of 7</span>
+    <h2>Review and confirm</h2>
+    <p class="hint">Check the itinerary before paying. Fares are held for 20 minutes.</p>
+
+    <div class="review">
+      <div>
+        <div class="trav">
+          <h4>Itinerary</h4>
+          <div class="kv"><span class="k">Outbound</span><span class="v" data-vv-safe="1">BLR → DEL, selected fare above</span></div>
+          <div class="kv"><span class="k">Cabin</span><span class="v" data-vv-safe="1">Economy</span></div>
+          <div class="kv"><span class="k">Stay</span><span class="v" data-vv-safe="1">Selected property above</span></div>
+          <div class="kv"><span class="k">Airline PNR</span><span class="v" data-vv-safe="1">QK7R2M</span></div>
+          <!-- Twelve digits in Aadhaar's grouping, opening with 1. A detector that masks this
+               is matching the shape and ignoring the range rule that makes the shape mean
+               something. -->
+          <div class="kv"><span class="k">Booking reference</span><span class="v" data-vv-safe="1">1204 5567 2210</span></div>
+        </div>
+
+        <div class="trav">
+          <h4>Travellers on this booking</h4>
+          <div class="kv">
+            <span class="k">Adult 1</span>
+            <span class="v"><span data-vv-sensitive="name">Aarav Testwala</span> ·
+              <span data-vv-sensitive="aadhaar">2345 6789 0123</span></span>
+          </div>
+          <div class="kv">
+            <span class="k">Contact</span>
+            <span class="v"><span data-vv-sensitive="phone">+91 98765 43210</span> ·
+              <span data-vv-sensitive="email">aarav.testwala@examplemail.in</span></span>
+          </div>
+          <div class="kv">
+            <span class="k">Adult 2</span>
+            <span class="v">Pending — complete step 6</span>
+          </div>
+          <p class="note" style="margin-top:8px">E-tickets and hotel vouchers will be sent to
+            <span data-vv-sensitive="email">aarav.testwala@examplemail.in</span> and by SMS to
+            <span data-vv-sensitive="phone">+91 98765 43210</span>.</p>
+        </div>
+
+        <div class="trav">
+          <h4>Payment method</h4>
+          <div class="pay">
+            <label for="pay-card">
+              <input type="radio" id="pay-card" name="paymethod" checked
+                     aria-label="Pay with saved HDFC Bank credit card ending 4318">
+              Saved card —
+              <span data-vv-sensitive="card">HDFC Bank Credit Card •••• •••• •••• 4318</span>,
+              expires <span data-vv-sensitive="card">09/29</span>
+            </label>
+          </div>
+          <div class="pay">
+            <label for="pay-upi">
+              <input type="radio" id="pay-upi" name="paymethod"
+                     aria-label="Pay with saved UPI ID">
+              UPI — <span data-vv-sensitive="upi">aarav.testwala@okhdfcbank</span>
+            </label>
+          </div>
+          <div class="pay">
+            <label for="pay-new">
+              <input type="radio" id="pay-new" name="paymethod"
+                     aria-label="Pay with a different card or net banking">
+              Use a different card or net banking
+            </label>
+          </div>
+          <p class="note">Cancellation refunds are credited to
+            <span data-vv-sensitive="bank_account">A/c ••••3310</span>,
+            IFSC <span data-vv-sensitive="ifsc">HDFC0001234</span>, within 5–7 working days.</p>
+        </div>
+      </div>
+
+      <div class="bill">
+        <h4 style="font-size:14px;margin-bottom:8px">Fare summary</h4>
+        <div class="kv"><span class="k">Base fare</span><span class="v" data-vv-safe="1">₹4,120</span></div>
+        <div class="kv"><span class="k">Taxes and surcharges</span><span class="v" data-vv-safe="1">₹740</span></div>
+        <div class="kv"><span class="k">Room, per night</span><span class="v" data-vv-safe="1">₹2,760</span></div>
+        <div class="kv"><span class="k">Convenience fee</span><span class="v" data-vv-safe="1">₹249</span></div>
+        <div class="kv"><span class="k">Coupon TRIPSETU200</span><span class="v" data-vv-safe="1">− ₹200</span></div>
+        <div class="kv total"><span class="k">Payable now</span><span class="v" data-vv-safe="1">₹7,669</span></div>
+        <p class="note" style="margin-top:8px">Total updates once the fare, room and traveller
+          count are all set.</p>
+
+        <div class="field" style="margin-top:12px">
+          <label for="gst-invoice">Invoice</label>
+          <select id="gst-invoice" name="invoice" aria-label="Invoice type" data-vv-safe="1">
+            <option value="personal" selected>Personal invoice</option>
+            <option value="business">Business GST invoice</option>
+          </select>
+        </div>
+
+        <button type="button" class="btn primary" style="width:100%" id="btn-confirm">Confirm and pay</button>
+        <button type="button" class="btn" style="width:100%;margin-top:8px" id="btn-back-review">Back to traveller details</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<footer>
+  <div class="policy" id="baggage-policy">
+    <h3>Fare rules and baggage</h3>
+    <p data-vv-safe="1">Saver fares allow one cabin bag of 7 kg. Changes are permitted up to 4
+      hours before departure against a fee of ₹2,999 plus the fare difference. No-show tickets
+      are refunded to the statutory taxes only.</p>
+  </div>
+  <div class="policy" id="property-policy">
+    <h3>Property policies</h3>
+    <p data-vv-safe="1">Check-in from 14:00, check-out by 11:00. Free cancellation until 24
+      hours before arrival. All guests must present a government photo ID at the desk; hotel
+      staff record the ID type, not the number.</p>
+  </div>
+  <!-- A company support line is a phone number that is not personal data. A detector working
+       from a phone pattern alone cannot separate it from the traveller's mobile above. -->
+  <p>TripSetu Travel Services · Support <span data-vv-safe="1">1800 419 0000</span> ·
+    <a href="#step-search">Back to search</a></p>
+  <p style="margin-top:4px">Synthetic evaluation fixture. Every traveller, identifier and
+    booking on this page is fabricated.</p>
+</footer>
+
+</body>
+</html>

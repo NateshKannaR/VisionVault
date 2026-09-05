@@ -734,12 +734,29 @@ function handleStepResult(r) {
     currentMissingMarkId = r.action.mark_id;
     confirmWrap.hidden = true;
     reveal(inputPromptWrap);
-    const fieldName = r.fieldLabel && r.fieldLabel !== r.fieldKey
-      ? `${esc(r.fieldLabel)} (${esc(r.fieldKey)})`
-      : esc(r.fieldKey);
-    $("inputPromptText").innerHTML =
-      `The page is asking for <strong>${fieldName}</strong>, and your vault has no value for it. ` +
-      `Type it once and the agent will carry on — it stays on this machine either way.`;
+    // Two different questions, and phrasing them the same way confuses both.
+    //
+    // A vault field is something the user HAS and the vault happens not to hold, so the
+    // sensible offer is "tell me once and I will remember". A task value — a travel date, a
+    // destination, a headcount — is something only they can decide, belongs to this task
+    // rather than to them, and must not be offered for storage at all.
+    const isVaultField = !String(r.fieldKey || "").startsWith("field:");
+    const fieldName = isVaultField
+      ? (r.fieldLabel && r.fieldLabel !== r.fieldKey
+          ? `${esc(r.fieldLabel)} (${esc(r.fieldKey)})`
+          : esc(r.fieldKey))
+      : esc(r.fieldLabel || "this field");
+
+    $("inputPromptText").innerHTML = isVaultField
+      ? `The page is asking for <strong>${fieldName}</strong>, and your vault has no value for it. ` +
+        `Type it once and the agent will carry on — it stays on this machine either way.`
+      : `This page needs <strong>${fieldName}</strong> before the agent can continue. ` +
+        `It is specific to this task, so it is used here and not stored.`;
+
+    // The remember-me offer only makes sense for something worth remembering.
+    const saveRow = $("saveMissingToVault")?.closest("label");
+    if (saveRow) saveRow.hidden = !isVaultField;
+    if (!isVaultField && $("saveMissingToVault")) $("saveMissingToVault").checked = false;
     const el = $("missingInputValue");
     // A secret must not sit in clear text in a panel that stays open on screen.
     const secret = /password|passcode|pin|otp|cvv|secret/i.test(r.fieldKey || "");

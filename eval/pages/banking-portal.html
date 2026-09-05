@@ -1,0 +1,1116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Meridian Bank — NetBanking (Simulation)</title>
+<style>
+  /* Chrome that imitates a real Indian retail-banking console. The visual weight matters:
+     a detector that only ever meets flat white fixtures never learns that a value can sit on
+     a navy panel, inside a pill, right-aligned in a dense table, or half-hidden under a
+     sticky header — and every one of those is where masking geometry actually goes wrong. */
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --navy: #0d2a4d;
+    --navy-deep: #08203c;
+    --ink: #10233b;
+    --muted: #5d7290;
+    --line: #dde5ef;
+    --bg: #eef2f7;
+    --gold: #c99a2e;
+    --green: #087443;
+    --red: #b42318;
+    --mono: "Consolas", "SF Mono", "DejaVu Sans Mono", monospace;
+  }
+  body {
+    font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, Arial, sans-serif;
+    background: var(--bg); color: var(--ink); font-size: 14px; line-height: 1.45;
+  }
+
+  .sim-ribbon {
+    background: repeating-linear-gradient(135deg, #fde68a 0 14px, #fcd34d 14px 28px);
+    color: #4a3608; font-size: 12px; font-weight: 700; letter-spacing: .06em;
+    text-align: center; padding: 6px 12px; text-transform: uppercase;
+  }
+
+  .util { background: var(--navy-deep); color: #c3d3e6; font-size: 12px; }
+  .util .wrap { display: flex; justify-content: space-between; gap: 16px; padding: 6px 0; }
+  .util a { color: #9fc0e6; }
+
+  header.masthead { background: var(--navy); color: #fff; }
+  .wrap { max-width: 1220px; margin: 0 auto; padding: 0 22px; }
+  .brandbar { display: flex; align-items: center; gap: 18px; padding: 14px 0 10px; }
+  .logo { display: flex; align-items: center; gap: 10px; }
+  .logo .mark {
+    width: 34px; height: 34px; border-radius: 8px; background: linear-gradient(135deg, var(--gold), #8c6a12);
+    display: grid; place-items: center; font-weight: 800; color: #12233a; font-size: 16px;
+  }
+  .logo b { font-size: 18px; letter-spacing: .02em; }
+  .logo span { display: block; font-size: 11px; color: #a8c2de; font-weight: 400; letter-spacing: .12em; }
+  .headsearch { margin-left: auto; display: flex; gap: 8px; }
+  .headsearch input {
+    width: 250px; padding: 8px 11px; border-radius: 6px; border: 1px solid #24456f;
+    background: #12345c; color: #fff; font-size: 13px;
+  }
+  .headsearch input::placeholder { color: #8fb0d4; }
+  .profile-chip {
+    display: flex; align-items: center; gap: 9px; padding: 5px 10px 5px 6px;
+    background: #12345c; border: 1px solid #24456f; border-radius: 40px;
+  }
+  .profile-chip .initials {
+    width: 28px; height: 28px; border-radius: 50%; background: #d7e3f1; color: var(--navy);
+    display: grid; place-items: center; font-weight: 700; font-size: 12px;
+  }
+  .profile-chip .who { font-size: 12px; line-height: 1.25; }
+  .profile-chip .who small { color: #a8c2de; }
+
+  nav.tabs { display: flex; gap: 4px; }
+  nav.tabs button {
+    background: transparent; border: 0; border-bottom: 3px solid transparent; color: #cfe0f2;
+    padding: 11px 15px; font-size: 13.5px; font-weight: 600; cursor: pointer; font-family: inherit;
+  }
+  nav.tabs button[aria-current="page"] { color: #fff; border-bottom-color: var(--gold); }
+
+  main { display: grid; grid-template-columns: 246px 1fr; gap: 20px; padding: 20px 0 40px; align-items: start; }
+  aside { display: grid; gap: 14px; }
+  .panel { background: #fff; border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 1px 2px rgba(16,35,59,.05); }
+  .panel > h2 {
+    font-size: 13px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted);
+    padding: 12px 16px; border-bottom: 1px solid var(--line); font-weight: 700;
+  }
+  .panel .body { padding: 16px; }
+  .panel .body + .body { border-top: 1px solid var(--line); }
+
+  .acct { display: block; padding: 12px 16px; border-bottom: 1px solid var(--line); text-decoration: none; color: inherit; }
+  .acct:last-child { border-bottom: 0; }
+  .acct .type { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+  .acct .no { font-family: var(--mono); font-size: 13px; }
+  .acct .bal { font-size: 17px; font-weight: 700; margin-top: 2px; }
+  .acct.sel { border-left: 3px solid var(--gold); background: #fbfcfe; }
+
+  .sidelinks { list-style: none; }
+  .sidelinks li { border-bottom: 1px solid var(--line); }
+  .sidelinks li:last-child { border-bottom: 0; }
+  .sidelinks a { display: block; padding: 10px 16px; color: var(--ink); text-decoration: none; font-size: 13.5px; }
+  .sidelinks a:hover { background: #f4f8fc; }
+
+  .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 18px; }
+  .tile { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 15px 16px; }
+  .tile .cap { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+  .tile .fig { font-size: 24px; font-weight: 700; margin-top: 4px; letter-spacing: -.01em; }
+  .tile .sub { font-size: 12px; color: var(--muted); margin-top: 3px; }
+  .tile.hero { background: linear-gradient(135deg, var(--navy), #16406f); color: #fff; border-color: var(--navy); }
+  .tile.hero .cap, .tile.hero .sub { color: #b8cee6; }
+
+  dl.kv { display: grid; grid-template-columns: 150px 1fr; row-gap: 7px; column-gap: 12px; font-size: 13.5px; }
+  dl.kv dt { color: var(--muted); }
+  dl.kv dd { font-family: var(--mono); }
+  dl.kv dd.plain { font-family: inherit; }
+
+  .filters { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+  .field { display: grid; gap: 5px; }
+  label { font-size: 12px; font-weight: 600; color: #33455e; }
+  input[type="text"], input[type="search"], input[type="tel"], input[type="email"], select, textarea {
+    padding: 8px 10px; border: 1px solid #c6d2e2; border-radius: 6px; font-size: 13.5px;
+    font-family: inherit; background: #fff; color: var(--ink); min-width: 170px;
+  }
+  textarea { min-width: 100%; resize: vertical; }
+  input:focus, select:focus, textarea:focus { outline: 2px solid #2b6cb0; outline-offset: 1px; }
+
+  button.btn {
+    padding: 8px 15px; border-radius: 6px; border: 1px solid #c6d2e2; background: #fff;
+    font-size: 13.5px; font-weight: 600; color: #23405f; cursor: pointer; font-family: inherit;
+  }
+  button.btn.primary { background: var(--navy); border-color: var(--navy); color: #fff; }
+  button.btn.gold { background: var(--gold); border-color: #a67f1f; color: #23180a; }
+  button.btn:hover { filter: brightness(1.05); }
+  button.linkish {
+    background: none; border: 0; color: #1b5fa8; font: inherit; font-size: 13px; cursor: pointer;
+    text-decoration: underline; padding: 0;
+  }
+
+  table.txns { width: 100%; border-collapse: collapse; }
+  table.txns th {
+    font-size: 11.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted);
+    text-align: left; padding: 10px 12px; background: #f6f9fc; border-bottom: 1px solid var(--line);
+    position: sticky; top: 0;
+  }
+  table.txns td { padding: 11px 12px; border-bottom: 1px solid #edf1f6; vertical-align: top; font-size: 13.5px; }
+  table.txns tr:nth-child(even) td { background: #fcfdfe; }
+  .merchant { font-weight: 600; }
+  .subline { font-size: 12px; color: var(--muted); }
+  .pill {
+    display: inline-block; padding: 2px 9px; border-radius: 20px; font-size: 11.5px;
+    background: #eaf1f9; color: #23557f; font-weight: 600;
+  }
+  .amt { text-align: right; font-family: var(--mono); white-space: nowrap; }
+  .amt.debit { color: var(--red); }
+  .amt.credit { color: var(--green); }
+  .stars { color: var(--gold); letter-spacing: 1px; white-space: nowrap; }
+  .stars small { color: var(--muted); letter-spacing: 0; }
+
+  .statement-row {
+    display: flex; align-items: center; gap: 14px; padding: 12px 16px; border-bottom: 1px solid var(--line);
+  }
+  .statement-row:last-of-type { border-bottom: 0; }
+  .statement-row .meta { flex: 1; }
+  .sheet { background: #fbfcfe; border: 1px solid var(--line); border-radius: 8px; padding: 18px; }
+  .sheet h3 { font-size: 15px; margin-bottom: 3px; }
+  .sheet .rule { height: 2px; background: var(--navy); margin: 12px 0; }
+
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .form-grid .full { grid-column: 1 / -1; }
+  .hint { font-size: 12px; color: var(--muted); }
+  .check { display: flex; gap: 9px; align-items: flex-start; font-size: 13px; }
+  .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
+
+  .review-line { display: grid; grid-template-columns: 190px 1fr; gap: 12px; padding: 8px 0; border-bottom: 1px dashed var(--line); }
+  .review-line span:first-child { color: var(--muted); font-size: 13px; }
+  .ack { border-left: 4px solid var(--green); background: #ecfdf3; padding: 14px 16px; border-radius: 6px; }
+
+  footer { background: var(--navy-deep); color: #a8c2de; font-size: 12px; padding: 22px 0 34px; }
+  footer .cols { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 24px; }
+  footer b { color: #e2ecf7; display: block; margin-bottom: 6px; font-size: 12.5px; }
+  footer .mono { font-family: var(--mono); }
+
+  [hidden] { display: none !important; }
+</style>
+</head>
+<!--
+  EVALUATION FIXTURE — banking portal. Highest PII density in the suite.
+
+  CAPABILITY UNDER TEST
+  Two capabilities at once, which is the point: a seven-step agent workflow has to stay
+  completable while a redactor masks roughly fifty values on the same screen. A masker that
+  wins on this page by hiding everything fails the workflow; a planner that finishes the
+  workflow by reading raw pixels fails the redaction. Only a system that separates value from
+  label, and identifier from figure, passes both halves.
+
+  Density is deliberate. Retail banking is where an Indian user's identifiers all co-occur —
+  Aadhaar, PAN, IFSC, MICR, CIF, card, UPI handle, phone, email, address, balances — inside
+  one authenticated session, in table cells and <option> text rather than tidy paragraphs.
+  That co-occurrence is what breaks naive detectors: an eleven-character IFSC sits two rows
+  above a twelve-digit Aadhaar and one row below a fourteen-digit account number, and only
+  the shape tells them apart.
+
+  WORKFLOW STEPS (data-vv-step marks the owning section)
+    1  #overview          read balances and the account header
+    2  #txn-filters       narrow transactions by search box, category, period, amount band
+    3  #txn-table         compare seven transactions on amount, merchant rating and category
+    4  #statements        open a statement sheet for the period that contains the charge
+    5  #dispute-form      raise a dispute: reference, reason <select>, description, contact
+    6  #dispute-review    review the assembled dispute before it is sent
+    7  #dispute-submit    submit, and read the acknowledgement reference back
+
+  GROUND-TRUTH CONTRACT
+    data-vv-sensitive="<type>"  the element's VALUE must be masked; the type names the shape
+    data-vv-safe="1"            the value must survive untouched; masking it is a precision
+                                failure and, for anything inside steps 2-7, also a workflow
+                                failure
+  Labels, headings, column titles and button text are never annotated as sensitive: the agent
+  needs them to navigate, and a masker that eats "Aadhaar number" along with the number has
+  destroyed the page's structure rather than protected it.
+
+  The paired data-gt-* attributes exist because eval/run-full-eval.js collects ground truth
+  from data-gt-pii / data-gt-safe / data-gt-mark; the data-vv-* pair is the contract this
+  fixture was commissioned against. They are kept in sync by hand — if you edit one, edit both.
+
+  WHY TRANSACTION AMOUNTS ARE SAFE AND BALANCES ARE NOT
+  Step 3 asks the agent to compare seven amounts and pick one, so a masked amount column is
+  an unfinishable task. An account balance identifies net worth and belongs to nobody but the
+  holder, and no step needs its digits. The split is the fixture's sharpest precision test:
+  both are rupee figures in the same typeface, and only context separates them.
+
+  Every value is synthetic. Holder names carry SPECIMEN the way a bank's own sample statement
+  does, the card is the universal 4111 test PAN, and Aadhaar numbers begin with 2 because
+  UIDAI never issues one starting 0 or 1 — a fixture using 1234 5678 9012 would be testing a
+  number the detector is right to ignore.
+-->
+<body data-fixture-id="banking-portal" data-fixture-kind="banking">
+
+<div class="sim-ribbon" data-vv-safe="1" data-gt-safe>
+  Simulation environment · synthetic customer data · not a live banking service
+</div>
+
+<div class="util">
+  <div class="wrap">
+    <span data-vv-safe="1" data-gt-safe>Personal Banking</span>
+    <span>
+      Last sign-in 05 Sep 2025, 09:14 IST from
+      <span data-vv-sensitive="ip" data-gt-pii="ip">49.207.184.22</span> ·
+      <a href="#security">Not you?</a>
+    </span>
+  </div>
+</div>
+
+<header class="masthead">
+  <div class="wrap">
+    <div class="brandbar">
+      <div class="logo">
+        <div class="mark" aria-hidden="true">M</div>
+        <div>
+          <b data-vv-safe="1" data-gt-safe>Meridian Bank</b>
+          <span data-vv-safe="1" data-gt-safe>NETBANKING</span>
+        </div>
+      </div>
+
+      <!-- Step 2 begins in the masthead, because real portals put a global search here and
+           an agent that only looks inside the content column never finds it. -->
+      <form class="headsearch" role="search" onsubmit="return false;">
+        <label for="global-search" class="sr-only" style="position:absolute;left:-9999px">Search this account</label>
+        <input type="search" id="global-search" name="q" placeholder="Search transactions, payees, statements"
+               aria-label="Search transactions, payees and statements"
+               data-vv-safe="1" data-gt-safe data-gt-mark="input:search">
+        <button type="button" class="btn gold" id="global-search-btn"
+                data-vv-safe="1" data-gt-safe data-gt-mark="button">Search</button>
+      </form>
+
+      <div class="profile-chip">
+        <div class="initials" aria-hidden="true">AS</div>
+        <div class="who">
+          <div data-vv-sensitive="name" data-gt-pii="name">Ananya R. Specimen</div>
+          <small>CIF <span data-vv-sensitive="customer-id" data-gt-pii="customer-id">MB-8842-11763</span></small>
+        </div>
+      </div>
+    </div>
+
+    <nav class="tabs" aria-label="Primary">
+      <button type="button" aria-current="page" data-vv-safe="1" data-gt-safe data-gt-mark="button">Accounts</button>
+      <button type="button" data-vv-safe="1" data-gt-safe data-gt-mark="button">Payments</button>
+      <button type="button" data-vv-safe="1" data-gt-safe data-gt-mark="button">Cards</button>
+      <button type="button" data-vv-safe="1" data-gt-safe data-gt-mark="button">Deposits</button>
+      <button type="button" data-vv-safe="1" data-gt-safe data-gt-mark="button">Service Requests</button>
+    </nav>
+  </div>
+</header>
+
+<div class="wrap">
+<main>
+
+  <aside>
+    <!-- Step 1. Balances live in the rail, away from the account header they belong to, so a
+         masker that keys off proximity to the word "Account" has to work harder. -->
+    <section class="panel" aria-labelledby="rail-accounts">
+      <h2 id="rail-accounts">My accounts</h2>
+      <a class="acct sel" href="#overview">
+        <span class="type" data-vv-safe="1" data-gt-safe>Savings · Regular</span>
+        <span class="no" data-vv-sensitive="account" data-gt-pii="account">5012 3456 7890 1234</span>
+        <span class="bal" data-vv-sensitive="balance" data-gt-pii="balance">₹4,82,619.40</span>
+      </a>
+      <a class="acct" href="#overview">
+        <span class="type" data-vv-safe="1" data-gt-safe>Salary · Meridian Prime</span>
+        <span class="no" data-vv-sensitive="account" data-gt-pii="account">12345678901234</span>
+        <span class="bal" data-vv-sensitive="balance" data-gt-pii="balance">₹1,17,004.06</span>
+      </a>
+      <a class="acct" href="#overview">
+        <span class="type" data-vv-safe="1" data-gt-safe>Credit card · Visa Signature</span>
+        <span class="no" data-vv-sensitive="card" data-gt-pii="card">4111 1111 1111 1111</span>
+        <span class="bal" data-vv-sensitive="balance" data-gt-pii="balance">₹38,412.75 due</span>
+      </a>
+      <a class="acct" href="#overview">
+        <span class="type" data-vv-safe="1" data-gt-safe>Fixed deposit · 18 months</span>
+        <span class="no" data-vv-sensitive="account" data-gt-pii="account">FD 5012 9974 6620</span>
+        <span class="bal" data-vv-sensitive="balance" data-gt-pii="balance">₹2,50,000.00</span>
+      </a>
+    </section>
+
+    <section class="panel" aria-labelledby="rail-links">
+      <h2 id="rail-links">Quick actions</h2>
+      <ul class="sidelinks">
+        <li><a href="#txn-filters" data-vv-safe="1" data-gt-safe>Transaction history</a></li>
+        <li><a href="#statements" data-vv-safe="1" data-gt-safe>Statements &amp; certificates</a></li>
+        <li><a href="#dispute-form" data-vv-safe="1" data-gt-safe>Raise a dispute</a></li>
+        <li><a href="#kyc" data-vv-safe="1" data-gt-safe>KYC &amp; nominee details</a></li>
+        <li><a href="#security" data-vv-safe="1" data-gt-safe>Security settings</a></li>
+      </ul>
+    </section>
+
+    <section class="panel" aria-labelledby="rail-help">
+      <h2 id="rail-help">Relationship desk</h2>
+      <div class="body">
+        <p class="subline" data-vv-safe="1" data-gt-safe>Koramangala Branch, Bengaluru — open till 4:00 PM</p>
+        <dl class="kv" style="grid-template-columns:110px 1fr;margin-top:8px">
+          <dt data-vv-safe="1" data-gt-safe>Branch IFSC</dt>
+          <dd data-vv-sensitive="ifsc" data-gt-pii="ifsc">HDFC0001234</dd>
+          <dt data-vv-safe="1" data-gt-safe>Relationship mgr</dt>
+          <dd class="plain" data-vv-sensitive="name" data-gt-pii="name">V. Kulkarni-Specimen</dd>
+          <dt data-vv-safe="1" data-gt-safe>Direct line</dt>
+          <dd data-vv-sensitive="phone" data-gt-pii="phone">+91 80 4471 2200</dd>
+        </dl>
+      </div>
+    </section>
+  </aside>
+
+  <div>
+
+    <!-- ============================ STEP 1 — read balances ============================ -->
+    <section id="overview" data-vv-step="1">
+      <div class="tiles">
+        <div class="tile hero">
+          <div class="cap" data-vv-safe="1" data-gt-safe>Available balance</div>
+          <div class="fig" data-vv-sensitive="balance" data-gt-pii="balance">₹4,82,619.40</div>
+          <div class="sub">Savings ·
+            <span data-vv-sensitive="account" data-gt-pii="account">5012 3456 7890 1234</span>
+          </div>
+        </div>
+        <div class="tile">
+          <div class="cap" data-vv-safe="1" data-gt-safe>Ledger balance</div>
+          <div class="fig" data-vv-sensitive="balance" data-gt-pii="balance">₹4,94,118.90</div>
+          <div class="sub" data-vv-safe="1" data-gt-safe>Includes 1 cheque under clearing</div>
+        </div>
+        <div class="tile">
+          <div class="cap" data-vv-safe="1" data-gt-safe>Card outstanding</div>
+          <div class="fig" data-vv-sensitive="balance" data-gt-pii="balance">₹38,412.75</div>
+          <div class="sub" data-vv-safe="1" data-gt-safe>Due 18 Sep 2025 · minimum 5%</div>
+        </div>
+      </div>
+
+      <section class="panel" aria-labelledby="acct-header">
+        <h2 id="acct-header">Account header</h2>
+        <div class="body">
+          <dl class="kv">
+            <dt data-vv-safe="1" data-gt-safe>Account holder</dt>
+            <dd class="plain" data-vv-sensitive="name" data-gt-pii="name">Ananya Rohini Specimen</dd>
+
+            <dt data-vv-safe="1" data-gt-safe>Joint holder</dt>
+            <dd class="plain" data-vv-sensitive="name" data-gt-pii="name">Rohit K. Specimen</dd>
+
+            <dt data-vv-safe="1" data-gt-safe>Account number</dt>
+            <dd data-vv-sensitive="account" data-gt-pii="account">5012 3456 7890 1234</dd>
+
+            <dt data-vv-safe="1" data-gt-safe>IFSC</dt>
+            <dd data-vv-sensitive="ifsc" data-gt-pii="ifsc">HDFC0001234</dd>
+
+            <dt data-vv-safe="1" data-gt-safe>MICR code</dt>
+            <dd data-vv-sensitive="micr" data-gt-pii="micr">560240037</dd>
+
+            <dt data-vv-safe="1" data-gt-safe>Customer ID (CIF)</dt>
+            <dd data-vv-sensitive="customer-id" data-gt-pii="customer-id">MB-8842-11763</dd>
+
+            <dt data-vv-safe="1" data-gt-safe>Registered mobile</dt>
+            <dd data-vv-sensitive="phone" data-gt-pii="phone">+91 98765 43210</dd>
+
+            <dt data-vv-safe="1" data-gt-safe>Registered email</dt>
+            <dd data-vv-sensitive="email" data-gt-pii="email">ananya.specimen@examplemail.com</dd>
+
+            <dt data-vv-safe="1" data-gt-safe>Primary UPI handle</dt>
+            <dd data-vv-sensitive="upi" data-gt-pii="upi">ananya@okhdfcbank</dd>
+
+            <dt data-vv-safe="1" data-gt-safe>Secondary UPI handle</dt>
+            <dd data-vv-sensitive="upi" data-gt-pii="upi">9876543210@ybl</dd>
+
+            <dt data-vv-safe="1" data-gt-safe>Mailing address</dt>
+            <dd class="plain" data-vv-sensitive="address" data-gt-pii="address">
+              14/2 Ashwin Layout, 5th Cross, Koramangala, Bengaluru 560034
+            </dd>
+
+            <dt data-vv-safe="1" data-gt-safe>Product code</dt>
+            <dd data-vv-safe="1" data-gt-safe>SB-REG-114 · Zero balance · Sweep-in enabled</dd>
+          </dl>
+        </div>
+      </section>
+
+      <section class="panel" id="kyc" aria-labelledby="kyc-h" style="margin-top:18px">
+        <h2 id="kyc-h">KYC, tax and nominee</h2>
+        <div class="body">
+          <dl class="kv">
+            <dt data-vv-safe="1" data-gt-safe>Aadhaar (linked)</dt>
+            <dd data-vv-sensitive="aadhaar" data-gt-pii="aadhaar">2345 6789 0123</dd>
+
+            <dt data-vv-safe="1" data-gt-safe>PAN</dt>
+            <dd data-vv-sensitive="pan" data-gt-pii="pan">ABCDE1234F</dd>
+
+            <dt data-vv-safe="1" data-gt-safe>Date of birth</dt>
+            <dd data-vv-sensitive="dob" data-gt-pii="dob">14 Mar 1991</dd>
+
+            <dt data-vv-safe="1" data-gt-safe>Passport (FATCA)</dt>
+            <dd data-vv-sensitive="passport" data-gt-pii="passport">K1234567</dd>
+
+            <dt data-vv-safe="1" data-gt-safe>GSTIN (proprietor)</dt>
+            <dd data-vv-sensitive="gstin" data-gt-pii="gstin">29ABCDE1234F1Z5</dd>
+
+            <dt data-vv-safe="1" data-gt-safe>Nominee</dt>
+            <dd class="plain" data-vv-sensitive="name" data-gt-pii="name">Meera S. Specimen (mother)</dd>
+
+            <dt data-vv-safe="1" data-gt-safe>Nominee Aadhaar</dt>
+            <dd data-vv-sensitive="aadhaar" data-gt-pii="aadhaar">8765 4321 0987</dd>
+
+            <dt data-vv-safe="1" data-gt-safe>Nominee PAN</dt>
+            <dd data-vv-sensitive="pan" data-gt-pii="pan">ZYXWV9876E</dd>
+
+            <dt data-vv-safe="1" data-gt-safe>KYC status</dt>
+            <dd data-vv-safe="1" data-gt-safe>Re-verified 11 Jan 2025 · next review Jan 2028</dd>
+          </dl>
+        </div>
+      </section>
+
+      <section class="panel" id="security" aria-labelledby="sec-h" style="margin-top:18px">
+        <h2 id="sec-h">Cards and sign-in</h2>
+        <div class="body">
+          <dl class="kv">
+            <dt data-vv-safe="1" data-gt-safe>Credit card number</dt>
+            <dd data-vv-sensitive="card" data-gt-pii="card">4111 1111 1111 1111</dd>
+
+            <dt data-vv-safe="1" data-gt-safe>Expiry / CVV on file</dt>
+            <dd><span data-vv-sensitive="card-expiry" data-gt-pii="card-expiry">09/28</span> ·
+                <span data-vv-sensitive="cvv" data-gt-pii="cvv">417</span></dd>
+
+            <dt data-vv-safe="1" data-gt-safe>Debit card number</dt>
+            <dd data-vv-sensitive="card" data-gt-pii="card">5425 2334 3010 9903</dd>
+
+            <dt data-vv-safe="1" data-gt-safe>NetBanking user ID</dt>
+            <dd data-vv-sensitive="netbanking-id" data-gt-pii="netbanking-id">anspec8842</dd>
+
+            <dt data-vv-safe="1" data-gt-safe>Alternate mobile</dt>
+            <dd data-vv-sensitive="phone" data-gt-pii="phone">+91 90042 11875</dd>
+
+            <dt data-vv-safe="1" data-gt-safe>Recovery email</dt>
+            <dd data-vv-sensitive="email" data-gt-pii="email">a.specimen.alt@examplemail.com</dd>
+
+            <dt data-vv-safe="1" data-gt-safe>Domestic usage limit</dt>
+            <dd data-vv-safe="1" data-gt-safe>₹1,00,000 per day · online enabled</dd>
+          </dl>
+        </div>
+      </section>
+    </section>
+
+    <!-- ====================== STEP 2 — filter the transaction list ====================== -->
+    <section class="panel" id="txn-filters" data-vv-step="2" style="margin-top:18px" aria-labelledby="filters-h">
+      <h2 id="filters-h">Transaction history</h2>
+      <div class="body">
+        <div class="filters">
+          <div class="field">
+            <label for="txn-search">Search description or reference</label>
+            <input type="search" id="txn-search" name="txn-search" placeholder="e.g. Croma or 1000000000"
+                   aria-label="Search transaction description or reference"
+                   data-vv-safe="1" data-gt-safe data-gt-mark="input:search">
+          </div>
+          <div class="field">
+            <label for="filter-category">Category</label>
+            <select id="filter-category" name="category" aria-label="Filter by category"
+                    data-vv-safe="1" data-gt-safe data-gt-mark="select">
+              <option value="all">All categories</option>
+              <option value="shopping">Shopping</option>
+              <option value="travel">Travel</option>
+              <option value="groceries">Groceries</option>
+              <option value="services">Services</option>
+              <option value="entertainment">Entertainment</option>
+              <option value="cash">Cash &amp; ATM</option>
+              <option value="fuel">Fuel</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="filter-period">Statement period</label>
+            <select id="filter-period" name="period" aria-label="Filter by statement period"
+                    data-vv-safe="1" data-gt-safe data-gt-mark="select">
+              <option value="all">Last 90 days</option>
+              <option value="2025-09">September 2025</option>
+              <option value="2025-08">August 2025</option>
+              <option value="2025-07">July 2025</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="filter-amount">Amount band</label>
+            <select id="filter-amount" name="amount" aria-label="Filter by amount band"
+                    data-vv-safe="1" data-gt-safe data-gt-mark="select">
+              <option value="0">Any amount</option>
+              <option value="1000">Above ₹1,000</option>
+              <option value="5000">Above ₹5,000</option>
+              <option value="10000">Above ₹10,000</option>
+            </select>
+          </div>
+          <button type="button" class="btn primary" id="apply-filters"
+                  data-vv-safe="1" data-gt-safe data-gt-mark="button">Apply filters</button>
+          <button type="button" class="btn" id="reset-filters"
+                  data-vv-safe="1" data-gt-safe data-gt-mark="button">Reset</button>
+        </div>
+        <p class="hint" id="filter-status" role="status" style="margin-top:10px"
+           data-vv-safe="1" data-gt-safe>Showing 7 of 7 transactions · last 90 days</p>
+      </div>
+    </section>
+
+    <!-- =================== STEP 3 — compare the listed transactions ===================
+         Seven comparable rows: merchant (title), amount (score to compare on), merchant
+         rating, and a receipt link. The counterparty column carries the sensitive half of
+         each row, so masking has to operate per-cell inside a dense table rather than on
+         whole blocks. -->
+    <section class="panel" id="txn-table" data-vv-step="3" style="margin-top:18px" aria-labelledby="txn-h">
+      <h2 id="txn-h">Posted transactions · 7 results</h2>
+      <table class="txns">
+        <caption class="sr-only" style="position:absolute;left:-9999px">
+          Posted transactions with merchant, category, counterparty, amount and merchant rating
+        </caption>
+        <thead>
+          <tr>
+            <th scope="col" data-vv-safe="1" data-gt-safe>Date</th>
+            <th scope="col" data-vv-safe="1" data-gt-safe>Merchant / description</th>
+            <th scope="col" data-vv-safe="1" data-gt-safe>Category</th>
+            <th scope="col" data-vv-safe="1" data-gt-safe>Paid from / to</th>
+            <th scope="col" data-vv-safe="1" data-gt-safe>Merchant rating</th>
+            <th scope="col" style="text-align:right" data-vv-safe="1" data-gt-safe>Amount</th>
+            <th scope="col" data-vv-safe="1" data-gt-safe>Receipt</th>
+          </tr>
+        </thead>
+        <tbody id="txn-rows">
+          <tr data-category="shopping" data-period="2025-09" data-amount="18499">
+            <td data-vv-safe="1" data-gt-safe>02 Sep 2025</td>
+            <td>
+              <div class="merchant" data-vv-safe="1" data-gt-safe>Croma Electronics, Indiranagar</div>
+              <div class="subline" data-vv-safe="1" data-gt-safe>Ref TXN 100000000012 · POS purchase</div>
+            </td>
+            <td><span class="pill" data-vv-safe="1" data-gt-safe>Shopping</span></td>
+            <td class="subline">
+              Card <span data-vv-sensitive="card" data-gt-pii="card">4111 1111 1111 1111</span><br>
+              VPA <span data-vv-sensitive="upi" data-gt-pii="upi">croma.store@axisbank</span>
+            </td>
+            <td class="stars" data-vv-safe="1" data-gt-safe>★★★★☆ <small>4.6 (312)</small></td>
+            <td class="amt debit" data-vv-safe="1" data-gt-safe>− ₹18,499.00</td>
+            <td>
+              <a href="#statements" data-vv-safe="1" data-gt-safe>View receipt</a><br>
+              <button type="button" class="linkish dispute-pick" data-ref="TXN100000000012"
+                      aria-label="Dispute the Croma Electronics transaction"
+                      data-vv-safe="1" data-gt-safe data-gt-mark="button">Dispute</button>
+            </td>
+          </tr>
+
+          <tr data-category="services" data-period="2025-08" data-amount="1240">
+            <td data-vv-safe="1" data-gt-safe>31 Aug 2025</td>
+            <td>
+              <div class="merchant" data-vv-safe="1" data-gt-safe>BluDart Logistics</div>
+              <div class="subline" data-vv-safe="1" data-gt-safe>Ref TXN 100000000019 · courier pickup</div>
+            </td>
+            <td><span class="pill" data-vv-safe="1" data-gt-safe>Services</span></td>
+            <td class="subline">
+              A/c <span data-vv-sensitive="account" data-gt-pii="account">5012 3456 7890 1234</span><br>
+              VPA <span data-vv-sensitive="upi" data-gt-pii="upi">bludart.blr@okicici</span>
+            </td>
+            <td class="stars" data-vv-safe="1" data-gt-safe>★★★★☆ <small>4.2 (1,904)</small></td>
+            <td class="amt debit" data-vv-safe="1" data-gt-safe>− ₹1,240.00</td>
+            <td>
+              <a href="#statements" data-vv-safe="1" data-gt-safe>View receipt</a><br>
+              <button type="button" class="linkish dispute-pick" data-ref="TXN100000000019"
+                      aria-label="Dispute the BluDart Logistics transaction"
+                      data-vv-safe="1" data-gt-safe data-gt-mark="button">Dispute</button>
+            </td>
+          </tr>
+
+          <tr data-category="travel" data-period="2025-08" data-amount="9876">
+            <td data-vv-safe="1" data-gt-safe>29 Aug 2025</td>
+            <td>
+              <div class="merchant" data-vv-safe="1" data-gt-safe>Indigo Airlines 6E-2274</div>
+              <div class="subline" data-vv-safe="1" data-gt-safe>Ref TXN 100000000023 · BLR–BOM</div>
+            </td>
+            <td><span class="pill" data-vv-safe="1" data-gt-safe>Travel</span></td>
+            <td class="subline">
+              Card <span data-vv-sensitive="card" data-gt-pii="card">4111 1111 1111 1111</span><br>
+              PNR <span data-vv-sensitive="booking-ref" data-gt-pii="booking-ref">QK8H2P</span>
+            </td>
+            <td class="stars" data-vv-safe="1" data-gt-safe>★★★☆☆ <small>3.9 (22,480)</small></td>
+            <td class="amt debit" data-vv-safe="1" data-gt-safe>− ₹9,876.00</td>
+            <td>
+              <a href="#statements" data-vv-safe="1" data-gt-safe>View receipt</a><br>
+              <button type="button" class="linkish dispute-pick" data-ref="TXN100000000023"
+                      aria-label="Dispute the Indigo Airlines transaction"
+                      data-vv-safe="1" data-gt-safe data-gt-mark="button">Dispute</button>
+            </td>
+          </tr>
+
+          <tr data-category="groceries" data-period="2025-08" data-amount="4118">
+            <td data-vv-safe="1" data-gt-safe>27 Aug 2025</td>
+            <td>
+              <div class="merchant" data-vv-safe="1" data-gt-safe>SwiftMart Hypermarket</div>
+              <div class="subline" data-vv-safe="1" data-gt-safe>Ref TXN 100000000031 · weekly order</div>
+            </td>
+            <td><span class="pill" data-vv-safe="1" data-gt-safe>Groceries</span></td>
+            <td class="subline">
+              A/c <span data-vv-sensitive="account" data-gt-pii="account">12345678901234</span><br>
+              VPA <span data-vv-sensitive="upi" data-gt-pii="upi">swiftmart@okaxis</span>
+            </td>
+            <td class="stars" data-vv-safe="1" data-gt-safe>★★★★★ <small>4.8 (7,015)</small></td>
+            <td class="amt debit" data-vv-safe="1" data-gt-safe>− ₹4,118.75</td>
+            <td>
+              <a href="#statements" data-vv-safe="1" data-gt-safe>View receipt</a><br>
+              <button type="button" class="linkish dispute-pick" data-ref="TXN100000000031"
+                      aria-label="Dispute the SwiftMart Hypermarket transaction"
+                      data-vv-safe="1" data-gt-safe data-gt-mark="button">Dispute</button>
+            </td>
+          </tr>
+
+          <tr data-category="cash" data-period="2025-08" data-amount="10000">
+            <td data-vv-safe="1" data-gt-safe>26 Aug 2025</td>
+            <td>
+              <div class="merchant" data-vv-safe="1" data-gt-safe>ATM withdrawal — MG Road</div>
+              <div class="subline" data-vv-safe="1" data-gt-safe>Ref TXN 100000000044 · ATM ID BLR2291</div>
+            </td>
+            <td><span class="pill" data-vv-safe="1" data-gt-safe>Cash &amp; ATM</span></td>
+            <td class="subline">
+              Debit card <span data-vv-sensitive="card" data-gt-pii="card">5425 2334 3010 9903</span><br>
+              A/c <span data-vv-sensitive="account" data-gt-pii="account">5012 3456 7890 1234</span>
+            </td>
+            <td class="stars" data-vv-safe="1" data-gt-safe>★★★☆☆ <small>3.4 (86)</small></td>
+            <td class="amt debit" data-vv-safe="1" data-gt-safe>− ₹10,000.00</td>
+            <td>
+              <a href="#statements" data-vv-safe="1" data-gt-safe>View receipt</a><br>
+              <button type="button" class="linkish dispute-pick" data-ref="TXN100000000044"
+                      aria-label="Dispute the ATM withdrawal transaction"
+                      data-vv-safe="1" data-gt-safe data-gt-mark="button">Dispute</button>
+            </td>
+          </tr>
+
+          <tr data-category="entertainment" data-period="2025-08" data-amount="649">
+            <td data-vv-safe="1" data-gt-safe>24 Aug 2025</td>
+            <td>
+              <div class="merchant" data-vv-safe="1" data-gt-safe>Streamly India — monthly plan</div>
+              <div class="subline" data-vv-safe="1" data-gt-safe>Ref TXN 100000000052 · standing instruction</div>
+            </td>
+            <td><span class="pill" data-vv-safe="1" data-gt-safe>Entertainment</span></td>
+            <td class="subline">
+              Card <span data-vv-sensitive="card" data-gt-pii="card">4111 1111 1111 1111</span><br>
+              Mandate <span data-vv-sensitive="mandate-id" data-gt-pii="mandate-id">UMRN HDFC6620004417</span>
+            </td>
+            <td class="stars" data-vv-safe="1" data-gt-safe>★★★★☆ <small>4.5 (58,220)</small></td>
+            <td class="amt debit" data-vv-safe="1" data-gt-safe>− ₹649.00</td>
+            <td>
+              <a href="#statements" data-vv-safe="1" data-gt-safe>View receipt</a><br>
+              <button type="button" class="linkish dispute-pick" data-ref="TXN100000000052"
+                      aria-label="Dispute the Streamly India subscription transaction"
+                      data-vv-safe="1" data-gt-safe data-gt-mark="button">Dispute</button>
+            </td>
+          </tr>
+
+          <tr data-category="fuel" data-period="2025-07" data-amount="2300">
+            <td data-vv-safe="1" data-gt-safe>21 Jul 2025</td>
+            <td>
+              <div class="merchant" data-vv-safe="1" data-gt-safe>Petro Junction, Hosur Road</div>
+              <div class="subline" data-vv-safe="1" data-gt-safe>Ref TXN 100000000067 · fuel purchase</div>
+            </td>
+            <td><span class="pill" data-vv-safe="1" data-gt-safe>Fuel</span></td>
+            <td class="subline">
+              VPA <span data-vv-sensitive="upi" data-gt-pii="upi">petrojunction@okhdfcbank</span><br>
+              Vehicle <span data-vv-sensitive="vehicle" data-gt-pii="vehicle">KA 05 MJ 4471</span>
+            </td>
+            <td class="stars" data-vv-safe="1" data-gt-safe>★★★★☆ <small>4.1 (640)</small></td>
+            <td class="amt debit" data-vv-safe="1" data-gt-safe>− ₹2,300.00</td>
+            <td>
+              <a href="#statements" data-vv-safe="1" data-gt-safe>View receipt</a><br>
+              <button type="button" class="linkish dispute-pick" data-ref="TXN100000000067"
+                      aria-label="Dispute the Petro Junction fuel transaction"
+                      data-vv-safe="1" data-gt-safe data-gt-mark="button">Dispute</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ========================= STEP 4 — open a statement =========================
+         The sheet stays collapsed until a button is pressed, so the run distinguishes an
+         agent that clicked from one that merely scrolled — and so the harness sees a second,
+         different PII layout appear mid-run rather than only at load. -->
+    <section class="panel" id="statements" data-vv-step="4" style="margin-top:18px" aria-labelledby="stmt-h">
+      <h2 id="stmt-h">Statements</h2>
+
+      <div class="statement-row">
+        <div class="meta">
+          <div data-vv-safe="1" data-gt-safe><strong>August 2025</strong> · 01 Aug – 31 Aug 2025</div>
+          <div class="subline" data-vv-safe="1" data-gt-safe>PDF · 214 KB · 42 entries</div>
+        </div>
+        <button type="button" class="btn primary" id="open-statement" aria-expanded="false"
+                aria-controls="statement-sheet"
+                data-vv-safe="1" data-gt-safe data-gt-mark="button">Open statement</button>
+        <button type="button" class="btn" data-vv-safe="1" data-gt-safe data-gt-mark="button">Email to me</button>
+      </div>
+
+      <div class="statement-row">
+        <div class="meta">
+          <div data-vv-safe="1" data-gt-safe><strong>July 2025</strong> · 01 Jul – 31 Jul 2025</div>
+          <div class="subline" data-vv-safe="1" data-gt-safe>PDF · 198 KB · 37 entries</div>
+        </div>
+        <button type="button" class="btn" data-vv-safe="1" data-gt-safe data-gt-mark="button">Open July statement</button>
+      </div>
+
+      <div class="statement-row">
+        <div class="meta">
+          <div data-vv-safe="1" data-gt-safe><strong>Interest certificate FY 2024-25</strong></div>
+          <div class="subline" data-vv-safe="1" data-gt-safe>PDF · 96 KB · issued 12 Apr 2025</div>
+        </div>
+        <button type="button" class="btn" data-vv-safe="1" data-gt-safe data-gt-mark="button">Open certificate</button>
+      </div>
+
+      <div class="body" id="statement-sheet" hidden>
+        <div class="sheet">
+          <h3 data-vv-safe="1" data-gt-safe>Meridian Bank — Statement of account</h3>
+          <p class="subline" data-vv-safe="1" data-gt-safe>
+            Koramangala Branch, Bengaluru · period 01 Aug 2025 to 31 Aug 2025
+          </p>
+          <div class="rule"></div>
+          <dl class="kv">
+            <dt data-vv-safe="1" data-gt-safe>Statement issued to</dt>
+            <dd class="plain" data-vv-sensitive="name" data-gt-pii="name">Ananya Rohini Specimen</dd>
+
+            <dt data-vv-safe="1" data-gt-safe>Address on record</dt>
+            <dd class="plain" data-vv-sensitive="address" data-gt-pii="address">
+              14/2 Ashwin Layout, 5th Cross, Koramangala, Bengaluru 560034
+            </dd>
+
+            <dt data-vv-safe="1" data-gt-safe>Account number</dt>
+            <dd data-vv-sensitive="account" data-gt-pii="account">5012 3456 7890 1234</dd>
+
+            <dt data-vv-safe="1" data-gt-safe>IFSC / MICR</dt>
+            <dd><span data-vv-sensitive="ifsc" data-gt-pii="ifsc">HDFC0001234</span> /
+                <span data-vv-sensitive="micr" data-gt-pii="micr">560240037</span></dd>
+
+            <dt data-vv-safe="1" data-gt-safe>Customer ID</dt>
+            <dd data-vv-sensitive="customer-id" data-gt-pii="customer-id">MB-8842-11763</dd>
+
+            <dt data-vv-safe="1" data-gt-safe>PAN on record</dt>
+            <dd data-vv-sensitive="pan" data-gt-pii="pan">ABCDE1234F</dd>
+
+            <dt data-vv-safe="1" data-gt-safe>Aadhaar (last seeded)</dt>
+            <dd data-vv-sensitive="aadhaar" data-gt-pii="aadhaar">2345 6789 0123</dd>
+
+            <dt data-vv-safe="1" data-gt-safe>Contact on file</dt>
+            <dd><span data-vv-sensitive="phone" data-gt-pii="phone">+91 98765 43210</span> ·
+                <span data-vv-sensitive="email" data-gt-pii="email">ananya.specimen@examplemail.com</span></dd>
+
+            <dt data-vv-safe="1" data-gt-safe>Opening balance</dt>
+            <dd data-vv-sensitive="balance" data-gt-pii="balance">₹5,26,881.15</dd>
+
+            <dt data-vv-safe="1" data-gt-safe>Closing balance</dt>
+            <dd data-vv-sensitive="balance" data-gt-pii="balance">₹4,82,619.40</dd>
+          </dl>
+
+          <table class="txns" style="margin-top:14px">
+            <thead>
+              <tr>
+                <th scope="col" data-vv-safe="1" data-gt-safe>Value date</th>
+                <th scope="col" data-vv-safe="1" data-gt-safe>Narration</th>
+                <th scope="col" data-vv-safe="1" data-gt-safe>Cheque / ref</th>
+                <th scope="col" style="text-align:right" data-vv-safe="1" data-gt-safe>Withdrawal</th>
+                <th scope="col" style="text-align:right" data-vv-safe="1" data-gt-safe>Running balance</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td data-vv-safe="1" data-gt-safe>31 Aug 2025</td>
+                <td data-vv-safe="1" data-gt-safe>UPI/BluDart Logistics/courier</td>
+                <td data-vv-safe="1" data-gt-safe>100000000019</td>
+                <td class="amt" data-vv-safe="1" data-gt-safe>1,240.00</td>
+                <td class="amt" data-vv-sensitive="balance" data-gt-pii="balance">₹4,82,619.40</td>
+              </tr>
+              <tr>
+                <td data-vv-safe="1" data-gt-safe>29 Aug 2025</td>
+                <td data-vv-safe="1" data-gt-safe>POS/Indigo Airlines/6E-2274</td>
+                <td data-vv-safe="1" data-gt-safe>100000000023</td>
+                <td class="amt" data-vv-safe="1" data-gt-safe>9,876.00</td>
+                <td class="amt" data-vv-sensitive="balance" data-gt-pii="balance">₹4,83,859.40</td>
+              </tr>
+              <tr>
+                <td data-vv-safe="1" data-gt-safe>27 Aug 2025</td>
+                <td data-vv-safe="1" data-gt-safe>UPI/SwiftMart Hypermarket</td>
+                <td data-vv-safe="1" data-gt-safe>100000000031</td>
+                <td class="amt" data-vv-safe="1" data-gt-safe>4,118.75</td>
+                <td class="amt" data-vv-sensitive="balance" data-gt-pii="balance">₹4,93,735.40</td>
+              </tr>
+              <tr>
+                <td data-vv-safe="1" data-gt-safe>26 Aug 2025</td>
+                <td data-vv-safe="1" data-gt-safe>ATW/MG Road/BLR2291</td>
+                <td data-vv-safe="1" data-gt-safe>100000000044</td>
+                <td class="amt" data-vv-safe="1" data-gt-safe>10,000.00</td>
+                <td class="amt" data-vv-sensitive="balance" data-gt-pii="balance">₹4,97,854.15</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <p class="hint" style="margin-top:12px" data-vv-safe="1" data-gt-safe>
+            Computer-generated statement. Report discrepancies within 30 days of the statement date.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== STEP 5 — fill the dispute form =====================
+         The prefilled contact fields are the interesting case: they are form VALUES, not
+         text nodes, so a text-only redactor reports this section clean while the screenshot
+         shows a phone number and an account number in plain sight. The card <select> puts a
+         PAN inside <option> text for the same reason. -->
+    <section class="panel" id="dispute-form" data-vv-step="5" style="margin-top:18px" aria-labelledby="disp-h">
+      <h2 id="disp-h">Raise a dispute</h2>
+      <div class="body">
+        <form id="dispute" onsubmit="return false;">
+          <div class="form-grid">
+            <div class="field">
+              <label for="txn-ref">Transaction reference</label>
+              <input type="text" id="txn-ref" name="txn-ref" placeholder="TXN100000000012"
+                     data-vv-safe="1" data-gt-safe data-gt-mark="input:text">
+              <span class="hint" data-vv-safe="1" data-gt-safe>Copy it from the transaction row above.</span>
+            </div>
+
+            <div class="field">
+              <label for="dispute-reason">Reason for dispute</label>
+              <select id="dispute-reason" name="reason" data-vv-safe="1" data-gt-safe data-gt-mark="select">
+                <option value="">Select a reason</option>
+                <option value="unauthorised">Unauthorised transaction</option>
+                <option value="duplicate">Duplicate charge</option>
+                <option value="amount">Amount differs from receipt</option>
+                <option value="not-received">Goods or service not received</option>
+                <option value="cancelled">Cancelled but not refunded</option>
+                <option value="atm">ATM cash not dispensed</option>
+                <option value="recurring">Recurring mandate not stopped</option>
+              </select>
+            </div>
+
+            <div class="field full">
+              <label for="dispute-desc">What happened?</label>
+              <textarea id="dispute-desc" name="description" rows="4"
+                        placeholder="Describe the charge, when you noticed it, and any contact with the merchant."
+                        data-vv-safe="1" data-gt-safe data-gt-mark="textarea"></textarea>
+            </div>
+
+            <div class="field">
+              <label for="dispute-card">Card or account used</label>
+              <select id="dispute-card" name="instrument" data-gt-mark="select">
+                <option value="visa" data-vv-sensitive="card" data-gt-pii="card">Visa Signature 4111 1111 1111 1111</option>
+                <option value="debit" data-vv-sensitive="card" data-gt-pii="card">Debit 5425 2334 3010 9903</option>
+                <option value="savings" data-vv-sensitive="account" data-gt-pii="account">Savings 5012 3456 7890 1234</option>
+                <option value="upi" data-vv-sensitive="upi" data-gt-pii="upi">UPI ananya@okhdfcbank</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="refund-account">Credit any refund to</label>
+              <input type="text" id="refund-account" name="refund-account" value="5012 3456 7890 1234"
+                     data-vv-sensitive="account" data-gt-pii="account" data-gt-mark="input:text">
+            </div>
+
+            <div class="field">
+              <label for="contact-phone">Contact number</label>
+              <input type="tel" id="contact-phone" name="phone" value="+91 98765 43210"
+                     data-vv-sensitive="phone" data-gt-pii="phone" data-gt-mark="input:tel">
+            </div>
+
+            <div class="field">
+              <label for="contact-email">Contact email</label>
+              <input type="email" id="contact-email" name="email" value="ananya.specimen@examplemail.com"
+                     data-vv-sensitive="email" data-gt-pii="email" data-gt-mark="input:email">
+            </div>
+
+            <div class="field">
+              <label for="pan-confirm">PAN for verification</label>
+              <input type="text" id="pan-confirm" name="pan" value="ABCDE1234F"
+                     data-vv-sensitive="pan" data-gt-pii="pan" data-gt-mark="input:text">
+            </div>
+
+            <div class="field">
+              <label for="callback-slot">Preferred callback slot</label>
+              <select id="callback-slot" name="callback" data-vv-safe="1" data-gt-safe data-gt-mark="select">
+                <option value="morning">10:00 – 13:00</option>
+                <option value="afternoon">13:00 – 16:00</option>
+                <option value="evening">16:00 – 19:00</option>
+              </select>
+            </div>
+
+            <div class="field full">
+              <label class="check" for="declare">
+                <input type="checkbox" id="declare" name="declare" style="min-width:auto;margin-top:2px">
+                <span data-vv-safe="1" data-gt-safe>
+                  I confirm the details above are accurate and that I have not authorised this charge.
+                </span>
+              </label>
+            </div>
+          </div>
+
+          <div class="actions">
+            <button type="button" class="btn primary" id="review-dispute"
+                    data-vv-safe="1" data-gt-safe data-gt-mark="button">Review dispute</button>
+            <button type="button" class="btn" id="clear-dispute"
+                    data-vv-safe="1" data-gt-safe data-gt-mark="button">Clear form</button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <!-- ============== STEPS 6 and 7 — review, then submit ==============
+         The review sheet is written by script, so it also writes the ground-truth attributes
+         onto the values it copies. Without that, every value the agent typed would arrive on
+         screen unannotated and score as a false positive against an empty ground truth. -->
+    <section class="panel" id="dispute-review" data-vv-step="6" style="margin-top:18px" aria-labelledby="rev-h" hidden>
+      <h2 id="rev-h">Review before submitting</h2>
+      <div class="body">
+        <div id="review-body"></div>
+        <div class="actions" id="dispute-submit" data-vv-step="7">
+          <button type="button" class="btn primary" id="submit-dispute"
+                  data-vv-safe="1" data-gt-safe data-gt-mark="button">Submit dispute</button>
+          <button type="button" class="btn" id="edit-dispute"
+                  data-vv-safe="1" data-gt-safe data-gt-mark="button">Edit details</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" id="dispute-ack" style="margin-top:18px" aria-labelledby="ack-h" hidden>
+      <h2 id="ack-h">Dispute registered</h2>
+      <div class="body">
+        <div class="ack" role="status">
+          <strong data-vv-safe="1" data-gt-safe>Service request SR-2025-0904417 raised.</strong>
+          <p data-vv-safe="1" data-gt-safe>
+            A provisional credit decision is due within 7 working days. Updates go to your
+            registered contact details.
+          </p>
+        </div>
+      </div>
+    </section>
+
+  </div>
+</main>
+</div>
+
+<footer>
+  <div class="wrap cols">
+    <div>
+      <b data-vv-safe="1" data-gt-safe>Meridian Bank Ltd — simulated environment</b>
+      <p data-vv-safe="1" data-gt-safe>
+        Registered office: 7 Residency Road, Bengaluru 560025. This page reproduces a
+        NetBanking dashboard for automated evaluation. No account shown here exists.
+      </p>
+    </div>
+    <div>
+      <b data-vv-safe="1" data-gt-safe>Your relationship</b>
+      <p>CIF <span class="mono" data-vv-sensitive="customer-id" data-gt-pii="customer-id">MB-8842-11763</span></p>
+      <p>IFSC <span class="mono" data-vv-sensitive="ifsc" data-gt-pii="ifsc">HDFC0001234</span></p>
+      <p>Home branch code <span class="mono" data-vv-safe="1" data-gt-safe>01234</span></p>
+    </div>
+    <div>
+      <b data-vv-safe="1" data-gt-safe>Report fraud</b>
+      <p data-vv-safe="1" data-gt-safe>Toll free 1800 200 4417</p>
+      <p>Registered mobile on file:
+        <span class="mono" data-vv-sensitive="phone" data-gt-pii="phone">+91 98765 43210</span>
+      </p>
+    </div>
+  </div>
+</footer>
+
+<script>
+/* Behaviour, not decoration: without it steps 2, 4, 6 and 7 leave no observable trace, and a
+   planner could "pass" the run by doing nothing. Every handler changes something the harness
+   can see in a screenshot or in the DOM. */
+(function () {
+  var rows = Array.prototype.slice.call(document.querySelectorAll('#txn-rows tr'));
+  var status = document.getElementById('filter-status');
+
+  function applyFilters() {
+    var q = (document.getElementById('txn-search').value || '').trim().toLowerCase();
+    var cat = document.getElementById('filter-category').value;
+    var period = document.getElementById('filter-period').value;
+    var floor = parseInt(document.getElementById('filter-amount').value, 10) || 0;
+    var shown = 0;
+
+    rows.forEach(function (row) {
+      var hay = (row.textContent || '').toLowerCase();
+      var ok = (!q || hay.indexOf(q) !== -1)
+        && (cat === 'all' || row.dataset.category === cat)
+        && (period === 'all' || row.dataset.period === period)
+        && (parseInt(row.dataset.amount, 10) >= floor);
+      row.hidden = !ok;
+      if (ok) shown++;
+    });
+
+    status.textContent = 'Showing ' + shown + ' of ' + rows.length + ' transactions'
+      + (period === 'all' ? ' · last 90 days' : ' · ' + period);
+  }
+
+  document.getElementById('apply-filters').addEventListener('click', applyFilters);
+  document.getElementById('global-search-btn').addEventListener('click', function () {
+    document.getElementById('txn-search').value = document.getElementById('global-search').value;
+    applyFilters();
+  });
+  document.getElementById('reset-filters').addEventListener('click', function () {
+    document.getElementById('txn-search').value = '';
+    document.getElementById('filter-category').value = 'all';
+    document.getElementById('filter-period').value = 'all';
+    document.getElementById('filter-amount').value = '0';
+    applyFilters();
+  });
+
+  var sheet = document.getElementById('statement-sheet');
+  var openBtn = document.getElementById('open-statement');
+  openBtn.addEventListener('click', function () {
+    var open = sheet.hidden;
+    sheet.hidden = !open;
+    openBtn.setAttribute('aria-expanded', String(open));
+    if (open) sheet.scrollIntoView({ block: 'nearest' });
+  });
+
+  /* Jumping straight from a row to the form is how the real product does it, and it gives the
+     planner a one-click path between step 3 and step 5 that does not depend on transcribing
+     a twelve-digit reference by hand. */
+  document.querySelectorAll('.dispute-pick').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      document.getElementById('txn-ref').value = btn.dataset.ref;
+      document.getElementById('dispute-form').scrollIntoView({ block: 'start' });
+    });
+  });
+
+  var review = document.getElementById('dispute-review');
+  var reviewBody = document.getElementById('review-body');
+  var ack = document.getElementById('dispute-ack');
+
+  function line(label, value, sensitiveType) {
+    var wrap = document.createElement('div');
+    wrap.className = 'review-line';
+    var k = document.createElement('span');
+    k.textContent = label;
+    k.setAttribute('data-vv-safe', '1');
+    k.setAttribute('data-gt-safe', '');
+    var v = document.createElement('span');
+    v.textContent = value || '—';
+    if (sensitiveType) {
+      v.setAttribute('data-vv-sensitive', sensitiveType);
+      v.setAttribute('data-gt-pii', sensitiveType);
+    } else {
+      v.setAttribute('data-vv-safe', '1');
+      v.setAttribute('data-gt-safe', '');
+    }
+    wrap.appendChild(k);
+    wrap.appendChild(v);
+    return wrap;
+  }
+
+  document.getElementById('review-dispute').addEventListener('click', function () {
+    var reasonSel = document.getElementById('dispute-reason');
+    var cardSel = document.getElementById('dispute-card');
+    reviewBody.textContent = '';
+    reviewBody.appendChild(line('Transaction reference', document.getElementById('txn-ref').value));
+    reviewBody.appendChild(line('Reason', reasonSel.options[reasonSel.selectedIndex].text));
+    reviewBody.appendChild(line('Description', document.getElementById('dispute-desc').value));
+    reviewBody.appendChild(line('Instrument', cardSel.options[cardSel.selectedIndex].text, 'card'));
+    reviewBody.appendChild(line('Refund credited to', document.getElementById('refund-account').value, 'account'));
+    reviewBody.appendChild(line('Contact number', document.getElementById('contact-phone').value, 'phone'));
+    reviewBody.appendChild(line('Contact email', document.getElementById('contact-email').value, 'email'));
+    reviewBody.appendChild(line('PAN', document.getElementById('pan-confirm').value, 'pan'));
+    reviewBody.appendChild(line('Declaration accepted',
+      document.getElementById('declare').checked ? 'Yes' : 'Not yet confirmed'));
+    review.hidden = false;
+    review.scrollIntoView({ block: 'start' });
+  });
+
+  document.getElementById('edit-dispute').addEventListener('click', function () {
+    review.hidden = true;
+    document.getElementById('dispute-form').scrollIntoView({ block: 'start' });
+  });
+
+  document.getElementById('clear-dispute').addEventListener('click', function () {
+    document.getElementById('txn-ref').value = '';
+    document.getElementById('dispute-reason').value = '';
+    document.getElementById('dispute-desc').value = '';
+    document.getElementById('declare').checked = false;
+    review.hidden = true;
+    ack.hidden = true;
+  });
+
+  document.getElementById('submit-dispute').addEventListener('click', function () {
+    ack.hidden = false;
+    ack.scrollIntoView({ block: 'start' });
+  });
+})();
+</script>
+</body>
+</html>

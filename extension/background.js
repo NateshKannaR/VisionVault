@@ -1431,16 +1431,45 @@ async function phaseRun() {
           }
         }
 
-        // The vault has no value for this field. Rather than typing nothing or inventing data,
-        // pause and ask the user; the panel offers to remember the answer.
-        if (!value && fieldKey) {
+        // Nothing to type. Rather than typing nothing or inventing data, pause and ask.
+        //
+        // Two different gaps end up here and both are worth asking about:
+        //
+        //   a vault field the vault does not hold — "phone", "address". The panel offers to
+        //   remember the answer, so it is asked once and never again.
+        //
+        //   a value no vault could ever hold, because it belongs to this task rather than to
+        //   this person: a travel date, a destination, how many people are going. A booking
+        //   form is mostly these. The agent has no business guessing them, and failing on
+        //   them is worse than asking — so the field's own visible label becomes the question.
+        //
+        // The second case is deliberately narrow. Only a field that looks like it WANTS a
+        // value qualifies: an empty text-ish input carrying a real label. A stray click target
+        // with no label must not turn into a question the user cannot answer.
+        if (!value) {
           const mark = (session.marks || []).find((m) => String(m.id) === String(resp.mark_id));
-          notifyPopup({ type: "step", step: session.stepCount, status: `Need your ${fieldKey} to continue.` });
-          return {
-            done: false, needsInput: true, fieldKey,
-            fieldLabel: mark?.label || fieldKey,
-            action: resp, actionLog: session.actionLog, progress: session.progress,
-          };
+          const label = (mark?.label || "").trim();
+          const fillableRole = /input|textbox|textarea|combobox|search|date|number/i.test(mark?.role || "");
+          const askable = fieldKey || (label.length >= 2 && label.length <= 60 && fillableRole);
+
+          if (askable) {
+            // A stable key so the same field is not asked twice in one run.
+            const key = fieldKey || `field:${label.toLowerCase().replace(/[^a-z0-9]+/g, "_").slice(0, 40)}`;
+            notifyPopup({
+              type: "step", step: session.stepCount,
+              status: fieldKey ? `Need your ${fieldKey} to continue.`
+                               : `Need a value for "${label}" to continue.`,
+            });
+            return {
+              done: false, needsInput: true,
+              fieldKey: key,
+              // Only a real vault field may be written back to the vault. A trip date is not
+              // a property of the person and must not be stored as one.
+              vaultField: fieldKey || null,
+              fieldLabel: label || fieldKey,
+              action: resp, actionLog: session.actionLog, progress: session.progress,
+            };
+          }
         }
 
         const exec = await withDeadlineSoft(
@@ -1907,8 +1936,15 @@ function scheduleDomChangeRescan(tabId) {
  * a runtime message: verifying this path end to end means calling it directly.
  */
 async function provideInput({ value, saveToVault, fieldKey, mark_id } = {}) {
+  // A synthetic key (see the ask path in phaseRun) describes a field on THIS page for THIS
+  // task — a travel date, a destination, how many people are going. Those are not properties
+  // of the person and must never become vault entries, however the panel was ticked: a vault
+  // that accumulates "field:check_in_date" is both wrong and a slow leak of what the user has
+  // been doing.
+  const isVaultField = !!fieldKey && !String(fieldKey).startsWith("field:");
+
   // Saving is worth doing even if the run has since been torn down, so it happens first.
-  if (saveToVault && fieldKey && value) {
+  if (saveToVault && isVaultField && value) {
     const vault = await getVault();
     const key = VAULT_KEY_MAP[fieldKey] || fieldKey;
     vault[key] = value;

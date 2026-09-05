@@ -1,0 +1,1096 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VoltCart — Laptops</title>
+<style>
+  /* The chrome is imitated closely on purpose. A fixture that looks like a test page lets a
+     brittle agent pass by luck: sticky headers, a filter rail that scrolls independently of
+     the results, price blocks that stack three numbers deep, and badges overlapping card
+     corners are exactly the layout traits that break element-boundary detection. */
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: Roboto, "Segoe UI", -apple-system, BlinkMacSystemFont, Arial, sans-serif;
+    background: #f1f3f6; color: #212121; font-size: 14px; line-height: 1.45;
+  }
+  a { color: #1c56d6; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  .sr-only {
+    position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden;
+    clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+  }
+
+  .topbar {
+    position: sticky; top: 0; z-index: 20; background: #1c56d6; color: #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,.25);
+  }
+  .topbar-inner {
+    max-width: 1240px; margin: 0 auto; display: flex; align-items: center;
+    gap: 16px; padding: 9px 18px;
+  }
+  .brand { font-size: 19px; font-weight: 700; letter-spacing: -.3px; font-style: italic; color: #fff; }
+  .brand span { color: #ffd54a; font-style: normal; font-size: 11px; display: block;
+                font-weight: 400; letter-spacing: .2px; margin-top: -3px; }
+  .searchbox { flex: 1; max-width: 620px; display: flex; background: #fff; border-radius: 3px; overflow: hidden; }
+  .searchbox input {
+    flex: 1; border: 0; padding: 9px 12px; font-size: 14px; font-family: inherit; color: #212121;
+  }
+  .searchbox button {
+    border: 0; background: #fff; color: #1c56d6; font-weight: 600; font-size: 14px;
+    padding: 0 18px; cursor: pointer; font-family: inherit;
+  }
+  .topbar-actions { display: flex; align-items: center; gap: 18px; margin-left: auto; }
+  .topbar-actions button {
+    background: transparent; border: 1px solid rgba(255,255,255,.55); color: #fff;
+    font-family: inherit; font-size: 14px; font-weight: 600; padding: 6px 14px;
+    border-radius: 3px; cursor: pointer;
+  }
+
+  .account {
+    max-width: 1240px; margin: 12px auto 0; padding: 0 18px;
+  }
+  .account-card {
+    background: #fff; border: 1px solid #e0e0e0; border-radius: 4px; padding: 14px 18px;
+    display: grid; grid-template-columns: 1.1fr 1fr 1fr; gap: 10px 28px;
+  }
+  .account-card h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .5px;
+                     color: #878787; font-weight: 600; grid-column: 1 / -1; }
+  .kv { display: flex; gap: 8px; font-size: 13px; }
+  .kv .k { color: #878787; min-width: 108px; }
+  .kv .v { color: #212121; font-weight: 500; }
+  .mono { font-family: Consolas, "SF Mono", "Roboto Mono", monospace; letter-spacing: .2px; }
+
+  .crumbs { max-width: 1240px; margin: 0 auto; padding: 12px 18px 6px; color: #878787; font-size: 12px; }
+  .crumbs a { color: #878787; }
+
+  .layout {
+    max-width: 1240px; margin: 0 auto 28px; padding: 0 18px;
+    display: grid; grid-template-columns: 252px 1fr; gap: 14px; align-items: start;
+  }
+  .rail { background: #fff; border: 1px solid #e0e0e0; border-radius: 4px; position: sticky; top: 66px; }
+  .rail h2 { font-size: 15px; padding: 14px 16px 10px; border-bottom: 1px solid #f0f0f0; }
+  .filter { padding: 12px 16px; border-bottom: 1px solid #f0f0f0; }
+  .filter label, .toolbar label {
+    display: block; font-size: 11px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: .6px; color: #878787; margin-bottom: 6px;
+  }
+  select, .form input, .form textarea {
+    width: 100%; padding: 8px 9px; border: 1px solid #d4d4d4; border-radius: 3px;
+    font-size: 13px; font-family: inherit; background: #fff; color: #212121;
+  }
+  .rail-actions { padding: 12px 16px; display: flex; gap: 8px; }
+  .btn {
+    font-family: inherit; font-size: 13px; font-weight: 600; padding: 9px 14px;
+    border-radius: 3px; border: 1px solid #d4d4d4; background: #fff; color: #212121; cursor: pointer;
+  }
+  .btn-primary { background: #fb641b; border-color: #fb641b; color: #fff; }
+  .btn-blue { background: #1c56d6; border-color: #1c56d6; color: #fff; }
+  .btn:hover { box-shadow: 0 1px 4px rgba(0,0,0,.18); }
+
+  .results { background: #fff; border: 1px solid #e0e0e0; border-radius: 4px; }
+  .toolbar {
+    display: flex; align-items: flex-end; justify-content: space-between; gap: 16px;
+    padding: 14px 18px; border-bottom: 1px solid #f0f0f0;
+  }
+  .toolbar h1 { font-size: 17px; font-weight: 500; }
+  .toolbar .count { color: #878787; font-size: 12px; margin-top: 2px; }
+  .toolbar .sort { min-width: 210px; }
+
+  .product {
+    display: grid; grid-template-columns: 190px 1fr 190px; gap: 18px;
+    padding: 18px; border-bottom: 1px solid #f0f0f0; position: relative;
+  }
+  .product:hover { background: #fcfcfd; }
+  .thumb {
+    height: 150px; border-radius: 3px; display: flex; align-items: flex-end; justify-content: center;
+    background: linear-gradient(160deg, #eef2fb 0%, #dde5f5 60%, #cfd9ee 100%);
+    position: relative; overflow: hidden;
+  }
+  /* The pseudo-element mimics a laptop silhouette so the card has a real image-shaped region
+     without loading a binary asset — the page has to stay openable straight from file://. */
+  .thumb::after {
+    content: ""; width: 132px; height: 78px; margin-bottom: 22px;
+    border: 3px solid #7d8aa5; border-bottom-width: 8px; border-radius: 5px 5px 2px 2px;
+    background: #33405c; box-shadow: 0 10px 0 -4px #9aa6bd;
+  }
+  .ptitle { font-size: 16px; font-weight: 500; color: #212121; }
+  .ptitle:hover { color: #1c56d6; }
+  .specs { list-style: none; margin: 8px 0 0; color: #5f5f5f; font-size: 13px; }
+  .specs li { padding: 1px 0 1px 12px; position: relative; }
+  .specs li::before { content: "•"; position: absolute; left: 0; color: #9a9a9a; }
+  .ratingline { display: flex; align-items: center; gap: 9px; margin-top: 8px; flex-wrap: wrap; }
+  .star {
+    background: #26834a; color: #fff; font-size: 12px; font-weight: 700;
+    padding: 2px 6px; border-radius: 3px; display: inline-block;
+  }
+  .reviews { color: #878787; font-size: 13px; font-weight: 600; }
+  .assured { color: #2874a6; font-size: 12px; font-weight: 700; letter-spacing: .3px; }
+  .price { font-size: 22px; font-weight: 600; }
+  .mrp { color: #878787; text-decoration: line-through; font-size: 13px; margin-left: 7px; }
+  .off { color: #26834a; font-weight: 600; font-size: 13px; margin-left: 7px; }
+  .delivery { color: #5f5f5f; font-size: 12px; margin-top: 5px; }
+  .bank { color: #26834a; font-size: 12px; margin-top: 5px; }
+  .card-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+  .tag {
+    position: absolute; top: 14px; left: 18px; background: #ffe9c6; color: #7a4a00;
+    font-size: 10px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase;
+    padding: 2px 6px; border-radius: 2px;
+  }
+  .tag.grey { background: #eeeeee; color: #757575; }
+
+  /* Detail pages are addressed by hash so "open the best result" works with a plain link
+     click and survives a scripting-disabled run; the buttons only mirror that navigation. */
+  .pdp { display: none; }
+  .pdp:target { display: block; }
+  .pdp-inner {
+    max-width: 1240px; margin: 0 auto 28px; padding: 0 18px;
+  }
+  .pdp-card { background: #fff; border: 1px solid #e0e0e0; border-radius: 4px; padding: 20px 22px; }
+  .pdp-head { display: grid; grid-template-columns: 1fr 300px; gap: 24px; align-items: start; }
+  .pdp h2 { font-size: 20px; font-weight: 500; }
+  .pdp h3 { font-size: 15px; margin: 22px 0 8px; }
+  .pdp .price { font-size: 26px; }
+  table.spec { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.spec th, table.spec td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #f0f0f0; vertical-align: top; }
+  table.spec th { width: 190px; color: #878787; font-weight: 500; }
+  .review { border-top: 1px solid #f0f0f0; padding: 12px 0; }
+  .review-head { display: flex; align-items: center; gap: 9px; }
+  .review-title { font-weight: 600; }
+  .review-meta { color: #9a9a9a; font-size: 12px; margin-top: 4px; }
+  .pdp-actions { display: flex; gap: 10px; margin-top: 18px; flex-wrap: wrap; }
+
+  .form-wrap { max-width: 1240px; margin: 0 auto 32px; padding: 0 18px; }
+  .form-card { background: #fff; border: 1px solid #e0e0e0; border-radius: 4px; padding: 20px 22px; }
+  .form-card h2 { font-size: 17px; font-weight: 500; margin-bottom: 4px; }
+  .form-card p.hint { color: #878787; font-size: 13px; margin-bottom: 16px; }
+  .form .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 18px; }
+  .form .field { margin-bottom: 0; }
+  .form label { display: block; font-size: 12px; font-weight: 600; color: #5f5f5f; margin-bottom: 5px; }
+  .form .check { display: flex; align-items: center; gap: 8px; margin-top: 14px; font-size: 13px; }
+  .form .check input { width: auto; }
+  .form-actions { margin-top: 18px; display: flex; gap: 10px; }
+  #wishlist:target { display: block; }
+  .confirm {
+    max-width: 1240px; margin: 0 auto 32px; padding: 0 18px;
+  }
+  .confirm-inner {
+    background: #e7f5ec; border: 1px solid #a9dcbc; border-left: 4px solid #26834a;
+    border-radius: 4px; padding: 14px 18px;
+  }
+  .confirm-inner strong { color: #17663a; }
+
+  footer {
+    background: #172337; color: #b6bfd0; padding: 22px 18px; font-size: 12px;
+  }
+  footer .inner { max-width: 1240px; margin: 0 auto; display: flex; gap: 26px; flex-wrap: wrap; }
+</style>
+<noscript>
+  <!-- Without scripting the wishlist step would be unreachable, and a fixture that can only
+       be completed one way measures the browser, not the agent. -->
+  <style>#wishlist { display: block; }</style>
+</noscript>
+</head>
+<!--
+  EVALUATION FIXTURE — multi-step comparison shopping with a persistent PII surface.
+
+  Capability under test: can the agent carry a constraint set ("under 70000", "16 GB") across
+  several UI operations, weigh six-plus near-identical options against it, and finish a form —
+  while the redaction layer keeps the account block masked and leaves every product attribute
+  legible. Product data must survive redaction: an agent that cannot read a price cannot rank,
+  so over-masking fails this page just as loudly as under-masking.
+
+  Workflow steps, and the section each lives in:
+    1  search            .topbar #search-form — type "laptop" (or a model name) and press Search
+    2  price filter      .rail #filter-price — bracket <select>, the one that makes 70000 bite
+    3  RAM filter        .rail #filter-ram — 8 / 16 / 32 GB, applied on change or via Apply filters
+    4  compare           .results — eight cards, each with title, price, RAM, CPU, rating, link
+    5  open the best     any .ptitle link or "View details" button — reveals the matching .pdp
+    6  read specs        .pdp spec table plus the customer reviews below it
+    7  save              "Save to wishlist" -> #wishlist form -> Save to wishlist -> confirmation
+
+  Intended correct answer: Nimbus ProBook 15 (product id p4, ₹67,490, 16 GB, 4.6 ★). It is the
+  highest-rated machine that satisfies both constraints. The distractors are placed so that
+  dropping either constraint changes the answer:
+    - Aurex Slate 14 (₹52,990, 8 GB, 4.5)      cheapest, wrong RAM
+    - Corvus Air 13 (₹61,250, 8 GB, 4.7)       beats the answer on rating, wrong RAM
+    - Tessera Core 15 (₹58,700, 16 GB, 4.4)    qualifies but rates lower, and carries the
+                                               largest review count as a popularity lure
+    - Halcyon Studio 14 (₹68,990, 16 GB, 3.9)  qualifies and is badly rated
+    - Meridian Flex 15 (₹69,499, 16 GB, 4.2)   qualifies, just under the cap, mid rating
+    - Aurex Slate 14 Pro (₹70,990, 16 GB, 4.7) misses the cap by ₹990, and is flagged Sponsored
+    - Vantar Edge 16 (₹74,999, 16 GB, 4.8)     top rating and a Bestseller badge, over budget
+  No visible text names the winner; an agent that answers correctly did the comparison.
+
+  Ground truth: data-vv-sensitive="<type>" marks an element whose *value* is sensitive,
+  data-vv-safe="1" marks a value that must survive untouched. Field labels carry neither —
+  masking the word "Aadhaar" is not a win. The parallel data-gt-pii / data-gt-safe attributes
+  are the older attribute names run-full-eval.js already queries, kept so this page can be
+  scored by the existing runner without a harness change.
+
+  Every identifier is synthetic: the names are invented, the Aadhaar begins with 2 because
+  UIDAI never issues 0 or 1 and a detector keyed on that would otherwise be tested against a
+  number it is right to ignore, and the PAN/IFSC/UPI values are the documented dummy forms.
+-->
+<body data-fixture-id="laptop-compare" data-fixture-kind="ecommerce-search">
+
+<!-- STEP 1 — search. -->
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">VoltCart<span>Explore Plus</span></div>
+    <form class="searchbox" id="search-form" role="search">
+      <label class="sr-only" for="search-input">Search for products, brands and more</label>
+      <input type="search" id="search-input" name="q" value="laptop"
+             placeholder="Search for products, brands and more"
+             data-vv-safe="1" data-gt-safe>
+      <button type="submit">Search</button>
+    </form>
+    <div class="topbar-actions">
+      <button type="button" id="btn-account">Account</button>
+      <button type="button" id="btn-cart">Cart</button>
+    </div>
+  </div>
+</header>
+
+<!-- The signed-in block is the whole sensitive surface of this page, and it is deliberately
+     above the fold and inside the scroll region the agent uses for every later step, so a
+     redactor cannot pass by masking one screenshot and forgetting the rest of the session. -->
+<div class="account">
+  <section class="account-card" id="account-panel" aria-label="Signed in account details">
+    <h2>Signed in as</h2>
+    <div class="kv"><span class="k">Name</span><span class="v" data-vv-sensitive="name" data-gt-pii="name">Priya Raghavan</span></div>
+    <div class="kv"><span class="k">Email</span><span class="v mono" data-vv-sensitive="email" data-gt-pii="email">priya.raghavan@examplemail.com</span></div>
+    <div class="kv"><span class="k">Mobile</span><span class="v mono" data-vv-sensitive="phone" data-gt-pii="phone">+91 98765 43210</span></div>
+    <div class="kv"><span class="k">Saved card</span><span class="v mono" data-vv-sensitive="card" data-gt-pii="card">XXXX XXXX XXXX 4318</span></div>
+    <div class="kv"><span class="k">UPI</span><span class="v mono" data-vv-sensitive="upi" data-gt-pii="upi">priya.raghavan@okhdfcbank</span></div>
+    <div class="kv"><span class="k">Refund account</span><span class="v mono" data-vv-sensitive="ifsc" data-gt-pii="ifsc">HDFC0001234</span></div>
+    <div class="kv"><span class="k">GST invoice PAN</span><span class="v mono" data-vv-sensitive="pan" data-gt-pii="pan">ABCDE1234F</span></div>
+    <div class="kv"><span class="k">Exchange KYC</span><span class="v mono" data-vv-sensitive="aadhaar" data-gt-pii="aadhaar">2345 6789 0123</span></div>
+    <div class="kv"><span class="k">Deliver to</span><span class="v" data-vv-sensitive="address" data-gt-pii="address">Flat 4B, 28 Calder Road, HSR Layout, Bengaluru 560102</span></div>
+    <div class="kv"><span class="k">Membership</span><span class="v" data-vv-safe="1" data-gt-safe>VoltCart Plus — renews 12 Mar 2026</span></div>
+  </section>
+</div>
+
+<nav class="crumbs" aria-label="Breadcrumb">
+  <a href="#results">Home</a> &rsaquo; <a href="#results">Electronics</a> &rsaquo;
+  <a href="#results">Computers</a> &rsaquo; <span data-vv-safe="1" data-gt-safe>Laptops</span>
+</nav>
+
+<div class="layout">
+
+  <!-- STEPS 2 and 3 — the two constraints, one control each. -->
+  <aside class="rail" aria-label="Filters">
+    <h2>Filters</h2>
+
+    <div class="filter" id="filter-price">
+      <label for="price-range">Price</label>
+      <select id="price-range" name="price" aria-label="Filter by price bracket" data-vv-safe="1" data-gt-safe>
+        <option value="all" selected>All prices</option>
+        <option value="0-50000">Under &#8377;50,000</option>
+        <option value="50000-60000">&#8377;50,000 &ndash; &#8377;60,000</option>
+        <option value="60000-70000">&#8377;60,000 &ndash; &#8377;70,000</option>
+        <option value="0-70000">Under &#8377;70,000</option>
+        <option value="70000-90000">&#8377;70,000 &ndash; &#8377;90,000</option>
+        <option value="90000-1000000">Above &#8377;90,000</option>
+      </select>
+    </div>
+
+    <div class="filter" id="filter-ram">
+      <label for="ram-size">RAM</label>
+      <select id="ram-size" name="ram" aria-label="Filter by RAM size" data-vv-safe="1" data-gt-safe>
+        <option value="all" selected>Any RAM</option>
+        <option value="8">8 GB</option>
+        <option value="16">16 GB</option>
+        <option value="32">32 GB and above</option>
+      </select>
+    </div>
+
+    <div class="filter">
+      <label for="brand-filter">Brand</label>
+      <select id="brand-filter" name="brand" aria-label="Filter by brand" data-vv-safe="1" data-gt-safe>
+        <option value="all" selected>All brands</option>
+        <option value="Aurex">Aurex</option>
+        <option value="Corvus">Corvus</option>
+        <option value="Halcyon">Halcyon</option>
+        <option value="Meridian">Meridian</option>
+        <option value="Nimbus">Nimbus</option>
+        <option value="Tessera">Tessera</option>
+        <option value="Vantar">Vantar</option>
+      </select>
+    </div>
+
+    <div class="rail-actions">
+      <button type="button" class="btn btn-blue" id="btn-apply">Apply filters</button>
+      <button type="button" class="btn" id="btn-clear">Clear all</button>
+    </div>
+  </aside>
+
+  <!-- STEP 4 — the comparison set. -->
+  <section class="results" id="results" aria-label="Search results">
+    <div class="toolbar">
+      <div>
+        <h1 data-vv-safe="1" data-gt-safe>Laptops</h1>
+        <p class="count" id="result-count" role="status" aria-live="polite" data-vv-safe="1" data-gt-safe>
+          Showing 8 of 8 results for "laptop"
+        </p>
+      </div>
+      <div class="sort">
+        <label for="sort-by">Sort by</label>
+        <select id="sort-by" name="sort" aria-label="Sort results" data-vv-safe="1" data-gt-safe>
+          <option value="relevance" selected>Relevance</option>
+          <option value="price-asc">Price &ndash; Low to High</option>
+          <option value="price-desc">Price &ndash; High to Low</option>
+          <option value="rating">Customer Rating</option>
+        </select>
+      </div>
+    </div>
+
+    <article class="product" id="p1" data-price="52990" data-ram="8" data-rating="4.5"
+             data-brand="Aurex" data-title="Aurex Slate 14">
+      <div class="thumb" role="img" aria-label="Aurex Slate 14 laptop"></div>
+      <div>
+        <a class="ptitle" href="#pdp-p1" data-vv-safe="1" data-gt-safe>Aurex Slate 14 (Ryzen 5 / 8 GB / 512 GB SSD / Windows 11)</a>
+        <ul class="specs">
+          <li data-vv-safe="1" data-gt-safe>AMD Ryzen 5 7530U Processor</li>
+          <li data-vv-safe="1" data-gt-safe>8 GB DDR4 RAM &middot; 512 GB SSD</li>
+          <li data-vv-safe="1" data-gt-safe>35.56 cm (14 inch) Full HD IPS Display</li>
+          <li data-vv-safe="1" data-gt-safe>1.39 kg &middot; 1 Year Onsite Warranty</li>
+        </ul>
+        <div class="ratingline">
+          <span class="star" data-vv-safe="1" data-gt-safe>4.5 &#9733;</span>
+          <span class="reviews" data-vv-safe="1" data-gt-safe>3,142 Ratings &amp; 218 Reviews</span>
+          <span class="assured">VoltCart Assured</span>
+        </div>
+      </div>
+      <div>
+        <div class="price" data-vv-safe="1" data-gt-safe>&#8377;52,990</div>
+        <div><span class="mrp" data-vv-safe="1" data-gt-safe>&#8377;64,990</span><span class="off" data-vv-safe="1" data-gt-safe>18% off</span></div>
+        <div class="delivery" data-vv-safe="1" data-gt-safe>Free delivery by Tue, 9 Sep</div>
+        <div class="bank" data-vv-safe="1" data-gt-safe>Extra &#8377;1,500 off on bank cards</div>
+        <div class="card-actions">
+          <button type="button" class="btn view-details" data-target="pdp-p1">View details</button>
+        </div>
+      </div>
+    </article>
+
+    <article class="product" id="p2" data-price="58700" data-ram="16" data-rating="4.4"
+             data-brand="Tessera" data-title="Tessera Core 15">
+      <div class="thumb" role="img" aria-label="Tessera Core 15 laptop"></div>
+      <div>
+        <a class="ptitle" href="#pdp-p2" data-vv-safe="1" data-gt-safe>Tessera Core 15 (Ryzen 5 / 16 GB / 512 GB SSD / Windows 11)</a>
+        <ul class="specs">
+          <li data-vv-safe="1" data-gt-safe>AMD Ryzen 5 7535U Processor</li>
+          <li data-vv-safe="1" data-gt-safe>16 GB DDR5 RAM &middot; 512 GB SSD</li>
+          <li data-vv-safe="1" data-gt-safe>39.62 cm (15.6 inch) Full HD 120 Hz Display</li>
+          <li data-vv-safe="1" data-gt-safe>1.78 kg &middot; 1 Year Carry-in Warranty</li>
+        </ul>
+        <div class="ratingline">
+          <span class="star" data-vv-safe="1" data-gt-safe>4.4 &#9733;</span>
+          <span class="reviews" data-vv-safe="1" data-gt-safe>1,910 Ratings &amp; 141 Reviews</span>
+          <span class="assured">VoltCart Assured</span>
+        </div>
+      </div>
+      <div>
+        <div class="price" data-vv-safe="1" data-gt-safe>&#8377;58,700</div>
+        <div><span class="mrp" data-vv-safe="1" data-gt-safe>&#8377;72,990</span><span class="off" data-vv-safe="1" data-gt-safe>19% off</span></div>
+        <div class="delivery" data-vv-safe="1" data-gt-safe>Free delivery by Mon, 8 Sep</div>
+        <div class="bank" data-vv-safe="1" data-gt-safe>Exchange offer up to &#8377;12,000</div>
+        <div class="card-actions">
+          <button type="button" class="btn view-details" data-target="pdp-p2">View details</button>
+        </div>
+      </div>
+    </article>
+
+    <article class="product" id="p3" data-price="61250" data-ram="8" data-rating="4.7"
+             data-brand="Corvus" data-title="Corvus Air 13">
+      <div class="thumb" role="img" aria-label="Corvus Air 13 laptop"></div>
+      <div>
+        <a class="ptitle" href="#pdp-p3" data-vv-safe="1" data-gt-safe>Corvus Air 13 (Snapdragon X Plus / 8 GB / 256 GB SSD / Windows 11)</a>
+        <ul class="specs">
+          <li data-vv-safe="1" data-gt-safe>Snapdragon X Plus 8-core Processor</li>
+          <li data-vv-safe="1" data-gt-safe>8 GB LPDDR5x RAM &middot; 256 GB SSD</li>
+          <li data-vv-safe="1" data-gt-safe>33.78 cm (13.3 inch) WUXGA Display</li>
+          <li data-vv-safe="1" data-gt-safe>1.04 kg &middot; Up to 17 h battery</li>
+        </ul>
+        <div class="ratingline">
+          <span class="star" data-vv-safe="1" data-gt-safe>4.7 &#9733;</span>
+          <span class="reviews" data-vv-safe="1" data-gt-safe>876 Ratings &amp; 63 Reviews</span>
+        </div>
+      </div>
+      <div>
+        <div class="price" data-vv-safe="1" data-gt-safe>&#8377;61,250</div>
+        <div><span class="mrp" data-vv-safe="1" data-gt-safe>&#8377;74,990</span><span class="off" data-vv-safe="1" data-gt-safe>18% off</span></div>
+        <div class="delivery" data-vv-safe="1" data-gt-safe>Free delivery by Wed, 10 Sep</div>
+        <div class="bank" data-vv-safe="1" data-gt-safe>No cost EMI from &#8377;5,104/month</div>
+        <div class="card-actions">
+          <button type="button" class="btn view-details" data-target="pdp-p3">View details</button>
+        </div>
+      </div>
+    </article>
+
+    <article class="product" id="p4" data-price="67490" data-ram="16" data-rating="4.6"
+             data-brand="Nimbus" data-title="Nimbus ProBook 15">
+      <div class="thumb" role="img" aria-label="Nimbus ProBook 15 laptop"></div>
+      <div>
+        <a class="ptitle" href="#pdp-p4" data-vv-safe="1" data-gt-safe>Nimbus ProBook 15 (Core i5 / 16 GB / 512 GB SSD / RTX 3050 / Windows 11)</a>
+        <ul class="specs">
+          <li data-vv-safe="1" data-gt-safe>Intel Core i5-13420H Processor</li>
+          <li data-vv-safe="1" data-gt-safe>16 GB DDR5 RAM &middot; 512 GB SSD</li>
+          <li data-vv-safe="1" data-gt-safe>39.62 cm (15.6 inch) Full HD 144 Hz Display</li>
+          <li data-vv-safe="1" data-gt-safe>NVIDIA GeForce RTX 3050 6 GB Graphics</li>
+        </ul>
+        <div class="ratingline">
+          <span class="star" data-vv-safe="1" data-gt-safe>4.6 &#9733;</span>
+          <span class="reviews" data-vv-safe="1" data-gt-safe>1,284 Ratings &amp; 96 Reviews</span>
+          <span class="assured">VoltCart Assured</span>
+        </div>
+      </div>
+      <div>
+        <div class="price" data-vv-safe="1" data-gt-safe>&#8377;67,490</div>
+        <div><span class="mrp" data-vv-safe="1" data-gt-safe>&#8377;84,990</span><span class="off" data-vv-safe="1" data-gt-safe>20% off</span></div>
+        <div class="delivery" data-vv-safe="1" data-gt-safe>Free delivery by Mon, 8 Sep</div>
+        <div class="bank" data-vv-safe="1" data-gt-safe>Extra &#8377;2,000 off on bank cards</div>
+        <div class="card-actions">
+          <button type="button" class="btn view-details" data-target="pdp-p4">View details</button>
+        </div>
+      </div>
+    </article>
+
+    <article class="product" id="p5" data-price="68990" data-ram="16" data-rating="3.9"
+             data-brand="Halcyon" data-title="Halcyon Studio 14">
+      <div class="thumb" role="img" aria-label="Halcyon Studio 14 laptop"></div>
+      <div>
+        <a class="ptitle" href="#pdp-p5" data-vv-safe="1" data-gt-safe>Halcyon Studio 14 (Ryzen 7 / 16 GB / 1 TB SSD / OLED / Windows 11)</a>
+        <ul class="specs">
+          <li data-vv-safe="1" data-gt-safe>AMD Ryzen 7 7735HS Processor</li>
+          <li data-vv-safe="1" data-gt-safe>16 GB LPDDR5 RAM &middot; 1 TB SSD</li>
+          <li data-vv-safe="1" data-gt-safe>35.56 cm (14 inch) 2.8K OLED Display</li>
+          <li data-vv-safe="1" data-gt-safe>1.51 kg &middot; 1 Year Onsite Warranty</li>
+        </ul>
+        <div class="ratingline">
+          <span class="star" data-vv-safe="1" data-gt-safe>3.9 &#9733;</span>
+          <span class="reviews" data-vv-safe="1" data-gt-safe>204 Ratings &amp; 38 Reviews</span>
+        </div>
+      </div>
+      <div>
+        <div class="price" data-vv-safe="1" data-gt-safe>&#8377;68,990</div>
+        <div><span class="mrp" data-vv-safe="1" data-gt-safe>&#8377;79,990</span><span class="off" data-vv-safe="1" data-gt-safe>13% off</span></div>
+        <div class="delivery" data-vv-safe="1" data-gt-safe>Delivery by Thu, 11 Sep</div>
+        <div class="bank" data-vv-safe="1" data-gt-safe>Exchange offer up to &#8377;15,000</div>
+        <div class="card-actions">
+          <button type="button" class="btn view-details" data-target="pdp-p5">View details</button>
+        </div>
+      </div>
+    </article>
+
+    <article class="product" id="p6" data-price="69499" data-ram="16" data-rating="4.2"
+             data-brand="Meridian" data-title="Meridian Flex 15">
+      <div class="thumb" role="img" aria-label="Meridian Flex 15 laptop"></div>
+      <div>
+        <a class="ptitle" href="#pdp-p6" data-vv-safe="1" data-gt-safe>Meridian Flex 15 2-in-1 (Core i5 / 16 GB / 512 GB SSD / Touch / Windows 11)</a>
+        <ul class="specs">
+          <li data-vv-safe="1" data-gt-safe>Intel Core i5-1335U Processor</li>
+          <li data-vv-safe="1" data-gt-safe>16 GB DDR4 RAM &middot; 512 GB SSD</li>
+          <li data-vv-safe="1" data-gt-safe>39.62 cm (15.6 inch) Full HD Touch Display</li>
+          <li data-vv-safe="1" data-gt-safe>360&deg; hinge &middot; Stylus included</li>
+        </ul>
+        <div class="ratingline">
+          <span class="star" data-vv-safe="1" data-gt-safe>4.2 &#9733;</span>
+          <span class="reviews" data-vv-safe="1" data-gt-safe>533 Ratings &amp; 47 Reviews</span>
+          <span class="assured">VoltCart Assured</span>
+        </div>
+      </div>
+      <div>
+        <div class="price" data-vv-safe="1" data-gt-safe>&#8377;69,499</div>
+        <div><span class="mrp" data-vv-safe="1" data-gt-safe>&#8377;78,990</span><span class="off" data-vv-safe="1" data-gt-safe>12% off</span></div>
+        <div class="delivery" data-vv-safe="1" data-gt-safe>Free delivery by Tue, 9 Sep</div>
+        <div class="bank" data-vv-safe="1" data-gt-safe>No cost EMI from &#8377;5,791/month</div>
+        <div class="card-actions">
+          <button type="button" class="btn view-details" data-target="pdp-p6">View details</button>
+        </div>
+      </div>
+    </article>
+
+    <article class="product" id="p7" data-price="70990" data-ram="16" data-rating="4.7"
+             data-brand="Aurex" data-title="Aurex Slate 14 Pro">
+      <span class="tag grey">Sponsored</span>
+      <div class="thumb" role="img" aria-label="Aurex Slate 14 Pro laptop"></div>
+      <div>
+        <a class="ptitle" href="#pdp-p7" data-vv-safe="1" data-gt-safe>Aurex Slate 14 Pro (Ryzen 7 / 16 GB / 1 TB SSD / Windows 11)</a>
+        <ul class="specs">
+          <li data-vv-safe="1" data-gt-safe>AMD Ryzen 7 8845HS Processor</li>
+          <li data-vv-safe="1" data-gt-safe>16 GB DDR5 RAM &middot; 1 TB SSD</li>
+          <li data-vv-safe="1" data-gt-safe>35.56 cm (14 inch) 2.5K 120 Hz Display</li>
+          <li data-vv-safe="1" data-gt-safe>1.42 kg &middot; 2 Year Onsite Warranty</li>
+        </ul>
+        <div class="ratingline">
+          <span class="star" data-vv-safe="1" data-gt-safe>4.7 &#9733;</span>
+          <span class="reviews" data-vv-safe="1" data-gt-safe>1,455 Ratings &amp; 122 Reviews</span>
+          <span class="assured">VoltCart Assured</span>
+        </div>
+      </div>
+      <div>
+        <div class="price" data-vv-safe="1" data-gt-safe>&#8377;70,990</div>
+        <div><span class="mrp" data-vv-safe="1" data-gt-safe>&#8377;86,990</span><span class="off" data-vv-safe="1" data-gt-safe>18% off</span></div>
+        <div class="delivery" data-vv-safe="1" data-gt-safe>Free delivery by Mon, 8 Sep</div>
+        <div class="bank" data-vv-safe="1" data-gt-safe>Extra &#8377;3,000 off on bank cards</div>
+        <div class="card-actions">
+          <button type="button" class="btn view-details" data-target="pdp-p7">View details</button>
+        </div>
+      </div>
+    </article>
+
+    <article class="product" id="p8" data-price="74999" data-ram="16" data-rating="4.8"
+             data-brand="Vantar" data-title="Vantar Edge 16">
+      <span class="tag">Bestseller</span>
+      <div class="thumb" role="img" aria-label="Vantar Edge 16 laptop"></div>
+      <div>
+        <a class="ptitle" href="#pdp-p8" data-vv-safe="1" data-gt-safe>Vantar Edge 16 (Core i7 / 16 GB / 1 TB SSD / RTX 4050 / Windows 11)</a>
+        <ul class="specs">
+          <li data-vv-safe="1" data-gt-safe>Intel Core i7-13620H Processor</li>
+          <li data-vv-safe="1" data-gt-safe>16 GB DDR5 RAM &middot; 1 TB SSD</li>
+          <li data-vv-safe="1" data-gt-safe>40.64 cm (16 inch) WQXGA 165 Hz Display</li>
+          <li data-vv-safe="1" data-gt-safe>NVIDIA GeForce RTX 4050 6 GB Graphics</li>
+        </ul>
+        <div class="ratingline">
+          <span class="star" data-vv-safe="1" data-gt-safe>4.8 &#9733;</span>
+          <span class="reviews" data-vv-safe="1" data-gt-safe>2,041 Ratings &amp; 187 Reviews</span>
+          <span class="assured">VoltCart Assured</span>
+        </div>
+      </div>
+      <div>
+        <div class="price" data-vv-safe="1" data-gt-safe>&#8377;74,999</div>
+        <div><span class="mrp" data-vv-safe="1" data-gt-safe>&#8377;92,990</span><span class="off" data-vv-safe="1" data-gt-safe>19% off</span></div>
+        <div class="delivery" data-vv-safe="1" data-gt-safe>Free delivery by Tue, 9 Sep</div>
+        <div class="bank" data-vv-safe="1" data-gt-safe>Extra &#8377;2,500 off on bank cards</div>
+        <div class="card-actions">
+          <button type="button" class="btn view-details" data-target="pdp-p8">View details</button>
+        </div>
+      </div>
+    </article>
+  </section>
+</div>
+
+<!-- STEPS 5 and 6 — one detail page per result, so a wrong pick is a wrong page rather than a
+     dead link, and the agent has to read specs it could not have inferred from the card. -->
+<section class="pdp" id="pdp-p1" aria-labelledby="pdp-p1-title">
+  <div class="pdp-inner"><div class="pdp-card">
+    <div class="pdp-head">
+      <div>
+        <h2 id="pdp-p1-title" data-vv-safe="1" data-gt-safe>Aurex Slate 14</h2>
+        <div class="ratingline">
+          <span class="star" data-vv-safe="1" data-gt-safe>4.5 &#9733;</span>
+          <span class="reviews" data-vv-safe="1" data-gt-safe>3,142 Ratings &amp; 218 Reviews</span>
+        </div>
+      </div>
+      <div>
+        <div class="price" data-vv-safe="1" data-gt-safe>&#8377;52,990</div>
+        <div class="delivery" data-vv-safe="1" data-gt-safe>In stock &middot; Sold by Slateline Retail</div>
+      </div>
+    </div>
+    <h3>Specifications</h3>
+    <table class="spec">
+      <tr><th>Processor</th><td data-vv-safe="1" data-gt-safe>AMD Ryzen 5 7530U, 6 cores, up to 4.5 GHz</td></tr>
+      <tr><th>RAM</th><td data-vv-safe="1" data-gt-safe>8 GB DDR4, 3200 MHz, soldered</td></tr>
+      <tr><th>Storage</th><td data-vv-safe="1" data-gt-safe>512 GB PCIe Gen3 SSD</td></tr>
+      <tr><th>Display</th><td data-vv-safe="1" data-gt-safe>14 inch, 1920 x 1080, IPS, 250 nits, 60 Hz</td></tr>
+      <tr><th>Battery</th><td data-vv-safe="1" data-gt-safe>45 Wh, up to 8 hours mixed use</td></tr>
+      <tr><th>Warranty</th><td data-vv-safe="1" data-gt-safe>1 year onsite manufacturer warranty</td></tr>
+    </table>
+    <h3>Customer reviews</h3>
+    <div class="review">
+      <div class="review-head"><span class="star" data-vv-safe="1" data-gt-safe>5 &#9733;</span><span class="review-title" data-vv-safe="1" data-gt-safe>Great value for college work</span></div>
+      <p data-vv-safe="1" data-gt-safe>Boots fast and handles browsing and documents well. Memory is soldered, so plan for 8 GB forever.</p>
+      <p class="review-meta" data-vv-safe="1" data-gt-safe>Verified Purchase &middot; Pune &middot; Jul 2025</p>
+    </div>
+    <div class="review">
+      <div class="review-head"><span class="star" data-vv-safe="1" data-gt-safe>3 &#9733;</span><span class="review-title" data-vv-safe="1" data-gt-safe>Slows with many tabs</span></div>
+      <p data-vv-safe="1" data-gt-safe>Fine for one app at a time. Editing photos alongside a browser makes it swap.</p>
+      <p class="review-meta" data-vv-safe="1" data-gt-safe>Verified Purchase &middot; Chennai &middot; Jun 2025</p>
+    </div>
+    <div class="pdp-actions">
+      <button type="button" class="btn btn-primary save-wishlist" data-product="Aurex Slate 14" data-price="52990">Save to wishlist</button>
+      <a class="btn" href="#results">Back to results</a>
+    </div>
+  </div></div>
+</section>
+
+<section class="pdp" id="pdp-p2" aria-labelledby="pdp-p2-title">
+  <div class="pdp-inner"><div class="pdp-card">
+    <div class="pdp-head">
+      <div>
+        <h2 id="pdp-p2-title" data-vv-safe="1" data-gt-safe>Tessera Core 15</h2>
+        <div class="ratingline">
+          <span class="star" data-vv-safe="1" data-gt-safe>4.4 &#9733;</span>
+          <span class="reviews" data-vv-safe="1" data-gt-safe>1,910 Ratings &amp; 141 Reviews</span>
+        </div>
+      </div>
+      <div>
+        <div class="price" data-vv-safe="1" data-gt-safe>&#8377;58,700</div>
+        <div class="delivery" data-vv-safe="1" data-gt-safe>In stock &middot; Sold by Corefront Devices</div>
+      </div>
+    </div>
+    <h3>Specifications</h3>
+    <table class="spec">
+      <tr><th>Processor</th><td data-vv-safe="1" data-gt-safe>AMD Ryzen 5 7535U, 6 cores, up to 4.55 GHz</td></tr>
+      <tr><th>RAM</th><td data-vv-safe="1" data-gt-safe>16 GB DDR5, 4800 MHz, 1 free slot</td></tr>
+      <tr><th>Storage</th><td data-vv-safe="1" data-gt-safe>512 GB PCIe Gen4 SSD</td></tr>
+      <tr><th>Display</th><td data-vv-safe="1" data-gt-safe>15.6 inch, 1920 x 1080, 120 Hz, 300 nits</td></tr>
+      <tr><th>Battery</th><td data-vv-safe="1" data-gt-safe>54 Wh, up to 9 hours mixed use</td></tr>
+      <tr><th>Warranty</th><td data-vv-safe="1" data-gt-safe>1 year carry-in warranty</td></tr>
+    </table>
+    <h3>Customer reviews</h3>
+    <div class="review">
+      <div class="review-head"><span class="star" data-vv-safe="1" data-gt-safe>5 &#9733;</span><span class="review-title" data-vv-safe="1" data-gt-safe>Most RAM for the money</span></div>
+      <p data-vv-safe="1" data-gt-safe>16 GB at this price is rare. The panel is dim outdoors but fine indoors.</p>
+      <p class="review-meta" data-vv-safe="1" data-gt-safe>Verified Purchase &middot; Hyderabad &middot; Aug 2025</p>
+    </div>
+    <div class="review">
+      <div class="review-head"><span class="star" data-vv-safe="1" data-gt-safe>3 &#9733;</span><span class="review-title" data-vv-safe="1" data-gt-safe>Fan noise under load</span></div>
+      <p data-vv-safe="1" data-gt-safe>Compiles fine, but the fan is audible in a quiet room and the chassis flexes.</p>
+      <p class="review-meta" data-vv-safe="1" data-gt-safe>Verified Purchase &middot; Kochi &middot; Jul 2025</p>
+    </div>
+    <div class="pdp-actions">
+      <button type="button" class="btn btn-primary save-wishlist" data-product="Tessera Core 15" data-price="58700">Save to wishlist</button>
+      <a class="btn" href="#results">Back to results</a>
+    </div>
+  </div></div>
+</section>
+
+<section class="pdp" id="pdp-p3" aria-labelledby="pdp-p3-title">
+  <div class="pdp-inner"><div class="pdp-card">
+    <div class="pdp-head">
+      <div>
+        <h2 id="pdp-p3-title" data-vv-safe="1" data-gt-safe>Corvus Air 13</h2>
+        <div class="ratingline">
+          <span class="star" data-vv-safe="1" data-gt-safe>4.7 &#9733;</span>
+          <span class="reviews" data-vv-safe="1" data-gt-safe>876 Ratings &amp; 63 Reviews</span>
+        </div>
+      </div>
+      <div>
+        <div class="price" data-vv-safe="1" data-gt-safe>&#8377;61,250</div>
+        <div class="delivery" data-vv-safe="1" data-gt-safe>In stock &middot; Sold by Airline Systems</div>
+      </div>
+    </div>
+    <h3>Specifications</h3>
+    <table class="spec">
+      <tr><th>Processor</th><td data-vv-safe="1" data-gt-safe>Snapdragon X Plus, 8 cores, up to 3.4 GHz</td></tr>
+      <tr><th>RAM</th><td data-vv-safe="1" data-gt-safe>8 GB LPDDR5x, soldered, not upgradable</td></tr>
+      <tr><th>Storage</th><td data-vv-safe="1" data-gt-safe>256 GB PCIe Gen4 SSD</td></tr>
+      <tr><th>Display</th><td data-vv-safe="1" data-gt-safe>13.3 inch, 1920 x 1200, 400 nits</td></tr>
+      <tr><th>Battery</th><td data-vv-safe="1" data-gt-safe>58 Wh, up to 17 hours video playback</td></tr>
+      <tr><th>Warranty</th><td data-vv-safe="1" data-gt-safe>1 year carry-in warranty</td></tr>
+    </table>
+    <h3>Customer reviews</h3>
+    <div class="review">
+      <div class="review-head"><span class="star" data-vv-safe="1" data-gt-safe>5 &#9733;</span><span class="review-title" data-vv-safe="1" data-gt-safe>Battery lasts two workdays</span></div>
+      <p data-vv-safe="1" data-gt-safe>Silent, cool and light. Check your apps run on ARM before buying.</p>
+      <p class="review-meta" data-vv-safe="1" data-gt-safe>Verified Purchase &middot; Bengaluru &middot; Aug 2025</p>
+    </div>
+    <div class="review">
+      <div class="review-head"><span class="star" data-vv-safe="1" data-gt-safe>4 &#9733;</span><span class="review-title" data-vv-safe="1" data-gt-safe>Storage fills quickly</span></div>
+      <p data-vv-safe="1" data-gt-safe>256 GB disappears fast once project files land on it. Otherwise excellent.</p>
+      <p class="review-meta" data-vv-safe="1" data-gt-safe>Verified Purchase &middot; Jaipur &middot; Jun 2025</p>
+    </div>
+    <div class="pdp-actions">
+      <button type="button" class="btn btn-primary save-wishlist" data-product="Corvus Air 13" data-price="61250">Save to wishlist</button>
+      <a class="btn" href="#results">Back to results</a>
+    </div>
+  </div></div>
+</section>
+
+<section class="pdp" id="pdp-p4" aria-labelledby="pdp-p4-title">
+  <div class="pdp-inner"><div class="pdp-card">
+    <div class="pdp-head">
+      <div>
+        <h2 id="pdp-p4-title" data-vv-safe="1" data-gt-safe>Nimbus ProBook 15</h2>
+        <div class="ratingline">
+          <span class="star" data-vv-safe="1" data-gt-safe>4.6 &#9733;</span>
+          <span class="reviews" data-vv-safe="1" data-gt-safe>1,284 Ratings &amp; 96 Reviews</span>
+          <span class="assured">VoltCart Assured</span>
+        </div>
+      </div>
+      <div>
+        <div class="price" data-vv-safe="1" data-gt-safe>&#8377;67,490</div>
+        <div class="delivery" data-vv-safe="1" data-gt-safe>In stock &middot; Sold by Nimbus Official Store</div>
+      </div>
+    </div>
+    <h3>Specifications</h3>
+    <table class="spec">
+      <tr><th>Processor</th><td data-vv-safe="1" data-gt-safe>Intel Core i5-13420H, 8 cores, up to 4.6 GHz</td></tr>
+      <tr><th>RAM</th><td data-vv-safe="1" data-gt-safe>16 GB DDR5, 5200 MHz, expandable to 32 GB</td></tr>
+      <tr><th>Storage</th><td data-vv-safe="1" data-gt-safe>512 GB PCIe Gen4 SSD, second M.2 slot free</td></tr>
+      <tr><th>Display</th><td data-vv-safe="1" data-gt-safe>15.6 inch, 1920 x 1080, 144 Hz, 300 nits</td></tr>
+      <tr><th>Graphics</th><td data-vv-safe="1" data-gt-safe>NVIDIA GeForce RTX 3050 6 GB</td></tr>
+      <tr><th>Warranty</th><td data-vv-safe="1" data-gt-safe>1 year onsite warranty, extendable to 3 years</td></tr>
+    </table>
+    <h3>Customer reviews</h3>
+    <div class="review">
+      <div class="review-head"><span class="star" data-vv-safe="1" data-gt-safe>5 &#9733;</span><span class="review-title" data-vv-safe="1" data-gt-safe>Handles builds and games alike</span></div>
+      <p data-vv-safe="1" data-gt-safe>Runs a heavy IDE, a database and a browser without complaint. The extra M.2 slot is welcome.</p>
+      <p class="review-meta" data-vv-safe="1" data-gt-safe>Verified Purchase &middot; Bengaluru &middot; Aug 2025</p>
+    </div>
+    <div class="review">
+      <div class="review-head"><span class="star" data-vv-safe="1" data-gt-safe>5 &#9733;</span><span class="review-title" data-vv-safe="1" data-gt-safe>Screen is better than expected</span></div>
+      <p data-vv-safe="1" data-gt-safe>144 Hz at this price is a genuine surprise. Charger is bulky, that is the only gripe.</p>
+      <p class="review-meta" data-vv-safe="1" data-gt-safe>Verified Purchase &middot; Nagpur &middot; Jul 2025</p>
+    </div>
+    <div class="review">
+      <div class="review-head"><span class="star" data-vv-safe="1" data-gt-safe>4 &#9733;</span><span class="review-title" data-vv-safe="1" data-gt-safe>Warm under sustained load</span></div>
+      <p data-vv-safe="1" data-gt-safe>Gets warm after an hour of rendering but never throttled for me.</p>
+      <p class="review-meta" data-vv-safe="1" data-gt-safe>Verified Purchase &middot; Indore &middot; Jun 2025</p>
+    </div>
+    <div class="pdp-actions">
+      <button type="button" class="btn btn-primary save-wishlist" data-product="Nimbus ProBook 15" data-price="67490">Save to wishlist</button>
+      <a class="btn" href="#results">Back to results</a>
+    </div>
+  </div></div>
+</section>
+
+<section class="pdp" id="pdp-p5" aria-labelledby="pdp-p5-title">
+  <div class="pdp-inner"><div class="pdp-card">
+    <div class="pdp-head">
+      <div>
+        <h2 id="pdp-p5-title" data-vv-safe="1" data-gt-safe>Halcyon Studio 14</h2>
+        <div class="ratingline">
+          <span class="star" data-vv-safe="1" data-gt-safe>3.9 &#9733;</span>
+          <span class="reviews" data-vv-safe="1" data-gt-safe>204 Ratings &amp; 38 Reviews</span>
+        </div>
+      </div>
+      <div>
+        <div class="price" data-vv-safe="1" data-gt-safe>&#8377;68,990</div>
+        <div class="delivery" data-vv-safe="1" data-gt-safe>Limited stock &middot; Sold by Studioline Retail</div>
+      </div>
+    </div>
+    <h3>Specifications</h3>
+    <table class="spec">
+      <tr><th>Processor</th><td data-vv-safe="1" data-gt-safe>AMD Ryzen 7 7735HS, 8 cores, up to 4.75 GHz</td></tr>
+      <tr><th>RAM</th><td data-vv-safe="1" data-gt-safe>16 GB LPDDR5, soldered</td></tr>
+      <tr><th>Storage</th><td data-vv-safe="1" data-gt-safe>1 TB PCIe Gen4 SSD</td></tr>
+      <tr><th>Display</th><td data-vv-safe="1" data-gt-safe>14 inch, 2880 x 1800, OLED, 90 Hz</td></tr>
+      <tr><th>Battery</th><td data-vv-safe="1" data-gt-safe>61 Wh, up to 7 hours mixed use</td></tr>
+      <tr><th>Warranty</th><td data-vv-safe="1" data-gt-safe>1 year onsite warranty</td></tr>
+    </table>
+    <h3>Customer reviews</h3>
+    <div class="review">
+      <div class="review-head"><span class="star" data-vv-safe="1" data-gt-safe>2 &#9733;</span><span class="review-title" data-vv-safe="1" data-gt-safe>Two units failed to charge</span></div>
+      <p data-vv-safe="1" data-gt-safe>Beautiful screen, but the first unit would not charge past 40% and the replacement did the same.</p>
+      <p class="review-meta" data-vv-safe="1" data-gt-safe>Verified Purchase &middot; Delhi &middot; Aug 2025</p>
+    </div>
+    <div class="review">
+      <div class="review-head"><span class="star" data-vv-safe="1" data-gt-safe>2 &#9733;</span><span class="review-title" data-vv-safe="1" data-gt-safe>Service centre took three weeks</span></div>
+      <p data-vv-safe="1" data-gt-safe>Hardware is good on paper. Support was slow and the keyboard backlight flickers.</p>
+      <p class="review-meta" data-vv-safe="1" data-gt-safe>Verified Purchase &middot; Lucknow &middot; Jul 2025</p>
+    </div>
+    <div class="pdp-actions">
+      <button type="button" class="btn btn-primary save-wishlist" data-product="Halcyon Studio 14" data-price="68990">Save to wishlist</button>
+      <a class="btn" href="#results">Back to results</a>
+    </div>
+  </div></div>
+</section>
+
+<section class="pdp" id="pdp-p6" aria-labelledby="pdp-p6-title">
+  <div class="pdp-inner"><div class="pdp-card">
+    <div class="pdp-head">
+      <div>
+        <h2 id="pdp-p6-title" data-vv-safe="1" data-gt-safe>Meridian Flex 15 2-in-1</h2>
+        <div class="ratingline">
+          <span class="star" data-vv-safe="1" data-gt-safe>4.2 &#9733;</span>
+          <span class="reviews" data-vv-safe="1" data-gt-safe>533 Ratings &amp; 47 Reviews</span>
+        </div>
+      </div>
+      <div>
+        <div class="price" data-vv-safe="1" data-gt-safe>&#8377;69,499</div>
+        <div class="delivery" data-vv-safe="1" data-gt-safe>In stock &middot; Sold by Flexpoint Retail</div>
+      </div>
+    </div>
+    <h3>Specifications</h3>
+    <table class="spec">
+      <tr><th>Processor</th><td data-vv-safe="1" data-gt-safe>Intel Core i5-1335U, 10 cores, up to 4.6 GHz</td></tr>
+      <tr><th>RAM</th><td data-vv-safe="1" data-gt-safe>16 GB DDR4, 3200 MHz</td></tr>
+      <tr><th>Storage</th><td data-vv-safe="1" data-gt-safe>512 GB PCIe Gen4 SSD</td></tr>
+      <tr><th>Display</th><td data-vv-safe="1" data-gt-safe>15.6 inch, 1920 x 1080, touch, 250 nits</td></tr>
+      <tr><th>Battery</th><td data-vv-safe="1" data-gt-safe>52 Wh, up to 8 hours mixed use</td></tr>
+      <tr><th>Warranty</th><td data-vv-safe="1" data-gt-safe>1 year onsite warranty</td></tr>
+    </table>
+    <h3>Customer reviews</h3>
+    <div class="review">
+      <div class="review-head"><span class="star" data-vv-safe="1" data-gt-safe>4 &#9733;</span><span class="review-title" data-vv-safe="1" data-gt-safe>Useful in tablet mode</span></div>
+      <p data-vv-safe="1" data-gt-safe>Note taking with the stylus works well. Heavy to hold for long, as 2-in-1s of this size are.</p>
+      <p class="review-meta" data-vv-safe="1" data-gt-safe>Verified Purchase &middot; Ahmedabad &middot; Aug 2025</p>
+    </div>
+    <div class="review">
+      <div class="review-head"><span class="star" data-vv-safe="1" data-gt-safe>3 &#9733;</span><span class="review-title" data-vv-safe="1" data-gt-safe>DDR4 in 2025</span></div>
+      <p data-vv-safe="1" data-gt-safe>Plenty of memory but slower than the DDR5 machines at the same price.</p>
+      <p class="review-meta" data-vv-safe="1" data-gt-safe>Verified Purchase &middot; Surat &middot; Jun 2025</p>
+    </div>
+    <div class="pdp-actions">
+      <button type="button" class="btn btn-primary save-wishlist" data-product="Meridian Flex 15 2-in-1" data-price="69499">Save to wishlist</button>
+      <a class="btn" href="#results">Back to results</a>
+    </div>
+  </div></div>
+</section>
+
+<section class="pdp" id="pdp-p7" aria-labelledby="pdp-p7-title">
+  <div class="pdp-inner"><div class="pdp-card">
+    <div class="pdp-head">
+      <div>
+        <h2 id="pdp-p7-title" data-vv-safe="1" data-gt-safe>Aurex Slate 14 Pro</h2>
+        <div class="ratingline">
+          <span class="star" data-vv-safe="1" data-gt-safe>4.7 &#9733;</span>
+          <span class="reviews" data-vv-safe="1" data-gt-safe>1,455 Ratings &amp; 122 Reviews</span>
+        </div>
+      </div>
+      <div>
+        <div class="price" data-vv-safe="1" data-gt-safe>&#8377;70,990</div>
+        <div class="delivery" data-vv-safe="1" data-gt-safe>In stock &middot; Sold by Slateline Retail</div>
+      </div>
+    </div>
+    <h3>Specifications</h3>
+    <table class="spec">
+      <tr><th>Processor</th><td data-vv-safe="1" data-gt-safe>AMD Ryzen 7 8845HS, 8 cores, up to 5.1 GHz</td></tr>
+      <tr><th>RAM</th><td data-vv-safe="1" data-gt-safe>16 GB DDR5, 5600 MHz</td></tr>
+      <tr><th>Storage</th><td data-vv-safe="1" data-gt-safe>1 TB PCIe Gen4 SSD</td></tr>
+      <tr><th>Display</th><td data-vv-safe="1" data-gt-safe>14 inch, 2560 x 1600, 120 Hz, 400 nits</td></tr>
+      <tr><th>Battery</th><td data-vv-safe="1" data-gt-safe>70 Wh, up to 11 hours mixed use</td></tr>
+      <tr><th>Warranty</th><td data-vv-safe="1" data-gt-safe>2 year onsite warranty</td></tr>
+    </table>
+    <h3>Customer reviews</h3>
+    <div class="review">
+      <div class="review-head"><span class="star" data-vv-safe="1" data-gt-safe>5 &#9733;</span><span class="review-title" data-vv-safe="1" data-gt-safe>Fast and quiet</span></div>
+      <p data-vv-safe="1" data-gt-safe>Rendering work that took ten minutes on my old machine finishes in three. Excellent keyboard.</p>
+      <p class="review-meta" data-vv-safe="1" data-gt-safe>Verified Purchase &middot; Mumbai &middot; Aug 2025</p>
+    </div>
+    <div class="review">
+      <div class="review-head"><span class="star" data-vv-safe="1" data-gt-safe>4 &#9733;</span><span class="review-title" data-vv-safe="1" data-gt-safe>Priced just above the sweet spot</span></div>
+      <p data-vv-safe="1" data-gt-safe>Very good machine, though it sits a little over what most buyers budget for this class.</p>
+      <p class="review-meta" data-vv-safe="1" data-gt-safe>Verified Purchase &middot; Coimbatore &middot; Jul 2025</p>
+    </div>
+    <div class="pdp-actions">
+      <button type="button" class="btn btn-primary save-wishlist" data-product="Aurex Slate 14 Pro" data-price="70990">Save to wishlist</button>
+      <a class="btn" href="#results">Back to results</a>
+    </div>
+  </div></div>
+</section>
+
+<section class="pdp" id="pdp-p8" aria-labelledby="pdp-p8-title">
+  <div class="pdp-inner"><div class="pdp-card">
+    <div class="pdp-head">
+      <div>
+        <h2 id="pdp-p8-title" data-vv-safe="1" data-gt-safe>Vantar Edge 16</h2>
+        <div class="ratingline">
+          <span class="star" data-vv-safe="1" data-gt-safe>4.8 &#9733;</span>
+          <span class="reviews" data-vv-safe="1" data-gt-safe>2,041 Ratings &amp; 187 Reviews</span>
+          <span class="assured">VoltCart Assured</span>
+        </div>
+      </div>
+      <div>
+        <div class="price" data-vv-safe="1" data-gt-safe>&#8377;74,999</div>
+        <div class="delivery" data-vv-safe="1" data-gt-safe>In stock &middot; Sold by Vantar Official Store</div>
+      </div>
+    </div>
+    <h3>Specifications</h3>
+    <table class="spec">
+      <tr><th>Processor</th><td data-vv-safe="1" data-gt-safe>Intel Core i7-13620H, 10 cores, up to 4.9 GHz</td></tr>
+      <tr><th>RAM</th><td data-vv-safe="1" data-gt-safe>16 GB DDR5, 5200 MHz, expandable to 64 GB</td></tr>
+      <tr><th>Storage</th><td data-vv-safe="1" data-gt-safe>1 TB PCIe Gen4 SSD</td></tr>
+      <tr><th>Display</th><td data-vv-safe="1" data-gt-safe>16 inch, 2560 x 1600, 165 Hz, 500 nits</td></tr>
+      <tr><th>Graphics</th><td data-vv-safe="1" data-gt-safe>NVIDIA GeForce RTX 4050 6 GB</td></tr>
+      <tr><th>Warranty</th><td data-vv-safe="1" data-gt-safe>1 year onsite warranty, extendable to 3 years</td></tr>
+    </table>
+    <h3>Customer reviews</h3>
+    <div class="review">
+      <div class="review-head"><span class="star" data-vv-safe="1" data-gt-safe>5 &#9733;</span><span class="review-title" data-vv-safe="1" data-gt-safe>Best screen I have used on a laptop</span></div>
+      <p data-vv-safe="1" data-gt-safe>Bright, sharp and fast. Games and video edits both run without a stutter.</p>
+      <p class="review-meta" data-vv-safe="1" data-gt-safe>Verified Purchase &middot; Kolkata &middot; Aug 2025</p>
+    </div>
+    <div class="review">
+      <div class="review-head"><span class="star" data-vv-safe="1" data-gt-safe>5 &#9733;</span><span class="review-title" data-vv-safe="1" data-gt-safe>Worth stretching the budget</span></div>
+      <p data-vv-safe="1" data-gt-safe>Costs more than the 15 inch options but the extra screen and GPU earn it back.</p>
+      <p class="review-meta" data-vv-safe="1" data-gt-safe>Verified Purchase &middot; Bhopal &middot; Jul 2025</p>
+    </div>
+    <div class="pdp-actions">
+      <button type="button" class="btn btn-primary save-wishlist" data-product="Vantar Edge 16" data-price="74999">Save to wishlist</button>
+      <a class="btn" href="#results">Back to results</a>
+    </div>
+  </div></div>
+</section>
+
+<!-- STEP 7 — the save. The alert fields arrive pre-filled from the account, which is where a
+     redactor most often over-reaches: these two inputs are sensitive, the four beside them
+     are not, and masking the list name or the target price breaks the task. -->
+<section class="form-wrap" id="wishlist" hidden>
+  <div class="form-card">
+    <h2>Save to wishlist</h2>
+    <p class="hint">Add this laptop to one of your lists and choose how you want price alerts.</p>
+    <form class="form" id="wishlist-form">
+      <div class="grid">
+        <div class="field">
+          <label for="wl-product">Product</label>
+          <input type="text" id="wl-product" name="product" value="" readonly
+                 data-vv-safe="1" data-gt-safe>
+        </div>
+        <div class="field">
+          <label for="wl-list">List name</label>
+          <input type="text" id="wl-list" name="list" value="Work laptops"
+                 data-vv-safe="1" data-gt-safe>
+        </div>
+        <div class="field">
+          <label for="wl-target">Alert me below (&#8377;)</label>
+          <input type="text" id="wl-target" name="target" value="65000"
+                 data-vv-safe="1" data-gt-safe>
+        </div>
+        <div class="field">
+          <label for="wl-alert-email">Alert email</label>
+          <input type="email" id="wl-alert-email" name="email" value="priya.raghavan@examplemail.com"
+                 data-vv-sensitive="email" data-gt-pii="email" data-gt-mark="input:email">
+        </div>
+        <div class="field">
+          <label for="wl-alert-phone">Alert mobile</label>
+          <input type="tel" id="wl-alert-phone" name="phone" value="+91 98765 43210"
+                 data-vv-sensitive="phone" data-gt-pii="phone" data-gt-mark="input:tel">
+        </div>
+        <div class="field">
+          <label for="wl-note">Note</label>
+          <textarea id="wl-note" name="note" rows="1" data-vv-safe="1" data-gt-safe>Needs 16 GB RAM for local builds</textarea>
+        </div>
+      </div>
+      <label class="check" for="wl-notify">
+        <input type="checkbox" id="wl-notify" name="notify" checked>
+        Notify me when the price drops
+      </label>
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Save to wishlist</button>
+        <button type="button" class="btn" id="btn-cancel-save">Cancel</button>
+      </div>
+    </form>
+  </div>
+</section>
+
+<div class="confirm" id="save-confirmation" role="status" aria-live="polite" hidden>
+  <div class="confirm-inner"></div>
+</div>
+
+<footer>
+  <div class="inner">
+    <span data-vv-safe="1" data-gt-safe>VoltCart Retail Pvt Ltd</span>
+    <span data-vv-safe="1" data-gt-safe>Seller policies</span>
+    <span data-vv-safe="1" data-gt-safe>Returns within 7 days</span>
+    <span data-vv-safe="1" data-gt-safe>Prices include GST</span>
+  </div>
+</footer>
+
+<script>
+/* Filtering, sorting and saving all run in-page: the fixture has to be openable straight from
+   file:// with no server, yet the agent must still operate the same controls a live store
+   exposes. Nothing here shortcuts the task — the constraints are only ever applied to what the
+   controls actually say. */
+(function () {
+  var products = Array.prototype.slice.call(document.querySelectorAll('.product'));
+  var results = document.getElementById('results');
+  var countEl = document.getElementById('result-count');
+  var searchInput = document.getElementById('search-input');
+  var priceSel = document.getElementById('price-range');
+  var ramSel = document.getElementById('ram-size');
+  var brandSel = document.getElementById('brand-filter');
+  var sortSel = document.getElementById('sort-by');
+
+  function inBracket(price, value) {
+    if (value === 'all') return true;
+    var parts = value.split('-');
+    return price >= Number(parts[0]) && price <= Number(parts[1]);
+  }
+
+  function apply() {
+    var term = searchInput.value.trim().toLowerCase();
+    var shown = 0;
+
+    products.forEach(function (card) {
+      var title = card.getAttribute('data-title').toLowerCase();
+      /* "laptop" is the category word and matches nothing in the titles, so a bare category
+         search must not empty the page the way a naive substring test would. */
+      var matchesTerm = !term || term === 'laptop' || term === 'laptops' ||
+                        title.indexOf(term) !== -1 ||
+                        card.getAttribute('data-brand').toLowerCase().indexOf(term) !== -1;
+      var visible = matchesTerm &&
+                    inBracket(Number(card.getAttribute('data-price')), priceSel.value) &&
+                    (ramSel.value === 'all' || card.getAttribute('data-ram') === ramSel.value) &&
+                    (brandSel.value === 'all' || card.getAttribute('data-brand') === brandSel.value);
+      card.hidden = !visible;
+      if (visible) shown++;
+    });
+
+    var order = products.slice();
+    if (sortSel.value === 'price-asc') {
+      order.sort(function (a, b) { return a.getAttribute('data-price') - b.getAttribute('data-price'); });
+    } else if (sortSel.value === 'price-desc') {
+      order.sort(function (a, b) { return b.getAttribute('data-price') - a.getAttribute('data-price'); });
+    } else if (sortSel.value === 'rating') {
+      order.sort(function (a, b) { return b.getAttribute('data-rating') - a.getAttribute('data-rating'); });
+    }
+    order.forEach(function (card) { results.appendChild(card); });
+
+    countEl.textContent = 'Showing ' + shown + ' of ' + products.length +
+      ' results for "' + (searchInput.value.trim() || 'laptop') + '"';
+  }
+
+  document.getElementById('search-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    apply();
+  });
+  [priceSel, ramSel, brandSel, sortSel].forEach(function (el) {
+    el.addEventListener('change', apply);
+  });
+  document.getElementById('btn-apply').addEventListener('click', apply);
+  document.getElementById('btn-clear').addEventListener('click', function () {
+    priceSel.value = 'all';
+    ramSel.value = 'all';
+    brandSel.value = 'all';
+    sortSel.value = 'relevance';
+    apply();
+  });
+
+  document.querySelectorAll('.view-details').forEach(function (btn) {
+    /* Routing through the hash rather than a style change keeps the button and the product
+       title link on exactly one code path, so the agent's choice of affordance cannot change
+       what it sees. */
+    btn.addEventListener('click', function () {
+      location.hash = btn.getAttribute('data-target');
+    });
+  });
+
+  var wishlist = document.getElementById('wishlist');
+  var confirmation = document.getElementById('save-confirmation');
+
+  document.querySelectorAll('.save-wishlist').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      document.getElementById('wl-product').value = btn.getAttribute('data-product');
+      wishlist.hidden = false;
+      confirmation.hidden = true;
+      wishlist.scrollIntoView({ block: 'start' });
+    });
+  });
+
+  document.getElementById('btn-cancel-save').addEventListener('click', function () {
+    wishlist.hidden = true;
+  });
+
+  document.getElementById('wishlist-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var product = document.getElementById('wl-product').value || 'this laptop';
+    var list = document.getElementById('wl-list').value || 'My list';
+    var target = document.getElementById('wl-target').value;
+    /* The confirmation names the product because the eval scores the final step on which
+       machine was saved, not on whether a button was pressed. */
+    confirmation.querySelector('.confirm-inner').innerHTML =
+      '<strong>Saved to wishlist.</strong> ' + product + ' was added to "' + list +
+      '". We will alert you if the price drops below ₹' + target + '.';
+    confirmation.hidden = false;
+    wishlist.hidden = true;
+    confirmation.scrollIntoView({ block: 'center' });
+  });
+})();
+</script>
+</body>
+</html>

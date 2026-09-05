@@ -540,9 +540,14 @@
       const t0 = performance.now();
 
       // 1. Capture screenshot and scan ALL frames in parallel
+      // Why the capture failed matters as much as that it did. Without this the reason was
+      // logged and thrown away, and the panel reported "Redaction failed" for a run in which
+      // redaction never ran - which sends the reader looking in the wrong file.
+      let captureError = null;
       const [rawScreenshot, domResult] = await Promise.all([
         captureScreenshot(windowId).catch((err) => {
-          console.warn("[vision] Screenshot capture failed:", err.message || err);
+          captureError = err && err.message || String(err);
+          console.warn("[vision] Screenshot capture failed:", captureError);
           return "";
         }),
         scanAllFrames(tabId).catch(() => ({ piiRegions: [], marks: [], frameStats: { total: 0, merged: 0, skipped: 0 } }))
@@ -554,6 +559,15 @@
         return {
           redactedImage: "",
           redactionOk: false,
+          // Named distinctly so the panel can tell the user which stage actually failed.
+          // Both abort the request and transmit nothing, but they have different causes and
+          // different fixes: a capture failure is usually the window losing focus or Chrome's
+          // captureVisibleTab quota, not anything to do with masking.
+          failedStage: "capture",
+          redactionError: captureError
+            ? `Could not capture the screen: ${captureError}`
+            : "Could not capture the screen. Chrome only captures the focused window - " +
+              "click the page once and try again.",
           regions: [],
           sourceBreakdown: { dom: 0, vision_face: 0, vision_ocr: 0, merged: 0 },
           timings: { capture: 0, domScan: 0, faceInference: 0, ocrInference: 0, visionInference: 0, merge: 0, redact: 0, total: 0 },
@@ -679,6 +693,7 @@
         return {
           redactedImage: "",
           redactionOk: false,
+          failedStage: "redaction",
           redactionError: redactErr.message || String(redactErr),
           regions: mergedRegions,
           sourceBreakdown: { dom: domPii.length, vision_face: faceBoxes.length, vision_ocr: ocrRegions.length, merged: mergedRegions.length },

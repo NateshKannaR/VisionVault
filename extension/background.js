@@ -611,8 +611,12 @@ async function phaseScan(task) {
   // FAIL CLOSED: abort the whole request rather than showing/sending anything unredacted.
   if (!scan.redactionOk) {
     session = null;
+    // Two different failures reach here and they are not the same problem. Saying "redaction
+    // failed" when the screen was never captured points the user at the masking pipeline for
+    // a fault that is usually just an unfocused window.
+    const stage = scan.failedStage === "capture" ? "Could not read the screen" : "Redaction failed";
     throw new Error(
-      "Redaction failed — request aborted, nothing was captured or transmitted. " +
+      `${stage} — request aborted, nothing was captured or transmitted. ` +
       (scan.redactionError || "")
     );
   }

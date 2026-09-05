@@ -1024,12 +1024,39 @@
           if (el && el.tagName && el.tagName.toLowerCase() === "select") {
             const rawVal = String(value || "").toLowerCase().trim();
             const normDigits = rawVal.replace(/[^0-9]/g, "");
-            const opt = Array.from(el.options).find(
+            let opt = Array.from(el.options).find(
               (o) => o.value === value ||
                      o.text.toLowerCase() === rawVal ||
                      (normDigits && o.value.replace(/[^0-9]/g, "") === normDigits) ||
                      (normDigits && o.text.replace(/[^0-9]/g, "") === normDigits)
             );
+
+            // A price filter is almost never a list of exact prices. It is a list of BANDS -
+            // "Under 50,000", "50,000 - 60,000", value="0-70000" - and a planner asked for a
+            // ceiling of 70000 has no exact option to match. Every real store does this, so
+            // exact matching meant the price filter simply never applied, and the failure
+            // surfaced as "Option not found" and then, misleadingly, as "the page moved".
+            //
+            // Given a bare number, choose the band that best expresses "at most this": the
+            // largest upper bound that does not exceed the ceiling. Failing that, the smallest
+            // band above it, which over-includes rather than silently filtering nothing.
+            if (!opt && normDigits && /^\d+$/.test(normDigits)) {
+              const ceiling = parseInt(normDigits, 10);
+              const banded = Array.from(el.options)
+                .map((o) => {
+                  const nums = `${o.value} ${o.text}`
+                    .replace(/[,\s]/g, "")
+                    .match(/\d{3,}/g);
+                  if (!nums || !nums.length) return null;
+                  return { o, upper: Math.max(...nums.map(Number)) };
+                })
+                .filter(Boolean);
+              const atOrBelow = banded.filter((b) => b.upper <= ceiling)
+                                      .sort((a, b) => b.upper - a.upper)[0];
+              const justAbove = banded.filter((b) => b.upper > ceiling)
+                                      .sort((a, b) => a.upper - b.upper)[0];
+              opt = (atOrBelow || justAbove || {}).o;
+            }
             if (opt) {
               const nativeSetter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")?.set;
               if (nativeSetter) {

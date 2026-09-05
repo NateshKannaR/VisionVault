@@ -82,7 +82,13 @@
 
     // A bare domain the user typed, e.g. "open example.co.uk"
     if (/^[a-z0-9-]+(\.[a-z]{2,})+$/i.test(name)) return `https://${name}`;
-    if (/^[a-z0-9 -]{2,30}$/i.test(key)) return `https://www.${key.replace(/\s+/g, "")}.com`;
+
+    // A SINGLE unknown word may be a brand this build has not heard of - "open zomato" is a
+    // reasonable guess at zomato.com. A phrase is not. Inventing a domain by deleting the
+    // spaces from arbitrary prose sent the agent to thebestone.com when the instruction said
+    // "open the best one", and would send it to mybankaccount.com for "open my bank account" -
+    // a domain anyone can register, reached with the user's own words as the excuse.
+    if (/^[a-z0-9-]{2,30}$/i.test(key)) return `https://www.${key}.com`;
     return null;
   }
 
@@ -1070,11 +1076,21 @@
     if ((progress.searched || progress.queryLanded) && (parsed.wantsFilter || parsed.maxPrice || parsed.minPrice) && !progress.filterApplied) {
       if (parsed.maxPrice) {
         const selectEls = available.filter(m => m.role === "select" || m.role === "combobox");
-        let maxSelect = selectEls.find(m => /\b(max|to|\₹|high|upper)\b/i.test(m.label || ""));
-        if (!maxSelect && selectEls.length >= 2) {
-          maxSelect = selectEls[1]; // In Min -> Max pairs on Flipkart, the second select is Max
-        } else if (!maxSelect && selectEls.length === 1 && /\bprice\b/i.test(selectEls[0].label || "")) {
-          maxSelect = selectEls[0];
+        const PRICEY = /\b(price|budget|cost|amount)\b|₹|\brs\.?\b|\binr\b/i;
+
+        // What the control is CALLED comes first. "the second select is the Max" is true of a
+        // Min/Max pair and of nothing else - on a page whose two visible selects were "price"
+        // and "sort by" it chose "sort by", which has no numeric options at all, and the price
+        // filter then failed four times against a control that could never satisfy it.
+        //
+        // Marks are viewport-only, so which selects are visible depends on the scroll position.
+        // A positional rule is guessing about a list it cannot see all of.
+        let maxSelect = selectEls.find(m => /\b(max|upper|high(?:est)?)\b/i.test(m.label || "") && PRICEY.test(m.label || ""));
+        if (!maxSelect) maxSelect = selectEls.find(m => PRICEY.test(m.label || ""));
+        // The pair heuristic survives only where it was ever true: both controls priced.
+        if (!maxSelect && selectEls.length >= 2 &&
+            PRICEY.test(selectEls[0].label || "") && PRICEY.test(selectEls[1].label || "")) {
+          maxSelect = selectEls[1];
         }
         if (maxSelect) {
           return {
@@ -1183,7 +1199,21 @@
         const hasProductEvidence = (c) => {
           const l = (c.label || "").toLowerCase();
           if (/(?:₹|rs\.?|inr|\$)\s*[\d,]+/i.test(l)) return true;
-          return queryWords.some((w) => l.includes(w));
+          if (queryWords.some((w) => l.includes(w))) return true;
+          // A product is usually named by its brand and model, not by the category the user
+          // searched for - "Aurex Stratos 14" contains neither a price nor the word "laptop".
+          // Length separates those from site chrome, which is uniformly short: "become a
+          // seller" is sixteen characters, a product title rarely under twenty.
+          //
+          // The role constraint is what makes length safe to use. A search box carries a long
+          // placeholder - "search for products, brands and more" - and was duly opened as the
+          // best matching laptop the first time length alone was trusted. You navigate to a
+          // product by following a link, never by clicking into a field.
+          // A genuine link only. "clickable" is the role given to a wrapper div, and the one
+          // wrapping the search box carries its placeholder as a 43-character label - long
+          // enough to look like a product title, and duly opened as the best matching laptop.
+          // The real product beside it is an <a>, which is how anyone reaches a product page.
+          return c.role === "link" && l.length >= 20;
         };
 
         const candidates = queryWords.length

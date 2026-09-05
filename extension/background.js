@@ -1026,10 +1026,51 @@ async function tryOpenSearchAffordance() {
  * against the same stale list produces another failure, and three of those end the run. One
  * re-scan turns that into a recoverable step.
  */
-async function recoverAfterFailedAction(error) {
-  if (!/not found|no longer visible|navigated before/i.test(String(error || ""))) return;
+async function recoverAfterFailedAction(error, failed) {
+  // "Option ... not found in <select>" is a different failure from a stale target: the control
+  // is right there, it simply has no option matching what was asked. Re-reading the page will
+  // not change that, and reporting it as "the page moved" sends everyone looking in the wrong
+  // place - which it did, for four identical steps.
+  if (/option .* not found/i.test(String(error || ""))) {
+    notifyPopup({ type: "step", step: session.stepCount,
+                  status: "That control has no option matching what the task asked for." });
+    return null;
+  }
+  if (!/not found|no longer visible|navigated before/i.test(String(error || ""))) return null;
   notifyPopup({ type: "step", step: session.stepCount, status: "The page moved under the plan — re-reading it." });
   await rescanCurrentTab(false, "recovery");
+
+  // Re-scanning alone is not recovery. Mark ids encode geometry, so on a page that reflows
+  // every scan the planner proposes a fresh id, it goes stale again before it executes, and
+  // the run loops until the failure counter ends it — observed on a fixture where the same
+  // price filter was proposed four times and never applied.
+  //
+  // The label is what the planner actually chose; the id was only how it pointed. Finding the
+  // same label on the re-read page and acting on it immediately closes the window that keeps
+  // reopening. Only an exact label and role match is accepted, so this cannot drift onto a
+  // different control.
+  if (!failed || !failed.label) return null;
+  const again = (session.marks || []).find(
+    (m) => (m.label || "") === failed.label && (!failed.role || m.role === failed.role));
+  if (!again || again.id === failed.mark_id) return null;
+
+  console.log(`[agent] retargeting "${failed.label}" ${failed.mark_id} -> ${again.id}`);
+  notifyPopup({ type: "step", step: session.stepCount,
+                status: `Found "${failed.label}" again after the page moved.` });
+  const retry = await executeMarkAction(failed.type, again.id, failed.value);
+  if (retry?.ok) {
+    session.actionLog.push({ action: failed.type, mark_id: again.id, ok: true, retargeted: true });
+  }
+  return retry?.ok ? again.id : null;
+}
+
+/** What an action was aiming at, so a failure can be retried against the same control. */
+function failedTargetOf(resp, actionType) {
+  const mark = (session.marks || []).find((m) => String(m.id) === String(resp?.mark_id));
+  return {
+    type: actionType, mark_id: resp?.mark_id, value: resp?.value,
+    label: mark?.label || null, role: mark?.role || null,
+  };
 }
 
 /**
@@ -1569,7 +1610,7 @@ async function phaseRun() {
           type: typedOk ? "filled" : "failed",
           field: fieldKey || value, mark_id: resp.mark_id, error: typedOk ? undefined : exec?.error,
         });
-        if (!typedOk) await recoverAfterFailedAction(exec?.error);
+        if (!typedOk) await recoverAfterFailedAction(exec?.error, failedTargetOf(resp, "type"));
         continue;
       }
 
@@ -1621,7 +1662,7 @@ async function phaseRun() {
           mark_id: resp.mark_id,
           error: exec?.ok ? undefined : exec?.error,
         });
-        if (!exec?.ok) await recoverAfterFailedAction(exec?.error);
+        if (!exec?.ok) await recoverAfterFailedAction(exec?.error, failedTargetOf(resp, actionType));
         continue;
       }
 
@@ -1738,7 +1779,7 @@ async function phaseRun() {
           type: "step", step: session.stepCount,
           status: clickOk ? `Clicked #${resp.mark_id}` : `Click on #${resp.mark_id} failed: ${exec?.error || "unknown"}`,
         });
-        if (!clickOk) await recoverAfterFailedAction(exec?.error);
+        if (!clickOk) await recoverAfterFailedAction(exec?.error, failedTargetOf(resp, "click"));
         continue;
       }
 
@@ -1750,7 +1791,7 @@ async function phaseRun() {
       guard.record(actionType, resp.mark_id, resp.value, !!exec?.ok);
       session.actionLog.push({ action: actionType, mark_id: resp.mark_id, serverMs, ok: !!exec?.ok, error: exec?.ok ? undefined : exec?.error });
       if (exec?.ok && NAV_ACTIONS.has(actionType)) await settleAfterNavAction(actionType);
-      else if (!exec?.ok) await recoverAfterFailedAction(exec?.error);
+      else if (!exec?.ok) await recoverAfterFailedAction(exec?.error, failedTargetOf(resp, actionType));
     }
 
     const left = AgentGuard.describeRemaining(session.parsedTask, session.progress);

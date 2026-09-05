@@ -551,6 +551,7 @@ async function requestPlan(task, pageInfo, settings, siteHints) {
     return local;
   } finally {
     clearTimeout(tid);
+    if (inFlightPlanRequest === ctrl) inFlightPlanRequest = null;
   }
 }
 

@@ -23,6 +23,12 @@ import urllib.error
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+try:
+    from PIL import Image
+    _PIL_AVAILABLE = True
+except ImportError:
+    _PIL_AVAILABLE = False
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware

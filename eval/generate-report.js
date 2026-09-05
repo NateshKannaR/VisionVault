@@ -27,6 +27,10 @@ const ROOT = path.resolve(__dirname, '..');
 const RESULTS_DIR = path.join(__dirname, 'results');
 const LIVE_PATH = path.join(RESULTS_DIR, 'live-eval.json');
 const MANUAL_PATH = path.join(RESULTS_DIR, 'manual-eval.json');
+// Written by `node eval/measure-resources.js` and `node eval/attack-redaction.js`. Both are
+// optional here: a report is still valid without them, it just answers fewer questions.
+const RESOURCES_PATH = path.join(RESULTS_DIR, 'resources.json');
+const ATTACK_PATH = path.join(RESULTS_DIR, 'attack-redaction.json');
 const REPORT_PATH = path.join(ROOT, 'eval_report.md');
 
 const live = fs.existsSync(LIVE_PATH) ? JSON.parse(fs.readFileSync(LIVE_PATH, 'utf8')) : null;
@@ -372,6 +376,93 @@ W('**Mark ID stability** — the same page is scanned repeatedly and the sets of
 W('compared. IDs are hashes of each element\'s identity and document-space geometry, so an');
 W('action planned against one scan still resolves on the next.');
 W();
+
+// ── Client cost, and the attack on our own output ────────────────────────────
+//
+// Two questions the sections above cannot answer: what does this cost the machine it runs on
+// (20% of the PS 26171 rubric), and does the redaction actually hold when someone tries to
+// undo it (the other 20%, tested rather than asserted). Both are optional: if the results file
+// is absent the section is skipped rather than filled with placeholders.
+
+function readJson(p) {
+  try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch (_) { return null; }
+}
+
+const resources = readJson(RESOURCES_PATH);
+if (resources) {
+  W('## What it costs the machine it runs on');
+  W();
+  W('**AUTOMATED** — `node eval/measure-resources.js`, real Chrome, real extension.');
+  W();
+  W(`Measured on ${resources.cpu || 'unknown CPU'} (${resources.cpuCount || '?'} logical cores), ` +
+    `${resources.platform || ''}, ${resources.chrome || ''}.`);
+  W();
+  if (resources.scanCostMs) {
+    W('| | ms |');
+    W('|---|---|');
+    W(`| First scan of a screen (face + OCR run) | ${resources.scanCostMs.coldP50} |`);
+    W(`| Every re-scan of the same screen (cached) | ${resources.scanCostMs.warmP50} |`);
+    W();
+    W('The agent re-scans after every action, so the second row is the common case. The vision');
+    W('result is cached against a hash of the captured pixels, so a hit means byte-identical');
+    W('input and the cached answer cannot be stale — the models are skipped, not approximated.');
+    W();
+  }
+  if (resources.stages) {
+    W('Per stage, when the models actually run:');
+    W();
+    W('| stage | p50 ms | p95 ms |');
+    W('|---|---|---|');
+    for (const [name, v] of Object.entries(resources.stages)) {
+      W(`| ${name} | ${v.p50} | ${v.p95} |`);
+    }
+    W();
+  }
+  W('| | |');
+  W('|---|---|');
+  W(`| Heap, idle | ${resources.idleTotalMB} MB |`);
+  W(`| Heap, peak under load | ${resources.peakHeapMB} MB |`);
+  W(`| Extension on disk | ${resources.footprint ? resources.footprint.totalMB : '?'} MB |`);
+  if (resources.footprint && resources.footprint.groupsMB) {
+    for (const [k, v] of Object.entries(resources.footprint.groupsMB)) W(`| — ${k} | ${v} MB |`);
+  }
+  if (resources.wire && resources.wire.p50KB != null) {
+    W(`| Sent per step (p50) | ${resources.wire.p50KB} KB |`);
+  }
+  W();
+}
+
+const attack = readJson(ATTACK_PATH);
+if (attack) {
+  W('## Attacking our own redacted output');
+  W();
+  W('**AUTOMATED** — `node eval/attack-redaction.js`.');
+  W();
+  W('"We draw a rectangle over it" is a claim about intent. This takes the frame that actually');
+  W('leaves the machine and tries to read the personal data back out of it, using the same');
+  W('bundled Tesseract the extension ships — so the attacker is no weaker than the defender.');
+  W();
+  W('| fixture | regions masked | attacks | values recovered |');
+  W('|---|---|---|---|');
+  for (const f of attack.fixtures || []) {
+    const n = Object.keys(f.attacks || {}).length;
+    const leaked = (f.leaks || []).length;
+    W(`| ${f.fixture} | ${f.piiMasked} | ${n} | ${leaked === 0 ? '**none**' : leaked} |`);
+  }
+  W();
+  W('Attacks: as transmitted, upscale 2x, upscale 4x, contrast stretch, extreme gain (any');
+  W('residue at all becomes black), and inversion. PNG ancillary chunks are inspected');
+  W('separately — an image still carrying the original in a tEXt or eXIf chunk would have');
+  W('leaked everything while looking perfect.');
+  W();
+  W('Two controls keep a clean result meaningful. The attack must recover *something* — if OCR');
+  W('silently returned nothing, zero leaks would mean the test was broken rather than the');
+  W('redaction sound. And the field labels beside the masked values must survive, or the');
+  W('"redaction" would just be a blank image, useless to the planner and to the user.');
+  W();
+  W(`Result: ${attack.pass} passed, ${attack.fail} failed.`);
+  W();
+}
 
 W('## Reproducing this');
 W();

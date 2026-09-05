@@ -247,6 +247,9 @@ Some pages cannot be automated, and saying so is more useful than trying harder:
 | Element labels cannot smuggle PII | `safeLabel()` never uses an input's `value`, and drops any candidate that matches a PII pattern |
 | Page context cannot smuggle PII | `page_info` carries origin + path only — no query string, no fragment, no page text |
 | Consequential actions need a human | risk-gated click confirmation (below) |
+| The claim is checkable, not just stated | every outbound request is recorded on-device by [`extension/audit-log.js`](extension/audit-log.js) — the exact bytes, the redacted image as sent, and the vault field *name* asked for — and shown in the panel's Privacy tab. Written inside `callServer()` from the same string handed to `fetch()`, so it is what was sent, not a reconstruction |
+| Redaction is verified by attacking it | [`eval/attack-redaction.js`](eval/attack-redaction.js) takes the transmitted frame and tries to read the data back out — upscaling, contrast stretch, extreme gain, inversion, and PNG metadata |
+| An identifier in Devanagari is still an identifier | Indic digits are normalised to ASCII before matching, one code point per code point so redaction boxes stay aligned; Devanagari is a second OCR recognition language, since an English-only model returns nothing for it and the page then looks clean |
 
 ### Click confirmation — the exact policy
 
@@ -426,6 +429,3 @@ scan, stage by stage), `node eval/ocr-tuning.js` (the OCR raster-size sweep).
 UltraFace RFB-320 — MIT (Linzaer). Tesseract.js / Tesseract — Apache 2.0.
 ONNX Runtime Web — MIT (Microsoft). All model and runtime assets are bundled; nothing is
 fetched from a CDN at runtime.
-# VisionVault
-# VisionVault
-# VisionVault

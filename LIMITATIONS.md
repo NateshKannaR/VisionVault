@@ -19,6 +19,24 @@ a measured figure, the figure is quoted and `eval_report.md` has the rest.
   `ocrDetect.js` has a labelled-value rule (`Billed to: …`, `Customer: …`). A name printed with
   no label at all will not be detected by OCR.
 
+- **OCR reads English and Devanagari only.** `hin.traineddata` covers Hindi and Marathi
+  alongside English. Tamil, Bengali, Telugu, Kannada, Malayalam, Gujarati, Odia and Gurmukhi
+  are handled in *text* — their digits are normalised to ASCII before matching, so an
+  identifier written in those scripts in the DOM is detected — but an identifier printed as
+  **pixels** in one of them is not read, because the recogniser has no glyphs for it. The gap
+  is per-script traineddata, roughly 1 MB each, at the cost of recognition time.
+
+- **A missing second language degrades silently by design.** If `hin.traineddata` is absent or
+  unreadable the worker falls back to English alone and logs it. That is deliberate: losing
+  Devanagari coverage is a gap, losing OCR entirely would be a leak. Check the console line
+  `Tesseract OCR worker initialized offline (eng+hin)` to confirm which is in force.
+
+- **Speech input is not on-device.** The task box accepts dictation via Chrome's
+  `SpeechRecognition`, which is a network service — the audio is transcribed on Google's
+  servers. It is push-to-talk, disclosed in the panel while the microphone is live, and
+  entirely separate from the redaction path; page content, captures and vault values are
+  unaffected. Anyone who needs the microphone never to be used should simply not press it.
+
 - **Small faces fall below the detector's floor.** UltraFace runs at 320×240; a 56px avatar in
   a 1200px viewport is ~15px at model scale and is frequently missed. Face figures in the report
   are measured against synthetic portraits, not photographs of people.

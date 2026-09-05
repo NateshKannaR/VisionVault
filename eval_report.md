@@ -21,8 +21,8 @@ measurement rather than bookkeeping.
 
 | Setting | Value |
 | :--- | :--- |
-| Run at | 2026-09-03T18:35:32.544Z |
-| Chrome | Chrome/152.0.7977.65 |
+| Run at | 2026-09-04T18:25:29.719Z |
+| Chrome | Chrome/152.0.7977.77 |
 | Node | v24.16.0 |
 | Platform | win32 x64 |
 | Planning backend | gemini (chain: gemini -> groq -> ollama -> mock) |
@@ -38,34 +38,35 @@ To add hand-recorded results, copy `eval/results/manual-eval.example.json` to
 
 ## Headline results (AUTOMATED)
 
-Across 6 fixture pages, 3 scans each,
-55 annotated sensitive regions in total.
+Across 7 fixture pages, 3 scans each,
+56 annotated sensitive regions in total.
 
 | Metric | Result | What it measures |
 | :--- | :---: | :--- |
 | PII recall | **100.0%** | share of annotated sensitive regions covered by a redaction box |
 | PII precision | **100.0%** | redactions that hid something annotated sensitive, not something annotated safe |
-| Redaction tightness (IoU) | **93.8%** | how closely each mask matches the region it hides |
+| Redaction tightness (IoU) | **94.7%** | how closely each mask matches the region it hides |
 | Pixel leaks | **0** | regions whose original ink survived into the returned PNG |
 | Surviving ink | **0.00%** | share of each region's original ink left unpainted (lower is better) |
-| Mean masked fraction | **98.2%** | share of ground-truth pixels actually painted over |
+| Mean masked fraction | **97.9%** | share of ground-truth pixels actually painted over |
 | Visual-context recall | **100.0%** | interactive elements the agent tagged, of those it should |
 | Role accuracy | **100.0%** | tagged elements given the correct role |
-| Mark box IoU | **98.3%** | geometric accuracy of the reported element boxes |
+| Mark box IoU | **98.5%** | geometric accuracy of the reported element boxes |
 | Mark ID stability | **stable** | identical IDs across repeated scans of the same page |
-| Mean scan latency | **1564ms** | full local pipeline, capture to redacted image |
-| p95 scan latency | **1713ms** | worst case across all runs |
+| Mean scan latency | **1745ms** | full local pipeline, capture to redacted image |
+| p95 scan latency | **1975ms** | worst case across all runs |
 
 ### Per page
 
 | Page | Regions | Recall | Precision | IoU | Pixel leaks | Marks | Role acc. | Latency |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| Signup form | 11 | 100.0% | 100.0% | 97.4% | 0 | 100.0% | 100.0% | 1592ms |
-| Admin dashboard | 18 | 100.0% | 100.0% | 100.0% | 0 | 100.0% | 100.0% | 1651ms |
-| E-commerce checkout | 7 | 100.0% | 100.0% | 100.0% | 0 | 100.0% | 100.0% | 1563ms |
-| Registration survey | 6 | 100.0% | 100.0% | 100.0% | 0 | 100.0% | 100.0% | 1476ms |
-| Social feed (+ same-origin iframe) | 9 | 100.0% | 100.0% | 98.0% | 0 | 100.0% | 100.0% | 1634ms |
-| Pixel-only receipt (DOM blind spot) | 4 | 100.0% | 100.0% | 67.5% | 0 | 100.0% | 100.0% | 1465ms |
+| Signup form | 11 | 100.0% | 100.0% | 97.4% | 0 | 100.0% | 100.0% | 1803ms |
+| Admin dashboard | 18 | 100.0% | 100.0% | 100.0% | 0 | 100.0% | 100.0% | 1873ms |
+| E-commerce checkout | 7 | 100.0% | 100.0% | 100.0% | 0 | 100.0% | 100.0% | 1748ms |
+| Registration survey | 6 | 100.0% | 100.0% | 100.0% | 0 | 100.0% | 100.0% | 1621ms |
+| Social feed (+ same-origin iframe) | 9 | 100.0% | 100.0% | 98.0% | 0 | 100.0% | 100.0% | 1872ms |
+| Pixel-only receipt (DOM blind spot) | 4 | 100.0% | 100.0% | 67.5% | 0 | 100.0% | 100.0% | 1623ms |
+| Product results (multi-step journey) | 1 | 100.0% | 100.0% | 100.0% | 0 | 100.0% | 100.0% | 1674ms |
 
 Each row is the mean of its repeats. The redacted frame from the first scan of each page
 is saved next to the results as `eval/results/redacted-<page>.png`, so the masking can be
@@ -81,6 +82,7 @@ inspected by eye rather than taken on trust.
 | Registration survey | 8 | 0 | 4 | 0 |
 | Social feed (+ same-origin iframe) | 9 | 0 | 4 | 0 |
 | Pixel-only receipt (DOM blind spot) | 0 | 0 | 4 | 4 |
+| Product results (multi-step journey) | 1 | 0 | 1 | 0 |
 
 Across the suite, **4** ground-truth regions were covered only by
 OCR-sourced detections — no DOM rule and no face box reached them.
@@ -91,15 +93,15 @@ The same pages, the same pipeline, scanned twice: once with OCR on, once with it
 
 | Profile | Mean latency | PII recall | Pixel leaks |
 | :--- | :---: | :---: | :---: |
-| Full — DOM + face + OCR | 1564ms | 100.0% | 0 |
-| Fast — DOM + face, no OCR | 111ms | 83.3% | 4 |
+| Full — DOM + face + OCR | 1745ms | 100.0% | 0 |
+| Fast — DOM + face, no OCR | 147ms | 85.7% | 4 |
 
 | Stage | Mean cost |
 | :--- | :---: |
-| Screen capture + DOM scan (all frames) | 50ms |
-| UltraFace ONNX (WASM SIMD) | 34ms |
-| Tesseract OCR (WASM) | 1456ms |
-| OffscreenCanvas redaction | 31ms |
+| Screen capture + DOM scan (all frames) | 67ms |
+| UltraFace ONNX (WASM SIMD) | 45ms |
+| Tesseract OCR (WASM) | 1595ms |
+| OffscreenCanvas redaction | 48ms |
 
 OCR dominates the budget. On pages whose text lives in the DOM it changes nothing, because
 the DOM rules already found that text — which is why the fast profile scores the same
@@ -112,12 +114,12 @@ setting so the choice is the user's, not a hidden default.
 
 | Measure | Value |
 | :--- | :---: |
-| Extension on disk, total | 22.35 MB |
+| Extension on disk, total | 22.47 MB |
 | &nbsp;&nbsp;ML runtimes (`lib/`) | 18.93 MB |
 | &nbsp;&nbsp;Model weights (`models/`) | 3.10 MB |
-| &nbsp;&nbsp;Extension code | 0.29 MB |
-| Offscreen JS heap in use, after scanning | 14.2 MB |
-| Offscreen JS heap allocated | 17.3 MB |
+| &nbsp;&nbsp;Extension code | 0.41 MB |
+| Offscreen JS heap in use, after scanning | 7.5 MB |
+| Offscreen JS heap allocated | 9.5 MB |
 
 Inference runs in an MV3 offscreen document, off the page's main thread, so a scan does
 not block the page the user is reading.
@@ -129,9 +131,9 @@ the live server chain (gemini (chain: gemini -> groq -> ollama -> mock)).
 
 | Measure | Value |
 | :--- | :---: |
-| Initial scan (local pipeline) | 2105ms |
-| Agent loop, 6 steps | 17416ms |
-| Total wall clock | 19521ms |
+| Initial scan (local pipeline) | 4402ms |
+| Agent loop, 6 steps | 13272ms |
+| Total wall clock | 17674ms |
 | Sensitive regions redacted before first upload | 16 |
 | Interactive elements offered to the planner | 9 |
 | Loop terminated cleanly | no |
@@ -151,7 +153,7 @@ them ever sent to the server:
 ```
 
 Per-step latency is dominated by the cloud planner, not by the client. The local scan
-costs 2105ms; each planning call to the hosted model took seconds.
+costs 4402ms; each planning call to the hosted model took seconds.
 
 ---
 
@@ -162,22 +164,22 @@ tasks — search and scroll. Nothing is bought, submitted or logged into. Succes
 from the page afterwards, not from the agent's own report: for a search task the query has
 to appear in the URL, the title or a field.
 
-Run at 2026-09-03T18:20:08.652Z, planner `gemini (gemini -> groq -> ollama -> mock)`, 75s budget per site.
+Run at 2026-09-05T16:18:48.742Z, planner `on-device fallback (no server reachable)`, 75s budget per site.
 
 | Site | Task | Steps | Local scan | Masked | Outcome |
 | :--- | :--- | ---: | ---: | ---: | :--- |
-| Amazon.in | search for iqoo neo 6 and show me | 1 | 3246ms | 1 | **searched** (in URL + title + field) |
-| Flipkart | search for running shoes and show me | 5 | 1510ms | 2 | **searched** (in URL + title + field) |
-| Wikipedia | search for quantum computing | 1 | 1814ms | 7 | **searched** (in URL + title) |
-| YouTube | search for lofi study music | 1 | 1321ms | 0 | **searched** (in URL + title + field) |
-| GitHub | search for onnxruntime | 2 | 1834ms | 2 | **searched** (in URL) |
-| Stack Overflow | search for webassembly simd | 1 | 3450ms | 2 | stopped — the site asked for human verification |
-| MDN | search for OffscreenCanvas | 2 | 1810ms | 0 | **searched** (in URL + title) |
-| BBC News | scroll down and show me more headlines | 1 | 2644ms | 2 | **acted** |
-| Hacker News | scroll down and show me more stories | 1 | 3498ms | 2 | **acted** |
-| MakeMyTrip | search for flights to goa | 4 | 2277ms | 4 | typed, but the site did not run it |
+| Amazon.in | search for iqoo neo 6 and show me | 1 | 8111ms | 4 | **searched** (in URL + title + field) |
+| Flipkart | search for running shoes and show me | 1 | 2114ms | 3 | **searched** (in URL + title + field) |
+| Wikipedia | search for quantum computing | 1 | 4247ms | 7 | **searched** (in URL + title) |
+| YouTube | search for lofi study music | 1 | 1522ms | 0 | **searched** (in URL + title + field) |
+| GitHub | search for onnxruntime | 2 | 3060ms | 3 | **searched** (in URL) |
+| Stack Overflow | search for webassembly simd | 1 | 6214ms | 4 | stopped — the site asked for human verification |
+| MDN | search for OffscreenCanvas | - | 3120ms | 0 | error: Protocol error (Runtime.callFunctionOn): Target closed |
+| BBC News | scroll down and show me more headlines | - | n/a | - | error: Protocol error (Page.bringToFront): Session closed. Most likely the page has been closed. |
+| Hacker News | scroll down and show me more stories | - | n/a | - | error: Protocol error (Page.bringToFront): Session closed. Most likely the page has been closed. |
+| MakeMyTrip | search for flights to goa | - | n/a | - | error: Protocol error (Page.bringToFront): Session closed. Most likely the page has been closed. |
 
-**6 of 7 search tasks reached the results page**, and 2 non-search tasks carried out the requested action. 1 site refused automation outright with a human-verification challenge, which the agent detects and reports rather than trying to get around. Every remaining case is reported by the agent as unfinished, with the reason, rather than being claimed as a success.
+**5 of 5 search tasks reached the results page**, and 0 non-search tasks carried out the requested action. 1 site refused automation outright with a human-verification challenge, which the agent detects and reports rather than trying to get around. Every remaining case is reported by the agent as unfinished, with the reason, rather than being claimed as a success.
 
 The "Masked" column is worth reading alongside the fixture numbers. On a shopping home
 page it is small because the face model — not a blanket rule over every image — decides
@@ -224,6 +226,72 @@ This is the metric for how faithfully the sanitized payload describes the screen
 **Mark ID stability** — the same page is scanned repeatedly and the sets of element IDs
 compared. IDs are hashes of each element's identity and document-space geometry, so an
 action planned against one scan still resolves on the next.
+
+## What it costs the machine it runs on
+
+**AUTOMATED** — `node eval/measure-resources.js`, real Chrome, real extension.
+
+Measured on AMD Ryzen 5 5600H with Radeon Graphics          (12 logical cores), win32 x64, Chrome/152.0.7977.77.
+
+| | ms |
+|---|---|
+| First scan of a screen (face + OCR run) | 1805 |
+| Every re-scan of the same screen (cached) | 75 |
+
+The agent re-scans after every action, so the second row is the common case. The vision
+result is cached against a hash of the captured pixels, so a hit means byte-identical
+input and the cached answer cannot be stale — the models are skipped, not approximated.
+
+Per stage, when the models actually run:
+
+| stage | p50 ms | p95 ms |
+|---|---|---|
+| screenshot | 46 | 358 |
+| scan | 46 | 358 |
+| faceInference | 30 | 55 |
+| ocrInference | 1585 | 1641 |
+| visionInference | 1596 | 1662 |
+| merge | 0 | 1 |
+| redact | 27 | 34 |
+| total | 76 | 1805 |
+
+| | |
+|---|---|
+| Heap, idle | 6.14 MB |
+| Heap, peak under load | 11.34 MB |
+| Extension on disk | 22.47 MB |
+| — extension code | 0.42 MB |
+| — icons & images | 0.01 MB |
+| — ONNX runtime (WASM) | 12.15 MB |
+| — OCR engine (WASM) | 6.78 MB |
+| — OCR language data | 1.89 MB |
+| — face model (ONNX) | 1.21 MB |
+
+## Attacking our own redacted output
+
+**AUTOMATED** — `node eval/attack-redaction.js`.
+
+"We draw a rectangle over it" is a claim about intent. This takes the frame that actually
+leaves the machine and tries to read the personal data back out of it, using the same
+bundled Tesseract the extension ships — so the attacker is no weaker than the defender.
+
+| fixture | regions masked | attacks | values recovered |
+|---|---|---|---|
+| pii-gauntlet.html | 40 | 6 | **none** |
+| pixel-receipt.html | 4 | 6 | **none** |
+| signup-form.html | 13 | 6 | **none** |
+
+Attacks: as transmitted, upscale 2x, upscale 4x, contrast stretch, extreme gain (any
+residue at all becomes black), and inversion. PNG ancillary chunks are inspected
+separately — an image still carrying the original in a tEXt or eXIf chunk would have
+leaked everything while looking perfect.
+
+Two controls keep a clean result meaningful. The attack must recover *something* — if OCR
+silently returned nothing, zero leaks would mean the test was broken rather than the
+redaction sound. And the field labels beside the masked values must survive, or the
+"redaction" would just be a blank image, useless to the planner and to the user.
+
+Result: 10 passed, 0 failed.
 
 ## Reproducing this
 

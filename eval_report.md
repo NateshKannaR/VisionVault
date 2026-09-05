@@ -164,22 +164,22 @@ tasks — search and scroll. Nothing is bought, submitted or logged into. Succes
 from the page afterwards, not from the agent's own report: for a search task the query has
 to appear in the URL, the title or a field.
 
-Run at 2026-09-05T16:18:48.742Z, planner `on-device fallback (no server reachable)`, 75s budget per site.
+Run at 2026-09-05T16:46:55.199Z, planner `ollama (ollama -> gemini -> mock)`, 75s budget per site.
 
 | Site | Task | Steps | Local scan | Masked | Outcome |
 | :--- | :--- | ---: | ---: | ---: | :--- |
-| Amazon.in | search for iqoo neo 6 and show me | 1 | 8111ms | 4 | **searched** (in URL + title + field) |
-| Flipkart | search for running shoes and show me | 1 | 2114ms | 3 | **searched** (in URL + title + field) |
-| Wikipedia | search for quantum computing | 1 | 4247ms | 7 | **searched** (in URL + title) |
-| YouTube | search for lofi study music | 1 | 1522ms | 0 | **searched** (in URL + title + field) |
-| GitHub | search for onnxruntime | 2 | 3060ms | 3 | **searched** (in URL) |
-| Stack Overflow | search for webassembly simd | 1 | 6214ms | 4 | stopped — the site asked for human verification |
-| MDN | search for OffscreenCanvas | - | 3120ms | 0 | error: Protocol error (Runtime.callFunctionOn): Target closed |
-| BBC News | scroll down and show me more headlines | - | n/a | - | error: Protocol error (Page.bringToFront): Session closed. Most likely the page has been closed. |
-| Hacker News | scroll down and show me more stories | - | n/a | - | error: Protocol error (Page.bringToFront): Session closed. Most likely the page has been closed. |
-| MakeMyTrip | search for flights to goa | - | n/a | - | error: Protocol error (Page.bringToFront): Session closed. Most likely the page has been closed. |
+| Amazon.in | search for iqoo neo 6 and show me | 1 | 8083ms | 1 | **searched** (in URL + title + field) |
+| Flipkart | search for running shoes and show me | 1 | 2311ms | 4 | **searched** (in URL + title + field) |
+| Wikipedia | search for quantum computing | 1 | 4054ms | 7 | **searched** (in URL + title) |
+| YouTube | search for lofi study music | 1 | 1562ms | 0 | **searched** (in URL + title + field) |
+| GitHub | search for onnxruntime | 2 | 2866ms | 3 | **searched** (in URL) |
+| Stack Overflow | search for webassembly simd | 1 | 6240ms | 2 | **searched** (in URL) |
+| MDN | search for OffscreenCanvas | 2 | 3253ms | 0 | **searched** (in URL + title) |
+| BBC News | scroll down and show me more headlines | 0 | 3286ms | 1 | stopped — the site asked for human verification |
+| Hacker News | scroll down and show me more stories | 1 | 6160ms | 1 | **acted** |
+| MakeMyTrip | search for flights to goa | 1 | 5162ms | 6 | search did not land |
 
-**5 of 5 search tasks reached the results page**, and 0 non-search tasks carried out the requested action. 1 site refused automation outright with a human-verification challenge, which the agent detects and reports rather than trying to get around. Every remaining case is reported by the agent as unfinished, with the reason, rather than being claimed as a success.
+**7 of 8 search tasks reached the results page**, and 1 non-search task carried out the requested action. 1 site refused automation outright with a human-verification challenge, which the agent detects and reports rather than trying to get around. Every remaining case is reported by the agent as unfinished, with the reason, rather than being claimed as a success.
 
 The "Masked" column is worth reading alongside the fixture numbers. On a shopping home
 page it is small because the face model — not a blanket rule over every image — decides
@@ -235,7 +235,7 @@ Measured on AMD Ryzen 5 5600H with Radeon Graphics          (12 logical cores), 
 
 | | ms |
 |---|---|
-| First scan of a screen (face + OCR run) | 1805 |
+| First scan of a screen (face + OCR run) | 2018 |
 | Every re-scan of the same screen (cached) | 75 |
 
 The agent re-scans after every action, so the second row is the common case. The vision
@@ -246,25 +246,25 @@ Per stage, when the models actually run:
 
 | stage | p50 ms | p95 ms |
 |---|---|---|
-| screenshot | 46 | 358 |
-| scan | 46 | 358 |
-| faceInference | 30 | 55 |
-| ocrInference | 1585 | 1641 |
-| visionInference | 1596 | 1662 |
+| screenshot | 46 | 63 |
+| scan | 46 | 63 |
+| faceInference | 30 | 57 |
+| ocrInference | 1936 | 2530 |
+| visionInference | 1951 | 2543 |
 | merge | 0 | 1 |
-| redact | 27 | 34 |
-| total | 76 | 1805 |
+| redact | 27 | 39 |
+| total | 78 | 2018 |
 
 | | |
 |---|---|
-| Heap, idle | 6.14 MB |
-| Heap, peak under load | 11.34 MB |
-| Extension on disk | 22.47 MB |
-| — extension code | 0.42 MB |
+| Heap, idle | 6.1 MB |
+| Heap, peak under load | 9.44 MB |
+| Extension on disk | 23.38 MB |
+| — extension code | 0.45 MB |
 | — icons & images | 0.01 MB |
 | — ONNX runtime (WASM) | 12.15 MB |
 | — OCR engine (WASM) | 6.78 MB |
-| — OCR language data | 1.89 MB |
+| — OCR language data | 2.77 MB |
 | — face model (ONNX) | 1.21 MB |
 
 ## Attacking our own redacted output

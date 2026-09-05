@@ -1,13 +1,13 @@
 {
-  "generatedAt": "2026-09-03T18:20:08.652Z",
-  "planner": "gemini (gemini -> groq -> ollama -> mock)",
+  "generatedAt": "2026-09-05T16:46:55.199Z",
+  "planner": "ollama (ollama -> gemini -> mock)",
   "budgetSeconds": 75,
   "sites": [
     {
       "site": "Amazon.in",
       "task": "search for iqoo neo 6 and show me",
       "landedOn": "https://www.amazon.in/",
-      "scanMs": 4017,
+      "scanMs": 9122,
       "pii": 1,
       "marks": 67,
       "sources": {
@@ -18,13 +18,13 @@
         "faceOk": true
       },
       "frames": {
-        "total": 1,
+        "total": 2,
         "merged": 1,
-        "skipped": 0
+        "skipped": 1
       },
-      "pipelineMs": 3246,
+      "pipelineMs": 8083,
       "screenshot": "real-amazon-in.png",
-      "runMs": 9504,
+      "runMs": 19224,
       "steps": 1,
       "stopped": false,
       "timedOut": false,
@@ -42,10 +42,16 @@
         "querySubmitted": true,
         "filledAny": false,
         "searchOpenAttempts": 0,
-        "siteSearchUrlTried": false
+        "siteSearchUrlTried": false,
+        "fillScrolls": 0,
+        "bookingStep": 0,
+        "fromTyped": false,
+        "toTyped": false,
+        "bookingCompleted": false
       },
       "stopReason": null,
-      "finalUrl": "https://www.amazon.in/s?k=iqoo+neo+6&crid=Y9BSGYZX1RU7&sprefix=iqoo+neo+6%2Caps%2C305&ref=nb_sb_noss_2",
+      "botWall": false,
+      "finalUrl": "https://www.amazon.in/s?k=iqoo+neo+6&crid=T9S2KPKXJI1J&sprefix=iqoo+neo+6%2Caps%2C337&ref=nb_sb_noss_2",
       "urlChanged": true,
       "parsedQuery": "iqoo neo 6",
       "queryOnPage": {
@@ -58,14 +64,14 @@
       "site": "Flipkart",
       "task": "search for running shoes and show me",
       "landedOn": "https://www.flipkart.com/",
-      "scanMs": 1744,
-      "pii": 2,
-      "marks": 33,
+      "scanMs": 3030,
+      "pii": 4,
+      "marks": 40,
       "sources": {
-        "dom": 2,
+        "dom": 4,
         "vision_face": 0,
         "vision_ocr": 0,
-        "merged": 2,
+        "merged": 4,
         "faceOk": true
       },
       "frames": {
@@ -73,64 +79,9 @@
         "merged": 1,
         "skipped": 0
       },
-      "pipelineMs": 1510,
+      "pipelineMs": 2311,
       "screenshot": "real-flipkart.png",
-      "runMs": 33007,
-      "steps": 5,
-      "stopped": false,
-      "timedOut": false,
-      "actions": [
-        "click",
-        "click",
-        "open_search(failed)",
-        "click",
-        "type"
-      ],
-      "needsConfirm": false,
-      "needsInput": false,
-      "agentProgress": {
-        "navigated": false,
-        "searched": true,
-        "opened": [],
-        "scrolled": false,
-        "queryLanded": true,
-        "querySubmitted": true,
-        "filledAny": false,
-        "searchOpenAttempts": 1,
-        "siteSearchUrlTried": true
-      },
-      "stopReason": null,
-      "finalUrl": "https://www.flipkart.com/search?q=running%20shoes&otracker=search&otracker1=search&marketplace=FLIPKART&as-show=off&as=off",
-      "urlChanged": true,
-      "parsedQuery": "running shoes",
-      "queryOnPage": {
-        "inBox": true,
-        "inUrl": true,
-        "inTitle": true
-      }
-    },
-    {
-      "site": "Wikipedia",
-      "task": "search for quantum computing",
-      "landedOn": "https://www.wikipedia.org/",
-      "scanMs": 2497,
-      "pii": 7,
-      "marks": 26,
-      "sources": {
-        "dom": 7,
-        "vision_face": 0,
-        "vision_ocr": 0,
-        "merged": 7,
-        "faceOk": true
-      },
-      "frames": {
-        "total": 1,
-        "merged": 1,
-        "skipped": 0
-      },
-      "pipelineMs": 1814,
-      "screenshot": "real-wikipedia.png",
-      "runMs": 9992,
+      "runMs": 12536,
       "steps": 1,
       "stopped": false,
       "timedOut": false,
@@ -148,9 +99,72 @@
         "querySubmitted": true,
         "filledAny": false,
         "searchOpenAttempts": 0,
-        "siteSearchUrlTried": false
+        "siteSearchUrlTried": false,
+        "fillScrolls": 0,
+        "bookingStep": 0,
+        "fromTyped": false,
+        "toTyped": false,
+        "bookingCompleted": false
       },
       "stopReason": null,
+      "botWall": false,
+      "finalUrl": "https://www.flipkart.com/search?q=running%20shoes&otracker=search&otracker1=search&marketplace=FLIPKART&as-show=on&as=off",
+      "urlChanged": true,
+      "parsedQuery": "running shoes",
+      "queryOnPage": {
+        "inBox": true,
+        "inUrl": true,
+        "inTitle": true
+      }
+    },
+    {
+      "site": "Wikipedia",
+      "task": "search for quantum computing",
+      "landedOn": "https://www.wikipedia.org/",
+      "scanMs": 4742,
+      "pii": 7,
+      "marks": 27,
+      "sources": {
+        "dom": 7,
+        "vision_face": 0,
+        "vision_ocr": 0,
+        "merged": 7,
+        "faceOk": true
+      },
+      "frames": {
+        "total": 1,
+        "merged": 1,
+        "skipped": 0
+      },
+      "pipelineMs": 4054,
+      "screenshot": "real-wikipedia.png",
+      "runMs": 13695,
+      "steps": 1,
+      "stopped": false,
+      "timedOut": false,
+      "actions": [
+        "type"
+      ],
+      "needsConfirm": false,
+      "needsInput": false,
+      "agentProgress": {
+        "navigated": false,
+        "searched": true,
+        "opened": [],
+        "scrolled": false,
+        "queryLanded": true,
+        "querySubmitted": true,
+        "filledAny": false,
+        "searchOpenAttempts": 0,
+        "siteSearchUrlTried": false,
+        "fillScrolls": 0,
+        "bookingStep": 0,
+        "fromTyped": false,
+        "toTyped": false,
+        "bookingCompleted": false
+      },
+      "stopReason": null,
+      "botWall": false,
       "finalUrl": "https://en.wikipedia.org/wiki/Quantum_computing",
       "urlChanged": true,
       "parsedQuery": "quantum computing",
@@ -164,7 +178,7 @@
       "site": "YouTube",
       "task": "search for lofi study music",
       "landedOn": "https://www.youtube.com/",
-      "scanMs": 1200,
+      "scanMs": 2256,
       "pii": 0,
       "marks": 13,
       "sources": {
@@ -179,9 +193,9 @@
         "merged": 2,
         "skipped": 1
       },
-      "pipelineMs": 1321,
+      "pipelineMs": 1562,
       "screenshot": "real-youtube.png",
-      "runMs": 7070,
+      "runMs": 11086,
       "steps": 1,
       "stopped": false,
       "timedOut": false,
@@ -199,10 +213,16 @@
         "querySubmitted": true,
         "filledAny": false,
         "searchOpenAttempts": 0,
-        "siteSearchUrlTried": false
+        "siteSearchUrlTried": false,
+        "fillScrolls": 0,
+        "bookingStep": 0,
+        "fromTyped": false,
+        "toTyped": false,
+        "bookingCompleted": false
       },
       "stopReason": null,
-      "finalUrl": "https://www.youtube.com/results?search_query=lofi+study+music",
+      "botWall": false,
+      "finalUrl": "https://www.youtube.com/results?search_query=lofi+study+music+1+hour",
       "urlChanged": true,
       "parsedQuery": "lofi study music",
       "queryOnPage": {
@@ -215,14 +235,14 @@
       "site": "GitHub",
       "task": "search for onnxruntime",
       "landedOn": "https://github.com/",
-      "scanMs": 1315,
-      "pii": 2,
-      "marks": 14,
+      "scanMs": 3297,
+      "pii": 3,
+      "marks": 16,
       "sources": {
-        "dom": 2,
+        "dom": 3,
         "vision_face": 0,
         "vision_ocr": 0,
-        "merged": 2,
+        "merged": 3,
         "faceOk": true
       },
       "frames": {
@@ -230,9 +250,9 @@
         "merged": 1,
         "skipped": 0
       },
-      "pipelineMs": 1834,
+      "pipelineMs": 2866,
       "screenshot": "real-github.png",
-      "runMs": 13063,
+      "runMs": 21133,
       "steps": 2,
       "stopped": false,
       "timedOut": false,
@@ -251,9 +271,16 @@
         "querySubmitted": true,
         "filledAny": false,
         "searchOpenAttempts": 0,
-        "siteSearchUrlTried": false
+        "siteSearchUrlTried": false,
+        "fillScrolls": 0,
+        "bookingStep": 0,
+        "fromTyped": false,
+        "toTyped": false,
+        "bookingCompleted": false,
+        "searchOpened": true
       },
       "stopReason": null,
+      "botWall": false,
       "finalUrl": "https://github.com/search?q=onnxruntime&type=repositories",
       "urlChanged": true,
       "parsedQuery": "onnxruntime",
@@ -267,24 +294,24 @@
       "site": "Stack Overflow",
       "task": "search for webassembly simd",
       "landedOn": "https://stackoverflow.com/questions",
-      "scanMs": 3662,
+      "scanMs": 7209,
       "pii": 2,
-      "marks": 71,
+      "marks": 79,
       "sources": {
         "dom": 2,
         "vision_face": 0,
         "vision_ocr": 0,
         "merged": 2,
-        "faceOk": true
+        "faceOk": false
       },
       "frames": {
         "total": 1,
         "merged": 1,
         "skipped": 0
       },
-      "pipelineMs": 3450,
+      "pipelineMs": 6240,
       "screenshot": "real-stack-overflow.png",
-      "runMs": 18201,
+      "runMs": 17455,
       "steps": 1,
       "stopped": false,
       "timedOut": false,
@@ -298,19 +325,25 @@
         "searched": true,
         "opened": [],
         "scrolled": false,
-        "queryLanded": false,
-        "querySubmitted": false,
+        "queryLanded": true,
+        "querySubmitted": true,
         "filledAny": false,
-        "searchOpenAttempts": 1,
-        "siteSearchUrlTried": false
+        "searchOpenAttempts": 0,
+        "siteSearchUrlTried": false,
+        "fillScrolls": 0,
+        "bookingStep": 0,
+        "fromTyped": false,
+        "toTyped": false,
+        "bookingCompleted": false
       },
-      "stopReason": "Stopped — the site redirected to a verification page. This site is asking for a human, so it is over to you.",
-      "finalUrl": "https://stackoverflow.com/nocaptcha?s=eb6ec70d-e475-4c24-b213-2035241198f2",
+      "stopReason": null,
+      "botWall": false,
+      "finalUrl": "https://stackoverflow.com/search?q=webassembly+simd",
       "urlChanged": true,
       "parsedQuery": "webassembly simd",
       "queryOnPage": {
         "inBox": false,
-        "inUrl": false,
+        "inUrl": true,
         "inTitle": false
       }
     },
@@ -318,9 +351,9 @@
       "site": "MDN",
       "task": "search for OffscreenCanvas",
       "landedOn": "https://developer.mozilla.org/en-US/",
-      "scanMs": 2504,
+      "scanMs": 2184,
       "pii": 0,
-      "marks": 16,
+      "marks": 24,
       "sources": {
         "dom": 0,
         "vision_face": 0,
@@ -333,9 +366,9 @@
         "merged": 1,
         "skipped": 0
       },
-      "pipelineMs": 1810,
+      "pipelineMs": 3253,
       "screenshot": "real-mdn.png",
-      "runMs": 7610,
+      "runMs": 11420,
       "steps": 2,
       "stopped": false,
       "timedOut": false,
@@ -354,9 +387,15 @@
         "querySubmitted": true,
         "filledAny": false,
         "searchOpenAttempts": 1,
-        "siteSearchUrlTried": true
+        "siteSearchUrlTried": true,
+        "fillScrolls": 0,
+        "bookingStep": 0,
+        "fromTyped": false,
+        "toTyped": false,
+        "bookingCompleted": false
       },
       "stopReason": null,
+      "botWall": false,
       "finalUrl": "https://developer.mozilla.org/en-US/docs/Web/API/OffscreenCanvas",
       "urlChanged": true,
       "parsedQuery": "OffscreenCanvas",
@@ -370,44 +409,48 @@
       "site": "BBC News",
       "task": "scroll down and show me more headlines",
       "landedOn": "https://www.bbc.com/news",
-      "scanMs": 2587,
-      "pii": 2,
+      "scanMs": 2878,
+      "pii": 1,
       "marks": 32,
       "sources": {
         "dom": 0,
-        "vision_face": 2,
+        "vision_face": 1,
         "vision_ocr": 0,
-        "merged": 2,
+        "merged": 1,
         "faceOk": true
       },
       "frames": {
         "total": 6,
-        "merged": 3,
-        "skipped": 3
+        "merged": 4,
+        "skipped": 2
       },
-      "pipelineMs": 2644,
+      "pipelineMs": 3286,
       "screenshot": "real-bbc-news.png",
-      "runMs": 7441,
-      "steps": 1,
+      "runMs": 609,
+      "steps": 0,
       "stopped": false,
       "timedOut": false,
-      "actions": [
-        "scroll"
-      ],
+      "actions": [],
       "needsConfirm": false,
       "needsInput": false,
       "agentProgress": {
         "navigated": false,
         "searched": false,
         "opened": [],
-        "scrolled": true,
+        "scrolled": false,
         "queryLanded": false,
         "querySubmitted": false,
         "filledAny": false,
         "searchOpenAttempts": 0,
-        "siteSearchUrlTried": false
+        "siteSearchUrlTried": false,
+        "fillScrolls": 0,
+        "bookingStep": 0,
+        "fromTyped": false,
+        "toTyped": false,
+        "bookingCompleted": false
       },
-      "stopReason": null,
+      "stopReason": "Stopped — the page is showing a CAPTCHA. This site is asking for a human, so it is over to you.",
+      "botWall": true,
       "finalUrl": "https://www.bbc.com/news",
       "urlChanged": false,
       "parsedQuery": null
@@ -416,24 +459,24 @@
       "site": "Hacker News",
       "task": "scroll down and show me more stories",
       "landedOn": "https://news.ycombinator.com/",
-      "scanMs": 4179,
-      "pii": 2,
-      "marks": 170,
+      "scanMs": 6838,
+      "pii": 1,
+      "marks": 174,
       "sources": {
         "dom": 1,
         "vision_face": 0,
-        "vision_ocr": 1,
-        "merged": 2,
-        "faceOk": true
+        "vision_ocr": 0,
+        "merged": 1,
+        "faceOk": false
       },
       "frames": {
         "total": 1,
         "merged": 1,
         "skipped": 0
       },
-      "pipelineMs": 3498,
+      "pipelineMs": 6160,
       "screenshot": "real-hacker-news.png",
-      "runMs": 6659,
+      "runMs": 8277,
       "steps": 1,
       "stopped": false,
       "timedOut": false,
@@ -451,9 +494,15 @@
         "querySubmitted": false,
         "filledAny": false,
         "searchOpenAttempts": 0,
-        "siteSearchUrlTried": false
+        "siteSearchUrlTried": false,
+        "fillScrolls": 0,
+        "bookingStep": 0,
+        "fromTyped": false,
+        "toTyped": false,
+        "bookingCompleted": false
       },
       "stopReason": null,
+      "botWall": false,
       "finalUrl": "https://news.ycombinator.com/",
       "urlChanged": false,
       "parsedQuery": null
@@ -462,14 +511,14 @@
       "site": "MakeMyTrip",
       "task": "search for flights to goa",
       "landedOn": "https://www.makemytrip.com/",
-      "scanMs": 3025,
-      "pii": 4,
-      "marks": 29,
+      "scanMs": 5881,
+      "pii": 6,
+      "marks": 37,
       "sources": {
-        "dom": 4,
+        "dom": 5,
         "vision_face": 0,
-        "vision_ocr": 0,
-        "merged": 4,
+        "vision_ocr": 1,
+        "merged": 6,
         "faceOk": true
       },
       "frames": {
@@ -477,16 +526,13 @@
         "merged": 1,
         "skipped": 0
       },
-      "pipelineMs": 2277,
+      "pipelineMs": 5162,
       "screenshot": "real-makemytrip.png",
-      "runMs": 76224,
-      "steps": 4,
-      "stopped": true,
+      "runMs": 21612,
+      "steps": 1,
+      "stopped": false,
       "timedOut": false,
       "actions": [
-        "type(failed)",
-        "click",
-        "type",
         "type"
       ],
       "needsConfirm": false,
@@ -496,18 +542,24 @@
         "searched": true,
         "opened": [],
         "scrolled": false,
-        "queryLanded": true,
+        "queryLanded": false,
         "querySubmitted": false,
         "filledAny": false,
         "searchOpenAttempts": 1,
-        "siteSearchUrlTried": true
+        "siteSearchUrlTried": false,
+        "fillScrolls": 0,
+        "bookingStep": 0,
+        "fromTyped": false,
+        "toTyped": true,
+        "bookingCompleted": false
       },
-      "stopReason": null,
-      "finalUrl": "https://www.makemytrip.com/flights/",
-      "urlChanged": true,
+      "stopReason": "Could not complete: search for \"flights to goa\".",
+      "botWall": false,
+      "finalUrl": "https://www.makemytrip.com/",
+      "urlChanged": false,
       "parsedQuery": "flights to goa",
       "queryOnPage": {
-        "inBox": true,
+        "inBox": false,
         "inUrl": false,
         "inTitle": false
       }

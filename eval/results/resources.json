@@ -1,25 +1,25 @@
 {
-  "generatedAt": "2026-09-05T15:49:07.365Z",
+  "generatedAt": "2026-09-05T16:47:17.397Z",
   "chrome": "Chrome/152.0.7977.77",
   "platform": "win32 x64",
   "cpu": "AMD Ryzen 5 5600H with Radeon Graphics         ",
   "cpuCount": 12,
   "repeats": 8,
   "footprint": {
-    "totalMB": 22.47,
-    "fileCount": 34,
+    "totalMB": 23.38,
+    "fileCount": 36,
     "groupsMB": {
-      "extension code": 0.42,
+      "extension code": 0.45,
       "icons & images": 0.01,
       "ONNX runtime (WASM)": 12.15,
       "OCR engine (WASM)": 6.78,
-      "OCR language data": 1.89,
+      "OCR language data": 2.77,
       "face model (ONNX)": 1.21
     }
   },
   "idleHeap": {
-    "service worker": 0.78,
-    "offscreen (vision models)": 5.35
+    "service worker": 0.8,
+    "offscreen (vision models)": 5.31
   },
   "perFixture": [
     {
@@ -28,48 +28,48 @@
       "scans": 8,
       "piiRegions": 13,
       "marks": 14,
-      "totalP50": 70,
-      "totalP95": 1805,
+      "totalP50": 75,
+      "totalP95": 2087,
       "coldScans": 1,
-      "coldP50": 1805,
+      "coldP50": 2087,
       "warmScans": 7,
-      "warmP50": 70,
+      "warmP50": 75,
       "stages": {
         "total": {
-          "p50": 70,
-          "p95": 1805
+          "p50": 75,
+          "p95": 2087
         },
         "wallClock": {
-          "p50": 748,
-          "p95": 2471
+          "p50": 754,
+          "p95": 2768
         },
         "scan": {
-          "p50": 43,
-          "p95": 51
+          "p50": 44,
+          "p95": 63
         },
         "screenshot": {
-          "p50": 43,
-          "p95": 51
+          "p50": 44,
+          "p95": 63
         },
         "visionInference": {
-          "p50": 1662,
-          "p95": 1662
+          "p50": 1957,
+          "p95": 1957
         },
         "faceInference": {
-          "p50": 55,
-          "p95": 55
+          "p50": 57,
+          "p95": 57
         },
         "ocrInference": {
-          "p50": 1641,
-          "p95": 1641
+          "p50": 1936,
+          "p95": 1936
         },
         "merge": {
           "p50": 1,
           "p95": 1
         },
         "redact": {
-          "p50": 25,
-          "p95": 86
+          "p50": 29,
+          "p95": 84
         }
       }
     },
@@ -80,46 +80,46 @@
       "piiRegions": 12,
       "marks": 5,
       "totalP50": 79,
-      "totalP95": 1671,
+      "totalP95": 2018,
       "coldScans": 1,
-      "coldP50": 1671,
+      "coldP50": 2018,
       "warmScans": 7,
       "warmP50": 79,
       "stages": {
         "total": {
           "p50": 79,
-          "p95": 1671
+          "p95": 2018
         },
         "wallClock": {
-          "p50": 771,
-          "p95": 2337
+          "p50": 759,
+          "p95": 2684
         },
         "scan": {
-          "p50": 46,
-          "p95": 358
+          "p50": 45,
+          "p95": 51
         },
         "screenshot": {
-          "p50": 46,
-          "p95": 358
+          "p50": 45,
+          "p95": 51
         },
         "visionInference": {
-          "p50": 1596,
-          "p95": 1596
+          "p50": 1951,
+          "p95": 1951
         },
         "faceInference": {
-          "p50": 33,
-          "p95": 33
+          "p50": 27,
+          "p95": 27
         },
         "ocrInference": {
-          "p50": 1585,
-          "p95": 1585
+          "p50": 1942,
+          "p95": 1942
         },
         "merge": {
           "p50": 0,
           "p95": 0
         },
         "redact": {
-          "p50": 27,
+          "p50": 30,
           "p95": 37
         }
       }
@@ -128,50 +128,50 @@
       "fixture": "pixel-receipt.html",
       "label": "receipt (OCR-only)",
       "scans": 8,
-      "piiRegions": 3,
+      "piiRegions": 4,
       "marks": 2,
-      "totalP50": 75,
-      "totalP95": 1889,
+      "totalP50": 78,
+      "totalP95": 1862,
       "coldScans": 1,
-      "coldP50": 1889,
+      "coldP50": 1862,
       "warmScans": 7,
-      "warmP50": 75,
+      "warmP50": 78,
       "stages": {
         "total": {
-          "p50": 75,
-          "p95": 1889
+          "p50": 78,
+          "p95": 1862
         },
         "wallClock": {
-          "p50": 750,
-          "p95": 1174
+          "p50": 747,
+          "p95": 2530
         },
         "scan": {
-          "p50": 44,
-          "p95": 360
+          "p50": 46,
+          "p95": 67
         },
         "screenshot": {
-          "p50": 44,
-          "p95": 360
+          "p50": 46,
+          "p95": 67
         },
         "visionInference": {
-          "p50": 1498,
-          "p95": 1498
+          "p50": 1773,
+          "p95": 1773
         },
         "faceInference": {
-          "p50": 26,
-          "p95": 26
+          "p50": 30,
+          "p95": 30
         },
         "ocrInference": {
-          "p50": 1488,
-          "p95": 1488
+          "p50": 1759,
+          "p95": 1759
         },
         "merge": {
           "p50": 0,
           "p95": 0
         },
         "redact": {
-          "p50": 29,
-          "p95": 34
+          "p50": 26,
+          "p95": 36
         }
       }
     },
@@ -181,48 +181,48 @@
       "scans": 8,
       "piiRegions": 22,
       "marks": 10,
-      "totalP50": 82,
-      "totalP95": 1711,
+      "totalP50": 75,
+      "totalP95": 2622,
       "coldScans": 1,
-      "coldP50": 1711,
+      "coldP50": 2622,
       "warmScans": 7,
-      "warmP50": 82,
+      "warmP50": 75,
       "stages": {
         "total": {
-          "p50": 82,
-          "p95": 1711
+          "p50": 75,
+          "p95": 2622
         },
         "wallClock": {
-          "p50": 758,
-          "p95": 2379
+          "p50": 752,
+          "p95": 3268
         },
         "scan": {
-          "p50": 50,
-          "p95": 357
+          "p50": 49,
+          "p95": 62
         },
         "screenshot": {
-          "p50": 50,
-          "p95": 357
+          "p50": 49,
+          "p95": 62
         },
         "visionInference": {
-          "p50": 1632,
-          "p95": 1632
+          "p50": 2543,
+          "p95": 2543
         },
         "faceInference": {
-          "p50": 30,
-          "p95": 30
+          "p50": 29,
+          "p95": 29
         },
         "ocrInference": {
-          "p50": 1622,
-          "p95": 1622
+          "p50": 2530,
+          "p95": 2530
         },
         "merge": {
-          "p50": 0,
-          "p95": 0
+          "p50": 1,
+          "p95": 1
         },
         "redact": {
-          "p50": 27,
-          "p95": 29
+          "p50": 25,
+          "p95": 30
         }
       }
     },
@@ -232,48 +232,48 @@
       "scans": 8,
       "piiRegions": 9,
       "marks": 6,
-      "totalP50": 70,
-      "totalP95": 1847,
+      "totalP50": 68,
+      "totalP95": 1953,
       "coldScans": 1,
-      "coldP50": 1847,
+      "coldP50": 1953,
       "warmScans": 7,
-      "warmP50": 70,
+      "warmP50": 68,
       "stages": {
         "total": {
-          "p50": 70,
-          "p95": 1847
+          "p50": 68,
+          "p95": 1953
         },
         "wallClock": {
-          "p50": 750,
-          "p95": 1217
+          "p50": 746,
+          "p95": 2637
         },
         "scan": {
-          "p50": 43,
-          "p95": 361
+          "p50": 41,
+          "p95": 51
         },
         "screenshot": {
-          "p50": 43,
-          "p95": 361
+          "p50": 41,
+          "p95": 51
         },
         "visionInference": {
-          "p50": 1459,
-          "p95": 1459
+          "p50": 1876,
+          "p95": 1876
         },
         "faceInference": {
-          "p50": 25,
-          "p95": 25
+          "p50": 33,
+          "p95": 33
         },
         "ocrInference": {
-          "p50": 1445,
-          "p95": 1445
+          "p50": 1854,
+          "p95": 1854
         },
         "merge": {
           "p50": 0,
           "p95": 0
         },
         "redact": {
-          "p50": 27,
-          "p95": 28
+          "p50": 24,
+          "p95": 91
         }
       }
     }
@@ -281,27 +281,27 @@
   "stages": {
     "screenshot": {
       "p50": 46,
-      "p95": 358,
+      "p95": 63,
       "samples": 40
     },
     "scan": {
       "p50": 46,
-      "p95": 358,
+      "p95": 63,
       "samples": 40
     },
     "faceInference": {
       "p50": 30,
-      "p95": 55,
+      "p95": 57,
       "samples": 40
     },
     "ocrInference": {
-      "p50": 1585,
-      "p95": 1641,
+      "p50": 1936,
+      "p95": 2530,
       "samples": 40
     },
     "visionInference": {
-      "p50": 1596,
-      "p95": 1662,
+      "p50": 1951,
+      "p95": 2543,
       "samples": 40
     },
     "merge": {
@@ -311,25 +311,25 @@
     },
     "redact": {
       "p50": 27,
-      "p95": 34,
+      "p95": 39,
       "samples": 40
     },
     "total": {
-      "p50": 76,
-      "p95": 1805,
+      "p50": 78,
+      "p95": 2018,
       "samples": 40
     }
   },
-  "peakHeapMB": 11.34,
-  "idleTotalMB": 6.14,
+  "peakHeapMB": 9.44,
+  "idleTotalMB": 6.1,
   "wire": {
     "requests": 0,
     "note": "no request bodies observed — local planner answered without network"
   },
   "scanCostMs": {
-    "coldP50": 1805,
+    "coldP50": 2018,
     "warmP50": 75,
-    "blendedP50": 76,
-    "blendedP95": 1805
+    "blendedP50": 78,
+    "blendedP95": 2018
   }
 }

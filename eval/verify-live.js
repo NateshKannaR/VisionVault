@@ -259,7 +259,24 @@ function section(title) {
     }
   }
 
-  check(sentBodies.length > 0 || plannerLabel.startsWith('none'), 'planning requests were captured (or no server was running)');
+  // Three outcomes are all correct here, and the check has to allow each of them:
+  //   requests were captured        a server answered and we inspected what went to it
+  //   no server was reachable       the on-device planner took over, nothing to inspect
+  //   plannerMode is "fast"         the DEFAULT. The extension plans on-device first and
+  //                                 only falls back to the server, so a reachable server
+  //                                 does not imply any request was made.
+  // Asserting only the first turned the suite red the moment a server happened to be running
+  // during a fast-mode run, which is the configuration a user actually ships with.
+  const plannedLocally = (await h.worker.evaluate(async () => {
+    const { settings } = await chrome.storage.local.get('settings');
+    return (settings && settings.plannerMode) || 'fast';
+  })) === 'fast';
+  check(sentBodies.length > 0 || plannerLabel.startsWith('none') || plannedLocally,
+    'planning requests were captured, or planning stayed on-device',
+    `captured ${sentBodies.length}, planner "${plannerLabel}", on-device mode: ${plannedLocally}`);
+  if (!sentBodies.length && plannedLocally) {
+    console.log('  note:     nothing was transmitted at all — the on-device planner answered every step');
+  }
   check(vaultLeaks.length === 0, 'no vault value appears in any request body', vaultLeaks.join('; '));
   check(imageIssues.length === 0, 'every transmitted image is a PNG data URL', imageIssues.join('; '));
 

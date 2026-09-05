@@ -125,6 +125,23 @@
 
     if (parsed.query && !p.queryLanded) return false;
     if (parsed.wantsFilter && !p.filterApplied && !p.sortApplied && !p.nonStopFiltered) return false;
+
+    // A constraint is a requirement even when the user never says the word "filter".
+    //
+    // "laptops under 70000 with 16GB ram" parses a maxPrice but not wantsFilter, which is
+    // driven by the literal words filter/sort/refine. The run therefore counted as complete
+    // the moment the search landed, and the budget - the whole point of the instruction -
+    // was ignored. Measured on eval/pages/laptop-compare.html: one action, then done.
+    //
+    // Satisfied by acting on the constraint in either of the two ways a page allows: narrowing
+    // the list, or picking from it. Requiring a filter control specifically would hang on the
+    // many sites that have none.
+    const hasConstraint = parsed.maxPrice != null || parsed.minPrice != null || parsed.minRating != null ||
+                          parsed.wantsBest || parsed.wantsCheapest;
+    if (hasConstraint && !p.filterApplied && !p.sortApplied &&
+        !p.productOpened && !(p.opened || []).length && !p.cartAdded) {
+      return false;
+    }
     if (parsed.wantsSort && !p.sortApplied) return false;
     if (parsed.wantsAddToCart && !p.cartAdded) return false;
     if (parsed.wantsStar && !p.starred) return false;
@@ -182,6 +199,10 @@
     }
     if (parsed?.query && !p.queryLanded) left.push(`search for "${parsed.query}"`);
     if (parsed?.wantsFilter && !p.filterApplied && !p.sortApplied) left.push("apply filter");
+    if ((parsed?.maxPrice != null || parsed?.minRating != null || parsed?.wantsBest || parsed?.wantsCheapest) &&
+        !p.filterApplied && !p.sortApplied && !p.productOpened && !(p.opened || []).length && !p.cartAdded) {
+      left.push(parsed.maxPrice != null ? `narrow to under ${parsed.maxPrice}` : "pick the best match");
+    }
     if (parsed?.wantsSort && !p.sortApplied) left.push("apply sorting");
     if (parsed?.wantsAddToCart && !p.cartAdded) left.push("add item to cart");
     if (parsed?.wantsStar && !p.starred) left.push("star the repository");

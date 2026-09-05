@@ -639,6 +639,42 @@ test('the task is NOT complete while only the search has landed', () => {
     'the open step is genuinely outstanding here');
 });
 
+
+// -- Constraints are requirements, even unspoken ones -------------------------
+//
+// "under 70000" is the entire point of the instruction, but wantsFilter is driven by the
+// literal words filter/sort/refine, so a budget alone left the guard thinking the task was
+// finished the moment the search landed. Measured on laptop-compare.html: one action, done,
+// budget ignored.
+
+test('a price constraint is outstanding work even without the word "filter"', () => {
+  const task = 'search for laptops under 70000 with 16GB ram, compare them and save the best one';
+  const parsed = TaskPlanner.parseTask(task);
+  assert.strictEqual(parsed.maxPrice, 70000, 'precondition: the budget parses');
+  assert.strictEqual(parsed.wantsFilter, false, 'precondition: no filter word was used');
+
+  const searchedOnly = { navigated: true, searched: true, queryLanded: true, opened: [] };
+  assert.strictEqual(AgentGuard.goalSatisfied(parsed, searchedOnly), false,
+    'searching is not acting on a budget');
+  assert.match(AgentGuard.describeRemaining(parsed, searchedOnly), /70000/,
+    'and the panel should say what is left');
+});
+
+test('acting on the constraint either way satisfies it', () => {
+  const parsed = TaskPlanner.parseTask('search for laptops under 70000 and show me the best');
+  const base = { navigated: true, searched: true, queryLanded: true, opened: [] };
+  assert.strictEqual(AgentGuard.goalSatisfied(parsed, { ...base, filterApplied: true }), true,
+    'narrowing the list counts');
+  assert.strictEqual(AgentGuard.goalSatisfied(parsed, { ...base, opened: ['Vertex 16 Slim'], productOpened: true }), true,
+    'picking from the list counts too - many sites have no filter control at all');
+});
+
+test('an unconstrained search is still complete once it lands', () => {
+  const parsed = TaskPlanner.parseTask('search for laptops');
+  assert.strictEqual(AgentGuard.goalSatisfied(parsed, { navigated: true, searched: true, queryLanded: true, opened: [] }), true,
+    'no constraint means nothing extra is owed');
+});
+
 console.log(`\n${passed} passed, ${failed} failed\n`);
 process.exit(failed ? 1 : 0);
 

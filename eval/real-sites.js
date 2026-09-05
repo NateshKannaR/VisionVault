@@ -24,17 +24,61 @@ const ONLY = (() => {
     : null;
 })();
 
+// Thirty-two live sites across the domains the problem statement names, plus the awkward
+// ones. Chosen for spread rather than for a good score: the CAPTCHA-walled and
+// canvas-rendered sites are here BECAUSE they fail, and a suite that quietly omitted them
+// would report a number that means nothing.
+//
+// Tasks are deliberately modest per site — one or two steps. Depth is measured against the
+// fixtures in eval/workflows.js, where a predicate can check the page afterwards; on a live
+// site the only honest check is "did the query reach the URL or the field", and a six-step
+// task would be scored on a guess.
 const ALL_SITES = [
+  // ── E-commerce ──────────────────────────────────────────────────────────────
   { name: 'Amazon.in',      url: 'https://www.amazon.in',            task: 'search for iqoo neo 6 and show me' },
   { name: 'Flipkart',       url: 'https://www.flipkart.com',         task: 'search for running shoes and show me' },
+  { name: 'Myntra',         url: 'https://www.myntra.com',           task: 'search for cotton shirts' },
+  { name: 'Ajio',           url: 'https://www.ajio.com',             task: 'search for sneakers' },
+  { name: 'eBay',           url: 'https://www.ebay.com',             task: 'search for mechanical keyboard' },
+  { name: 'Etsy',           url: 'https://www.etsy.com',             task: 'search for handmade mug' },
+  { name: 'BigBasket',      url: 'https://www.bigbasket.com',        task: 'search for olive oil' },
+
+  // ── Travel ──────────────────────────────────────────────────────────────────
+  { name: 'MakeMyTrip',     url: 'https://www.makemytrip.com',       task: 'search for flights to goa' },
+  { name: 'Goibibo',        url: 'https://www.goibibo.com',          task: 'search for hotels in jaipur' },
+  { name: 'IRCTC',          url: 'https://www.irctc.co.in/nget/train-search', task: 'search for trains to chennai' },
+  { name: 'Booking.com',    url: 'https://www.booking.com',          task: 'search for hotels in goa' },
+  { name: 'RedBus',         url: 'https://www.redbus.in',            task: 'search for buses to bangalore' },
+
+  // ── Reference and knowledge ─────────────────────────────────────────────────
   { name: 'Wikipedia',      url: 'https://www.wikipedia.org',        task: 'search for quantum computing' },
-  { name: 'YouTube',        url: 'https://www.youtube.com',          task: 'search for lofi study music' },
-  { name: 'GitHub',         url: 'https://github.com',               task: 'search for onnxruntime' },
-  { name: 'Stack Overflow', url: 'https://stackoverflow.com',        task: 'search for webassembly simd' },
   { name: 'MDN',            url: 'https://developer.mozilla.org',    task: 'search for OffscreenCanvas' },
+  { name: 'arXiv',          url: 'https://arxiv.org',                task: 'search for federated learning' },
+  { name: 'Stack Overflow', url: 'https://stackoverflow.com',        task: 'search for webassembly simd' },
+  { name: 'W3C',            url: 'https://www.w3.org',               task: 'search for accessible name' },
+
+  // ── Developer and productivity ──────────────────────────────────────────────
+  { name: 'GitHub',         url: 'https://github.com',               task: 'search for onnxruntime' },
+  { name: 'GitLab',         url: 'https://gitlab.com/explore',       task: 'search for kubernetes operator' },
+  { name: 'npm',            url: 'https://www.npmjs.com',            task: 'search for tesseract.js' },
+  { name: 'PyPI',           url: 'https://pypi.org',                 task: 'search for fastapi' },
+  { name: 'Docker Hub',     url: 'https://hub.docker.com',           task: 'search for postgres' },
+
+  // ── News and media ──────────────────────────────────────────────────────────
   { name: 'BBC News',       url: 'https://www.bbc.com/news',         task: 'scroll down and show me more headlines' },
   { name: 'Hacker News',    url: 'https://news.ycombinator.com',     task: 'scroll down and show me more stories' },
-  { name: 'MakeMyTrip',     url: 'https://www.makemytrip.com',       task: 'search for flights to goa' },
+  { name: 'The Hindu',      url: 'https://www.thehindu.com',         task: 'search for monsoon' },
+  { name: 'YouTube',        url: 'https://www.youtube.com',          task: 'search for lofi study music' },
+  { name: 'Reddit',         url: 'https://www.reddit.com',           task: 'search for privacy tools' },
+
+  // ── Government and public services ──────────────────────────────────────────
+  { name: 'India.gov.in',   url: 'https://www.india.gov.in',         task: 'search for pan card' },
+  { name: 'Income Tax',     url: 'https://www.incometax.gov.in',     task: 'search for e filing' },
+  { name: 'UIDAI',          url: 'https://uidai.gov.in',             task: 'search for aadhaar update' },
+
+  // ── Jobs and services ───────────────────────────────────────────────────────
+  { name: 'Naukri',         url: 'https://www.naukri.com',           task: 'search for python developer jobs' },
+  { name: 'Zomato',         url: 'https://www.zomato.com',           task: 'search for pizza' },
 ];
 
 const SITES = ONLY

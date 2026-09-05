@@ -1707,6 +1707,22 @@ def repair_plan(plan: StepResponse, req: AgentStepRequest, tier: str) -> StepRes
         notes.append("dropped a literal value supplied alongside a vault field")
         action.value = None
 
+    # 4b. "press_key" carrying a phrase is a typo for "type". Small local models produce this
+    #     regularly — observed: press_key target=102 value='onnxruntime' — and it is not an
+    #     executable action, because there is no key named "onnxruntime". The intent is
+    #     unambiguous, so it is corrected rather than thrown away and replanned.
+    #     Real key names are short and known; anything else is text meant for a field.
+    KEY_NAMES = {
+        "enter", "return", "tab", "escape", "esc", "space", "backspace", "delete",
+        "arrowup", "arrowdown", "arrowleft", "arrowright", "up", "down", "left", "right",
+        "home", "end", "pageup", "pagedown",
+    }
+    if kind == "press_key" and action.value:
+        key = str(action.value).strip()
+        if key.lower().replace(" ", "") not in KEY_NAMES and len(key) > 1:
+            notes.append(f"press_key carried text ({key[:24]!r}) rather than a key name; typing it instead")
+            kind, action.type = "type", "type"
+
     # 5. An action that needs a target but has none cannot be executed.
     if kind in ("click", "type", "select", "press_key") and action.target is None:
         notes.append(f"no usable target for {kind}")

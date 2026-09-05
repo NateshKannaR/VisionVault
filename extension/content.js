@@ -71,11 +71,54 @@ const EMAIL_RE    = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
 const PHONE_RE    = /(\+?\d[\d\s\-().]{7,}\d)/g;
 const CARD_RE     = /\b(?:\d{4}[- ]?){3}\d{4}\b/g;
 const SSN_RE      = /\b\d{3}[-\s]?\d{2}[-\s]?\d{4}\b/g;
-const AADHAAR_RE  = /\b\d{4}\s?\d{4}\s?\d{4}\b/g;
+// Kept in step with the same identifiers in vision/ocrDetect.js. The two detectors read
+// the same page by different routes - this one walks the DOM, that one reads the flattened
+// pixels - so a shape recognised by only one of them is a hole that opens the moment a site
+// renders the value as an image instead of text.
+// A UIDAI Aadhaar never begins with 0 or 1, which keeps order numbers out of the mask.
+const AADHAAR_RE  = /\b[2-9]\d{3}[\s-]{0,2}\d{4}[\s-]{0,2}\d{4}\b/g;
 const PAN_RE      = /\b[A-Z]{5}[0-9]{4}[A-Z]{1}\b/g;
 const PASSPORT_RE = /\b[A-Z][0-9]{7}\b/g;
 const IFSC_RE     = /\b[A-Z]{4}0[A-Z0-9]{6}\b/g;
 const UPI_RE      = /\b[a-zA-Z0-9.\-_]{2,40}@(okhdfcbank|okaxis|oksbi|okicici|paytm|ybl|ibl|axl|upi)\b/gi;
+const VID_RE      = /\b\d{4}[\s-]{0,2}\d{4}[\s-]{0,2}\d{4}[\s-]{0,2}\d{4}\b/g;
+const DL_RE       = /\b[A-Z]{2}[-\s]?\d{2}[-\s]?\d{4}[-\s]?\d{7}\b|\b[A-Z]{2}[-\s]?\d{2}[-\s]?\d{11}\b/g;
+const VEHICLE_RE  = /\b[A-Z]{2}[\s-]?\d{1,2}[\s-]?[A-Z]{1,3}[\s-]?\d{4}\b/g;
+const ACCOUNT_RE  = /\b(?:a\/c|acc(?:oun)?t(?:\s*(?:no|number|#))?|bank\s*a\/?c)\s*[:.#-]?\s*(\d{9,18})\b/gi;
+
+// Devanagari, Tamil, Bengali and the other Indic digit blocks, mapped one code point to one
+// so match offsets are unaffected. Without this an Aadhaar printed as 2345 6789 0123 in
+// Devanagari matches none of the patterns above and the page looks clean.
+// The zero of each Indic digit block. Digits run consecutively from there, so subtracting the
+// block base is the whole conversion - and unlike masking the low nibble it is actually right:
+// Devanagari zero is U+0966, which is not on a sixteen boundary.
+const INDIC_ZEROS = [
+  0x0966, // Devanagari
+  0x09E6, // Bengali
+  0x0A66, // Gurmukhi
+  0x0AE6, // Gujarati
+  0x0B66, // Odia
+  0x0BE6, // Tamil
+  0x0C66, // Telugu
+  0x0CE6, // Kannada
+  0x0D66, // Malayalam
+  0x0660  // Arabic-Indic
+];
+const INDIC_DIGIT_RE = /[\u0966-\u096F\u09E6-\u09EF\u0A66-\u0A6F\u0AE6-\u0AEF\u0B66-\u0B6F\u0BE6-\u0BEF\u0C66-\u0C6F\u0CE6-\u0CEF\u0D66-\u0D6F\u0660-\u0669]/g;
+
+/** ASCII digits, one code point per code point, so match offsets are unchanged. */
+function normalizeDigits(text) {
+  INDIC_DIGIT_RE.lastIndex = 0;
+  if (!INDIC_DIGIT_RE.test(text)) { INDIC_DIGIT_RE.lastIndex = 0; return text; }
+  INDIC_DIGIT_RE.lastIndex = 0;
+  return text.replace(INDIC_DIGIT_RE, (d) => {
+    const c = d.codePointAt(0);
+    for (const z of INDIC_ZEROS) {
+      if (c >= z && c <= z + 9) return String(c - z);
+    }
+    return d;
+  });
+}
 
 // ── PII Label Keywords ───────────────────────────────────────────────────────
 const PII_LABEL_KEYWORDS = [
@@ -316,8 +359,10 @@ function deterministicMarkId(el, usedIds) {
 }
 
 function testPII(text) {
-  const tests = [EMAIL_RE, PHONE_RE, CARD_RE, SSN_RE, AADHAAR_RE, PAN_RE, PASSPORT_RE, IFSC_RE, UPI_RE];
-  const result = tests.some(re => { re.lastIndex = 0; return re.test(text); });
+  const tests = [EMAIL_RE, PHONE_RE, CARD_RE, SSN_RE, VID_RE, AADHAAR_RE, PAN_RE, DL_RE,
+                 VEHICLE_RE, ACCOUNT_RE, PASSPORT_RE, IFSC_RE, UPI_RE];
+  const probe = normalizeDigits(text);
+  const result = tests.some(re => { re.lastIndex = 0; return re.test(probe); });
   tests.forEach(re => { re.lastIndex = 0; });
   return result;
 }

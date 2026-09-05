@@ -22,15 +22,69 @@
  */
 
 (function (global) {
+  // ── Indic numerals ─────────────────────────────────────────────────────────
+  //
+  // An Aadhaar printed as आधार २३४५ ६७८९ ०१२३ is an Aadhaar. Every pattern below is written
+  // in [0-9], so without this step a page in Devanagari, Tamil or Bengali defeats the whole
+  // detector while looking, in the logs, exactly like a page with no PII on it.
+  //
+  // The mapping is one code point to one code point, which is what makes it safe here:
+  // callers use `index` and `length` to find the OCR word box that produced a match, so a
+  // substitution that changed the string's length would misplace every redaction rectangle
+  // after it.
+  const INDIC_DIGITS = {
+    "०": "0", "१": "1", "२": "2", "३": "3", "४": "4",  // Devanagari
+    "५": "5", "६": "6", "७": "7", "८": "8", "९": "9",
+    "০": "0", "১": "1", "২": "2", "৩": "3", "৪": "4",  // Bengali
+    "৫": "5", "৬": "6", "৭": "7", "৮": "8", "৯": "9",
+    "૦": "0", "૧": "1", "૨": "2", "૩": "3", "૪": "4",  // Gujarati
+    "૫": "5", "૬": "6", "૭": "7", "૮": "8", "૯": "9",
+    "୦": "0", "୧": "1", "୨": "2", "୩": "3", "୪": "4",  // Odia
+    "୫": "5", "୬": "6", "୭": "7", "୮": "8", "୯": "9",
+    "௦": "0", "௧": "1", "௨": "2", "௩": "3", "௪": "4",  // Tamil
+    "௫": "5", "௬": "6", "௭": "7", "௮": "8", "௯": "9",
+    "౦": "0", "౧": "1", "౨": "2", "౩": "3", "౪": "4",  // Telugu
+    "౫": "5", "౬": "6", "౭": "7", "౮": "8", "౯": "9",
+    "೦": "0", "೧": "1", "೨": "2", "೩": "3", "೪": "4",  // Kannada
+    "೫": "5", "೬": "6", "೭": "7", "೮": "8", "೯": "9",
+    "൦": "0", "൧": "1", "൨": "2", "൩": "3", "൪": "4",  // Malayalam
+    "൫": "5", "൬": "6", "൭": "7", "൮": "8", "൯": "9",
+    "੦": "0", "੧": "1", "੨": "2", "੩": "3", "੪": "4",  // Gurmukhi
+    "੫": "5", "੬": "6", "੭": "7", "੮": "8", "੯": "9",
+    "٠": "0", "١": "1", "٢": "2", "٣": "3", "٤": "4",  // Arabic-Indic
+    "٥": "5", "٦": "6", "٧": "7", "٨": "8", "٩": "9"
+  };
+  const INDIC_DIGIT_RE = /[०-९০-৯૦-૯୦-୯௦-௯౦-౯೦-೯൦-൯੦-੯٠-٩]/g;
+
+  /** ASCII digits, same length, so match offsets still address the original string. */
+  function normalizeDigits(text) {
+    if (!INDIC_DIGIT_RE.test(text)) { INDIC_DIGIT_RE.lastIndex = 0; return text; }
+    INDIC_DIGIT_RE.lastIndex = 0;
+    return text.replace(INDIC_DIGIT_RE, (d) => INDIC_DIGITS[d] || d);
+  }
+
   const EMAIL_RE    = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
   const PHONE_RE    = /(\+?\d[\d\s\-().]{7,}\d)/g;
   const CARD_RE     = /\b(?:\d{4}[- ]?){3}\d{4}\b/g;
   const SSN_RE      = /\b\d{3}[-\s]?\d{2}[-\s]?\d{4}\b/g;
-  const AADHAAR_RE  = /\b\d{4}\s?\d{4}\s?\d{4}\b/g;
+  // A UIDAI Aadhaar never begins with 0 or 1, which is the cheapest way to stop masking every
+  // twelve-digit order number and invoice reference on the page. Separators are whatever the
+  // site chose, plus the wider gaps OCR tends to read out of printed cards.
+  const AADHAAR_RE  = /\b[2-9]\d{3}[\s-]{0,2}\d{4}[\s-]{0,2}\d{4}\b/g;
+  // The 16-digit virtual ID stands in for the Aadhaar itself and is exactly as sensitive.
+  const VID_RE      = /\b\d{4}[\s-]{0,2}\d{4}[\s-]{0,2}\d{4}[\s-]{0,2}\d{4}\b/g;
   const PAN_RE      = /\b[A-Z]{5}[0-9]{4}[A-Z]{1}\b/g;
   const PASSPORT_RE = /\b[A-Z][0-9]{7}\b/g;
   const IFSC_RE     = /\b[A-Z]{4}0[A-Z0-9]{6}\b/g;
   const UPI_RE      = /\b[a-zA-Z0-9.\-_]{2,40}@(okhdfcbank|okaxis|oksbi|okicici|paytm|ybl|ibl|axl|upi)\b/gi;
+  // State code, RTO code, then year and serial: TN-01-2011-0012345, written with or without
+  // separators depending on who printed it.
+  const DL_RE       = /\b[A-Z]{2}[-\s]?\d{2}[-\s]?\d{4}[-\s]?\d{7}\b|\b[A-Z]{2}[-\s]?\d{2}[-\s]?\d{11}\b/g;
+  // TN 01 AB 1234, and the older single-letter series.
+  const VEHICLE_RE  = /\b[A-Z]{2}[\s-]?\d{1,2}[\s-]?[A-Z]{1,3}[\s-]?\d{4}\b/g;
+  // A bare run of digits is only an account number when something nearby says so; without the
+  // cue this would mask every long number on the page and cost more precision than it buys.
+  const ACCOUNT_RE  = /\b(?:a\/c|acc(?:oun)?t(?:\s*(?:no|number|#))?|bank\s*a\/?c)\s*[:.#-]?\s*(\d{9,18})\b/gi;
 
   // Values that are sensitive because of the words printed next to them, not their shape.
   // A personal name matches no pattern — "Priya Raghavan" is just two capitalised words — so
@@ -38,12 +92,19 @@
   // Capture group 2 is the value; group 1 is the label, which is not itself sensitive.
   const LABELLED_VALUE_RE = /\b(billed to|bill to|invoice to|sold to|customer|client|account holder|card ?holder|patient|employee|member|full name|name|recipient|addressed to|deliver to|ship to)\s*[:\-]\s*([^\r\n]{2,60})/gi;
 
+  // Order is significant: the first pattern to claim a span keeps it (see isCovered), so the
+  // more specific shapes are tried before the looser ones. PHONE_RE in particular will happily
+  // swallow a driving licence or an account number if it is given the chance.
   const PII_PATTERNS = [
     { label: "email",    regex: EMAIL_RE },
     { label: "card",     regex: CARD_RE },
     { label: "ssn",      regex: SSN_RE },
+    { label: "vid",      regex: VID_RE },
     { label: "aadhaar",  regex: AADHAAR_RE },
     { label: "pan",      regex: PAN_RE },
+    { label: "driving_licence", regex: DL_RE },
+    { label: "vehicle_reg", regex: VEHICLE_RE },
+    { label: "bank_account", regex: ACCOUNT_RE, valueGroup: 1 },
     { label: "passport", regex: PASSPORT_RE },
     { label: "ifsc",     regex: IFSC_RE },
     { label: "upi",      regex: UPI_RE },
@@ -115,6 +176,10 @@
    */
   function findPiiInText(text) {
     if (!text || typeof text !== "string") return [];
+    // Matching runs against ASCII digits; `text` itself is kept for the reported value so the
+    // caller still sees what was actually on the page. The substitution is length-preserving,
+    // so offsets address both strings identically.
+    const haystack = normalizeDigits(text);
     const results = [];
     const coveredRanges = [];
 
@@ -125,10 +190,16 @@
     for (const { label, regex, valueGroup } of PII_PATTERNS) {
       regex.lastIndex = 0;
       let match;
-      while ((match = regex.exec(text)) !== null) {
+      while ((match = regex.exec(haystack)) !== null) {
         // For labelled values, keep only the value itself so the label text is not masked.
         const captured = valueGroup ? (match[valueGroup] || "") : match[0];
+        const offset0 = valueGroup ? match[0].indexOf(captured) : 0;
+        const rawStart = match.index + (offset0 > 0 ? offset0 : 0);
+        // Two views of the same span. Decisions below count ASCII digits, so they use the
+        // normalized form; the reported value is the glyphs actually printed on the page, so
+        // a Devanagari number is not silently rewritten in the audit trail.
         const val = captured.trim();
+        const rawVal = (text.substr(rawStart, captured.length).trim() || val);
         const offsetInMatch = valueGroup ? match[0].indexOf(captured) : 0;
         const start = match.index + (offsetInMatch > 0 ? offsetInMatch : 0);
         const end = start + captured.length;
@@ -142,7 +213,7 @@
 
           results.push({
             label,
-            text: val,
+            text: rawVal,
             index: start,
             length: val.length
           });

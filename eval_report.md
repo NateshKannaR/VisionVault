@@ -164,22 +164,44 @@ tasks — search and scroll. Nothing is bought, submitted or logged into. Succes
 from the page afterwards, not from the agent's own report: for a search task the query has
 to appear in the URL, the title or a field.
 
-Run at 2026-09-05T16:46:55.199Z, planner `ollama (ollama -> gemini -> mock)`, 75s budget per site.
+Run at 2026-09-05T18:52:11.310Z, planner `ollama (ollama -> gemini -> mock)`, 70s budget per site.
 
 | Site | Task | Steps | Local scan | Masked | Outcome |
 | :--- | :--- | ---: | ---: | ---: | :--- |
-| Amazon.in | search for iqoo neo 6 and show me | 1 | 8083ms | 1 | **searched** (in URL + title + field) |
-| Flipkart | search for running shoes and show me | 1 | 2311ms | 4 | **searched** (in URL + title + field) |
-| Wikipedia | search for quantum computing | 1 | 4054ms | 7 | **searched** (in URL + title) |
-| YouTube | search for lofi study music | 1 | 1562ms | 0 | **searched** (in URL + title + field) |
-| GitHub | search for onnxruntime | 2 | 2866ms | 3 | **searched** (in URL) |
-| Stack Overflow | search for webassembly simd | 1 | 6240ms | 2 | **searched** (in URL) |
-| MDN | search for OffscreenCanvas | 2 | 3253ms | 0 | **searched** (in URL + title) |
-| BBC News | scroll down and show me more headlines | 0 | 3286ms | 1 | stopped — the site asked for human verification |
-| Hacker News | scroll down and show me more stories | 1 | 6160ms | 1 | **acted** |
-| MakeMyTrip | search for flights to goa | 1 | 5162ms | 6 | search did not land |
+| Amazon.in | search for iqoo neo 6 and show me | 1 | 6554ms | 2 | **searched** (in URL + title + field) |
+| Flipkart | search for running shoes and show me | 1 | 1926ms | 3 | **searched** (in URL + title + field) |
+| Myntra | search for cotton shirts | 1 | 4686ms | 11 | **searched** (in URL + title) |
+| Ajio | search for sneakers | 1 | 2998ms | 1 | **searched** (in URL + title + field) |
+| eBay | search for mechanical keyboard | 1 | 5223ms | 1 | stopped — the site asked for human verification |
+| Etsy | search for handmade mug | 0 | 77ms | 1 | search did not land |
+| BigBasket | search for olive oil | 1 | 2736ms | 1 | **searched** (in URL) |
+| MakeMyTrip | search for flights to goa | 1 | 4782ms | 5 | search did not land |
+| Goibibo | search for hotels in jaipur | 2 | 5897ms | 5 | search did not land |
+| IRCTC | search for trains to chennai | 0 | 76ms | 4 | search did not land |
+| Booking.com | search for hotels in goa | 1 | 2962ms | 1 | typed, but the site did not run it |
+| RedBus | search for buses to bangalore | 2 | 2549ms | 1 | search did not land |
+| Wikipedia | search for quantum computing | 1 | 3191ms | 7 | **searched** (in URL + title) |
+| MDN | search for OffscreenCanvas | 2 | 2496ms | 0 | **searched** (in URL + title) |
+| arXiv | search for federated learning | 3 | 6128ms | 3 | **searched** (in URL + field) |
+| Stack Overflow | search for webassembly simd | 0 | 6331ms | 4 | search did not land |
+| W3C | search for accessible name | 1 | 2160ms | 0 | search did not land |
+| GitHub | search for onnxruntime | 2 | 2491ms | 3 | **searched** (in URL) |
+| GitLab | search for kubernetes operator | 1 | 4936ms | 6 | search did not land |
+| npm | search for tesseract.js | 1 | 2581ms | 0 | **searched** (in URL + title) |
+| PyPI | search for fastapi | 1 | 2549ms | 0 | **searched** (in URL) |
+| Docker Hub | search for postgres | 2 | 4000ms | 3 | **searched** (in URL) |
+| BBC News | scroll down and show me more headlines | 0 | 2858ms | 5 | stopped — the site asked for human verification |
+| Hacker News | scroll down and show me more stories | 1 | 6117ms | 1 | **acted** |
+| The Hindu | search for monsoon | 1 | 3337ms | 10 | search did not land |
+| YouTube | search for lofi study music | 1 | 1479ms | 0 | **searched** (in URL + title + field) |
+| Reddit | search for privacy tools | 0 | 1717ms | 0 | stopped — the site asked for human verification |
+| India.gov.in | search for pan card | 1 | 3827ms | 3 | **searched** (in URL + field) |
+| Income Tax | search for e filing | 1 | 3976ms | 4 | typed, but the site did not run it |
+| UIDAI | search for aadhaar update | 1 | 2774ms | 11 | **searched** (in URL + field) |
+| Naukri | search for python developer jobs | 1 | 2415ms | 6 | stopped — the site asked for human verification |
+| Zomato | search for pizza | 1 | 3232ms | 1 | search did not land |
 
-**7 of 8 search tasks reached the results page**, and 1 non-search task carried out the requested action. 1 site refused automation outright with a human-verification challenge, which the agent detects and reports rather than trying to get around. Every remaining case is reported by the agent as unfinished, with the reason, rather than being claimed as a success.
+**15 of 27 search tasks reached the results page**, and 1 non-search task carried out the requested action. 4 sites refused automation outright with a human-verification challenge, which the agent detects and reports rather than trying to get around. Every remaining case is reported by the agent as unfinished, with the reason, rather than being claimed as a success.
 
 The "Masked" column is worth reading alongside the fixture numbers. On a shopping home
 page it is small because the face model — not a blanket rule over every image — decides

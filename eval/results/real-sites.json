@@ -1,30 +1,30 @@
 {
-  "generatedAt": "2026-09-05T16:46:55.199Z",
+  "generatedAt": "2026-09-05T18:52:11.310Z",
   "planner": "ollama (ollama -> gemini -> mock)",
-  "budgetSeconds": 75,
+  "budgetSeconds": 70,
   "sites": [
     {
       "site": "Amazon.in",
       "task": "search for iqoo neo 6 and show me",
       "landedOn": "https://www.amazon.in/",
-      "scanMs": 9122,
-      "pii": 1,
-      "marks": 67,
+      "scanMs": 7298,
+      "pii": 2,
+      "marks": 68,
       "sources": {
         "dom": 1,
         "vision_face": 0,
-        "vision_ocr": 0,
-        "merged": 1,
+        "vision_ocr": 1,
+        "merged": 2,
         "faceOk": true
       },
       "frames": {
-        "total": 2,
+        "total": 1,
         "merged": 1,
-        "skipped": 1
+        "skipped": 0
       },
-      "pipelineMs": 8083,
+      "pipelineMs": 6554,
       "screenshot": "real-amazon-in.png",
-      "runMs": 19224,
+      "runMs": 14654,
       "steps": 1,
       "stopped": false,
       "timedOut": false,
@@ -51,7 +51,7 @@
       },
       "stopReason": null,
       "botWall": false,
-      "finalUrl": "https://www.amazon.in/s?k=iqoo+neo+6&crid=T9S2KPKXJI1J&sprefix=iqoo+neo+6%2Caps%2C337&ref=nb_sb_noss_2",
+      "finalUrl": "https://www.amazon.in/s?k=iqoo+neo+6&crid=37WS4WN0MHTUR&sprefix=iqoo+neo+6%2Caps%2C314&ref=nb_sb_noss_2",
       "urlChanged": true,
       "parsedQuery": "iqoo neo 6",
       "queryOnPage": {
@@ -64,14 +64,14 @@
       "site": "Flipkart",
       "task": "search for running shoes and show me",
       "landedOn": "https://www.flipkart.com/",
-      "scanMs": 3030,
-      "pii": 4,
+      "scanMs": 2095,
+      "pii": 3,
       "marks": 40,
       "sources": {
-        "dom": 4,
+        "dom": 3,
         "vision_face": 0,
         "vision_ocr": 0,
-        "merged": 4,
+        "merged": 3,
         "faceOk": true
       },
       "frames": {
@@ -79,9 +79,9 @@
         "merged": 1,
         "skipped": 0
       },
-      "pipelineMs": 2311,
+      "pipelineMs": 1926,
       "screenshot": "real-flipkart.png",
-      "runMs": 12536,
+      "runMs": 10575,
       "steps": 1,
       "stopped": false,
       "timedOut": false,
@@ -118,10 +118,578 @@
       }
     },
     {
+      "site": "Myntra",
+      "task": "search for cotton shirts",
+      "landedOn": "https://www.myntra.com/",
+      "scanMs": 5702,
+      "pii": 11,
+      "marks": 10,
+      "sources": {
+        "dom": 1,
+        "vision_face": 10,
+        "vision_ocr": 0,
+        "merged": 11,
+        "faceOk": true
+      },
+      "frames": {
+        "total": 2,
+        "merged": 2,
+        "skipped": 0
+      },
+      "pipelineMs": 4686,
+      "screenshot": "real-myntra.png",
+      "runMs": 10359,
+      "steps": 1,
+      "stopped": false,
+      "timedOut": false,
+      "actions": [
+        "type"
+      ],
+      "needsConfirm": false,
+      "needsInput": false,
+      "agentProgress": {
+        "navigated": false,
+        "searched": true,
+        "opened": [],
+        "scrolled": false,
+        "queryLanded": true,
+        "querySubmitted": true,
+        "filledAny": false,
+        "searchOpenAttempts": 0,
+        "siteSearchUrlTried": false,
+        "fillScrolls": 0,
+        "bookingStep": 0,
+        "fromTyped": false,
+        "toTyped": false,
+        "bookingCompleted": false
+      },
+      "stopReason": null,
+      "botWall": false,
+      "finalUrl": "https://www.myntra.com/cotton-shirts?rawQuery=cotton%20shirts",
+      "urlChanged": true,
+      "parsedQuery": "cotton shirts",
+      "queryOnPage": {
+        "inBox": false,
+        "inUrl": true,
+        "inTitle": true
+      }
+    },
+    {
+      "site": "Ajio",
+      "task": "search for sneakers",
+      "landedOn": "https://www.ajio.com/",
+      "scanMs": 3726,
+      "pii": 1,
+      "marks": 51,
+      "sources": {
+        "dom": 0,
+        "vision_face": 1,
+        "vision_ocr": 0,
+        "merged": 1,
+        "faceOk": true
+      },
+      "frames": {
+        "total": 6,
+        "merged": 1,
+        "skipped": 5
+      },
+      "pipelineMs": 2998,
+      "screenshot": "real-ajio.png",
+      "runMs": 14606,
+      "steps": 1,
+      "stopped": false,
+      "timedOut": false,
+      "actions": [
+        "type"
+      ],
+      "needsConfirm": false,
+      "needsInput": false,
+      "agentProgress": {
+        "navigated": false,
+        "searched": true,
+        "opened": [],
+        "scrolled": false,
+        "queryLanded": true,
+        "querySubmitted": true,
+        "filledAny": false,
+        "searchOpenAttempts": 0,
+        "siteSearchUrlTried": false,
+        "fillScrolls": 0,
+        "bookingStep": 0,
+        "fromTyped": false,
+        "toTyped": false,
+        "bookingCompleted": false
+      },
+      "stopReason": null,
+      "botWall": false,
+      "finalUrl": "https://www.ajio.com/search/?text=sneakers&itm_source=search&itm_source_detail=sneakers",
+      "urlChanged": true,
+      "parsedQuery": "sneakers",
+      "queryOnPage": {
+        "inBox": true,
+        "inUrl": true,
+        "inTitle": true
+      }
+    },
+    {
+      "site": "eBay",
+      "task": "search for mechanical keyboard",
+      "landedOn": "https://www.ebay.com/",
+      "scanMs": 6020,
+      "pii": 1,
+      "marks": 49,
+      "sources": {
+        "dom": 0,
+        "vision_face": 0,
+        "vision_ocr": 1,
+        "merged": 1,
+        "faceOk": true
+      },
+      "frames": {
+        "total": 6,
+        "merged": 1,
+        "skipped": 5
+      },
+      "pipelineMs": 5223,
+      "screenshot": "real-ebay.png",
+      "runMs": 11447,
+      "steps": 1,
+      "stopped": false,
+      "timedOut": false,
+      "actions": [
+        "type"
+      ],
+      "needsConfirm": false,
+      "needsInput": false,
+      "agentProgress": {
+        "navigated": false,
+        "searched": true,
+        "opened": [],
+        "scrolled": false,
+        "queryLanded": true,
+        "querySubmitted": true,
+        "filledAny": false,
+        "searchOpenAttempts": 0,
+        "siteSearchUrlTried": false,
+        "fillScrolls": 0,
+        "bookingStep": 0,
+        "fromTyped": false,
+        "toTyped": false,
+        "bookingCompleted": false
+      },
+      "stopReason": "Stopped — the page is showing a CAPTCHA. This site is asking for a human, so it is over to you.",
+      "botWall": true,
+      "finalUrl": "https://www.ebay.com/sch/i.html?_nkw=mechanical+keyboard+full+size&_sacat=0&_from=R40&_trksid=p4624852.m570.l1311",
+      "urlChanged": true,
+      "parsedQuery": "mechanical keyboard",
+      "queryOnPage": {
+        "inBox": true,
+        "inUrl": true,
+        "inTitle": true
+      }
+    },
+    {
+      "site": "Etsy",
+      "task": "search for handmade mug",
+      "landedOn": "https://www.etsy.com/",
+      "scanMs": 6747,
+      "pii": 1,
+      "marks": 0,
+      "sources": {
+        "dom": 0,
+        "vision_face": 0,
+        "vision_ocr": 1,
+        "merged": 1,
+        "faceOk": true
+      },
+      "frames": {
+        "total": 2,
+        "merged": 1,
+        "skipped": 1
+      },
+      "pipelineMs": 77,
+      "screenshot": "real-etsy.png",
+      "runMs": 5412,
+      "steps": 0,
+      "stopped": false,
+      "timedOut": false,
+      "actions": [],
+      "needsConfirm": false,
+      "needsInput": false,
+      "agentProgress": {
+        "navigated": false,
+        "searched": false,
+        "opened": [],
+        "scrolled": false,
+        "queryLanded": false,
+        "querySubmitted": false,
+        "filledAny": false,
+        "searchOpenAttempts": 0,
+        "siteSearchUrlTried": false,
+        "fillScrolls": 0,
+        "bookingStep": 0,
+        "fromTyped": false,
+        "toTyped": false,
+        "bookingCompleted": false
+      },
+      "stopReason": "No interactive elements detected on this page.",
+      "botWall": false,
+      "finalUrl": "https://www.etsy.com/",
+      "urlChanged": false,
+      "parsedQuery": "handmade mug",
+      "queryOnPage": {
+        "inBox": false,
+        "inUrl": false,
+        "inTitle": false
+      }
+    },
+    {
+      "site": "BigBasket",
+      "task": "search for olive oil",
+      "landedOn": "https://www.bigbasket.com/",
+      "scanMs": 3428,
+      "pii": 1,
+      "marks": 54,
+      "sources": {
+        "dom": 0,
+        "vision_face": 1,
+        "vision_ocr": 0,
+        "merged": 1,
+        "faceOk": true
+      },
+      "frames": {
+        "total": 1,
+        "merged": 1,
+        "skipped": 0
+      },
+      "pipelineMs": 2736,
+      "screenshot": "real-bigbasket.png",
+      "runMs": 7329,
+      "steps": 1,
+      "stopped": false,
+      "timedOut": false,
+      "actions": [
+        "type"
+      ],
+      "needsConfirm": false,
+      "needsInput": false,
+      "agentProgress": {
+        "navigated": false,
+        "searched": true,
+        "opened": [],
+        "scrolled": false,
+        "queryLanded": true,
+        "querySubmitted": true,
+        "filledAny": false,
+        "searchOpenAttempts": 0,
+        "siteSearchUrlTried": false,
+        "fillScrolls": 0,
+        "bookingStep": 0,
+        "fromTyped": false,
+        "toTyped": false,
+        "bookingCompleted": false
+      },
+      "stopReason": null,
+      "botWall": false,
+      "finalUrl": "https://www.bigbasket.com/ps/?q=olive+oil&nc=as",
+      "urlChanged": true,
+      "parsedQuery": "olive oil",
+      "queryOnPage": {
+        "inBox": false,
+        "inUrl": true,
+        "inTitle": false
+      }
+    },
+    {
+      "site": "MakeMyTrip",
+      "task": "search for flights to goa",
+      "landedOn": "https://www.makemytrip.com/",
+      "scanMs": 5607,
+      "pii": 5,
+      "marks": 37,
+      "sources": {
+        "dom": 5,
+        "vision_face": 0,
+        "vision_ocr": 0,
+        "merged": 5,
+        "faceOk": true
+      },
+      "frames": {
+        "total": 1,
+        "merged": 1,
+        "skipped": 0
+      },
+      "pipelineMs": 4782,
+      "screenshot": "real-makemytrip.png",
+      "runMs": 19699,
+      "steps": 1,
+      "stopped": false,
+      "timedOut": false,
+      "actions": [
+        "type"
+      ],
+      "needsConfirm": false,
+      "needsInput": false,
+      "agentProgress": {
+        "navigated": false,
+        "searched": true,
+        "opened": [],
+        "scrolled": false,
+        "queryLanded": false,
+        "querySubmitted": false,
+        "filledAny": false,
+        "searchOpenAttempts": 1,
+        "siteSearchUrlTried": false,
+        "fillScrolls": 0,
+        "bookingStep": 0,
+        "fromTyped": false,
+        "toTyped": true,
+        "bookingCompleted": false
+      },
+      "stopReason": "Could not complete: search for \"flights to goa\".",
+      "botWall": false,
+      "finalUrl": "https://www.makemytrip.com/",
+      "urlChanged": false,
+      "parsedQuery": "flights to goa",
+      "queryOnPage": {
+        "inBox": false,
+        "inUrl": false,
+        "inTitle": false
+      }
+    },
+    {
+      "site": "Goibibo",
+      "task": "search for hotels in jaipur",
+      "landedOn": "https://www.goibibo.com/",
+      "scanMs": 1341,
+      "pii": 5,
+      "marks": 37,
+      "sources": {
+        "dom": 5,
+        "vision_face": 0,
+        "vision_ocr": 0,
+        "merged": 5,
+        "faceOk": true
+      },
+      "frames": {
+        "total": 1,
+        "merged": 1,
+        "skipped": 0
+      },
+      "pipelineMs": 5897,
+      "screenshot": "real-goibibo.png",
+      "runMs": 21584,
+      "steps": 2,
+      "stopped": false,
+      "timedOut": false,
+      "actions": [
+        "type(failed)",
+        "type"
+      ],
+      "needsConfirm": false,
+      "needsInput": false,
+      "agentProgress": {
+        "navigated": false,
+        "searched": true,
+        "opened": [],
+        "scrolled": false,
+        "queryLanded": false,
+        "querySubmitted": false,
+        "filledAny": false,
+        "searchOpenAttempts": 1,
+        "siteSearchUrlTried": false,
+        "fillScrolls": 0,
+        "bookingStep": 0,
+        "fromTyped": false,
+        "toTyped": false,
+        "bookingCompleted": false
+      },
+      "stopReason": "Could not complete: search for \"hotels in jaipur\".",
+      "botWall": false,
+      "finalUrl": "https://www.goibibo.com/",
+      "urlChanged": false,
+      "parsedQuery": "hotels in jaipur",
+      "queryOnPage": {
+        "inBox": false,
+        "inUrl": false,
+        "inTitle": false
+      }
+    },
+    {
+      "site": "IRCTC",
+      "task": "search for trains to chennai",
+      "landedOn": "https://www.irctc.co.in/nget/train-search",
+      "scanMs": 6586,
+      "pii": 4,
+      "marks": 0,
+      "sources": {
+        "dom": 2,
+        "vision_face": 0,
+        "vision_ocr": 2,
+        "merged": 4,
+        "faceOk": true
+      },
+      "frames": {
+        "total": 1,
+        "merged": 1,
+        "skipped": 0
+      },
+      "pipelineMs": 76,
+      "screenshot": "real-irctc.png",
+      "runMs": 5405,
+      "steps": 0,
+      "stopped": false,
+      "timedOut": false,
+      "actions": [],
+      "needsConfirm": false,
+      "needsInput": false,
+      "agentProgress": {
+        "navigated": false,
+        "searched": false,
+        "opened": [],
+        "scrolled": false,
+        "queryLanded": false,
+        "querySubmitted": false,
+        "filledAny": false,
+        "searchOpenAttempts": 0,
+        "siteSearchUrlTried": false,
+        "fillScrolls": 0,
+        "bookingStep": 0,
+        "fromTyped": false,
+        "toTyped": false,
+        "bookingCompleted": false
+      },
+      "stopReason": "No interactive elements detected on this page.",
+      "botWall": false,
+      "finalUrl": "https://www.irctc.co.in/nget/train-search",
+      "urlChanged": false,
+      "parsedQuery": "trains to chennai",
+      "queryOnPage": {
+        "inBox": false,
+        "inUrl": false,
+        "inTitle": false
+      }
+    },
+    {
+      "site": "Booking.com",
+      "task": "search for hotels in goa",
+      "landedOn": "https://www.booking.com/?chal_t=1788633745489&force_referer=",
+      "scanMs": 3685,
+      "pii": 1,
+      "marks": 24,
+      "sources": {
+        "dom": 1,
+        "vision_face": 0,
+        "vision_ocr": 0,
+        "merged": 1,
+        "faceOk": true
+      },
+      "frames": {
+        "total": 2,
+        "merged": 1,
+        "skipped": 1
+      },
+      "pipelineMs": 2962,
+      "screenshot": "real-booking-com.png",
+      "runMs": 14198,
+      "steps": 1,
+      "stopped": false,
+      "timedOut": false,
+      "actions": [
+        "type"
+      ],
+      "needsConfirm": false,
+      "needsInput": false,
+      "agentProgress": {
+        "navigated": false,
+        "searched": true,
+        "opened": [],
+        "scrolled": false,
+        "queryLanded": true,
+        "querySubmitted": false,
+        "filledAny": false,
+        "searchOpenAttempts": 0,
+        "siteSearchUrlTried": true,
+        "fillScrolls": 0,
+        "bookingStep": 0,
+        "fromTyped": false,
+        "toTyped": false,
+        "bookingCompleted": false
+      },
+      "stopReason": null,
+      "botWall": false,
+      "finalUrl": "https://www.booking.com/?chal_t=1788633745489&force_referer=",
+      "urlChanged": false,
+      "parsedQuery": "hotels in goa",
+      "queryOnPage": {
+        "inBox": true,
+        "inUrl": false,
+        "inTitle": false
+      }
+    },
+    {
+      "site": "RedBus",
+      "task": "search for buses to bangalore",
+      "landedOn": "https://www.redbus.in/",
+      "scanMs": 2609,
+      "pii": 1,
+      "marks": 24,
+      "sources": {
+        "dom": 1,
+        "vision_face": 0,
+        "vision_ocr": 0,
+        "merged": 1,
+        "faceOk": true
+      },
+      "frames": {
+        "total": 1,
+        "merged": 1,
+        "skipped": 0
+      },
+      "pipelineMs": 2549,
+      "screenshot": "real-redbus.png",
+      "runMs": 10312,
+      "steps": 2,
+      "stopped": false,
+      "timedOut": false,
+      "actions": [
+        "type",
+        "open_search(failed)"
+      ],
+      "needsConfirm": false,
+      "needsInput": false,
+      "agentProgress": {
+        "navigated": false,
+        "searched": true,
+        "opened": [],
+        "scrolled": false,
+        "queryLanded": false,
+        "querySubmitted": false,
+        "filledAny": false,
+        "searchOpenAttempts": 2,
+        "siteSearchUrlTried": true,
+        "fillScrolls": 0,
+        "bookingStep": 0,
+        "fromTyped": false,
+        "toTyped": true,
+        "bookingCompleted": false
+      },
+      "stopReason": "Could not complete: search for \"buses to bangalore\".",
+      "botWall": false,
+      "finalUrl": "https://www.redbus.in/",
+      "urlChanged": false,
+      "parsedQuery": "buses to bangalore",
+      "queryOnPage": {
+        "inBox": false,
+        "inUrl": false,
+        "inTitle": false
+      }
+    },
+    {
       "site": "Wikipedia",
       "task": "search for quantum computing",
       "landedOn": "https://www.wikipedia.org/",
-      "scanMs": 4742,
+      "scanMs": 3875,
       "pii": 7,
       "marks": 27,
       "sources": {
@@ -136,9 +704,9 @@
         "merged": 1,
         "skipped": 0
       },
-      "pipelineMs": 4054,
+      "pipelineMs": 3191,
       "screenshot": "real-wikipedia.png",
-      "runMs": 13695,
+      "runMs": 11850,
       "steps": 1,
       "stopped": false,
       "timedOut": false,
@@ -175,12 +743,12 @@
       }
     },
     {
-      "site": "YouTube",
-      "task": "search for lofi study music",
-      "landedOn": "https://www.youtube.com/",
-      "scanMs": 2256,
+      "site": "MDN",
+      "task": "search for OffscreenCanvas",
+      "landedOn": "https://developer.mozilla.org/en-US/",
+      "scanMs": 3195,
       "pii": 0,
-      "marks": 13,
+      "marks": 24,
       "sources": {
         "dom": 0,
         "vision_face": 0,
@@ -189,17 +757,77 @@
         "faceOk": true
       },
       "frames": {
-        "total": 3,
-        "merged": 2,
-        "skipped": 1
+        "total": 1,
+        "merged": 1,
+        "skipped": 0
       },
-      "pipelineMs": 1562,
-      "screenshot": "real-youtube.png",
-      "runMs": 11086,
-      "steps": 1,
+      "pipelineMs": 2496,
+      "screenshot": "real-mdn.png",
+      "runMs": 9161,
+      "steps": 2,
       "stopped": false,
       "timedOut": false,
       "actions": [
+        "open_search(failed)",
+        "navigate"
+      ],
+      "needsConfirm": false,
+      "needsInput": false,
+      "agentProgress": {
+        "navigated": false,
+        "searched": false,
+        "opened": [],
+        "scrolled": false,
+        "queryLanded": true,
+        "querySubmitted": true,
+        "filledAny": false,
+        "searchOpenAttempts": 1,
+        "siteSearchUrlTried": true,
+        "fillScrolls": 0,
+        "bookingStep": 0,
+        "fromTyped": false,
+        "toTyped": false,
+        "bookingCompleted": false
+      },
+      "stopReason": null,
+      "botWall": false,
+      "finalUrl": "https://developer.mozilla.org/en-US/docs/Web/API/OffscreenCanvas",
+      "urlChanged": true,
+      "parsedQuery": "OffscreenCanvas",
+      "queryOnPage": {
+        "inBox": false,
+        "inUrl": true,
+        "inTitle": true
+      }
+    },
+    {
+      "site": "arXiv",
+      "task": "search for federated learning",
+      "landedOn": "https://arxiv.org/",
+      "scanMs": 6814,
+      "pii": 3,
+      "marks": 157,
+      "sources": {
+        "dom": 3,
+        "vision_face": 0,
+        "vision_ocr": 0,
+        "merged": 3,
+        "faceOk": false
+      },
+      "frames": {
+        "total": 1,
+        "merged": 1,
+        "skipped": 0
+      },
+      "pipelineMs": 6128,
+      "screenshot": "real-arxiv.png",
+      "runMs": 17119,
+      "steps": 3,
+      "stopped": false,
+      "timedOut": false,
+      "actions": [
+        "open_search(failed)",
+        "type(failed)",
         "type"
       ],
       "needsConfirm": false,
@@ -212,7 +840,7 @@
         "queryLanded": true,
         "querySubmitted": true,
         "filledAny": false,
-        "searchOpenAttempts": 0,
+        "searchOpenAttempts": 1,
         "siteSearchUrlTried": false,
         "fillScrolls": 0,
         "bookingStep": 0,
@@ -222,20 +850,117 @@
       },
       "stopReason": null,
       "botWall": false,
-      "finalUrl": "https://www.youtube.com/results?search_query=lofi+study+music+1+hour",
+      "finalUrl": "https://arxiv.org/search/astro-ph?query=federated+learning&searchtype=all&abstracts=show&order=-announced_date_first&size=50",
       "urlChanged": true,
-      "parsedQuery": "lofi study music",
+      "parsedQuery": "federated learning",
       "queryOnPage": {
         "inBox": true,
         "inUrl": true,
-        "inTitle": true
+        "inTitle": false
+      }
+    },
+    {
+      "site": "Stack Overflow",
+      "task": "search for webassembly simd",
+      "landedOn": "https://stackoverflow.com/questions",
+      "scanMs": 7057,
+      "pii": 4,
+      "marks": 78,
+      "sources": {
+        "dom": 4,
+        "vision_face": 0,
+        "vision_ocr": 0,
+        "merged": 4,
+        "faceOk": false
+      },
+      "frames": {
+        "total": 3,
+        "merged": 1,
+        "skipped": 2
+      },
+      "pipelineMs": 6331,
+      "screenshot": "real-stack-overflow.png",
+      "runMs": 100005,
+      "steps": 0,
+      "stopped": false,
+      "timedOut": true,
+      "actions": [],
+      "needsConfirm": false,
+      "needsInput": false,
+      "agentProgress": null,
+      "stopReason": null,
+      "botWall": false,
+      "finalUrl": "https://stackoverflow.com/questions",
+      "urlChanged": false,
+      "parsedQuery": "webassembly simd",
+      "queryOnPage": {
+        "inBox": false,
+        "inUrl": false,
+        "inTitle": false
+      }
+    },
+    {
+      "site": "W3C",
+      "task": "search for accessible name",
+      "landedOn": "https://www.w3.org/",
+      "scanMs": 2838,
+      "pii": 0,
+      "marks": 18,
+      "sources": {
+        "dom": 0,
+        "vision_face": 0,
+        "vision_ocr": 0,
+        "merged": 0,
+        "faceOk": true
+      },
+      "frames": {
+        "total": 1,
+        "merged": 1,
+        "skipped": 0
+      },
+      "pipelineMs": 2160,
+      "screenshot": "real-w3c.png",
+      "runMs": 2744,
+      "steps": 1,
+      "stopped": false,
+      "timedOut": false,
+      "actions": [
+        "open_search(failed)"
+      ],
+      "needsConfirm": false,
+      "needsInput": false,
+      "agentProgress": {
+        "navigated": false,
+        "searched": false,
+        "opened": [],
+        "scrolled": false,
+        "queryLanded": false,
+        "querySubmitted": false,
+        "filledAny": false,
+        "searchOpenAttempts": 1,
+        "siteSearchUrlTried": true,
+        "fillScrolls": 0,
+        "bookingStep": 0,
+        "fromTyped": false,
+        "toTyped": false,
+        "bookingCompleted": false
+      },
+      "stopReason": "Could not complete: search for \"accessible name\".",
+      "botWall": false,
+      "finalUrl": "https://www.w3.org/help/search/",
+      "urlChanged": true,
+      "parsedQuery": "accessible name",
+      "queryOnPage": {
+        "inBox": false,
+        "inUrl": false,
+        "inTitle": false
       }
     },
     {
       "site": "GitHub",
       "task": "search for onnxruntime",
       "landedOn": "https://github.com/",
-      "scanMs": 3297,
+      "scanMs": 2403,
       "pii": 3,
       "marks": 16,
       "sources": {
@@ -250,9 +975,9 @@
         "merged": 1,
         "skipped": 0
       },
-      "pipelineMs": 2866,
+      "pipelineMs": 2491,
       "screenshot": "real-github.png",
-      "runMs": 21133,
+      "runMs": 16064,
       "steps": 2,
       "stopped": false,
       "timedOut": false,
@@ -291,27 +1016,84 @@
       }
     },
     {
-      "site": "Stack Overflow",
-      "task": "search for webassembly simd",
-      "landedOn": "https://stackoverflow.com/questions",
-      "scanMs": 7209,
-      "pii": 2,
-      "marks": 79,
+      "site": "GitLab",
+      "task": "search for kubernetes operator",
+      "landedOn": "https://gitlab.com/explore/projects/active",
+      "scanMs": 5127,
+      "pii": 6,
+      "marks": 93,
       "sources": {
         "dom": 2,
         "vision_face": 0,
-        "vision_ocr": 0,
-        "merged": 2,
-        "faceOk": false
+        "vision_ocr": 4,
+        "merged": 6,
+        "faceOk": true
       },
       "frames": {
         "total": 1,
         "merged": 1,
         "skipped": 0
       },
-      "pipelineMs": 6240,
-      "screenshot": "real-stack-overflow.png",
-      "runMs": 17455,
+      "pipelineMs": 4936,
+      "screenshot": "real-gitlab.png",
+      "runMs": 14567,
+      "steps": 1,
+      "stopped": false,
+      "timedOut": false,
+      "actions": [
+        "type"
+      ],
+      "needsConfirm": false,
+      "needsInput": false,
+      "agentProgress": {
+        "navigated": false,
+        "searched": true,
+        "opened": [],
+        "scrolled": false,
+        "queryLanded": false,
+        "querySubmitted": false,
+        "filledAny": false,
+        "searchOpenAttempts": 1,
+        "siteSearchUrlTried": false,
+        "fillScrolls": 0,
+        "bookingStep": 0,
+        "fromTyped": false,
+        "toTyped": false,
+        "bookingCompleted": false
+      },
+      "stopReason": "Could not complete: search for \"kubernetes operator\".",
+      "botWall": false,
+      "finalUrl": "https://gitlab.com/explore/projects/active",
+      "urlChanged": false,
+      "parsedQuery": "kubernetes operator",
+      "queryOnPage": {
+        "inBox": false,
+        "inUrl": false,
+        "inTitle": false
+      }
+    },
+    {
+      "site": "npm",
+      "task": "search for tesseract.js",
+      "landedOn": "https://www.npmjs.com/",
+      "scanMs": 3330,
+      "pii": 0,
+      "marks": 14,
+      "sources": {
+        "dom": 0,
+        "vision_face": 0,
+        "vision_ocr": 0,
+        "merged": 0,
+        "faceOk": true
+      },
+      "frames": {
+        "total": 1,
+        "merged": 1,
+        "skipped": 0
+      },
+      "pipelineMs": 2581,
+      "screenshot": "real-npm.png",
+      "runMs": 8222,
       "steps": 1,
       "stopped": false,
       "timedOut": false,
@@ -338,22 +1120,22 @@
       },
       "stopReason": null,
       "botWall": false,
-      "finalUrl": "https://stackoverflow.com/search?q=webassembly+simd",
+      "finalUrl": "https://www.npmjs.com/package/tesseract.js",
       "urlChanged": true,
-      "parsedQuery": "webassembly simd",
+      "parsedQuery": "tesseract.js",
       "queryOnPage": {
         "inBox": false,
         "inUrl": true,
-        "inTitle": false
+        "inTitle": true
       }
     },
     {
-      "site": "MDN",
-      "task": "search for OffscreenCanvas",
-      "landedOn": "https://developer.mozilla.org/en-US/",
-      "scanMs": 2184,
+      "site": "PyPI",
+      "task": "search for fastapi",
+      "landedOn": "https://pypi.org/",
+      "scanMs": 1793,
       "pii": 0,
-      "marks": 24,
+      "marks": 12,
       "sources": {
         "dom": 0,
         "vision_face": 0,
@@ -366,28 +1148,27 @@
         "merged": 1,
         "skipped": 0
       },
-      "pipelineMs": 3253,
-      "screenshot": "real-mdn.png",
-      "runMs": 11420,
-      "steps": 2,
+      "pipelineMs": 2549,
+      "screenshot": "real-pypi.png",
+      "runMs": 9268,
+      "steps": 1,
       "stopped": false,
       "timedOut": false,
       "actions": [
-        "open_search(failed)",
-        "navigate"
+        "type"
       ],
       "needsConfirm": false,
       "needsInput": false,
       "agentProgress": {
         "navigated": false,
-        "searched": false,
+        "searched": true,
         "opened": [],
         "scrolled": false,
         "queryLanded": true,
         "querySubmitted": true,
         "filledAny": false,
-        "searchOpenAttempts": 1,
-        "siteSearchUrlTried": true,
+        "searchOpenAttempts": 0,
+        "siteSearchUrlTried": false,
         "fillScrolls": 0,
         "bookingStep": 0,
         "fromTyped": false,
@@ -396,37 +1177,95 @@
       },
       "stopReason": null,
       "botWall": false,
-      "finalUrl": "https://developer.mozilla.org/en-US/docs/Web/API/OffscreenCanvas",
+      "finalUrl": "https://pypi.org/search/?q=fastapi",
       "urlChanged": true,
-      "parsedQuery": "OffscreenCanvas",
+      "parsedQuery": "fastapi",
       "queryOnPage": {
         "inBox": false,
         "inUrl": true,
-        "inTitle": true
+        "inTitle": false
+      }
+    },
+    {
+      "site": "Docker Hub",
+      "task": "search for postgres",
+      "landedOn": "https://hub.docker.com/",
+      "scanMs": 4694,
+      "pii": 3,
+      "marks": 28,
+      "sources": {
+        "dom": 3,
+        "vision_face": 0,
+        "vision_ocr": 0,
+        "merged": 3,
+        "faceOk": true
+      },
+      "frames": {
+        "total": 2,
+        "merged": 2,
+        "skipped": 0
+      },
+      "pipelineMs": 4000,
+      "screenshot": "real-docker-hub.png",
+      "runMs": 14755,
+      "steps": 2,
+      "stopped": false,
+      "timedOut": false,
+      "actions": [
+        "open_search",
+        "type"
+      ],
+      "needsConfirm": false,
+      "needsInput": false,
+      "agentProgress": {
+        "navigated": false,
+        "searched": true,
+        "opened": [],
+        "scrolled": false,
+        "queryLanded": true,
+        "querySubmitted": true,
+        "filledAny": false,
+        "searchOpenAttempts": 1,
+        "siteSearchUrlTried": false,
+        "fillScrolls": 0,
+        "bookingStep": 0,
+        "fromTyped": false,
+        "toTyped": false,
+        "bookingCompleted": false
+      },
+      "stopReason": null,
+      "botWall": false,
+      "finalUrl": "https://hub.docker.com/search?q=postgres",
+      "urlChanged": true,
+      "parsedQuery": "postgres",
+      "queryOnPage": {
+        "inBox": false,
+        "inUrl": true,
+        "inTitle": false
       }
     },
     {
       "site": "BBC News",
       "task": "scroll down and show me more headlines",
       "landedOn": "https://www.bbc.com/news",
-      "scanMs": 2878,
-      "pii": 1,
+      "scanMs": 2292,
+      "pii": 5,
       "marks": 32,
       "sources": {
         "dom": 0,
-        "vision_face": 1,
+        "vision_face": 5,
         "vision_ocr": 0,
-        "merged": 1,
+        "merged": 5,
         "faceOk": true
       },
       "frames": {
-        "total": 6,
+        "total": 7,
         "merged": 4,
-        "skipped": 2
+        "skipped": 3
       },
-      "pipelineMs": 3286,
+      "pipelineMs": 2858,
       "screenshot": "real-bbc-news.png",
-      "runMs": 609,
+      "runMs": 319,
       "steps": 0,
       "stopped": false,
       "timedOut": false,
@@ -459,7 +1298,7 @@
       "site": "Hacker News",
       "task": "scroll down and show me more stories",
       "landedOn": "https://news.ycombinator.com/",
-      "scanMs": 6838,
+      "scanMs": 6803,
       "pii": 1,
       "marks": 174,
       "sources": {
@@ -474,9 +1313,9 @@
         "merged": 1,
         "skipped": 0
       },
-      "pipelineMs": 6160,
+      "pipelineMs": 6117,
       "screenshot": "real-hacker-news.png",
-      "runMs": 8277,
+      "runMs": 8234,
       "steps": 1,
       "stopped": false,
       "timedOut": false,
@@ -508,27 +1347,84 @@
       "parsedQuery": null
     },
     {
-      "site": "MakeMyTrip",
-      "task": "search for flights to goa",
-      "landedOn": "https://www.makemytrip.com/",
-      "scanMs": 5881,
-      "pii": 6,
-      "marks": 37,
+      "site": "The Hindu",
+      "task": "search for monsoon",
+      "landedOn": "https://www.thehindu.com/",
+      "scanMs": 4279,
+      "pii": 10,
+      "marks": 21,
       "sources": {
-        "dom": 5,
-        "vision_face": 0,
-        "vision_ocr": 1,
-        "merged": 6,
+        "dom": 8,
+        "vision_face": 2,
+        "vision_ocr": 0,
+        "merged": 10,
         "faceOk": true
       },
       "frames": {
-        "total": 1,
-        "merged": 1,
-        "skipped": 0
+        "total": 15,
+        "merged": 8,
+        "skipped": 7
       },
-      "pipelineMs": 5162,
-      "screenshot": "real-makemytrip.png",
-      "runMs": 21612,
+      "pipelineMs": 3337,
+      "screenshot": "real-the-hindu.png",
+      "runMs": 35285,
+      "steps": 1,
+      "stopped": false,
+      "timedOut": false,
+      "actions": [
+        "open_search(failed)"
+      ],
+      "needsConfirm": false,
+      "needsInput": false,
+      "agentProgress": {
+        "navigated": false,
+        "searched": false,
+        "opened": [],
+        "scrolled": false,
+        "queryLanded": false,
+        "querySubmitted": false,
+        "filledAny": false,
+        "searchOpenAttempts": 1,
+        "siteSearchUrlTried": true,
+        "fillScrolls": 0,
+        "bookingStep": 0,
+        "fromTyped": false,
+        "toTyped": false,
+        "bookingCompleted": false
+      },
+      "stopReason": "Could not complete: search for \"monsoon\".",
+      "botWall": false,
+      "finalUrl": "https://www.thehindu.com/search/#gsc.tab=0",
+      "urlChanged": true,
+      "parsedQuery": "monsoon",
+      "queryOnPage": {
+        "inBox": false,
+        "inUrl": false,
+        "inTitle": false
+      }
+    },
+    {
+      "site": "YouTube",
+      "task": "search for lofi study music",
+      "landedOn": "https://www.youtube.com/",
+      "scanMs": 1500,
+      "pii": 0,
+      "marks": 13,
+      "sources": {
+        "dom": 0,
+        "vision_face": 0,
+        "vision_ocr": 0,
+        "merged": 0,
+        "faceOk": true
+      },
+      "frames": {
+        "total": 3,
+        "merged": 2,
+        "skipped": 1
+      },
+      "pipelineMs": 1479,
+      "screenshot": "real-youtube.png",
+      "runMs": 8432,
       "steps": 1,
       "stopped": false,
       "timedOut": false,
@@ -542,22 +1438,362 @@
         "searched": true,
         "opened": [],
         "scrolled": false,
-        "queryLanded": false,
-        "querySubmitted": false,
+        "queryLanded": true,
+        "querySubmitted": true,
         "filledAny": false,
-        "searchOpenAttempts": 1,
+        "searchOpenAttempts": 0,
         "siteSearchUrlTried": false,
         "fillScrolls": 0,
         "bookingStep": 0,
         "fromTyped": false,
-        "toTyped": true,
+        "toTyped": false,
         "bookingCompleted": false
       },
-      "stopReason": "Could not complete: search for \"flights to goa\".",
+      "stopReason": null,
       "botWall": false,
-      "finalUrl": "https://www.makemytrip.com/",
+      "finalUrl": "https://www.youtube.com/results?search_query=lofi+study+music+bollywood",
+      "urlChanged": true,
+      "parsedQuery": "lofi study music",
+      "queryOnPage": {
+        "inBox": true,
+        "inUrl": true,
+        "inTitle": true
+      }
+    },
+    {
+      "site": "Reddit",
+      "task": "search for privacy tools",
+      "landedOn": "https://www.reddit.com/",
+      "scanMs": 1333,
+      "pii": 0,
+      "marks": 6,
+      "sources": {
+        "dom": 0,
+        "vision_face": 0,
+        "vision_ocr": 0,
+        "merged": 0,
+        "faceOk": true
+      },
+      "frames": {
+        "total": 5,
+        "merged": 2,
+        "skipped": 3
+      },
+      "pipelineMs": 1717,
+      "screenshot": "real-reddit.png",
+      "runMs": 269,
+      "steps": 0,
+      "stopped": false,
+      "timedOut": false,
+      "actions": [],
+      "needsConfirm": false,
+      "needsInput": false,
+      "agentProgress": {
+        "navigated": false,
+        "searched": false,
+        "opened": [],
+        "scrolled": false,
+        "queryLanded": false,
+        "querySubmitted": false,
+        "filledAny": false,
+        "searchOpenAttempts": 0,
+        "siteSearchUrlTried": false,
+        "fillScrolls": 0,
+        "bookingStep": 0,
+        "fromTyped": false,
+        "toTyped": false,
+        "bookingCompleted": false
+      },
+      "stopReason": "Stopped — the page is showing a CAPTCHA. This site is asking for a human, so it is over to you.",
+      "botWall": true,
+      "finalUrl": "https://www.reddit.com/",
       "urlChanged": false,
-      "parsedQuery": "flights to goa",
+      "parsedQuery": "privacy tools",
+      "queryOnPage": {
+        "inBox": false,
+        "inUrl": false,
+        "inTitle": false
+      }
+    },
+    {
+      "site": "India.gov.in",
+      "task": "search for pan card",
+      "landedOn": "https://www.india.gov.in/",
+      "scanMs": 4550,
+      "pii": 3,
+      "marks": 34,
+      "sources": {
+        "dom": 0,
+        "vision_face": 1,
+        "vision_ocr": 2,
+        "merged": 3,
+        "faceOk": true
+      },
+      "frames": {
+        "total": 1,
+        "merged": 1,
+        "skipped": 0
+      },
+      "pipelineMs": 3827,
+      "screenshot": "real-india-gov-in.png",
+      "runMs": 8589,
+      "steps": 1,
+      "stopped": false,
+      "timedOut": false,
+      "actions": [
+        "type"
+      ],
+      "needsConfirm": false,
+      "needsInput": false,
+      "agentProgress": {
+        "navigated": false,
+        "searched": true,
+        "opened": [],
+        "scrolled": false,
+        "queryLanded": true,
+        "querySubmitted": true,
+        "filledAny": false,
+        "searchOpenAttempts": 0,
+        "siteSearchUrlTried": false,
+        "fillScrolls": 0,
+        "bookingStep": 0,
+        "fromTyped": false,
+        "toTyped": false,
+        "bookingCompleted": false
+      },
+      "stopReason": null,
+      "botWall": false,
+      "finalUrl": "https://www.india.gov.in/search?search=PAN+Card+Services&type=all",
+      "urlChanged": true,
+      "parsedQuery": "pan card",
+      "queryOnPage": {
+        "inBox": true,
+        "inUrl": true,
+        "inTitle": false
+      }
+    },
+    {
+      "site": "Income Tax",
+      "task": "search for e filing",
+      "landedOn": "https://www.incometax.gov.in/iec/foportal/",
+      "scanMs": 4719,
+      "pii": 4,
+      "marks": 32,
+      "sources": {
+        "dom": 4,
+        "vision_face": 0,
+        "vision_ocr": 0,
+        "merged": 4,
+        "faceOk": true
+      },
+      "frames": {
+        "total": 2,
+        "merged": 1,
+        "skipped": 1
+      },
+      "pipelineMs": 3976,
+      "screenshot": "real-income-tax.png",
+      "runMs": 14575,
+      "steps": 1,
+      "stopped": false,
+      "timedOut": false,
+      "actions": [
+        "type"
+      ],
+      "needsConfirm": false,
+      "needsInput": false,
+      "agentProgress": {
+        "navigated": false,
+        "searched": true,
+        "opened": [],
+        "scrolled": false,
+        "queryLanded": true,
+        "querySubmitted": false,
+        "filledAny": false,
+        "searchOpenAttempts": 0,
+        "siteSearchUrlTried": true,
+        "fillScrolls": 0,
+        "bookingStep": 0,
+        "fromTyped": false,
+        "toTyped": false,
+        "bookingCompleted": false
+      },
+      "stopReason": null,
+      "botWall": false,
+      "finalUrl": "https://www.incometax.gov.in/iec/foportal/",
+      "urlChanged": false,
+      "parsedQuery": "e filing",
+      "queryOnPage": {
+        "inBox": true,
+        "inUrl": false,
+        "inTitle": false
+      }
+    },
+    {
+      "site": "UIDAI",
+      "task": "search for aadhaar update",
+      "landedOn": "https://uidai.gov.in/hi",
+      "scanMs": 3538,
+      "pii": 11,
+      "marks": 29,
+      "sources": {
+        "dom": 10,
+        "vision_face": 1,
+        "vision_ocr": 0,
+        "merged": 11,
+        "faceOk": true
+      },
+      "frames": {
+        "total": 1,
+        "merged": 1,
+        "skipped": 0
+      },
+      "pipelineMs": 2774,
+      "screenshot": "real-uidai.png",
+      "runMs": 11115,
+      "steps": 1,
+      "stopped": false,
+      "timedOut": false,
+      "actions": [
+        "type"
+      ],
+      "needsConfirm": false,
+      "needsInput": false,
+      "agentProgress": {
+        "navigated": false,
+        "searched": true,
+        "opened": [],
+        "scrolled": false,
+        "queryLanded": true,
+        "querySubmitted": true,
+        "filledAny": false,
+        "searchOpenAttempts": 0,
+        "siteSearchUrlTried": false,
+        "fillScrolls": 0,
+        "bookingStep": 0,
+        "fromTyped": false,
+        "toTyped": false,
+        "bookingCompleted": false
+      },
+      "stopReason": null,
+      "botWall": false,
+      "finalUrl": "https://uidai.gov.in/hi/search?query=aadhaar%20update",
+      "urlChanged": true,
+      "parsedQuery": "aadhaar update",
+      "queryOnPage": {
+        "inBox": true,
+        "inUrl": true,
+        "inTitle": false
+      }
+    },
+    {
+      "site": "Naukri",
+      "task": "search for python developer jobs",
+      "landedOn": "https://www.naukri.com/",
+      "scanMs": 3101,
+      "pii": 6,
+      "marks": 30,
+      "sources": {
+        "dom": 5,
+        "vision_face": 1,
+        "vision_ocr": 0,
+        "merged": 6,
+        "faceOk": true
+      },
+      "frames": {
+        "total": 1,
+        "merged": 1,
+        "skipped": 0
+      },
+      "pipelineMs": 2415,
+      "screenshot": "real-naukri.png",
+      "runMs": 17792,
+      "steps": 1,
+      "stopped": false,
+      "timedOut": false,
+      "actions": [
+        "type"
+      ],
+      "needsConfirm": false,
+      "needsInput": false,
+      "agentProgress": {
+        "navigated": false,
+        "searched": true,
+        "opened": [],
+        "scrolled": false,
+        "queryLanded": true,
+        "querySubmitted": true,
+        "filledAny": false,
+        "searchOpenAttempts": 0,
+        "siteSearchUrlTried": false,
+        "fillScrolls": 0,
+        "bookingStep": 0,
+        "fromTyped": false,
+        "toTyped": false,
+        "bookingCompleted": false
+      },
+      "stopReason": "Stopped — the page is showing a CAPTCHA. This site is asking for a human, so it is over to you.",
+      "botWall": true,
+      "finalUrl": "https://www.naukri.com/python-developer-jobs?k=python%20developer%20jobs",
+      "urlChanged": true,
+      "parsedQuery": "python developer jobs",
+      "queryOnPage": {
+        "inBox": true,
+        "inUrl": true,
+        "inTitle": true
+      }
+    },
+    {
+      "site": "Zomato",
+      "task": "search for pizza",
+      "landedOn": "https://www.zomato.com/",
+      "scanMs": 13178,
+      "pii": 1,
+      "marks": 2,
+      "sources": {
+        "dom": 1,
+        "vision_face": 0,
+        "vision_ocr": 0,
+        "merged": 1,
+        "faceOk": true
+      },
+      "frames": {
+        "total": 1,
+        "merged": 1,
+        "skipped": 0
+      },
+      "pipelineMs": 3232,
+      "screenshot": "real-zomato.png",
+      "runMs": 16575,
+      "steps": 1,
+      "stopped": false,
+      "timedOut": false,
+      "actions": [
+        "open_search(failed)"
+      ],
+      "needsConfirm": false,
+      "needsInput": false,
+      "agentProgress": {
+        "navigated": false,
+        "searched": false,
+        "opened": [],
+        "scrolled": false,
+        "queryLanded": false,
+        "querySubmitted": false,
+        "filledAny": false,
+        "searchOpenAttempts": 1,
+        "siteSearchUrlTried": true,
+        "fillScrolls": 0,
+        "bookingStep": 0,
+        "fromTyped": false,
+        "toTyped": false,
+        "bookingCompleted": false
+      },
+      "stopReason": "Could not complete: search for \"pizza\".",
+      "botWall": false,
+      "finalUrl": "https://www.zomato.com/",
+      "urlChanged": false,
+      "parsedQuery": "pizza",
       "queryOnPage": {
         "inBox": false,
         "inUrl": false,

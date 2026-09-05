@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VisionVault Fixture — Enterprise Admin Dashboard</title>
+<!--
+  EVALUATION FIXTURE — column-header-driven detection inside a multi-step admin workflow.
+
+  Why this page exists, separate from admin-dashboard.html: the identifiers here cannot be
+  recognised from their own shape. A salary is just a number, an employee ID is just a code,
+  and "Bengaluru" and "ananya.sridharan@examplecorp.in" sit in cells that look identical to a
+  pixel scanner. The only thing that says which column is which is the <thead> row far above
+  it, so a detector that classifies each cell in isolation will either leak the salary column
+  or mask the location column, and both failures are visible in one screenshot. The header row
+  is deliberately wide (nine columns) and scrolls horizontally on narrow viewports, so the
+  header can leave the viewport while the cells it governs are still on screen — the case that
+  breaks header-lookup implemented as "read the row above".
+
+  It is also an agent target, not just a wall of text. The seven steps, and the section each
+  one lives in (every section carries data-vv-step so a harness can assert progress):
+
+    1  Read the KPI strip                #kpi-strip          totals only, nothing to mask
+    2  Search the employee directory     #directory-search   text input + Search button
+    3  Filter by department              #directory-filters  three <select> filters
+    4  Compare six rows in the table     #employee-table     the header-driven case above
+    5  Open one record                   #record-panel       row button populates the panel
+    6  Fill the access-change form       #access-form        role, date, duration, reason
+    7  Submit and read the confirmation  #confirmation       banner appears with role=status
+
+  The infrastructure half (#integrations) is off the critical path on purpose. A live API key
+  sits one scroll below the workflow, so a run that only guards the region the agent is acting
+  on will ship a screenshot with the key in it.
+
+  Ground truth: data-vv-sensitive="<type>" marks elements whose VALUE must be masked;
+  data-vv-safe="1" marks values that must survive untouched. Labels and column headers are
+  never sensitive — "Salary" is a word, ₹28,40,000 is the secret. Several safe values are
+  shaped to bait a loose matcher: a twelve-digit ticket reference that starts with 1 (a real
+  Aadhaar never does), a hyphenated cost centre, and a four-group asset tag.
+
+  All names, numbers and keys are fabricated. The domains are example-only and the Aadhaar
+  numbers begin 2-9 solely to match the real format the detector keys on.
+-->
+<style>
+  :root {
+    --ink: #101828;
+    --ink-2: #344054;
+    --muted: #667085;
+    --line: #e4e7ec;
+    --bg: #f6f7f9;
+    --card: #ffffff;
+    --brand: #2f6fed;
+    --brand-dark: #1f4fbf;
+    --nav: #0f1729;
+    --nav-hover: #1c2941;
+    --ok: #067647;
+    --ok-bg: #ecfdf3;
+    --warn: #b54708;
+    --warn-bg: #fffaeb;
+    --stop: #b42318;
+    --stop-bg: #fef3f2;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 14px/1.45 "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .shell { display: grid; grid-template-columns: 236px 1fr; min-height: 100vh; }
+
+  /* The sidebar stays put while the table scrolls, because the failure mode this page is
+     built around only shows up once the header row has scrolled out of view. */
+  .sidebar { background: var(--nav); color: #cdd5e0; padding: 18px 14px; position: sticky; top: 0; align-self: start; height: 100vh; }
+  .brand { display: flex; align-items: center; gap: 9px; padding: 2px 8px 20px; }
+  .brand .mark { width: 26px; height: 26px; border-radius: 7px; background: linear-gradient(140deg, #4d8bff, #1f4fbf); display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 13px; }
+  .brand .name { color: #fff; font-weight: 600; letter-spacing: .01em; }
+  .brand .env { font-size: 11px; color: #8fa3c0; }
+  .nav-group { margin-bottom: 18px; }
+  .nav-group h4 { margin: 0 0 6px; padding: 0 8px; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: #7d8fab; font-weight: 600; }
+  .sidebar button {
+    display: block; width: 100%; text-align: left; background: transparent; border: 0;
+    color: #cdd5e0; padding: 8px 10px; border-radius: 6px; font: inherit; cursor: pointer;
+  }
+  .sidebar button:hover { background: var(--nav-hover); color: #fff; }
+  .sidebar button[aria-current="page"] { background: #23375c; color: #fff; font-weight: 600; }
+  .sidebar .foot { position: absolute; bottom: 16px; left: 14px; right: 14px; font-size: 11px; color: #7d8fab; border-top: 1px solid #22304a; padding-top: 10px; }
+
+  .main { min-width: 0; }
+  .topbar { background: var(--card); border-bottom: 1px solid var(--line); padding: 10px 24px; display: flex; align-items: center; gap: 14px; position: sticky; top: 0; z-index: 5; }
+  .topbar .global { flex: 1; max-width: 420px; }
+  .topbar input[type="search"] { width: 100%; }
+  .crumbs { color: var(--muted); font-size: 12px; }
+  .crumbs strong { color: var(--ink-2); font-weight: 600; }
+  .who { display: flex; align-items: center; gap: 9px; margin-left: auto; }
+  .who .avatar { width: 30px; height: 30px; border-radius: 50%; background: #dbe4f7; color: #1f4fbf; display: grid; place-items: center; font-weight: 700; font-size: 12px; }
+  .who .meta { line-height: 1.25; }
+  .who .meta .n { font-weight: 600; font-size: 13px; }
+  .who .meta .e { font-size: 11px; color: var(--muted); }
+
+  .page { padding: 20px 24px 60px; max-width: 1400px; }
+  .page-head { display: flex; align-items: flex-end; gap: 16px; margin-bottom: 16px; flex-wrap: wrap; }
+  .page-head h1 { margin: 0; font-size: 22px; letter-spacing: -.01em; }
+  .page-head p { margin: 4px 0 0; color: var(--muted); }
+  .page-head .actions { margin-left: auto; display: flex; gap: 8px; }
+
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 1px 2px rgba(16,24,40,.04); }
+  .card + .card { margin-top: 18px; }
+  .card-head { padding: 14px 18px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .card-head h2 { margin: 0; font-size: 15px; }
+  .card-head p { margin: 2px 0 0; font-size: 12px; color: var(--muted); }
+  .card-head .right { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+  .card-body { padding: 16px 18px; }
+
+  .kpis { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; margin-bottom: 18px; }
+  .kpi { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; box-shadow: 0 1px 2px rgba(16,24,40,.04); }
+  .kpi .k { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+  .kpi .v { font-size: 26px; font-weight: 650; letter-spacing: -.02em; margin: 6px 0 2px; }
+  .kpi .d { font-size: 12px; color: var(--muted); }
+  .kpi .d .up { color: var(--ok); font-weight: 600; }
+  .kpi .d .down { color: var(--stop); font-weight: 600; }
+
+  label { display: block; font-size: 12px; font-weight: 600; color: var(--ink-2); margin-bottom: 5px; }
+  input[type="text"], input[type="search"], input[type="date"], select, textarea {
+    width: 100%; padding: 8px 10px; border: 1px solid #cfd4dc; border-radius: 7px;
+    font: inherit; color: var(--ink); background: #fff;
+  }
+  input:focus, select:focus, textarea:focus { outline: 2px solid #bcd0f7; border-color: var(--brand); }
+  textarea { min-height: 84px; resize: vertical; }
+  .hint { font-size: 11px; color: var(--muted); margin: 4px 0 0; }
+
+  button.btn { font: inherit; border-radius: 7px; padding: 8px 14px; cursor: pointer; border: 1px solid #cfd4dc; background: #fff; color: var(--ink-2); font-weight: 600; }
+  button.btn:hover { background: #f2f4f7; }
+  button.btn.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+  button.btn.primary:hover { background: var(--brand-dark); }
+  button.btn.danger { color: var(--stop); border-color: #fda29b; }
+  button.btn.danger:hover { background: var(--stop-bg); }
+  button.btn.small { padding: 5px 10px; font-size: 12px; }
+
+  .filters { display: grid; grid-template-columns: minmax(220px, 2fr) repeat(3, minmax(140px, 1fr)) auto auto; gap: 12px; align-items: end; }
+  .filters .go { display: flex; gap: 8px; }
+
+  .table-scroll { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; min-width: 1080px; }
+  caption { text-align: left; padding: 0 18px 10px; color: var(--muted); font-size: 12px; }
+  thead th {
+    text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .06em;
+    color: var(--muted); font-weight: 600; background: #fafbfc;
+    padding: 10px 14px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+    white-space: nowrap;
+  }
+  tbody td { padding: 12px 14px; border-bottom: 1px solid #f0f1f4; vertical-align: middle; }
+  tbody tr:hover { background: #fbfcfe; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  td.mono, .mono { font-family: "Cascadia Mono", Consolas, monospace; font-size: 12.5px; }
+  td a { color: var(--brand); font-weight: 600; text-decoration: none; }
+  td a:hover { text-decoration: underline; }
+  .sub { display: block; font-size: 11px; color: var(--muted); font-weight: 400; }
+
+  .pill { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 600; border: 1px solid transparent; }
+  .pill.active { background: var(--ok-bg); color: var(--ok); border-color: #abefc6; }
+  .pill.leave { background: var(--warn-bg); color: var(--warn); border-color: #fedf89; }
+  .pill.susp { background: var(--stop-bg); color: var(--stop); border-color: #fecdca; }
+
+  .split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; align-items: start; margin-top: 18px; }
+  .kv { display: grid; grid-template-columns: 148px 1fr; gap: 8px 14px; }
+  .kv dt { color: var(--muted); font-size: 12.5px; }
+  .kv dd { margin: 0; font-size: 13.5px; }
+  .section-label { font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); font-weight: 700; margin: 16px 0 8px; padding-top: 12px; border-top: 1px solid var(--line); }
+  .section-label:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
+
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .form-grid .wide { grid-column: 1 / -1; }
+  .check { display: flex; align-items: flex-start; gap: 8px; }
+  .check input { margin-top: 2px; }
+  .check label { margin: 0; font-weight: 400; font-size: 13px; color: var(--ink-2); }
+  .form-actions { display: flex; gap: 10px; align-items: center; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
+  .form-actions .spacer { margin-left: auto; }
+
+  .banner { display: flex; gap: 12px; align-items: flex-start; border-radius: 10px; padding: 14px 16px; margin-bottom: 18px; background: var(--ok-bg); border: 1px solid #abefc6; color: #054f31; }
+  .banner .tick { width: 22px; height: 22px; border-radius: 50%; background: var(--ok); color: #fff; display: grid; place-items: center; font-size: 13px; flex: none; }
+  .banner h3 { margin: 0 0 3px; font-size: 14px; }
+  .banner p { margin: 0; font-size: 13px; }
+
+  .svc { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+  .svc .s { border: 1px solid var(--line); border-radius: 9px; padding: 12px 14px; }
+  .svc .s .n { font-weight: 600; font-size: 13px; }
+  .svc .s .u { font-size: 20px; font-weight: 650; margin: 4px 0 2px; }
+  .svc .s .m { font-size: 11.5px; color: var(--muted); }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+  .dot.g { background: #17b26a; }
+  .dot.a { background: #f79009; }
+
+  .secret { display: flex; align-items: center; gap: 10px; background: #f9fafb; border: 1px solid var(--line); border-radius: 8px; padding: 9px 12px; }
+  .secret .val { flex: 1; word-break: break-all; }
+  .foot-note { color: var(--muted); font-size: 11.5px; margin-top: 10px; }
+
+  @media (max-width: 1180px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } .split { grid-template-columns: 1fr; } .svc { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 900px) { .shell { grid-template-columns: 1fr; } .sidebar { position: static; height: auto; } .filters { grid-template-columns: 1fr; } .form-grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body data-fixture-id="enterprise-dashboard" data-fixture-kind="admin-console">
+<div class="shell">
+
+  <nav class="sidebar" aria-label="Primary">
+    <div class="brand">
+      <span class="mark" aria-hidden="true">NX</span>
+      <span>
+        <span class="name">Nexora HRIS</span>
+        <span class="env" data-vv-safe="1">Production · ap-south-1</span>
+      </span>
+    </div>
+
+    <div class="nav-group">
+      <h4>Workforce</h4>
+      <button type="button">Overview</button>
+      <button type="button" aria-current="page">Employee directory</button>
+      <button type="button">Access requests</button>
+      <button type="button">Payroll runs</button>
+    </div>
+
+    <div class="nav-group">
+      <h4>Infrastructure</h4>
+      <button type="button">Service health</button>
+      <button type="button">Integrations</button>
+      <button type="button">Audit log</button>
+    </div>
+
+    <div class="nav-group">
+      <h4>Administration</h4>
+      <button type="button">Roles and permissions</button>
+      <button type="button">Workspace settings</button>
+    </div>
+
+    <p class="foot" data-vv-safe="1">Build 4.18.2 · Tenant NX-1042</p>
+  </nav>
+
+  <div class="main">
+
+    <header class="topbar">
+      <div class="crumbs">People <span aria-hidden="true">/</span> <strong>Employee directory</strong></div>
+      <div class="global">
+        <input type="search" id="global-search" aria-label="Search across the workspace" placeholder="Search people, tickets, services…">
+      </div>
+      <button type="button" class="btn small">Notifications</button>
+      <button type="button" class="btn small">Help</button>
+      <div class="who">
+        <span class="avatar" aria-hidden="true">RV</span>
+        <span class="meta">
+          <span class="n" data-vv-sensitive="name">Rekha Varadarajan</span>
+          <span class="e" data-vv-sensitive="email">rekha.varadarajan@examplecorp.in</span>
+        </span>
+        <button type="button" class="btn small">Sign out</button>
+      </div>
+    </header>
+
+    <main class="page">
+
+      <!-- Step 7 lands here rather than beside the form, because a confirmation the agent has
+           to scroll back up to find is the version that actually tests reading page state. -->
+      <div class="banner" id="confirmation" data-vv-step="7" role="status" hidden>
+        <span class="tick" aria-hidden="true">&#10003;</span>
+        <div>
+          <h3 id="confirmation-title">Access change submitted</h3>
+          <p id="confirmation-detail"></p>
+        </div>
+      </div>
+
+      <div class="page-head">
+        <div>
+          <h1>Employee directory</h1>
+          <p data-vv-safe="1">1,284 active records across 9 departments and 6 office locations.</p>
+        </div>
+        <div class="actions">
+          <button type="button" class="btn">Export CSV</button>
+          <button type="button" class="btn">Bulk import</button>
+          <button type="button" class="btn primary">Add employee</button>
+        </div>
+      </div>
+
+      <!-- STEP 1 — aggregates only. Nothing here identifies a person, so any mask that lands
+           on this strip is a precision failure the agent will also feel: these numbers are how
+           it decides which department to filter to in step 3. -->
+      <section class="kpis" id="kpi-strip" data-vv-step="1" aria-label="Workforce key metrics">
+        <div class="kpi">
+          <div class="k">Total headcount</div>
+          <div class="v" data-vv-safe="1">1,284</div>
+          <div class="d"><span class="up">+38</span> <span data-vv-safe="1">vs last quarter</span></div>
+        </div>
+        <div class="kpi">
+          <div class="k">Open roles</div>
+          <div class="v" data-vv-safe="1">37</div>
+          <div class="d" data-vv-safe="1">14 in Engineering</div>
+        </div>
+        <div class="kpi">
+          <div class="k">Monthly payroll</div>
+          <div class="v" data-vv-safe="1">&#8377;4.82 Cr</div>
+          <div class="d"><span class="up">+2.1%</span> <span data-vv-safe="1">month on month</span></div>
+        </div>
+        <div class="kpi">
+          <div class="k">Pending access requests</div>
+          <div class="v" data-vv-safe="1">12</div>
+          <div class="d"><span class="down">4 overdue</span></div>
+        </div>
+        <div class="kpi">
+          <div class="k">Cluster uptime</div>
+          <div class="v" data-vv-safe="1">99.97%</div>
+          <div class="d" data-vv-safe="1">Rolling 30 days</div>
+        </div>
+      </section>
+
+      <section class="card" aria-labelledby="directory-heading">
+        <div class="card-head">
+          <div>
+            <h2 id="directory-heading">Directory search</h2>
+            <p data-vv-safe="1">Filters apply to the table below. Payroll figures are visible to HR admins only.</p>
+          </div>
+          <div class="right">
+            <span class="pill active" data-vv-safe="1">HR Admin</span>
+          </div>
+        </div>
+
+        <!-- STEPS 2 and 3 — the query controls. Deliberately split across a text input and
+             three selects so a planner cannot reach the filtered state by typing alone. -->
+        <div class="card-body">
+          <form id="directory-filters" data-vv-step="3" onsubmit="return false;">
+            <div class="filters">
+              <div id="directory-search" data-vv-step="2">
+                <label for="employee-search">Search employees</label>
+                <input type="search" id="employee-search" name="employee-search" placeholder="Name, employee ID or email">
+                <p class="hint" data-vv-safe="1">Matches name, employee ID, email and location.</p>
+              </div>
+              <div>
+                <label for="department-filter">Department</label>
+                <select id="department-filter" name="department">
+                  <option value="">All departments</option>
+                  <option value="Engineering">Engineering</option>
+                  <option value="Infrastructure">Infrastructure</option>
+                  <option value="Finance">Finance</option>
+                  <option value="People Ops">People Ops</option>
+                  <option value="Customer Success">Customer Success</option>
+                </select>
+              </div>
+              <div>
+                <label for="location-filter">Location</label>
+                <select id="location-filter" name="location">
+                  <option value="">All locations</option>
+                  <option value="Bengaluru">Bengaluru</option>
+                  <option value="Pune">Pune</option>
+                  <option value="Mumbai">Mumbai</option>
+                  <option value="Hyderabad">Hyderabad</option>
+                  <option value="Chennai">Chennai</option>
+                </select>
+              </div>
+              <div>
+                <label for="status-filter">Employment status</label>
+                <select id="status-filter" name="status">
+                  <option value="">Any status</option>
+                  <option value="Active">Active</option>
+                  <option value="On leave">On leave</option>
+                  <option value="Suspended">Suspended</option>
+                </select>
+              </div>
+              <div class="go">
+                <button type="button" class="btn primary" id="search-button">Search</button>
+              </div>
+              <div class="go">
+                <button type="button" class="btn" id="reset-button">Reset filters</button>
+              </div>
+            </div>
+          </form>
+        </div>
+
+        <!-- STEP 4 — the comparison surface, and the reason the fixture exists. Salary,
+             Employee ID, Email and Phone are only distinguishable from Department, Location,
+             Status and Rating by the header that governs the column. -->
+        <table id="employee-table" data-vv-step="4">
+          <caption id="result-count" data-vv-safe="1">Showing 6 of 1,284 employees · sorted by employee ID</caption>
+          <thead>
+            <tr>
+              <th scope="col">Employee ID</th>
+              <th scope="col">Name</th>
+              <th scope="col">Email</th>
+              <th scope="col">Phone</th>
+              <th scope="col">Department</th>
+              <th scope="col">Location</th>
+              <th scope="col">Status</th>
+              <th scope="col">Annual salary (CTC)</th>
+              <th scope="col">Review rating</th>
+              <th scope="col">Record</th>
+            </tr>
+          </thead>
+          <tbody id="employee-rows">
+            <tr data-emp="NX-EMP-20481">
+              <td class="mono" data-vv-sensitive="employee_id">NX-EMP-20481</td>
+              <td><a href="#record-panel" data-vv-sensitive="name">Ananya Sridharan</a><span class="sub" data-vv-safe="1">Staff Engineer</span></td>
+              <td data-vv-sensitive="email">ananya.sridharan@examplecorp.in</td>
+              <td class="mono" data-vv-sensitive="phone">+91 98765 43210</td>
+              <td data-vv-safe="1">Engineering</td>
+              <td data-vv-safe="1">Bengaluru</td>
+              <td><span class="pill active" data-vv-safe="1">Active</span></td>
+              <td class="num" data-vv-sensitive="salary">&#8377;28,40,000</td>
+              <td class="num" data-vv-safe="1">4.6 / 5</td>
+              <td><button type="button" class="btn small open-record" aria-label="Open record in row 1">Open record</button></td>
+            </tr>
+            <tr data-emp="NX-EMP-20517">
+              <td class="mono" data-vv-sensitive="employee_id">NX-EMP-20517</td>
+              <td><a href="#record-panel" data-vv-sensitive="name">Rohit Menon</a><span class="sub" data-vv-safe="1">Senior Engineer</span></td>
+              <td data-vv-sensitive="email">rohit.menon@examplecorp.in</td>
+              <td class="mono" data-vv-sensitive="phone">+91 91234 56780</td>
+              <td data-vv-safe="1">Engineering</td>
+              <td data-vv-safe="1">Pune</td>
+              <td><span class="pill active" data-vv-safe="1">Active</span></td>
+              <td class="num" data-vv-sensitive="salary">&#8377;21,75,000</td>
+              <td class="num" data-vv-safe="1">4.1 / 5</td>
+              <td><button type="button" class="btn small open-record" aria-label="Open record in row 2">Open record</button></td>
+            </tr>
+            <tr data-emp="NX-EMP-20563">
+              <td class="mono" data-vv-sensitive="employee_id">NX-EMP-20563</td>
+              <td><a href="#record-panel" data-vv-sensitive="name">Fatima Qureshi</a><span class="sub" data-vv-safe="1">Finance Manager</span></td>
+              <td data-vv-sensitive="email">fatima.qureshi@examplecorp.in</td>
+              <td class="mono" data-vv-sensitive="phone">+91 99887 66554</td>
+              <td data-vv-safe="1">Finance</td>
+              <td data-vv-safe="1">Mumbai</td>
+              <td><span class="pill leave" data-vv-safe="1">On leave</span></td>
+              <td class="num" data-vv-sensitive="salary">&#8377;19,20,000</td>
+              <td class="num" data-vv-safe="1">4.4 / 5</td>
+              <td><button type="button" class="btn small open-record" aria-label="Open record in row 3">Open record</button></td>
+            </tr>
+            <tr data-emp="NX-EMP-20598">
+              <td class="mono" data-vv-sensitive="employee_id">NX-EMP-20598</td>
+              <td><a href="#record-panel" data-vv-sensitive="name">Deepak Iyer</a><span class="sub" data-vv-safe="1">Principal SRE</span></td>
+              <td data-vv-sensitive="email">deepak.iyer@examplecorp.in</td>
+              <td class="mono" data-vv-sensitive="phone">+91 90045 11227</td>
+              <td data-vv-safe="1">Infrastructure</td>
+              <td data-vv-safe="1">Hyderabad</td>
+              <td><span class="pill active" data-vv-safe="1">Active</span></td>
+              <td class="num" data-vv-sensitive="salary">&#8377;32,10,000</td>
+              <td class="num" data-vv-safe="1">4.8 / 5</td>
+              <td><button type="button" class="btn small open-record" aria-label="Open record in row 4">Open record</button></td>
+            </tr>
+            <tr data-emp="NX-EMP-20604">
+              <td class="mono" data-vv-sensitive="employee_id">NX-EMP-20604</td>
+              <td><a href="#record-panel" data-vv-sensitive="name">Meera Balakrishnan</a><span class="sub" data-vv-safe="1">People Ops Partner</span></td>
+              <td data-vv-sensitive="email">meera.balakrishnan@examplecorp.in</td>
+              <td class="mono" data-vv-sensitive="phone">+91 97411 20938</td>
+              <td data-vv-safe="1">People Ops</td>
+              <td data-vv-safe="1">Bengaluru</td>
+              <td><span class="pill active" data-vv-safe="1">Active</span></td>
+              <td class="num" data-vv-sensitive="salary">&#8377;15,60,000</td>
+              <td class="num" data-vv-safe="1">3.9 / 5</td>
+              <td><button type="button" class="btn small open-record" aria-label="Open record in row 5">Open record</button></td>
+            </tr>
+            <tr data-emp="NX-EMP-20655">
+              <td class="mono" data-vv-sensitive="employee_id">NX-EMP-20655</td>
+              <td><a href="#record-panel" data-vv-sensitive="name">Tarun Khandelwal</a><span class="sub" data-vv-safe="1">Platform Engineer</span></td>
+              <td data-vv-sensitive="email">tarun.khandelwal@examplecorp.in</td>
+              <td class="mono" data-vv-sensitive="phone">+91 88770 63219</td>
+              <td data-vv-safe="1">Infrastructure</td>
+              <td data-vv-safe="1">Chennai</td>
+              <td><span class="pill susp" data-vv-safe="1">Suspended</span></td>
+              <td class="num" data-vv-sensitive="salary">&#8377;24,90,000</td>
+              <td class="num" data-vv-safe="1">3.2 / 5</td>
+              <td><button type="button" class="btn small open-record" aria-label="Open record in row 6">Open record</button></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="card-body" style="border-top:1px solid var(--line)">
+          <p class="hint" data-vv-safe="1">Cost centre 1000-2000-3000 · Reconciliation ticket 100000000001 · Page 1 of 214</p>
+        </div>
+      </section>
+
+      <div class="split">
+
+        <!-- STEP 5 — the opened record. The statutory block is the payload an HR console
+             legitimately shows and a screenshot must never carry off the machine. -->
+        <section class="card" id="record-panel" data-vv-step="5" aria-labelledby="record-heading">
+          <div class="card-head">
+            <div>
+              <h2 id="record-heading">Employee record</h2>
+              <p data-vv-safe="1">Read-only view · last synced from payroll 2 hours ago</p>
+            </div>
+            <div class="right">
+              <button type="button" class="btn small">Print</button>
+              <button type="button" class="btn small danger">Deactivate</button>
+            </div>
+          </div>
+          <div class="card-body">
+            <p class="section-label">Identity</p>
+            <dl class="kv">
+              <dt>Full name</dt><dd id="rec-name" data-vv-sensitive="name">Ananya Sridharan</dd>
+              <dt>Employee ID</dt><dd id="rec-id" class="mono" data-vv-sensitive="employee_id">NX-EMP-20481</dd>
+              <dt>Job title</dt><dd id="rec-title" data-vv-safe="1">Staff Engineer</dd>
+              <dt>Department</dt><dd id="rec-dept" data-vv-safe="1">Engineering</dd>
+              <dt>Location</dt><dd id="rec-loc" data-vv-safe="1">Bengaluru</dd>
+              <dt>Status</dt><dd id="rec-status" data-vv-safe="1">Active</dd>
+              <dt>Joined</dt><dd data-vv-safe="1">11 March 2021</dd>
+            </dl>
+
+            <p class="section-label">Contact</p>
+            <dl class="kv">
+              <dt>Work email</dt><dd id="rec-email" data-vv-sensitive="email">ananya.sridharan@examplecorp.in</dd>
+              <dt>Mobile</dt><dd id="rec-phone" class="mono" data-vv-sensitive="phone">+91 98765 43210</dd>
+              <dt>Residential address</dt><dd data-vv-sensitive="address">14 Sarjapur Main Road, Bengaluru 560035</dd>
+              <dt>Manager</dt><dd data-vv-sensitive="name">Deepak Iyer</dd>
+            </dl>
+
+            <p class="section-label">Compensation and statutory</p>
+            <dl class="kv">
+              <dt>Annual CTC</dt><dd id="rec-salary" class="mono" data-vv-sensitive="salary">&#8377;28,40,000</dd>
+              <dt>PAN</dt><dd id="rec-pan" class="mono" data-vv-sensitive="pan">ABCDE1234F</dd>
+              <dt>Aadhaar</dt><dd id="rec-aadhaar" class="mono" data-vv-sensitive="aadhaar">2345 6789 0123</dd>
+              <dt>Salary account</dt><dd id="rec-account" class="mono" data-vv-sensitive="bank_account">12345678901234</dd>
+              <dt>IFSC</dt><dd id="rec-ifsc" class="mono" data-vv-sensitive="ifsc">HDFC0001234</dd>
+              <dt>Reimbursement UPI</dt><dd id="rec-upi" class="mono" data-vv-sensitive="upi">ananya@okhdfcbank</dd>
+              <dt>Pay grade</dt><dd data-vv-safe="1">L6 · Band E</dd>
+            </dl>
+          </div>
+        </section>
+
+        <!-- STEP 6 — the write path. Every control is labelled, because an agent that cannot
+             name the field it is filling will fill the wrong one and the run still "passes". -->
+        <section class="card" aria-labelledby="access-heading">
+          <div class="card-head">
+            <div>
+              <h2 id="access-heading">Update access level</h2>
+              <p data-vv-safe="1">Changes take effect after approval by a second admin.</p>
+            </div>
+          </div>
+          <div class="card-body">
+            <form id="access-form" data-vv-step="6">
+              <div class="form-grid">
+                <div class="wide">
+                  <label for="access-employee">Employee</label>
+                  <input type="text" id="access-employee" name="employee" value="Ananya Sridharan (NX-EMP-20481)" readonly data-vv-sensitive="name">
+                  <p class="hint" data-vv-safe="1">Populated by the Open record button in the directory table.</p>
+                </div>
+                <div>
+                  <label for="access-role">New access level</label>
+                  <select id="access-role" name="role">
+                    <option value="viewer">Viewer — read only</option>
+                    <option value="contributor" selected>Contributor</option>
+                    <option value="approver">Approver</option>
+                    <option value="workspace-admin">Workspace admin</option>
+                    <option value="break-glass">Break-glass root</option>
+                  </select>
+                </div>
+                <div>
+                  <label for="effective-date">Effective date</label>
+                  <input type="date" id="effective-date" name="effective_date" value="2026-10-01">
+                </div>
+                <div>
+                  <label for="access-duration">Duration</label>
+                  <select id="access-duration" name="duration">
+                    <option value="permanent">Permanent</option>
+                    <option value="90">90 days</option>
+                    <option value="30" selected>30 days</option>
+                    <option value="7">7 days</option>
+                  </select>
+                </div>
+                <div>
+                  <label for="ticket-reference">Change ticket</label>
+                  <input type="text" id="ticket-reference" name="ticket" value="CHG-4471" data-vv-safe="1">
+                </div>
+                <div class="wide">
+                  <label for="justification">Justification</label>
+                  <textarea id="justification" name="justification" placeholder="Why does this employee need the new access level?"></textarea>
+                  <p class="hint" data-vv-safe="1">Retained for 7 years in the audit log. Do not paste customer data here.</p>
+                </div>
+                <div class="wide check">
+                  <input type="checkbox" id="notify-manager" name="notify" checked>
+                  <label for="notify-manager">Notify the reporting manager by email when this change is approved</label>
+                </div>
+              </div>
+
+              <div class="form-actions">
+                <button type="submit" class="btn primary" id="submit-access">Submit access change</button>
+                <button type="button" class="btn" id="save-draft">Save as draft</button>
+                <span class="spacer"></span>
+                <button type="button" class="btn danger" id="cancel-request">Cancel request</button>
+              </div>
+            </form>
+          </div>
+        </section>
+      </div>
+
+      <!-- Off the workflow path on purpose: a live credential a scroll below the region the
+           agent is working in, plus safe telemetry it must leave alone. -->
+      <section class="card" id="integrations" aria-labelledby="integrations-heading">
+        <div class="card-head">
+          <div>
+            <h2 id="integrations-heading">Infrastructure and integrations</h2>
+            <p data-vv-safe="1">Service health for the ap-south-1 cluster serving this workspace.</p>
+          </div>
+          <div class="right">
+            <button type="button" class="btn small">View audit log</button>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="svc">
+            <div class="s">
+              <div class="n"><span class="dot g" aria-hidden="true"></span>Directory API</div>
+              <div class="u" data-vv-safe="1">99.99%</div>
+              <div class="m" data-vv-safe="1">p95 latency 84 ms</div>
+            </div>
+            <div class="s">
+              <div class="n"><span class="dot g" aria-hidden="true"></span>Payroll sync</div>
+              <div class="u" data-vv-safe="1">99.94%</div>
+              <div class="m" data-vv-safe="1">Last run 06:15 IST</div>
+            </div>
+            <div class="s">
+              <div class="n"><span class="dot a" aria-hidden="true"></span>SSO gateway</div>
+              <div class="u" data-vv-safe="1">99.21%</div>
+              <div class="m" data-vv-safe="1">2 degraded nodes</div>
+            </div>
+            <div class="s">
+              <div class="n"><span class="dot g" aria-hidden="true"></span>Document store</div>
+              <div class="u" data-vv-safe="1">100%</div>
+              <div class="m" data-vv-safe="1">4.2 TB of 10 TB used</div>
+            </div>
+          </div>
+
+          <p class="section-label">Workspace credentials</p>
+          <div class="secret">
+            <span class="mono" style="color:var(--muted)">Live API key</span>
+            <span class="val mono" id="api-key" data-vv-sensitive="api_key">sk_live_9f2Ac7Qm1XdR4tKp83NwZbLv</span>
+            <button type="button" class="btn small" id="copy-key">Copy key</button>
+            <button type="button" class="btn small" id="rotate-key">Rotate key</button>
+          </div>
+          <div class="secret" style="margin-top:10px">
+            <span class="mono" style="color:var(--muted)">Webhook secret</span>
+            <span class="val mono" data-vv-sensitive="api_key">whsec_3Kd8Rr0Vx7QpLmT2eYb6Az</span>
+            <button type="button" class="btn small">Reveal history</button>
+          </div>
+          <dl class="kv" style="margin-top:14px">
+            <dt>On-call engineer</dt><dd data-vv-sensitive="name">Deepak Iyer</dd>
+            <dt>Escalation number</dt><dd class="mono" data-vv-sensitive="phone">+91 90045 11227</dd>
+            <dt>Service account</dt><dd data-vv-sensitive="email">svc-hris-sync@examplecorp.in</dd>
+            <dt>Region</dt><dd data-vv-safe="1">ap-south-1 (Mumbai)</dd>
+            <dt>Asset tag</dt><dd class="mono" data-vv-safe="1">4471-8820-5533-0091</dd>
+          </dl>
+          <p class="foot-note" data-vv-safe="1">All records on this page are synthetic and generated for evaluation purposes.</p>
+        </div>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<script>
+// Statutory identifiers are keyed off the employee ID rather than stored in row attributes,
+// so the only place these values ever exist as text is the marked record panel — a scan of
+// the rendered DOM and a scan of the screenshot see the same set.
+var STATUTORY = {
+  'NX-EMP-20481': { pan: 'ABCDE1234F', aadhaar: '2345 6789 0123', account: '12345678901234', ifsc: 'HDFC0001234', upi: 'ananya@okhdfcbank', address: '14 Sarjapur Main Road, Bengaluru 560035' },
+  'NX-EMP-20517': { pan: 'BHQPS4471K', aadhaar: '4471 8820 5533', account: '90881234450027', ifsc: 'ICIC0004421', upi: 'rohit.menon@okicici', address: '22 Baner Road, Pune 411045' },
+  'NX-EMP-20563': { pan: 'CJRTM9082L', aadhaar: '6612 9034 7781', account: '33017788221904', ifsc: 'SBIN0007790', upi: 'fatima.q@oksbi', address: '7 Hill Road, Bandra West, Mumbai 400050' },
+  'NX-EMP-20598': { pan: 'DKLNV3316P', aadhaar: '3390 5518 2264', account: '55120099347781', ifsc: 'AXIS0003318', upi: 'deepak.iyer@okaxis', address: '9 Jubilee Enclave, Hyderabad 500081' },
+  'NX-EMP-20604': { pan: 'EMWXA7725R', aadhaar: '7724 6031 9945', account: '61004488230015', ifsc: 'KKBK0006612', upi: 'meera.b@okhdfcbank', address: '61 Indiranagar 12th Main, Bengaluru 560038' },
+  'NX-EMP-20655': { pan: 'FQZBD5590T', aadhaar: '5508 2276 4419', account: '77220011903364', ifsc: 'YESB0001180', upi: 'tarun.k@okhdfcbank', address: '5 Nungambakkam High Road, Chennai 600034' }
+};
+
+function cell(row, index) { return row.cells[index].textContent.trim(); }
+
+function applyFilters() {
+  var q = document.getElementById('employee-search').value.trim().toLowerCase();
+  var dept = document.getElementById('department-filter').value;
+  var loc = document.getElementById('location-filter').value;
+  var status = document.getElementById('status-filter').value;
+  var rows = document.querySelectorAll('#employee-rows tr');
+  var shown = 0;
+
+  for (var i = 0; i < rows.length; i++) {
+    var r = rows[i];
+    var haystack = r.textContent.toLowerCase();
+    var ok = (!q || haystack.indexOf(q) !== -1)
+      && (!dept || cell(r, 4) === dept)
+      && (!loc || cell(r, 5) === loc)
+      && (!status || cell(r, 6) === status);
+    r.hidden = !ok;
+    if (ok) { shown++; }
+  }
+
+  document.getElementById('result-count').textContent =
+    'Showing ' + shown + ' of 1,284 employees · sorted by employee ID';
+}
+
+function openRecord(row) {
+  var id = row.getAttribute('data-emp');
+  var extra = STATUTORY[id];
+  var nameCell = row.cells[1];
+  var name = nameCell.querySelector('a').textContent.trim();
+
+  document.getElementById('rec-name').textContent = name;
+  document.getElementById('rec-id').textContent = id;
+  document.getElementById('rec-title').textContent = nameCell.querySelector('.sub').textContent.trim();
+  document.getElementById('rec-dept').textContent = cell(row, 4);
+  document.getElementById('rec-loc').textContent = cell(row, 5);
+  document.getElementById('rec-status').textContent = cell(row, 6);
+  document.getElementById('rec-email').textContent = cell(row, 2);
+  document.getElementById('rec-phone').textContent = cell(row, 3);
+  document.getElementById('rec-salary').textContent = cell(row, 7);
+  document.getElementById('rec-pan').textContent = extra.pan;
+  document.getElementById('rec-aadhaar').textContent = extra.aadhaar;
+  document.getElementById('rec-account').textContent = extra.account;
+  document.getElementById('rec-ifsc').textContent = extra.ifsc;
+  document.getElementById('rec-upi').textContent = extra.upi;
+  document.getElementById('access-employee').value = name + ' (' + id + ')';
+  document.getElementById('record-panel').scrollIntoView({ block: 'start' });
+}
+
+document.getElementById('search-button').addEventListener('click', applyFilters);
+document.getElementById('employee-search').addEventListener('input', applyFilters);
+document.getElementById('department-filter').addEventListener('change', applyFilters);
+document.getElementById('location-filter').addEventListener('change', applyFilters);
+document.getElementById('status-filter').addEventListener('change', applyFilters);
+
+document.getElementById('reset-button').addEventListener('click', function () {
+  document.getElementById('employee-search').value = '';
+  document.getElementById('department-filter').value = '';
+  document.getElementById('location-filter').value = '';
+  document.getElementById('status-filter').value = '';
+  applyFilters();
+});
+
+var openButtons = document.querySelectorAll('.open-record');
+for (var b = 0; b < openButtons.length; b++) {
+  openButtons[b].addEventListener('click', function (e) {
+    openRecord(e.target.closest('tr'));
+  });
+}
+
+var nameLinks = document.querySelectorAll('#employee-rows a');
+for (var n = 0; n < nameLinks.length; n++) {
+  nameLinks[n].addEventListener('click', function (e) {
+    openRecord(e.target.closest('tr'));
+  });
+}
+
+// The confirmation names the employee, so it is a fresh surface to mask rather than a copy of
+// one already checked — a guard that only inspects the table will miss the banner.
+document.getElementById('access-form').addEventListener('submit', function (e) {
+  e.preventDefault();
+  var employee = document.getElementById('access-employee').value;
+  var roleSelect = document.getElementById('access-role');
+  var role = roleSelect.options[roleSelect.selectedIndex].text;
+  var date = document.getElementById('effective-date').value;
+  var ticket = document.getElementById('ticket-reference').value;
+  var banner = document.getElementById('confirmation');
+  var detail = document.getElementById('confirmation-detail');
+
+  // Reset anything the draft path left behind, so the banner's ground-truth marks always
+  // describe what is currently rendered in it.
+  document.getElementById('confirmation-title').textContent = 'Access change submitted';
+  detail.removeAttribute('data-vv-safe');
+  detail.innerHTML = '';
+
+  var who = document.createElement('span');
+  who.setAttribute('data-vv-sensitive', 'name');
+  who.textContent = employee;
+  var tail = document.createElement('span');
+  tail.setAttribute('data-vv-safe', '1');
+  tail.textContent = ' will move to ' + role + ' from ' + date + ', pending second-admin approval. Tracked as ' + ticket + '.';
+  detail.appendChild(who);
+  detail.appendChild(tail);
+
+  banner.hidden = false;
+  banner.scrollIntoView({ block: 'center' });
+});
+
+document.getElementById('save-draft').addEventListener('click', function () {
+  document.getElementById('confirmation-title').textContent = 'Draft saved';
+  var detail = document.getElementById('confirmation-detail');
+  detail.textContent = 'The access change was saved as a draft and has not been submitted for approval.';
+  detail.setAttribute('data-vv-safe', '1');
+  document.getElementById('confirmation').hidden = false;
+});
+
+document.getElementById('cancel-request').addEventListener('click', function () {
+  document.getElementById('access-form').reset();
+  document.getElementById('confirmation').hidden = true;
+});
+
+document.getElementById('rotate-key').addEventListener('click', function () {
+  document.getElementById('api-key').textContent = 'sk_live_5tHb2Nq8WzXe6RvY41MdKcJp';
+});
+</script>
+</body>
+</html>

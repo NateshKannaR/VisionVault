@@ -969,14 +969,26 @@
     const url = (pageInfo && pageInfo.url) || "";
     const title = (pageInfo && pageInfo.title) || "";
 
+    // "Add to cart" and "Buy now" are not interchangeable. One puts an item in a basket the
+    // user can still empty; the other starts a purchase. Treating them as the same control
+    // meant that on a page offering both, "add it to cart" reached for Buy now — observed on
+    // an Amazon product page, where the risk gate caught it and asked, but the agent should
+    // never have proposed it. Buy now is only considered when the instruction actually asked
+    // to buy, and even then only if no cart button exists.
+    const isClickableRole = (m) =>
+      m.role === "button" || m.role === "clickable" || m.role === "input:submit";
+    const notCartNav = (l) => !/view\s*cart|items?\s*in\s*cart|go\s*to\s*cart|shopping\s*cart/i.test(l);
+
     const isAddToCartBtn = (m) => {
       const l = (m.label || "").toLowerCase();
-      if (/view\s*cart|items?\s*in\s*cart|go\s*to\s*cart|shopping\s*cart/i.test(l)) return false;
-      return (
-        (m.role === "button" || m.role === "clickable" || m.role === "input:submit") &&
-        /\b(add\s*to\s*cart|add\s*to\s*basket|buy\s*now)\b/i.test(l)
-      );
+      return isClickableRole(m) && notCartNav(l) && /\b(add\s*to\s*(?:cart|bag|basket))\b/i.test(l);
     };
+    const isBuyNowBtn = (m) => {
+      const l = (m.label || "").toLowerCase();
+      return isClickableRole(m) && notCartNav(l) && /\b(buy\s*now|place\s*order|proceed\s*to\s*buy)\b/i.test(l);
+    };
+    const wantsToBuyOutright = /\b(buy\s*(?:it\s*)?now|purchase|place\s*(?:the\s*)?order|proceed\s*to\s*buy|checkout)\b/i
+      .test(parsed.raw || "");
 
     // Substep 0: Cart confirmation / Done
     if (progress.cartAdded) {
@@ -1003,10 +1015,21 @@
 
     // Substep 1: If Add to Cart button is visible on a product page or after product selection
     const isProductPage = progress.productOpened || /amazon\..+\/(?:dp|gp\/product|gp\/aw\/d)\/|flipkart\..+\/p\//i.test(url);
-    const addBtn = available.find(isAddToCartBtn);
+    // Cart first, always. Buy now is a fallback only when the user asked to buy outright and
+    // the page offers no cart button at all.
+    const addBtn = available.find(isAddToCartBtn) ||
+                   (wantsToBuyOutright ? available.find(isBuyNowBtn) : null);
     if (addBtn && (isProductPage || (parsed.wantsAddToCart && (progress.searched || progress.queryLanded)))) {
+      // cartClicked records that we are about to try — the confirmation check above reads it.
+      // cartAdded is deliberately NOT set here: it is an outcome, and background.js sets it
+      // once the click has actually executed.
+      //
+      // Setting it here was self-defeating. The planner marked the task complete, the guard
+      // then read that flag, concluded there was nothing left to do, and replaced this very
+      // click with `done`. The click never ran, no confirmation gate fired, and the run
+      // reported "added item to cart" having added nothing — the worst of the three failures,
+      // because a false success is invisible.
       progress.cartClicked = true;
-      progress.cartAdded = true;
       return { action: "click", mark_id: addBtn.id, isAddToCart: true, reasoning: `Click "${addBtn.label || "Add to Cart"}" button` };
     }
 

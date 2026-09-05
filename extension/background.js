@@ -257,6 +257,105 @@ async function executeMarkAction(action, mark_id, value) {
 }
 
 // Wait for a tab to finish loading after navigation
+// ── Following a link that opens a new tab ────────────────────────────────────
+//
+// Plenty of real sites open results with target="_blank" - Flipkart's product links do. The
+// click succeeds, the product loads, and the agent carries on scanning the tab it was already
+// on, where nothing it needs exists. Observed on
+// "search for running shoes and open the first result and add it to cart": the product opened
+// in a second tab and the agent then scrolled the SEARCH RESULTS looking for an Add to Cart
+// button until the stall detector stopped it.
+//
+// Chrome sets openerTabId on a tab opened this way, so a tab our own tab opened is
+// identifiable without guessing from timing or URLs.
+const _openedTabIds = [];
+
+chrome.tabs.onCreated.addListener((tab) => {
+  if (!session || !tab) return;
+  if (tab.openerTabId === session.tabId) _openedTabIds.push(tab.id);
+});
+
+/**
+ * Waits until a page has actually rendered something to act on.
+ *
+ * `load` is not that signal. On an SPA it fires while the document is still a skeleton, and
+ * the agent then plans against a page that does not exist yet. Measured on a Flipkart product
+ * page: eleven seconds after load the document was still exactly one viewport tall with four
+ * buttons and no "Add to cart" anywhere in the DOM. The agent duly scrolled, was told it had
+ * "reached the bottom" - true, of a 860px document - scrolled again, and was stopped by the
+ * loop detector having never seen the button that was about to appear.
+ *
+ * Readiness is judged by the page growing and then stopping: two consecutive identical
+ * readings of height and interactive-element count. That works without knowing anything about
+ * the site, which is the point - a rule about Flipkart would not survive the next site.
+ *
+ * Bounded, and never fatal: a page that never settles is scanned anyway, because a late scan
+ * beats no scan.
+ */
+async function waitForContent(tabId, timeoutMs = 6000) {
+  const started = Date.now();
+  let last = null;
+  let stable = 0;
+  while (Date.now() - started < timeoutMs) {
+    let shot = null;
+    try {
+      const [res] = await chrome.scripting.executeScript({
+        target: { tabId, frameIds: [0] },
+        func: () => ({
+          h: document.body ? document.body.scrollHeight : 0,
+          n: document.querySelectorAll("a,button,input,select,textarea,[role=button]").length,
+        }),
+      });
+      shot = res && res.result;
+    } catch (_) {
+      return false; // the tab went away or cannot be scripted; the caller scans regardless
+    }
+    if (!shot) break;
+    const sig = `${shot.h}:${shot.n}`;
+    if (sig === last) {
+      // Two identical readings, and something is actually there.
+      if (++stable >= 1 && shot.n > 4) return true;
+    } else {
+      stable = 0;
+      last = sig;
+    }
+    await new Promise((r) => setTimeout(r, 400));
+  }
+  return false;
+}
+
+/**
+ * Moves the session onto a tab our click just opened, if there is one.
+ *
+ * Only tabs opened BY the session's own tab are adopted, so a tab the user opened themselves
+ * mid-run is left alone - the agent should not wander into someone else's browsing.
+ * @returns {Promise<boolean>} whether the session moved.
+ */
+async function adoptNewTabIfAny() {
+  if (!session || !_openedTabIds.length) return false;
+  const candidate = _openedTabIds[_openedTabIds.length - 1];
+  _openedTabIds.length = 0;
+
+  const tab = await new Promise((r) =>
+    chrome.tabs.get(candidate, (t) => r(chrome.runtime.lastError ? null : t)));
+  if (!tab) return false;
+
+  await withDeadlineSoft(waitForTabLoad(tab.id, 6000), 8000, "new tab load");
+  // captureVisibleTab only captures the ACTIVE tab, so adopting without activating would
+  // redact and transmit a picture of the wrong page.
+  await new Promise((r) => chrome.tabs.update(tab.id, { active: true }, () => r()));
+  // And `load` on an SPA means the shell arrived, not the content.
+  await withDeadlineSoft(waitForContent(tab.id, 6000), 7000, "new tab content");
+
+  session.tabId = tab.id;
+  session.windowId = tab.windowId;
+  // The element ids from the old page mean nothing here.
+  session.filledIds = [];
+  notifyPopup({ type: "step", step: session.stepCount, status: "Following the page that just opened..." });
+  console.log(`[agent] followed a new tab opened by the click -> ${tab.id}`);
+  return true;
+}
+
 function waitForTabLoad(tabId, timeoutMs = 15000) {
   return new Promise(async (resolve) => {
     let tab = null;
@@ -620,6 +719,9 @@ async function phaseScan(task) {
       (scan.redactionError || "")
     );
   }
+
+  // Any tab recorded during an earlier run belongs to that run.
+  _openedTabIds.length = 0;
 
   session = {
     task,
@@ -1190,7 +1292,13 @@ async function phaseRun() {
 
       resp = verdict.action;
       const actionType = (resp.action || resp.type || "").toString().toLowerCase();
-      session.lastAction = resp;
+      // Mark ids are hashes of an element's identity AND its geometry, so any reflow between
+      // proposing an action and executing it invalidates them. A risky action waits for a
+      // human, which can take seconds on a page that is still settling, so record what the
+      // action was aiming at as well - see phaseConfirm.
+      const pendingMark = (session.marks || []).find((m) => m.id === resp.mark_id);
+      session.lastAction = { ...resp, _targetLabel: pendingMark?.label || null,
+                             _targetRole: pendingMark?.role || null };
       if (!verdict.reason) {
         notifyPopup({
           type: "step", step: session.stepCount,
@@ -1653,7 +1761,15 @@ async function didUrlChange() {
  */
 async function settleAfterNavAction(actionType) {
   await new Promise(r => setTimeout(r, 900));
+  // Before anything else: if the click opened a new tab, that is where the page the user
+  // asked for now lives. Adopting it counts as a navigation, because it is one.
+  const followed = await adoptNewTabIfAny();
   await withDeadlineSoft(waitForTabLoad(session.tabId, 5000), 7000, "settle");
+  await withDeadlineSoft(waitForContent(session.tabId, 5000), 6000, "content settle");
+  if (followed) {
+    await rescanCurrentTab(true);
+    return true;
+  }
   // Read this BEFORE the re-scan: re-scanning overwrites the URL it compares against.
   const navigated = await didUrlChange();
   await rescanCurrentTab(navigated);
@@ -1726,6 +1842,29 @@ async function phaseConfirm() {
   let exec;
   try {
     exec = await executeMarkAction(actionType, pending.mark_id, pending.value);
+
+    // The element can move or be re-rendered while the confirmation dialog is open - the whole
+    // point of the dialog is that a human takes their time over it. Observed on an Amazon
+    // results page: "Target element 7523838 is no longer visible" every time, so the safety
+    // gate was effectively a dead end - approve, and nothing happened.
+    //
+    // Re-resolve by what the user was actually shown ("add to cart"), not by an id that
+    // encodes a position the page has since changed. Only the approved label and role are
+    // accepted, so this cannot silently click something else.
+    if (!exec?.ok && pending._targetLabel && /no longer visible|not found|no element/i.test(exec?.error || "")) {
+      await rescanCurrentTab(false, "confirm-retarget");
+      const again = (session.marks || []).find(
+        (m) => (m.label || "") === pending._targetLabel &&
+               (!pending._targetRole || m.role === pending._targetRole));
+      if (again && again.id !== pending.mark_id) {
+        console.log(`[agent] approved target moved; re-resolved "${pending._targetLabel}" -> ${again.id}`);
+        notifyPopup({ type: "step", step: session.stepCount,
+                      status: "The page moved while you were deciding — found the same control again." });
+        pending.mark_id = again.id;
+        exec = await executeMarkAction(actionType, again.id, pending.value);
+      }
+    }
+
     if (exec?.ok) session.filledIds.push(pending.mark_id);
     session.lastAction = null;
     session.actionLog.push({ action: actionType, mark_id: pending.mark_id, ok: !!exec?.ok, error: exec?.ok ? undefined : exec?.error });

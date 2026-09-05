@@ -3,6 +3,8 @@
 **SIH PS 26171.** A Chrome MV3 extension that lets a cloud vision-language model drive your
 browser, while every piece of sensitive data stays on your machine.
 
+# project
+
 > **Just want to use it?** [START-HERE.md](START-HERE.md) is the two-minute version.
 
 The idea is simple to state and fiddly to get right: a server-side agent is powerful but you

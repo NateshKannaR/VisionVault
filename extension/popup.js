@@ -366,8 +366,8 @@ let currentMissingField = null;
 let currentMissingMarkId = null;
 let liveStepRow = null;
 
-const SCAN_LABEL = `${icon("scan")}<span>Scan &amp; redact screen</span>`;
-const RUN_LABEL = `${icon("play")}<span>Run automation</span>`;
+const SCAN_LABEL = `${icon("scan")}<span>Run agent</span>`;
+const RUN_LABEL = `${icon("play")}<span>Continue — run the agent</span>`;
 
 function setStat(id, val) { const el = $(id); if (el) el.textContent = val; }
 
@@ -538,6 +538,9 @@ function clearLiveStep() {
 
 // ── Scan ──────────────────────────────────────────────────────────────────────
 scanBtn.addEventListener("click", () => {
+  resetPipeline();
+  setProtection("running", "Reading the screen locally");
+  setPipelineStage("observe");
   const task = taskEl.value.trim();
   if (!task) {
     showStatus("statusMsg", "warn", "Describe what the agent should do first.");
@@ -573,8 +576,37 @@ scanBtn.addEventListener("click", () => {
     }
 
     renderScan(res.result, true);
+
+    // One mode, and it is automatic.
+    //
+    // Scan and Run used to be two buttons the user pressed in order, which made the privacy
+    // step look like a separate feature they could skip — and made the product feel like a
+    // tool rather than an agent. It is one flow: the scan IS the redaction, and nothing can
+    // be transmitted until it has succeeded, so pausing between them protects nobody.
+    //
+    // The pause is kept for exactly one case: a scan that found nothing to act on. Running
+    // then would just burn steps against a page the agent cannot see.
+    const marks = res.result?.markCount || 0;
+    if (autoAgentMode() && marks > 0) {
+      setPipelineStage("reason");
+      setRunning(true);
+      runBtn.hidden = true;
+      setLiveStep("Planning the first step…");
+      startRun(true);
+    }
   });
 });
+
+/**
+ * Whether the agent carries straight on from the scan into the run.
+ *
+ * On by default. The toggle exists because a demo sometimes wants to stop on the redacted
+ * frame and talk about it before anything moves.
+ */
+function autoAgentMode() {
+  const el = $("s-autoAgent");
+  return !el || el.checked;
+}
 
 /** Paints a scan result into the panel. Shared by the Scan button and the run-time recovery. */
 function renderScan(d, announce) {
@@ -592,7 +624,9 @@ function renderScan(d, announce) {
   setStat("s-actions", 0);
   renderTimings(d.timings);
 
-  runBtn.hidden = false;
+  // Only offered when the agent is NOT continuing on its own; otherwise two primary actions
+  // are on screen at once and neither reads as the thing to press.
+  runBtn.hidden = autoAgentMode();
   runBtn.innerHTML = RUN_LABEL;
   // The scan is the privacy review step; Run is what the user is being asked to approve next.
   scannedTask = taskEl.value.trim();
@@ -616,6 +650,9 @@ runBtn.addEventListener("click", () => {
   confirmWrap.hidden = true;
   hideStatus("statusMsg");
   setLiveStep("Planning the first step…");
+  // A rail carrying the previous run's marks would claim work this run has not done.
+  resetPipeline();
+  setProtection("running");
   startRun(true);
 });
 
@@ -878,6 +915,65 @@ $("clearHistory")?.addEventListener("click", () => {
   });
 });
 
+// ── Pipeline rail and protection banner ──────────────────────────────────────
+//
+// These reflect the run rather than decorating it. The rail is driven from the same
+// notifications the log is built from, so it cannot show a stage the agent is not in — a
+// privacy indicator that is merely animated would be worse than none, because it would be
+// evidence of nothing while looking like evidence of something.
+
+const PIPE_ORDER = ["observe", "redact", "reason", "act"];
+
+function setPipelineStage(stage) {
+  const idx = PIPE_ORDER.indexOf(stage);
+  document.querySelectorAll(".pipe-step").forEach((el) => {
+    const i = PIPE_ORDER.indexOf(el.dataset.stage);
+    el.classList.toggle("is-active", i === idx);
+    // Everything before the current stage has genuinely happened this step.
+    el.classList.toggle("is-done", idx > -1 && i < idx);
+  });
+}
+
+function resetPipeline() {
+  document.querySelectorAll(".pipe-step").forEach((el) => {
+    el.classList.remove("is-active", "is-done");
+  });
+}
+
+/**
+ * @param {"armed"|"running"|"breach"} state
+ */
+function setProtection(state, detail) {
+  const el = $("protectBanner");
+  if (!el) return;
+  el.classList.toggle("is-running", state === "running");
+  el.classList.toggle("is-breach", state === "breach");
+  const title = $("protectTitle");
+  const sub = $("protectState");
+  if (title) {
+    title.textContent = state === "breach" ? "Transmission blocked"
+      : state === "running" ? "Protecting this run"
+      : "Protection Active";
+  }
+  if (sub) {
+    sub.textContent = detail || (
+      state === "breach" ? "Redaction could not be verified — nothing was sent"
+      : state === "running" ? "Masking every frame before it leaves"
+      : "Your data stays on this device");
+  }
+}
+
+// Map the worker's own notifications onto the rail. The strings come from background.js and
+// are the same ones the user reads in the log, so the two can never disagree.
+function pipelineFromStatus(text) {
+  const t = (text || "").toLowerCase();
+  if (/reading the page|scanning|screenshot/.test(t)) return "observe";
+  if (/redact|masking/.test(t)) return "redact";
+  if (/asking the planner|planner|thinking/.test(t)) return "reason";
+  if (/click|type|scroll|navigat|filled|approved action|following the page/.test(t)) return "act";
+  return null;
+}
+
 // ── Dictation ────────────────────────────────────────────────────────────────
 //
 // Typing a whole instruction into a side panel is the slowest part of using this thing, so the
@@ -1111,6 +1207,9 @@ chrome.runtime.onMessage.addListener((msg) => {
 
   if (d.type === "step") {
     setLiveStep(`Step ${esc(d.step)} — ${esc(d.status)}`, d.planner);
+    const stage = pipelineFromStatus(d.status);
+    if (stage) setPipelineStage(stage);
+    setProtection("running");
   }
   if (d.type === "filled") {
     addLogEntry("type", `Filled <strong>${esc(d.field)}</strong> in element #${esc(d.mark_id)}`, null);
@@ -1119,6 +1218,12 @@ chrome.runtime.onMessage.addListener((msg) => {
     addLogEntry("alert", `Could not fill <strong>${esc(d.field)}</strong> in element #${esc(d.mark_id)}${d.error ? " — " + esc(d.error) : ""}`, null, true);
   }
   if (d.type === "error") {
+    // The fail-closed path is the only thing allowed to turn the banner red, and it is
+    // reporting a success of the design, not a failure of it: nothing was transmitted.
+    if (/redaction failed|could not read the screen|nothing (?:was )?transmitted/i.test(d.message || "")) {
+      setProtection("breach");
+      setPipelineStage("redact");
+    }
     showStatus("statusMsg", "error", esc(d.message));
   }
   if (d.type === "rescanned") {

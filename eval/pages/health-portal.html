@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VisionVault Fixture — Patient Health Portal</title>
+<!--
+  EVALUATION FIXTURE — the case where over-redaction costs as much as under-redaction.
+
+  Capability under test: a redacting agent driving a seven-step booking flow on a page where
+  the protected values and the values it must read sit inside the same cards. A masker that
+  blanks every digit on this page passes a naive PII score and still fails the task, because
+  the agent cannot compare a 850 fee against a 1,200 fee it can no longer see. Both failure
+  directions are therefore scored from the same DOM: data-vv-sensitive marks what must be
+  hidden, data-vv-safe marks what must survive.
+
+  Steps, and where each one lives:
+    1  #step-search      search the record index
+    2  #step-filters     narrow by department / date / sort
+    3  #step-slots       five comparable slots — doctor, time, fee, rating, profile link
+    4  #step-reports     pick a report from the list and open it
+    5  #step-record      read the opened report: diagnosis, medication, lab values
+    6  #step-booking     fill patient name, DOB, phone, symptoms, consent
+    7  #step-confirm     review the summary and confirm
+
+  The tension is expressed structurally, not chromatically. The left rail is patient-linked
+  and the main column is operational, but the record panel and the booking form deliberately
+  straddle both — that overlap is the whole point, and a fixture with a clean split would
+  test nothing. Sensitive and safe values are styled identically on purpose: if protected
+  fields carried a warning colour, a vision detector could score well by matching the CSS
+  instead of understanding the content.
+
+  Every value is fabricated. Aadhaar numbers begin with 2 because UIDAI never issues a
+  number starting 0 or 1, and a detector that keys on that rule must not be handed a
+  1234-prefixed string that lets it pass by accident. The hospital helpline is a 1800 number
+  and the patient mobile is a +91 10-digit one, so "is this phone number a person" has a
+  decidable answer rather than a coin flip.
+
+  data-gt-pii / data-gt-safe mirror the data-vv-* truth because eval/run-full-eval.js already
+  reads the older attribute names; both describe the same annotation.
+-->
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, "Helvetica Neue", sans-serif;
+    background: #f1f5f9;
+    color: #0f172a;
+    font-size: 14px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .topbar {
+    background: #0b6b62;
+    color: #e6fffb;
+    padding: 10px 24px;
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    border-bottom: 3px solid #08554e;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 16px; letter-spacing: .2px; }
+  .brand .mark {
+    width: 28px; height: 28px; border-radius: 7px; background: #ffffff; color: #0b6b62;
+    display: grid; place-items: center; font-size: 17px; font-weight: 800;
+  }
+  .topbar .unit { font-size: 12px; opacity: .85; border-left: 1px solid rgba(255,255,255,.28); padding-left: 18px; }
+  .topbar .spacer { margin-left: auto; }
+  .topbar .helpline { font-size: 12px; opacity: .9; }
+  .acct { display: flex; align-items: center; gap: 9px; background: rgba(255,255,255,.12); padding: 5px 11px 5px 6px; border-radius: 20px; }
+  .acct .initials { width: 26px; height: 26px; border-radius: 50%; background: #f8fafc; color: #0b6b62; display: grid; place-items: center; font-weight: 700; font-size: 12px; }
+  .acct .who { font-size: 12.5px; font-weight: 600; }
+  .acct .role { font-size: 11px; opacity: .8; }
+
+  .tabs { background: #fff; border-bottom: 1px solid #dbe3ea; padding: 0 24px; display: flex; gap: 4px; }
+  .tabs button {
+    background: none; border: none; border-bottom: 3px solid transparent;
+    padding: 12px 14px; font: inherit; font-weight: 600; font-size: 13.5px; color: #52627a; cursor: pointer;
+  }
+  .tabs button[aria-current="page"] { color: #0b6b62; border-bottom-color: #0b6b62; }
+  .tabs button:hover { color: #0f172a; }
+
+  .shell { display: grid; grid-template-columns: 292px minmax(0, 1fr); gap: 20px; padding: 20px 24px 56px; align-items: start; max-width: 1320px; margin: 0 auto; }
+  @media (max-width: 900px) { .shell { grid-template-columns: minmax(0, 1fr); } }
+
+  .card { background: #fff; border: 1px solid #dfe6ee; border-radius: 12px; box-shadow: 0 1px 2px rgba(16,24,40,.05); margin-bottom: 16px; }
+  .card > header { padding: 13px 16px; border-bottom: 1px solid #eaeff4; display: flex; align-items: center; gap: 10px; }
+  .card > header h2 { font-size: 14.5px; font-weight: 700; color: #0f172a; }
+  .card > header .hint { margin-left: auto; font-size: 11.5px; color: #64748b; font-weight: 500; }
+  .card .body { padding: 16px; }
+
+  .zone { font-size: 11px; text-transform: uppercase; letter-spacing: .7px; font-weight: 700; color: #64748b; margin: 0 0 8px 2px; }
+  .stepnote { font-size: 12px; color: #64748b; margin-bottom: 12px; }
+
+  .kv { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 4px 10px; font-size: 13px; }
+  .kv dt { color: #64748b; }
+  .kv dd { color: #0f172a; font-weight: 600; word-break: break-word; }
+
+  .searchrow { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
+  .field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+  .field.grow { flex: 1 1 260px; }
+  label { font-size: 12px; font-weight: 600; color: #334155; }
+  input, select, textarea {
+    font: inherit; font-size: 13.5px; color: #0f172a; background: #fff;
+    border: 1px solid #c9d4e0; border-radius: 8px; padding: 9px 11px; width: 100%;
+  }
+  input:focus, select:focus, textarea:focus { outline: 2px solid #0b6b62; outline-offset: 1px; border-color: #0b6b62; }
+  textarea { resize: vertical; min-height: 84px; }
+
+  button.btn {
+    font: inherit; font-size: 13.5px; font-weight: 600; padding: 9px 15px; border-radius: 8px;
+    border: 1px solid #c9d4e0; background: #fff; color: #334155; cursor: pointer; white-space: nowrap;
+  }
+  button.btn:hover { background: #f4f7fa; }
+  button.btn.primary { background: #0b6b62; border-color: #0b6b62; color: #fff; }
+  button.btn.primary:hover { background: #095a53; }
+  button.btn.ghost { border-style: dashed; color: #52627a; }
+  .btnrow { display: flex; gap: 9px; flex-wrap: wrap; }
+
+  .filters { display: grid; grid-template-columns: repeat(3, minmax(150px, 1fr)) auto auto; gap: 12px; align-items: end; }
+  @media (max-width: 760px) { .filters { grid-template-columns: minmax(0, 1fr); } }
+
+  .slot { display: grid; grid-template-columns: 46px minmax(0, 1fr) 132px 150px; gap: 14px; align-items: center; padding: 14px 16px; border-bottom: 1px solid #eef2f6; }
+  .slot:last-child { border-bottom: none; }
+  .slot:has(input[type="radio"]:checked) { background: #f0fdfa; box-shadow: inset 3px 0 0 #0b6b62; }
+  @media (max-width: 760px) { .slot { grid-template-columns: 34px minmax(0, 1fr); } }
+  .slot .pick { display: grid; place-items: center; }
+  .slot input[type="radio"] { width: 17px; height: 17px; accent-color: #0b6b62; }
+  .slot .doc { font-size: 14.5px; font-weight: 700; }
+  .slot .meta { font-size: 12.5px; color: #52627a; }
+  .slot .when { font-size: 13px; font-weight: 600; color: #0f172a; margin-top: 3px; }
+  .slot .fee { font-size: 17px; font-weight: 700; text-align: right; }
+  .slot .fee small { display: block; font-size: 11.5px; font-weight: 500; color: #64748b; }
+  .slot .rate { font-size: 12.5px; color: #52627a; }
+  .slot .star { color: #d97706; font-weight: 700; }
+  .slot .act { display: flex; flex-direction: column; gap: 6px; align-items: stretch; }
+  .slot a.profile { font-size: 12.5px; color: #0b6b62; font-weight: 600; text-align: center; }
+
+  .reportrow { display: flex; align-items: center; gap: 12px; padding: 11px 16px; border-bottom: 1px solid #eef2f6; }
+  .reportrow:last-child { border-bottom: none; }
+  .reportrow .t { font-weight: 600; }
+  .reportrow .d { font-size: 12.5px; color: #64748b; }
+  .reportrow .push { margin-left: auto; }
+  .pill { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 20px; background: #eef2f6; color: #475569; text-transform: uppercase; letter-spacing: .4px; }
+  .pill.open { background: #dcfce7; color: #166534; }
+
+  #step-record:target { box-shadow: 0 0 0 3px rgba(11,107,98,.35), 0 1px 2px rgba(16,24,40,.05); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #eef2f6; }
+  th { font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: #64748b; background: #f8fafc; }
+  td.num { font-variant-numeric: tabular-nums; font-weight: 600; }
+  .flag { font-size: 11px; font-weight: 700; color: #b42318; }
+
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 760px) { .grid2 { grid-template-columns: minmax(0, 1fr); } }
+
+  .consent { display: flex; gap: 10px; align-items: flex-start; padding: 11px 12px; border: 1px solid #dfe6ee; border-radius: 9px; background: #f8fafc; }
+  .consent input { width: 17px; height: 17px; margin-top: 2px; accent-color: #0b6b62; flex: none; }
+  .consent label { font-weight: 500; font-size: 12.5px; color: #334155; line-height: 1.5; }
+
+  .summary { font-size: 13px; }
+  .summary li { list-style: none; display: flex; justify-content: space-between; gap: 16px; padding: 6px 0; border-bottom: 1px dashed #e2e8f0; }
+  .summary li:last-child { border-bottom: none; }
+  .summary .k { color: #64748b; }
+  .summary .v { font-weight: 600; text-align: right; }
+
+  .status { margin-top: 12px; font-size: 12.5px; color: #64748b; }
+  .banner { background: #fffbeb; border: 1px solid #fde68a; color: #713f12; font-size: 12.5px; padding: 9px 14px; }
+  .footer { padding: 0 24px 40px; max-width: 1320px; margin: 0 auto; font-size: 12px; color: #64748b; }
+  .footer p { margin-bottom: 4px; }
+</style>
+</head>
+
+<body data-fixture-id="health-portal" data-fixture-kind="healthcare">
+
+<div class="topbar">
+  <span class="brand"><span class="mark">S</span> Sanjeevani Health Cloud</span>
+  <span class="unit" data-vv-safe="1" data-gt-safe>Meridian Multispeciality Hospital &middot; Whitefield, Bengaluru 560066</span>
+  <span class="spacer"></span>
+  <span class="helpline" data-vv-safe="1" data-gt-safe>Appointments helpline 1800 202 4455</span>
+  <span class="acct">
+    <span class="initials" aria-hidden="true">MK</span>
+    <span>
+      <span class="who" data-vv-sensitive="name" data-gt-pii="name">Meera Kulkarni</span><br>
+      <span class="role" data-vv-safe="1" data-gt-safe>Patient login</span>
+    </span>
+  </span>
+</div>
+
+<nav class="tabs" aria-label="Portal sections">
+  <button type="button">Dashboard</button>
+  <button type="button" aria-current="page">Health records</button>
+  <button type="button">Appointments</button>
+  <button type="button">Prescriptions</button>
+  <button type="button">Billing</button>
+</nav>
+
+<p class="banner">Demonstration environment. All patient identifiers, diagnoses and results on this page are synthetic and belong to no real person.</p>
+
+<div class="shell">
+
+  <!-- The rail is where a patient portal parks identity, so a masker that only walks the main
+       column leaves the whole file readable in the sidebar. -->
+  <aside>
+    <p class="zone">Patient-linked record</p>
+
+    <section class="card" aria-labelledby="rail-identity">
+      <header><h2 id="rail-identity">Registered patient</h2></header>
+      <div class="body">
+        <dl class="kv">
+          <dt>Full name</dt>
+          <dd data-vv-sensitive="name" data-gt-pii="name">Meera Kulkarni</dd>
+          <dt>Date of birth</dt>
+          <dd data-vv-sensitive="dob" data-gt-pii="dob">14 March 1979</dd>
+          <dt>Mobile</dt>
+          <dd data-vv-sensitive="phone" data-gt-pii="phone">+91 98765 43210</dd>
+          <dt>Email</dt>
+          <dd data-vv-sensitive="email" data-gt-pii="email">meera.kulkarni@examplemail.in</dd>
+          <dt>ABHA number</dt>
+          <dd data-vv-sensitive="abha" data-gt-pii="abha">91-2345-6789-0123</dd>
+          <dt>ABHA address</dt>
+          <dd data-vv-sensitive="abha" data-gt-pii="abha">meera.kulkarni@abdm</dd>
+          <dt>Aadhaar linked</dt>
+          <dd data-vv-sensitive="aadhaar" data-gt-pii="aadhaar">2345 6789 0123</dd>
+          <dt>Hospital MRN</dt>
+          <dd data-vv-sensitive="mrn" data-gt-pii="mrn">MRN-BLR-0084517</dd>
+          <dt>Home address</dt>
+          <dd data-vv-sensitive="address" data-gt-pii="address">17 Sarjapur Cross, Bellandur, Bengaluru 560103</dd>
+        </dl>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="rail-cover">
+      <header><h2 id="rail-cover">Insurance &amp; settlement</h2></header>
+      <div class="body">
+        <dl class="kv">
+          <dt>Insurer</dt>
+          <dd data-vv-safe="1" data-gt-safe>Nirvana General Insurance</dd>
+          <dt>Policy number</dt>
+          <dd data-vv-sensitive="insurance_id" data-gt-pii="insurance_id">NGI/HLT/2019/0447312</dd>
+          <dt>PAN on claim</dt>
+          <dd data-vv-sensitive="pan" data-gt-pii="pan">BNZPK7412R</dd>
+          <dt>Refund UPI</dt>
+          <dd data-vv-sensitive="upi" data-gt-pii="upi">meera.k@okhdfcbank</dd>
+          <dt>Bank IFSC</dt>
+          <dd data-vv-sensitive="ifsc" data-gt-pii="ifsc">HDFC0004512</dd>
+          <dt>Cashless limit</dt>
+          <dd data-vv-safe="1" data-gt-safe>&#8377;3,00,000 per year</dd>
+          <dt>OPD co-pay</dt>
+          <dd data-vv-safe="1" data-gt-safe>20% of consultation fee</dd>
+        </dl>
+        <p class="status" data-vv-safe="1" data-gt-safe>Co-pay applies to every slot fee listed on the right, so the fee column has to stay legible for the estimate to be correct.</p>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="rail-hospital">
+      <header><h2 id="rail-hospital">Visiting the hospital</h2></header>
+      <div class="body">
+        <dl class="kv">
+          <dt>OPD block</dt>
+          <dd data-vv-safe="1" data-gt-safe>Block C, Level 2, Cardiology OPD</dd>
+          <dt>Address</dt>
+          <dd data-vv-safe="1" data-gt-safe>44 Varthur Main Road, Whitefield, Bengaluru 560066</dd>
+          <dt>OPD hours</dt>
+          <dd data-vv-safe="1" data-gt-safe>Mon&ndash;Sat, 08:00&ndash;20:00</dd>
+          <dt>Reception</dt>
+          <dd data-vv-safe="1" data-gt-safe>1800 202 4455 (toll free)</dd>
+        </dl>
+      </div>
+    </section>
+  </aside>
+
+  <main>
+    <p class="zone">Operational &mdash; must stay readable after redaction</p>
+
+    <!-- Step 1. -->
+    <section class="card" id="step-search" aria-labelledby="h-search">
+      <header>
+        <h2 id="h-search">Search health records</h2>
+        <span class="hint">Step 1 of 7</span>
+      </header>
+      <div class="body">
+        <div class="searchrow">
+          <div class="field grow">
+            <label for="record-query">Search records</label>
+            <input type="search" id="record-query" name="q"
+                   placeholder="Try: cardiology follow-up, lipid profile, ECG"
+                   aria-label="Search health records by keyword"
+                   data-vv-safe="1" data-gt-safe>
+          </div>
+          <button type="button" class="btn primary" id="btn-search">Search records</button>
+          <button type="button" class="btn ghost" id="btn-clear-search">Reset search</button>
+        </div>
+        <p class="stepnote" style="margin:12px 0 0" data-vv-safe="1" data-gt-safe>18 records across 6 departments. Records older than 24 months are in the archive tab.</p>
+      </div>
+    </section>
+
+    <!-- Step 2. -->
+    <section class="card" id="step-filters" aria-labelledby="h-filters">
+      <header>
+        <h2 id="h-filters">Narrow the results</h2>
+        <span class="hint">Step 2 of 7</span>
+      </header>
+      <div class="body">
+        <div class="filters">
+          <div class="field">
+            <label for="filter-department">Department</label>
+            <select id="filter-department" name="department" aria-label="Filter by department">
+              <option value="all">All departments</option>
+              <option value="cardiology" selected>Cardiology</option>
+              <option value="endocrinology">Endocrinology</option>
+              <option value="orthopaedics">Orthopaedics</option>
+              <option value="general-medicine">General medicine</option>
+              <option value="dermatology">Dermatology</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="filter-window">Appointment window</label>
+            <select id="filter-window" name="window" aria-label="Filter by appointment window">
+              <option value="week">This week</option>
+              <option value="fortnight" selected>Next 14 days</option>
+              <option value="month">Next 30 days</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="filter-sort">Sort slots by</label>
+            <select id="filter-sort" name="sort" aria-label="Sort appointment slots">
+              <option value="earliest" selected>Earliest available</option>
+              <option value="fee-asc">Consultation fee, low to high</option>
+              <option value="rating">Patient rating</option>
+            </select>
+          </div>
+          <button type="button" class="btn primary" id="btn-apply">Apply filters</button>
+          <button type="button" class="btn" id="btn-reset-filters">Clear filters</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Step 3. Fee, time and rating are the comparison keys, which is exactly why they are
+         annotated safe: losing them is a task failure, not a privacy win. -->
+    <section class="card" id="step-slots" aria-labelledby="h-slots">
+      <header>
+        <h2 id="h-slots">Available consultation slots</h2>
+        <span class="hint">Step 3 of 7 &middot; 5 slots in Cardiology</span>
+      </header>
+
+      <div class="slot">
+        <span class="pick"><input type="radio" name="slot" id="slot-1" value="deshpande-1030" aria-label="Select slot with Dr. Anjali Deshpande, Tuesday 06 October, 10:30 AM"></span>
+        <div>
+          <div class="doc" data-vv-safe="1" data-gt-safe>Dr. Anjali Deshpande</div>
+          <div class="meta" data-vv-safe="1" data-gt-safe>Cardiology &middot; Interventional &middot; 16 years &middot; Reg. KMC-2009-41822</div>
+          <div class="when" data-vv-safe="1" data-gt-safe>Tue 06 Oct &middot; 10:30 AM &middot; Block C-214</div>
+        </div>
+        <div class="fee" data-vv-safe="1" data-gt-safe>&#8377;850<small>consultation</small></div>
+        <div class="act">
+          <div class="rate" data-vv-safe="1" data-gt-safe><span class="star">&#9733; 4.8</span> &middot; 312 ratings</div>
+          <button type="button" class="btn">Select slot</button>
+          <a class="profile" href="#doc-deshpande" data-vv-safe="1" data-gt-safe>View doctor profile</a>
+        </div>
+      </div>
+
+      <div class="slot">
+        <span class="pick"><input type="radio" name="slot" id="slot-2" value="menon-1115" aria-label="Select slot with Dr. Rohit Menon, Tuesday 06 October, 11:15 AM"></span>
+        <div>
+          <div class="doc" data-vv-safe="1" data-gt-safe>Dr. Rohit Menon</div>
+          <div class="meta" data-vv-safe="1" data-gt-safe>Cardiology &middot; Non-invasive &middot; 9 years &middot; Reg. KMC-2016-58104</div>
+          <div class="when" data-vv-safe="1" data-gt-safe>Tue 06 Oct &middot; 11:15 AM &middot; Block C-207</div>
+        </div>
+        <div class="fee" data-vv-safe="1" data-gt-safe>&#8377;700<small>consultation</small></div>
+        <div class="act">
+          <div class="rate" data-vv-safe="1" data-gt-safe><span class="star">&#9733; 4.5</span> &middot; 188 ratings</div>
+          <button type="button" class="btn">Select slot</button>
+          <a class="profile" href="#doc-menon" data-vv-safe="1" data-gt-safe>View doctor profile</a>
+        </div>
+      </div>
+
+      <div class="slot">
+        <span class="pick"><input type="radio" name="slot" id="slot-3" value="iyer-0900" aria-label="Select slot with Dr. Kavya Iyer, Wednesday 07 October, 9:00 AM"></span>
+        <div>
+          <div class="doc" data-vv-safe="1" data-gt-safe>Dr. Kavya Iyer</div>
+          <div class="meta" data-vv-safe="1" data-gt-safe>Cardiology &middot; Electrophysiology &middot; 21 years &middot; Reg. KMC-2004-30977</div>
+          <div class="when" data-vv-safe="1" data-gt-safe>Wed 07 Oct &middot; 09:00 AM &middot; Block C-301</div>
+        </div>
+        <div class="fee" data-vv-safe="1" data-gt-safe>&#8377;1,200<small>consultation</small></div>
+        <div class="act">
+          <div class="rate" data-vv-safe="1" data-gt-safe><span class="star">&#9733; 4.9</span> &middot; 541 ratings</div>
+          <button type="button" class="btn">Select slot</button>
+          <a class="profile" href="#doc-iyer" data-vv-safe="1" data-gt-safe>View doctor profile</a>
+        </div>
+      </div>
+
+      <div class="slot">
+        <span class="pick"><input type="radio" name="slot" id="slot-4" value="fernandes-1645" aria-label="Select slot with Dr. Samuel Fernandes, Wednesday 07 October, 4:45 PM"></span>
+        <div>
+          <div class="doc" data-vv-safe="1" data-gt-safe>Dr. Samuel Fernandes</div>
+          <div class="meta" data-vv-safe="1" data-gt-safe>Cardiology &middot; Preventive &middot; 6 years &middot; Reg. KMC-2019-66240</div>
+          <div class="when" data-vv-safe="1" data-gt-safe>Wed 07 Oct &middot; 04:45 PM &middot; Block C-118</div>
+        </div>
+        <div class="fee" data-vv-safe="1" data-gt-safe>&#8377;650<small>consultation</small></div>
+        <div class="act">
+          <div class="rate" data-vv-safe="1" data-gt-safe><span class="star">&#9733; 4.2</span> &middot; 96 ratings</div>
+          <button type="button" class="btn">Select slot</button>
+          <a class="profile" href="#doc-fernandes" data-vv-safe="1" data-gt-safe>View doctor profile</a>
+        </div>
+      </div>
+
+      <div class="slot">
+        <span class="pick"><input type="radio" name="slot" id="slot-5" value="bhatt-1200" aria-label="Select slot with Dr. Nikhil Bhatt, Thursday 08 October, 12:00 PM"></span>
+        <div>
+          <div class="doc" data-vv-safe="1" data-gt-safe>Dr. Nikhil Bhatt</div>
+          <div class="meta" data-vv-safe="1" data-gt-safe>Cardiology &amp; Diabetology &middot; 13 years &middot; Reg. KMC-2012-49551</div>
+          <div class="when" data-vv-safe="1" data-gt-safe>Thu 08 Oct &middot; 12:00 PM &middot; Block C-220</div>
+        </div>
+        <div class="fee" data-vv-safe="1" data-gt-safe>&#8377;900<small>consultation</small></div>
+        <div class="act">
+          <div class="rate" data-vv-safe="1" data-gt-safe><span class="star">&#9733; 4.6</span> &middot; 233 ratings</div>
+          <button type="button" class="btn">Select slot</button>
+          <a class="profile" href="#doc-bhatt" data-vv-safe="1" data-gt-safe>View doctor profile</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- Step 4. The report titles are safe; only what is inside one is not. -->
+    <section class="card" id="step-reports" aria-labelledby="h-reports">
+      <header>
+        <h2 id="h-reports">Recent reports</h2>
+        <span class="hint">Step 4 of 7</span>
+      </header>
+
+      <div class="reportrow">
+        <div>
+          <div class="t" data-vv-safe="1" data-gt-safe>Lipid profile &amp; HbA1c panel</div>
+          <div class="d" data-vv-safe="1" data-gt-safe>Collected 28 Sep 2025 &middot; Central Lab &middot; Report LAB-2025-77431</div>
+        </div>
+        <span class="pill open">Opened below</span>
+        <span class="push"></span>
+        <a class="profile" href="#step-record" data-vv-safe="1" data-gt-safe>Jump to report</a>
+        <button type="button" class="btn primary">Open report</button>
+      </div>
+
+      <div class="reportrow">
+        <div>
+          <div class="t" data-vv-safe="1" data-gt-safe>Resting ECG, 12-lead</div>
+          <div class="d" data-vv-safe="1" data-gt-safe>Recorded 12 Aug 2025 &middot; Cardiology OPD &middot; Report ECG-2025-21188</div>
+        </div>
+        <span class="pill">PDF</span>
+        <span class="push"></span>
+        <button type="button" class="btn">Open report</button>
+      </div>
+
+      <div class="reportrow">
+        <div>
+          <div class="t" data-vv-safe="1" data-gt-safe>Discharge summary, day-care admission</div>
+          <div class="d" data-vv-safe="1" data-gt-safe>Issued 03 Jun 2025 &middot; Block A &middot; Report DIS-2025-09044</div>
+        </div>
+        <span class="pill">PDF</span>
+        <span class="push"></span>
+        <button type="button" class="btn">Open report</button>
+      </div>
+    </section>
+
+    <!-- Step 5. One card holds the sharpest version of the trade-off: the reference ranges and
+         the lab's own address are safe, the measured numbers beside them are not, and they sit
+         in adjacent table cells. -->
+    <section class="card" id="step-record" aria-labelledby="h-record">
+      <header>
+        <h2 id="h-record">Lipid profile &amp; HbA1c panel &mdash; opened</h2>
+        <span class="hint">Step 5 of 7 &middot; read the values, then book the follow-up</span>
+      </header>
+      <div class="body">
+
+        <div class="grid2" style="margin-bottom:16px">
+          <dl class="kv">
+            <dt>Patient</dt>
+            <dd data-vv-sensitive="name" data-gt-pii="name">Meera Kulkarni</dd>
+            <dt>Date of birth</dt>
+            <dd data-vv-sensitive="dob" data-gt-pii="dob">14/03/1979</dd>
+            <dt>Contact</dt>
+            <dd data-vv-sensitive="phone" data-gt-pii="phone">+91 98765 43210</dd>
+            <dt>ABHA</dt>
+            <dd data-vv-sensitive="abha" data-gt-pii="abha">91-2345-6789-0123</dd>
+          </dl>
+          <dl class="kv">
+            <dt>Referred by</dt>
+            <dd data-vv-safe="1" data-gt-safe>Dr. Anjali Deshpande, Cardiology</dd>
+            <dt>Sample no.</dt>
+            <dd data-vv-safe="1" data-gt-safe>LAB-2025-77431</dd>
+            <dt>Collected</dt>
+            <dd data-vv-safe="1" data-gt-safe>28 Sep 2025, 07:40 AM</dd>
+            <dt>Lab</dt>
+            <dd data-vv-safe="1" data-gt-safe>Meridian Central Lab, Block B, Whitefield</dd>
+          </dl>
+        </div>
+
+        <h3 style="font-size:13px; margin-bottom:8px; color:#334155">Clinical impression</h3>
+        <p data-vv-sensitive="diagnosis" data-gt-pii="diagnosis" style="margin-bottom:6px">
+          Type 2 diabetes mellitus with mixed dyslipidaemia; stage 1 hypertension, poorly controlled on current dose. Family history of premature coronary artery disease on the maternal side.
+        </p>
+        <p data-vv-sensitive="diagnosis" data-gt-pii="diagnosis" style="margin-bottom:16px">
+          Reviewed for episodic exertional chest tightness since mid-August 2025; treadmill test deferred pending lipid control.
+        </p>
+
+        <h3 style="font-size:13px; margin-bottom:8px; color:#334155">Results</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Analyte</th><th>Result</th><th>Unit</th><th>Reference range</th><th>Flag</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td data-vv-safe="1" data-gt-safe>HbA1c</td>
+              <td class="num" data-vv-sensitive="lab_value" data-gt-pii="lab_value">8.4</td>
+              <td data-vv-safe="1" data-gt-safe>%</td>
+              <td data-vv-safe="1" data-gt-safe>4.0 &ndash; 5.6</td>
+              <td class="flag" data-vv-sensitive="lab_value" data-gt-pii="lab_value">HIGH</td>
+            </tr>
+            <tr>
+              <td data-vv-safe="1" data-gt-safe>Fasting glucose</td>
+              <td class="num" data-vv-sensitive="lab_value" data-gt-pii="lab_value">168</td>
+              <td data-vv-safe="1" data-gt-safe>mg/dL</td>
+              <td data-vv-safe="1" data-gt-safe>70 &ndash; 100</td>
+              <td class="flag" data-vv-sensitive="lab_value" data-gt-pii="lab_value">HIGH</td>
+            </tr>
+            <tr>
+              <td data-vv-safe="1" data-gt-safe>LDL cholesterol</td>
+              <td class="num" data-vv-sensitive="lab_value" data-gt-pii="lab_value">164</td>
+              <td data-vv-safe="1" data-gt-safe>mg/dL</td>
+              <td data-vv-safe="1" data-gt-safe>below 100</td>
+              <td class="flag" data-vv-sensitive="lab_value" data-gt-pii="lab_value">HIGH</td>
+            </tr>
+            <tr>
+              <td data-vv-safe="1" data-gt-safe>HDL cholesterol</td>
+              <td class="num" data-vv-sensitive="lab_value" data-gt-pii="lab_value">38</td>
+              <td data-vv-safe="1" data-gt-safe>mg/dL</td>
+              <td data-vv-safe="1" data-gt-safe>above 50</td>
+              <td class="flag" data-vv-sensitive="lab_value" data-gt-pii="lab_value">LOW</td>
+            </tr>
+            <tr>
+              <td data-vv-safe="1" data-gt-safe>Serum creatinine</td>
+              <td class="num" data-vv-sensitive="lab_value" data-gt-pii="lab_value">0.9</td>
+              <td data-vv-safe="1" data-gt-safe>mg/dL</td>
+              <td data-vv-safe="1" data-gt-safe>0.6 &ndash; 1.1</td>
+              <td data-vv-safe="1" data-gt-safe>Normal</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3 style="font-size:13px; margin:16px 0 8px; color:#334155">Current medication</h3>
+        <ul data-vv-sensitive="medication" data-gt-pii="medication" style="padding-left:18px; font-size:13px">
+          <li>Metformin 1000 mg &mdash; twice daily after food</li>
+          <li>Telmisartan 40 mg &mdash; once daily, morning</li>
+          <li>Atorvastatin 20 mg &mdash; once daily at night, started 28 Sep 2025</li>
+          <li>Ecosprin 75 mg &mdash; once daily, review at follow-up</li>
+        </ul>
+
+        <p class="status" data-vv-safe="1" data-gt-safe>
+          Verified by Dr. Anjali Deshpande, Cardiology, Meridian Multispeciality Hospital. Queries: 1800 202 4455.
+        </p>
+
+        <div class="btnrow" style="margin-top:14px">
+          <button type="button" class="btn">Download report PDF</button>
+          <button type="button" class="btn">Share with doctor</button>
+          <button type="button" class="btn ghost">Close report</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Step 6. Prefilled because that is how portals behave, and because a form the agent must
+         read before it edits is harder than an empty one. -->
+    <section class="card" id="step-booking" aria-labelledby="h-booking">
+      <header>
+        <h2 id="h-booking">Book follow-up appointment</h2>
+        <span class="hint">Step 6 of 7</span>
+      </header>
+      <div class="body">
+        <form id="booking-form" novalidate>
+          <div class="grid2" style="margin-bottom:14px">
+            <div class="field">
+              <label for="patient-name">Patient full name</label>
+              <input type="text" id="patient-name" name="patient_name" value="Meera Kulkarni"
+                     autocomplete="name" data-vv-sensitive="name" data-gt-pii="name">
+            </div>
+            <div class="field">
+              <label for="patient-dob">Date of birth</label>
+              <input type="date" id="patient-dob" name="patient_dob" value="1979-03-14"
+                     data-vv-sensitive="dob" data-gt-pii="dob">
+            </div>
+            <div class="field">
+              <label for="patient-phone">Mobile number</label>
+              <input type="tel" id="patient-phone" name="patient_phone" value="+91 98765 43210"
+                     autocomplete="tel" data-vv-sensitive="phone" data-gt-pii="phone">
+            </div>
+            <div class="field">
+              <label for="patient-abha">ABHA number</label>
+              <input type="text" id="patient-abha" name="patient_abha" value="91-2345-6789-0123"
+                     data-vv-sensitive="abha" data-gt-pii="abha">
+            </div>
+            <div class="field">
+              <label for="visit-department">Department for this visit</label>
+              <select id="visit-department" name="visit_department">
+                <option value="cardiology" selected>Cardiology</option>
+                <option value="endocrinology">Endocrinology</option>
+                <option value="general-medicine">General medicine</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="visit-mode">Consultation mode</label>
+              <select id="visit-mode" name="visit_mode">
+                <option value="in-person" selected>In person, OPD</option>
+                <option value="video">Video consultation</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="field" style="margin-bottom:14px">
+            <label for="symptoms">Reason for visit and current symptoms</label>
+            <textarea id="symptoms" name="symptoms" rows="4"
+                      placeholder="Describe what the doctor should know before the consultation"
+                      data-vv-sensitive="symptoms" data-gt-pii="symptoms">Chest tightness on climbing two flights, easing with rest. Fasting sugars around 160 for the last three weeks despite Metformin. Occasional giddiness in the evening after Telmisartan.</textarea>
+          </div>
+
+          <div class="consent">
+            <input type="checkbox" id="consent-share" name="consent_share">
+            <label for="consent-share">I consent to sharing my ABHA-linked records and the 28 Sep 2025 lab report with the treating doctor for this consultation.</label>
+          </div>
+
+          <div class="btnrow" style="margin-top:14px">
+            <button type="button" class="btn">Save as draft</button>
+            <button type="submit" class="btn primary">Continue to review</button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <!-- Step 7. The summary repeats the safe half of the slot on purpose: if the fee and time
+         were masked upstream, the failure surfaces here as an unconfirmable booking. -->
+    <section class="card" id="step-confirm" aria-labelledby="h-confirm">
+      <header>
+        <h2 id="h-confirm">Review and confirm</h2>
+        <span class="hint">Step 7 of 7</span>
+      </header>
+      <div class="body">
+        <ul class="summary">
+          <li><span class="k">Doctor</span><span class="v" data-vv-safe="1" data-gt-safe>Dr. Anjali Deshpande, Cardiology</span></li>
+          <li><span class="k">Appointment</span><span class="v" data-vv-safe="1" data-gt-safe>Tue 06 Oct 2025, 10:30 AM, Block C-214</span></li>
+          <li><span class="k">Consultation fee</span><span class="v" data-vv-safe="1" data-gt-safe>&#8377;850</span></li>
+          <li><span class="k">Co-pay payable now</span><span class="v" data-vv-safe="1" data-gt-safe>&#8377;170</span></li>
+          <li><span class="k">Patient</span><span class="v" data-vv-sensitive="name" data-gt-pii="name">Meera Kulkarni</span></li>
+          <li><span class="k">Contact</span><span class="v" data-vv-sensitive="phone" data-gt-pii="phone">+91 98765 43210</span></li>
+        </ul>
+
+        <div class="btnrow" style="margin-top:16px">
+          <button type="button" class="btn primary">Confirm booking</button>
+          <button type="button" class="btn">Change slot</button>
+          <button type="button" class="btn ghost">Cancel</button>
+        </div>
+        <p class="status" role="status" data-vv-safe="1" data-gt-safe>Not confirmed yet. Confirming sends an OTP to the registered mobile number.</p>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div class="footer">
+  <p data-vv-safe="1" data-gt-safe>Meridian Multispeciality Hospital, 44 Varthur Main Road, Whitefield, Bengaluru 560066. Helpline 1800 202 4455.</p>
+  <p data-vv-safe="1" data-gt-safe>Records are held under ABDM data-sharing rules. Synthetic evaluation copy &mdash; not a medical document.</p>
+</div>
+
+</body>
+</html>

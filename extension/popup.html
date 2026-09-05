@@ -14,6 +14,12 @@
 -->
 <svg width="0" height="0" class="sprite" aria-hidden="true">
   <defs>
+    <!-- The brand mark is the one place a gradient earns its keep: it is the only element on
+         screen that is purely identity, so it can carry colour the rest of the panel cannot. -->
+    <linearGradient id="vv-shield-grad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#4d8bff"/>
+      <stop offset="100%" stop-color="#8b7bf7"/>
+    </linearGradient>
     <g id="i-scan"><path d="M3 8V5.5A2.5 2.5 0 0 1 5.5 3H8M16 3h2.5A2.5 2.5 0 0 1 21 5.5V8M21 16v2.5a2.5 2.5 0 0 1-2.5 2.5H16M8 21H5.5A2.5 2.5 0 0 1 3 18.5V16"/><path d="M3 12h18"/></g>
     <g id="i-play"><path d="M7 4.5l11.5 7.5L7 19.5z"/></g>
     <g id="i-stop"><rect x="6.5" y="6.5" width="11" height="11" rx="2.5"/></g>
@@ -76,6 +82,49 @@
   <!-- ── RUN ────────────────────────────────────────────────────────────── -->
   <section id="panel-run" class="panel active" role="tabpanel" tabindex="0">
 
+    <!--
+      The standing promise, stated before anything happens rather than after.
+
+      It is not a status readout of the current run: it describes the architecture, which is
+      true whether or not a task is in flight. `protectionState` narrows it while a run is
+      going on, and turns red only if the fail-closed path ever fires - the one case where the
+      promise would otherwise be a lie.
+    -->
+    <div class="protect-banner" id="protectBanner">
+      <span class="protect-dot" aria-hidden="true"></span>
+      <div class="protect-text">
+        <strong id="protectTitle">Protection Active</strong>
+        <span id="protectState">Your data stays on this device</span>
+      </div>
+    </div>
+
+    <!--
+      The four stages the pipeline actually runs, in order, as a progress rail.
+
+      This is the whole product argument reduced to four words, and it is worth showing
+      continuously rather than in a report at the end: a viewer can see that Redact sits
+      between what the agent saw and what the model was told, every single step.
+      `data-stage` is set by popup.js as the run moves.
+    -->
+    <ol class="pipeline" id="pipeline" aria-label="Privacy pipeline">
+      <li class="pipe-step" data-stage="observe">
+        <span class="pipe-ico"><svg class="ic" viewBox="0 0 24 24"><use href="#i-eye"/></svg></span>
+        <span class="pipe-name">Observe</span>
+      </li>
+      <li class="pipe-step" data-stage="redact">
+        <span class="pipe-ico"><svg class="ic" viewBox="0 0 24 24"><use href="#i-lock"/></svg></span>
+        <span class="pipe-name">Redact</span>
+      </li>
+      <li class="pipe-step" data-stage="reason">
+        <span class="pipe-ico"><svg class="ic" viewBox="0 0 24 24"><use href="#i-sparkle"/></svg></span>
+        <span class="pipe-name">Reason</span>
+      </li>
+      <li class="pipe-step" data-stage="act">
+        <span class="pipe-ico"><svg class="ic" viewBox="0 0 24 24"><use href="#i-cursor"/></svg></span>
+        <span class="pipe-name">Act</span>
+      </li>
+    </ol>
+
     <div class="field">
       <div class="field-head">
         <label class="field-label" for="task">What should the agent do?</label>
@@ -111,13 +160,21 @@
         <button class="quick-chip" data-template="fill the signup form with my details">Fill a form</button>
         <button class="quick-chip" data-template="scroll down and show me more">Scroll for more</button>
       </div>
-      <p class="kbd-hint"><kbd>Ctrl</kbd>+<kbd>Enter</kbd> to scan · <kbd>Ctrl</kbd>+<kbd>M</kbd> to dictate</p>
+      <p class="kbd-hint"><kbd>Ctrl</kbd>+<kbd>Enter</kbd> to run · <kbd>Ctrl</kbd>+<kbd>M</kbd> to dictate</p>
+      <!--
+        Automatic is the product. This exists so a demo can stop on the redacted frame and
+        talk about it before anything moves, not because two-step is a supported way to work.
+      -->
+      <label class="check auto-toggle" for="s-autoAgent">
+        <input type="checkbox" id="s-autoAgent" checked>
+        <span>Run automatically after redacting</span>
+      </label>
     </div>
 
     <div class="actions">
       <button class="btn btn-primary" id="scanBtn">
         <svg class="ic" viewBox="0 0 24 24"><use href="#i-scan"/></svg>
-        <span>Scan &amp; redact screen</span>
+        <span>Run agent</span>
       </button>
       <div class="actions-row">
         <button class="btn btn-accent" id="runBtn" hidden>

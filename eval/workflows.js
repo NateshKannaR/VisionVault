@@ -77,83 +77,14 @@ const VAULT = {
  *   It must check state the AGENT caused — a select moved off its first option, an input
  *   holding a value, a confirmation now visible — not markup the fixture always had.
  */
+// The deep instructions live in their own file: they are data about the fixtures rather than
+// harness logic, and each carries seven stage predicates. The shallow entries below remain for
+// the two pages that have no seven-step shape - a signup form and the read-only PII gauntlet.
+const DEEP = require('./lib/deep-workflows');
+
 const WORKFLOWS = [
-  {
-    key: 'shopping',
-    page: 'laptop-compare.html',
-    task: 'search for laptops under 70000 with 16GB ram, compare them and save the best one',
-    reached: () => {
-      const q = document.querySelector('input[type=search], input[type=text]');
-      const typed = !!(q && q.value && q.value.trim().length > 2);
-      const filtered = Array.from(document.querySelectorAll('select')).some((s) => s.selectedIndex > 0);
-      const saved = /saved|wishlist/i.test(document.body.innerText) &&
-                    !!document.querySelector('.saved, [data-saved="1"], .is-saved');
-      return { ok: typed && (filtered || saved), detail: `typed=${typed} filtered=${filtered} saved=${saved}` };
-    },
-  },
-  {
-    key: 'travel',
-    page: 'travel-booking.html',
-    task: 'search for flights and compare the fares and pick the cheapest one',
-    reached: () => {
-      const filled = Array.from(document.querySelectorAll('input')).filter((i) => i.value && i.value.trim()).length;
-      const filtered = Array.from(document.querySelectorAll('select')).some((s) => s.selectedIndex > 0);
-      return { ok: filled > 0 || filtered, detail: `inputsFilled=${filled} filtered=${filtered}` };
-    },
-    // This fixture leaves required fields empty on purpose, so the agent should ask rather
-    // than invent. Asking counts as success for this workflow.
-    asksExpected: true,
-  },
-  {
-    key: 'jobs',
-    page: 'jobs-portal.html',
-    task: 'search for developer jobs and filter by experience and open the best match',
-    reached: () => {
-      const typed = Array.from(document.querySelectorAll('input')).some((i) => i.value && i.value.trim().length > 2);
-      const filtered = Array.from(document.querySelectorAll('select')).some((s) => s.selectedIndex > 0);
-      return { ok: typed || filtered, detail: `typed=${typed} filtered=${filtered}` };
-    },
-  },
-  {
-    key: 'banking',
-    page: 'banking-portal.html',
-    task: 'filter the transactions and show me the recent ones',
-    reached: () => {
-      const filtered = Array.from(document.querySelectorAll('select')).some((s) => s.selectedIndex > 0);
-      const typed = Array.from(document.querySelectorAll('input')).some((i) => i.value && i.value.trim());
-      return { ok: filtered || typed, detail: `filtered=${filtered} typed=${typed}` };
-    },
-  },
-  {
-    key: 'healthcare',
-    page: 'health-portal.html',
-    task: 'search the records and filter by department and show me the appointment slots',
-    reached: () => {
-      const filtered = Array.from(document.querySelectorAll('select')).some((s) => s.selectedIndex > 0);
-      const typed = Array.from(document.querySelectorAll('input')).some((i) => i.value && i.value.trim().length > 2);
-      return { ok: filtered || typed, detail: `filtered=${filtered} typed=${typed}` };
-    },
-  },
-  {
-    key: 'government',
-    page: 'gov-services.html',
-    task: 'search for a certificate service and compare the schemes',
-    reached: () => {
-      const typed = Array.from(document.querySelectorAll('input')).some((i) => i.value && i.value.trim().length > 2);
-      const filtered = Array.from(document.querySelectorAll('select')).some((s) => s.selectedIndex > 0);
-      return { ok: typed || filtered, detail: `typed=${typed} filtered=${filtered}` };
-    },
-  },
-  {
-    key: 'enterprise',
-    page: 'enterprise-dashboard.html',
-    task: 'search the employee directory and filter by department',
-    reached: () => {
-      const typed = Array.from(document.querySelectorAll('input')).some((i) => i.value && i.value.trim().length > 2);
-      const filtered = Array.from(document.querySelectorAll('select')).some((s) => s.selectedIndex > 0);
-      return { ok: typed || filtered, detail: `typed=${typed} filtered=${filtered}` };
-    },
-  },
+  ...DEEP,
+
   {
     key: 'signup',
     page: 'signup-form.html',

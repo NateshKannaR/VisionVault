@@ -2,13 +2,75 @@
  * vault.js — Privacy Vault Manager
  *
  * Wrapper around chrome.storage.local for storing and retrieving user's own real values:
- * name, email, phone, address, username, password, company, zip, about.
+ * Satellite telemetry, mission parameters, and personal credentials.
  *
  * Real values are resolved strictly locally on-device and never transmitted over the network.
  */
 
 (function (global) {
+  const DEFAULT_MISSION_VAULT = {
+    satellite_name: "INSAT-4B",
+    mission_id: "INSAT-4B / M-201",
+    operator: "R. Sharma",
+    launch_date: "2007-03-12",
+    orbit_type: "Geostationary (GEO)",
+    orbital_inclination: "0.05°",
+    apogee: "35,786 km",
+    perigee: "35,786 km",
+    tle_line_1: "1 30798U 07007A 26248.51249811 -.00000124 00000-0 10000-4 0 9991",
+    tle_line_2: "2 30798 0.0512 87.2145 0001248 145.2104 214.8901 1.00273412 71234",
+    ground_station_freq: "14.250 GHz (Ku-Band)",
+    encryption_key_ref: "ISRO-KMS-EK-2026-04871",
+    name: "R. Sharma",
+    email: "r.sharma@isro.gov.in",
+    username: "rsharma_mcc",
+    phone: "+91 80 2217 2296",
+    company: "ISRO Master Control Facility (MCF)",
+    address: "MCF Salgame Road, Hassan, Karnataka, India",
+    zip: "573201",
+    password: "ISRO-MCF-SECURE-AUTH-2026",
+    about: "Senior Mission Operations Controller — INSAT / GSAT Series"
+  };
+
   const VAULT_KEY_MAP = {
+    // satellite & telemetry
+    satellite_name: "satellite_name",
+    satellite: "satellite_name",
+    sat_name: "satellite_name",
+    "satellite-name": "satellite_name",
+    mission_id: "mission_id",
+    mission: "mission_id",
+    "mission-id": "mission_id",
+    operator: "operator",
+    operator_name: "operator",
+    "operator on duty": "operator",
+    "operator-name": "operator",
+    duty: "operator",
+    launch_date: "launch_date",
+    "launch-date": "launch_date",
+    orbit_type: "orbit_type",
+    "orbit-type": "orbit_type",
+    orbit: "orbit_type",
+    orbital_inclination: "orbital_inclination",
+    inclination: "orbital_inclination",
+    "orbital-inclination": "orbital_inclination",
+    apogee: "apogee",
+    perigee: "perigee",
+    tle_line_1: "tle_line_1",
+    "tle-line-1": "tle_line_1",
+    tle1: "tle_line_1",
+    tle_line_2: "tle_line_2",
+    "tle-line-2": "tle_line_2",
+    tle2: "tle_line_2",
+    ground_station_freq: "ground_station_freq",
+    "ground-station-freq": "ground_station_freq",
+    frequency: "ground_station_freq",
+    freq: "ground_station_freq",
+    encryption_key_ref: "encryption_key_ref",
+    "encryption-key-ref": "encryption_key_ref",
+    encryption_key: "encryption_key_ref",
+    key_ref: "encryption_key_ref",
+    // contact & personal
     email: "email",
     mail: "email",
     "email-address": "email",
@@ -37,14 +99,15 @@
   };
 
   /**
-   * Retrieves the local vault object from chrome.storage.local.
+   * Retrieves the local vault object from chrome.storage.local, defaulting to satellite telemetry.
    */
   async function getVault() {
     if (typeof chrome === "undefined" || !chrome.storage || !chrome.storage.local) {
-      return {};
+      return { ...DEFAULT_MISSION_VAULT };
     }
     const data = await chrome.storage.local.get("vault");
-    return data.vault || {};
+    const merged = Object.assign({}, DEFAULT_MISSION_VAULT, data.vault || {});
+    return merged;
   }
 
   /**
@@ -62,15 +125,16 @@
    * Resolves a vault field type to the user's stored real value.
    * Used ONLY locally when executing a type action referencing use_vault_field.
    *
-   * @param {string} fieldType - The field key (e.g., "email", "phone", "name", "address")
+   * @param {string} fieldType - The field key (e.g., "satellite_name", "operator", "apogee", "email")
    * @returns {Promise<string>} The user's real personal value
    */
   async function resolveVaultField(fieldType) {
     if (!fieldType) return "";
     const vault = await getVault();
-    const normalizedKey = (fieldType || "").toLowerCase().trim();
-    const mappedKey = VAULT_KEY_MAP[normalizedKey] || normalizedKey;
-    return vault[mappedKey] || "";
+    const normalizedKey = (fieldType || "").toLowerCase().trim().replace(/[\s-]+/g, "_");
+    const directKey = (fieldType || "").toLowerCase().trim();
+    const mappedKey = VAULT_KEY_MAP[normalizedKey] || VAULT_KEY_MAP[directKey] || normalizedKey;
+    return vault[mappedKey] || vault[directKey] || "";
   }
 
   /**
@@ -97,10 +161,6 @@
 
   /**
    * Computes SHA-256 hash of salt + pin.
-   *
-   * @param {string} pin - Plaintext PIN
-   * @param {string} salt - Hex salt string
-   * @returns {Promise<string>} Hex-encoded SHA-256 digest
    */
   async function hashPin(pin, salt) {
     const text = (salt || "") + (pin || "");
@@ -123,8 +183,6 @@
 
   /**
    * Checks whether a vault PIN has been configured in local storage.
-   *
-   * @returns {Promise<boolean>}
    */
   async function hasVaultPin() {
     if (typeof chrome === "undefined" || !chrome.storage || !chrome.storage.local) {
@@ -136,10 +194,6 @@
 
   /**
    * Verifies a provided PIN against the stored salt + SHA-256 hash.
-   * If no PIN has been set, returns true.
-   *
-   * @param {string} pin
-   * @returns {Promise<boolean>}
    */
   async function verifyVaultPin(pin) {
     if (typeof chrome === "undefined" || !chrome.storage || !chrome.storage.local) {
@@ -156,9 +210,6 @@
 
   /**
    * Sets or updates the vault PIN.
-   *
-   * @param {string} pin - The new PIN (minimum 4 characters)
-   * @returns {Promise<boolean>}
    */
   async function setVaultPin(pin) {
     if (!pin || typeof pin !== "string" || pin.trim().length < 4) {
@@ -174,9 +225,6 @@
 
   /**
    * Removes the vault PIN protection after verifying the current PIN.
-   *
-   * @param {string} currentPin - The current PIN for confirmation
-   * @returns {Promise<boolean>}
    */
   async function removeVaultPin(currentPin) {
     const hasPin = await hasVaultPin();
@@ -192,6 +240,7 @@
   }
 
   const VaultManager = {
+    DEFAULT_MISSION_VAULT,
     getVault,
     saveVault,
     resolveVaultField,
@@ -204,6 +253,7 @@
     VAULT_KEY_MAP
   };
 
+  global.DEFAULT_MISSION_VAULT = DEFAULT_MISSION_VAULT;
   global.VaultManager = VaultManager;
   global.getVault = getVault;
   global.saveVault = saveVault;

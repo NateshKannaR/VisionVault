@@ -122,12 +122,21 @@ function normalizeDigits(text) {
 
 // ── PII Label Keywords ───────────────────────────────────────────────────────
 const PII_LABEL_KEYWORDS = [
-  // identity
+  // identity & personnel
   "name", "surname", "first name", "last name", "full name", "username", "user id",
   "aadhaar", "ssn", "social security", "national id", "voter", "passport", "license",
   "licence", "pan", "tax id", "nino", "date of birth", "dob", "birth", "age", "gender",
-  // credentials
+  "operator", "operator on duty", "duty", "mission", "mission id", "officer", "supervisor",
+  "commander", "technician", "pilot", "personnel", "author", "creator", "admin", "agent",
+  "employee", "staff", "applicant", "candidate", "member",
+  // credentials & security
   "password", "passwd", "passcode", "pin", "otp", "secret", "api key", "token", "key",
+  "encryption key", "encryption key ref", "encryption", "auth token", "private key",
+  "clearance", "restricted", "confidential", "classified", "internal", "data classification",
+  // orbital, aerospace & telemetry
+  "satellite", "satellite name", "launch date", "apogee", "perigee", "inclination",
+  "orbital inclination", "orbit type", "orbit", "tle", "tle line 1", "tle line 2",
+  "frequency", "ground station", "ground station freq", "telemetry", "payload",
   // contact
   "email", "e-mail", "phone", "mobile", "telephone", "contact", "address", "street",
   "postcode", "post code", "zip", "postal", "city", "country",
@@ -204,10 +213,75 @@ function safeLabel(el) {
 
   const associatedLabel = () => {
     try {
+      // 1. Explicit <label for="..."> or wrapping <label>
       const byFor = el.id ? document.querySelector(`label[for="${CSS.escape(el.id)}"]`) : null;
       const wrapping = el.closest ? el.closest("label") : null;
-      const src = byFor || wrapping;
-      return src ? (src.innerText || src.textContent || "") : "";
+      if (byFor || wrapping) {
+        const text = (byFor || wrapping).innerText || (byFor || wrapping).textContent || "";
+        if (text.trim()) return text;
+      }
+
+      // 2. Direct previous sibling (e.g. <span class="label">Satellite Name *</span><input>)
+      let prev = el.previousElementSibling;
+      while (prev && /^(input|textarea|select|button)$/i.test(prev.tagName)) {
+        prev = prev.previousElementSibling;
+      }
+      if (prev) {
+        const t = (prev.innerText || prev.textContent || "").trim();
+        if (t && t.length < 80) return t;
+      }
+
+      // 3. Parent's previous sibling
+      if (el.parentElement) {
+        let parentPrev = el.parentElement.previousElementSibling;
+        if (parentPrev) {
+          const t = (parentPrev.innerText || parentPrev.textContent || "").trim();
+          if (t && t.length < 80) return t;
+        }
+      }
+
+      // 4. Immediate row / form group with 1-2 inputs
+      const immediateRow = el.closest("tr, .form-row, .row, .field, .form-group, .form-item, p, li");
+      if (immediateRow) {
+        const inputsInRow = immediateRow.querySelectorAll("input, textarea, select");
+        if (inputsInRow.length <= 2) {
+          const rowLabel = immediateRow.querySelector("label, .label, .form-label, .field-label, th, dt, .key, .name, strong, b, span");
+          if (rowLabel && rowLabel !== el && !rowLabel.contains(el)) {
+            const t = (rowLabel.innerText || rowLabel.textContent || "").trim();
+            if (t && t.length < 80 && !/^(identification|orbital parameters|communications|security|metadata)$/i.test(t)) return t;
+          }
+        }
+      }
+
+      // 5. Spatial / Geometric horizontal scan: find text label aligned horizontally on the left
+      const inputRect = el.getBoundingClientRect();
+      if (inputRect.width > 0 && inputRect.height > 0) {
+        const allLabels = document.querySelectorAll("label, span, th, td, dt, div, p, strong, b");
+        let bestLabel = null;
+        let bestDist = Infinity;
+        for (const candidate of allLabels) {
+          if (candidate === el || candidate.contains(el) || el.contains(candidate)) continue;
+          if (candidate.children.length > 2) continue;
+          const text = (candidate.innerText || candidate.textContent || "").trim();
+          if (!text || text.length < 2 || text.length > 70) continue;
+          if (/^(identification|orbital parameters|communications|security|metadata|save draft|submit|reset|auto-saved)$/i.test(text)) continue;
+
+          const r = candidate.getBoundingClientRect();
+          if (r.width === 0 || r.height === 0) continue;
+
+          const vOverlap = Math.abs((r.top + r.height / 2) - (inputRect.top + inputRect.height / 2));
+          if (vOverlap < 22 && r.right <= inputRect.left + 30 && r.left < inputRect.left) {
+            const dist = inputRect.left - r.right;
+            if (dist >= -30 && dist < bestDist) {
+              bestDist = dist;
+              bestLabel = text;
+            }
+          }
+        }
+        if (bestLabel) return bestLabel;
+      }
+
+      return "";
     } catch (_) {
       return "";
     }
@@ -230,6 +304,7 @@ function safeLabel(el) {
         el.getAttribute("placeholder"),
         el.getAttribute("title"),
         el.getAttribute("name"),
+        el.getAttribute("id"),
         dataIcon(),
       ]
     : [
@@ -237,6 +312,8 @@ function safeLabel(el) {
         el.getAttribute("aria-label"),
         el.getAttribute("title"),
         el.getAttribute("placeholder"),
+        el.getAttribute("name"),
+        el.getAttribute("id"),
         dataIcon(),
       ];
 
@@ -244,9 +321,9 @@ function safeLabel(el) {
     let text = (raw || "").trim();
     if (!text) continue;
     if (testPII(text)) continue; // never let a detected PII string become a label
-    text = text.replace(/[\r\n\t]+/g, " ").replace(/\s+/g, " ").trim();
+    text = text.replace(/[\r\n\t]+/g, " ").replace(/[*:]+/g, "").replace(/\s+/g, " ").trim();
     if (text.length > 50) text = text.substring(0, 50);
-    return text.toLowerCase();
+    if (text) return text.toLowerCase();
   }
   return null;
 }
@@ -408,36 +485,43 @@ function isSearchLike(el) {
 }
 
 function checkNearbyLabelPII(inputEl) {
+  const rowContainer = inputEl.closest(".form-row, .form-group, .field, .row, .group, tr, td, li, div");
+  const rowLabelEl = rowContainer ? rowContainer.querySelector("label, .label, .form-label, .field-label, dt, th") : null;
   const labelEl = inputEl.closest("label") ||
                   (inputEl.id ? document.querySelector(`label[for="${CSS.escape(inputEl.id)}"]`) : null) ||
-                  inputEl.previousElementSibling;
+                  inputEl.previousElementSibling ||
+                  (inputEl.parentElement && inputEl.parentElement.previousElementSibling) ||
+                  rowLabelEl;
+  
+  const isRestrictedContainer = Boolean(inputEl.closest(
+    "[class*='restricted' i], [class*='classified' i], [class*='confidential' i], [id*='restricted' i], [id*='classified' i], [data-classification]"
+  ));
+
   const candidates = [
     labelEl && (labelEl.innerText || labelEl.textContent),
+    rowLabelEl && (rowLabelEl.innerText || rowLabelEl.textContent),
     inputEl.getAttribute("aria-label"),
     inputEl.getAttribute("placeholder"),
     inputEl.getAttribute("name"),
     inputEl.getAttribute("id"),
     inputEl.getAttribute("autocomplete"),
   ];
-  return candidates.some(matchesPiiKeyword);
+
+  return isRestrictedContainer || candidates.some(matchesPiiKeyword);
 }
 
 /**
  * Values whose sensitivity comes from CONTEXT rather than shape.
  *
- * Personal names, street lines and account labels match no regex — a table of customers is
- * just capitalised words. What marks them sensitive is the column they sit in, or the term
- * they sit beside. This resolves that context two ways:
- *
- *   1. Table cells -> the <th> at the same column index (and any row header).
- *   2. Definition lists and label/value pairs -> the preceding <dt>/<label>/<strong>/<b>.
- *
- * Without this, dashboards leak every name and address they display; the live evaluation
- * measured exactly that before this rule existed.
+ * Catches personal names ("R. Sharma"), telemetry values ("35,786 km"), mission identifiers,
+ * and data fields inside restricted cards/dashboards.
  */
 function findContextLabelledPII() {
   const hits = [];
+  const MAX_LABEL_LEN = 60;
+  const MAX_VALUE_LEN = 120;
 
+  // 1. Table columns and rows
   document.querySelectorAll("table").forEach((table) => {
     const headerCells = Array.from(table.querySelectorAll("thead th, tr:first-child th"));
     if (!headerCells.length) return;
@@ -448,8 +532,6 @@ function findContextLabelledPII() {
     if (!sensitiveCols.size) return;
 
     table.querySelectorAll("tr").forEach((row) => {
-      // Header rows label the data; they are not the data. Masking "Email" as though it were
-      // an address hides page structure the planner needs and scores as over-redaction.
       if (row.closest("thead")) return;
       const cells = Array.from(row.children).filter((c) => /^td$/i.test(c.tagName));
       cells.forEach((cell, i) => {
@@ -460,6 +542,7 @@ function findContextLabelledPII() {
     });
   });
 
+  // 2. Definition lists (<dt> -> <dd>)
   document.querySelectorAll("dd").forEach((dd) => {
     const dt = dd.previousElementSibling;
     if (dt && dt.tagName === "DT" && matchesPiiKeyword(dt.innerText || dt.textContent)) {
@@ -468,35 +551,37 @@ function findContextLabelledPII() {
     }
   });
 
-  // The label/value row, which is how most of the modern web lays out a detail list: two
-  // sibling elements inside a flex or grid row, no <table> and no <dl> anywhere.
-  //
-  // This case matters more than it looks. A personal name matches no regex — "Priya Raghavan"
-  // is two capitalised words — so the only thing marking it as sensitive is the word sitting
-  // beside it. eval/attack-redaction.js caught exactly this: a name displayed this way
-  // survived every enhancement attack on the redacted capture, because nothing had ever
-  // classified it as PII.
-  //
-  // The guards below are what keep this from masking half the page. A label is short, a value
-  // is short, and a row holds a couple of things — prose that happens to contain the word
-  // "name" satisfies none of that.
-  const MAX_LABEL_LEN = 40;
-  const MAX_VALUE_LEN = 90;
-  document.querySelectorAll("div, span, p, li, td").forEach((el) => {
-    const prev = el.previousElementSibling;
+  // 3. Label/Value pairs across flex, grid, and dashboard rows
+  document.querySelectorAll("div, span, p, li, td, dd, input, textarea").forEach((el) => {
+    if (el.tagName === "INPUT" || el.tagName === "TEXTAREA") {
+      if (checkNearbyLabelPII(el) && !isSearchLike(el)) {
+        hits.push({ el, label: (el.getAttribute("name") || "sensitive_field").toLowerCase() });
+      }
+      return;
+    }
+
+    const prev = el.previousElementSibling || (el.parentElement && el.parentElement.previousElementSibling);
     if (!prev) return;
-    if (el.children.length > 1 || prev.children.length > 1) return;      // leaves, not containers
-    const parent = el.parentElement;
-    if (!parent || parent.children.length > 3) return;                    // a row, not a list
     const label = (prev.innerText || prev.textContent || "").trim();
     if (!label || label.length > MAX_LABEL_LEN) return;
     if (!matchesPiiKeyword(label)) return;
-    const value = (el.innerText || el.textContent || "").trim();
+
+    const value = (el.innerText || el.textContent || (el.value !== undefined ? el.value : "") || "").trim();
     if (value.length < 2 || value.length > MAX_VALUE_LEN) return;
-    // The label cell itself is page structure, not data; masking it would hide the very thing
-    // that tells a reader — and the planner — what the field is.
     if (matchesPiiKeyword(value) && value.length <= MAX_LABEL_LEN) return;
-    hits.push({ el, label: label.toLowerCase().slice(0, 30) });
+
+    hits.push({ el, label: label.toLowerCase().slice(0, 40) });
+  });
+
+  // 4. Restricted and Classified Containers: Mask all data values within them
+  document.querySelectorAll(
+    "[class*='restricted' i], [class*='classified' i], [class*='confidential' i], [id*='restricted' i], [data-classification]"
+  ).forEach((container) => {
+    container.querySelectorAll("input:not([type='button']):not([type='submit']), textarea, .value, .val, td, dd").forEach((dataEl) => {
+      if (!isSearchLike(dataEl)) {
+        hits.push({ el: dataEl, label: "restricted_data" });
+      }
+    });
   });
 
   return hits;

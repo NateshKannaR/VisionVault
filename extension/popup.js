@@ -119,7 +119,12 @@ checkServer();
 $("checkServer").addEventListener("click", checkServer);
 
 // ── Vault ─────────────────────────────────────────────────────────────────────
-const VAULT_KEYS = ["name", "email", "phone", "address", "username", "company", "zip", "password", "about"];
+const VAULT_KEYS = [
+  "satellite_name", "mission_id", "operator", "launch_date", "orbit_type",
+  "orbital_inclination", "apogee", "perigee", "tle_line_1", "tle_line_2",
+  "ground_station_freq", "encryption_key_ref", "name", "username", "email",
+  "phone", "company", "zip", "address", "password", "about"
+];
 let isVaultUnlocked = false;
 
 async function updateVaultUI() {
@@ -587,8 +592,7 @@ scanBtn.addEventListener("click", () => {
     //
     // The pause is kept for exactly one case: a scan that found nothing to act on. Running
     // then would just burn steps against a page the agent cannot see.
-    const marks = res.result?.markCount || 0;
-    if (autoAgentMode() && marks > 0) {
+    if (autoAgentMode()) {
       setPipelineStage("reason");
       setRunning(true);
       runBtn.hidden = true;
@@ -877,6 +881,13 @@ function describeProgress(p) {
 }
 
 // ── Missing value prompt ──────────────────────────────────────────────────────
+$("missingInputValue").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    $("inputPromptSubmit").click();
+  }
+});
+
 $("inputPromptSubmit").addEventListener("click", () => {
   const value = $("missingInputValue").value.trim();
   const saveToVault = $("saveMissingToVault").checked;

@@ -87,10 +87,10 @@
   const ACCOUNT_RE  = /\b(?:a\/c|acc(?:oun)?t(?:\s*(?:no|number|#))?|bank\s*a\/?c)\s*[:.#-]?\s*(\d{9,18})\b/gi;
 
   // Values that are sensitive because of the words printed next to them, not their shape.
-  // A personal name matches no pattern — "Priya Raghavan" is just two capitalised words — so
+  // A personal name matches no pattern — "R. Sharma" is just two words — so
   // the only way to recognise it in a flattened image is the field label rendered beside it.
   // Capture group 2 is the value; group 1 is the label, which is not itself sensitive.
-  const LABELLED_VALUE_RE = /\b(billed to|bill to|invoice to|sold to|customer|client|account holder|card ?holder|patient|employee|member|full name|name|recipient|addressed to|deliver to|ship to)\s*[:\-]\s*([^\r\n]{2,60})/gi;
+  const LABELLED_VALUE_RE = /\b(billed to|bill to|invoice to|sold to|customer|client|account holder|card ?holder|patient|employee|member|full name|name|operator on duty|operator|duty|mission id|mission|officer|supervisor|pilot|commander|technician|personnel|satellite name|satellite|orbit type|launch date|orbital inclination|apogee|perigee|tle line 1|tle line 2|tle|ground station freq|ground station|encryption key ref|encryption key|encryption|recipient|addressed to|deliver to|ship to)\s*[:\-]\s*([^\r\n]{2,60})/gi;
 
   // Order is significant: the first pattern to claim a span keeps it (see isCovered), so the
   // more specific shapes are tried before the looser ones. PHONE_RE in particular will happily

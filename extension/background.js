@@ -46,9 +46,22 @@ chrome.action.onClicked?.addListener(async (tab) => {
 });
 
 const VAULT_KEY_MAP = {
+  // satellite & telemetry
+  satellite_name: "satellite_name", satellite: "satellite_name", sat_name: "satellite_name", "satellite-name": "satellite_name",
+  mission_id: "mission_id", mission: "mission_id", "mission-id": "mission_id",
+  operator: "operator", operator_name: "operator", "operator on duty": "operator", "operator-name": "operator", duty: "operator",
+  launch_date: "launch_date", "launch-date": "launch_date",
+  orbit_type: "orbit_type", "orbit-type": "orbit_type", orbit: "orbit_type",
+  orbital_inclination: "orbital_inclination", inclination: "orbital_inclination", "orbital-inclination": "orbital_inclination",
+  apogee: "apogee", perigee: "perigee",
+  tle_line_1: "tle_line_1", "tle-line-1": "tle_line_1", tle1: "tle_line_1",
+  tle_line_2: "tle_line_2", "tle-line-2": "tle_line_2", tle2: "tle_line_2",
+  ground_station_freq: "ground_station_freq", "ground-station-freq": "ground_station_freq", frequency: "ground_station_freq", freq: "ground_station_freq",
+  encryption_key_ref: "encryption_key_ref", "encryption-key-ref": "encryption_key_ref", encryption_key: "encryption_key_ref", key_ref: "encryption_key_ref",
+  // contact & personal
   email: "email", phone: "phone", name: "name", address: "address",
   username: "username", fullname: "name", mobile: "phone",
-  company: "company", zip: "address", postal: "address",
+  company: "company", zip: "zip", postal: "zip",
   about: "about", bio: "about", description: "about",
   password: "password", passwd: "password", pass: "password",
 };
@@ -167,7 +180,8 @@ function notifyPopup(data) {
 // ── Storage ───────────────────────────────────────────────────────────────────
 async function getVault() {
   const { vault } = await chrome.storage.local.get("vault");
-  return vault || {};
+  const defaults = typeof DEFAULT_MISSION_VAULT !== "undefined" ? DEFAULT_MISSION_VAULT : {};
+  return Object.assign({}, defaults, vault || {});
 }
 async function getSettings() {
   const { settings } = await chrome.storage.local.get("settings");
@@ -1444,21 +1458,18 @@ async function phaseRun() {
           if (fromLabel.unknownIdentifier) {
             const slug = String(mark?.label || "value").toLowerCase()
               .replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 40) || "value";
-            // If the user answered this one before and chose to remember it, use that.
-            const stored = (await getVault())[slug];
-            if (stored) {
-              fieldKey = slug;
-            } else {
-              // Set it aside and carry on. Stopping at the first unknown field would leave the
-              // rest of the form empty while the panel waits for an answer; a person filling
-              // the same form would do everything they could first and come back to this one.
-              deferField(slug, mark);
-              continue;
-            }
-          }
-          if (fromLabel.key && fromLabel.key !== fieldKey) {
+            fieldKey = slug;
+          } else if (fromLabel.key && fromLabel.key !== fieldKey) {
             console.log(`[agent] "${mark?.label}" takes ${fromLabel.key}, not ${fieldKey}`);
             fieldKey = fromLabel.key;
+          }
+        } else {
+          const mark = (session.marks || []).find((m) => String(m.id) === String(resp.mark_id));
+          const fromLabel = TaskPlanner.vaultKeyForLabel(mark?.label);
+          if (fromLabel.key) {
+            fieldKey = fromLabel.key;
+          } else if (mark?.label) {
+            fieldKey = mark.label.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 40);
           }
         }
 
@@ -1993,12 +2004,14 @@ async function provideInput({ value, saveToVault, fieldKey, mark_id } = {}) {
   // been doing.
   const isVaultField = !!fieldKey && !String(fieldKey).startsWith("field:");
 
-  // Saving is worth doing even if the run has since been torn down, so it happens first.
-  if (saveToVault && isVaultField && value) {
-    const vault = await getVault();
-    const key = VAULT_KEY_MAP[fieldKey] || fieldKey;
-    vault[key] = value;
-    await chrome.storage.local.set({ vault });
+  if (saveToVault && value) {
+    const rawKey = String(fieldKey || "custom_field").replace(/^field:/, "").trim();
+    if (rawKey) {
+      const vault = await getVault();
+      const key = VAULT_KEY_MAP[rawKey] || rawKey;
+      vault[key] = value;
+      await chrome.storage.local.set({ vault });
+    }
   }
 
   if (!session) {

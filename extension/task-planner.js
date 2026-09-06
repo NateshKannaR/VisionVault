@@ -72,22 +72,27 @@
     "(?=\\s+(?:and|then|,)\\s+|\\s+(?:" + SEARCH_VERB + ")\\b|$)", "i");
   const OPEN_TARGET_RE = /\b(?:open|click|select|choose|tap)\s+(?:on\s+)?(?:the\s+)?(.+?)(?=\s+(?:and|then|,)\s+|$)/i;
 
+  const NON_SITE_WORDS = new Set([
+    "logs", "log", "history", "settings", "overview", "profile", "comms", "details",
+    "summary", "cart", "checkout", "form", "tab", "page", "section", "menu", "first",
+    "second", "third", "result", "top", "link", "button", "item", "product", "next",
+    "previous", "back", "home", "dashboard", "console", "data", "orbital", "satellite",
+    "input", "field", "account", "signup", "login", "register", "more", "telemetry"
+  ]);
+
   function stripQuotes(s) {
     return String(s || "").replace(/^["'`“‘]+|["'`”’]+$/g, "").trim();
   }
 
   function siteUrlFor(name) {
-    const key = String(name || "").toLowerCase().trim().replace(/\.(com|in|org|net|co\.in)$/, "");
+    const rawName = String(name || "").toLowerCase().trim();
+    const key = rawName.replace(/\.(com|in|org|net|co\.in)$/, "");
+    if (NON_SITE_WORDS.has(key) || NON_SITE_WORDS.has(rawName)) return null;
     if (KNOWN_SITES[key]) return KNOWN_SITES[key];
 
     // A bare domain the user typed, e.g. "open example.co.uk"
     if (/^[a-z0-9-]+(\.[a-z]{2,})+$/i.test(name)) return `https://${name}`;
 
-    // A SINGLE unknown word may be a brand this build has not heard of - "open zomato" is a
-    // reasonable guess at zomato.com. A phrase is not. Inventing a domain by deleting the
-    // spaces from arbitrary prose sent the agent to thebestone.com when the instruction said
-    // "open the best one", and would send it to mybankaccount.com for "open my bank account" -
-    // a domain anyone can register, reached with the user's own words as the excuse.
     if (/^[a-z0-9-]{2,30}$/i.test(key)) return `https://www.${key}.com`;
     return null;
   }
@@ -107,7 +112,7 @@
       query: null,
       openTargets: [],
       wantsScroll: /\b(scroll|load more|read more|next page|more results|scroll down)\b/i.test(text),
-      wantsFill: /\b(fill|register|sign\s*up|signup|form|checkout|enter my details|apply\s+(?:for|job|loan|form|membership|card|visa))\b/i.test(text),
+      wantsFill: /\b(fill|register|sign\s*up|signup|login|log\s*in|sign\s*in|signin|authenticate|credentials|form|checkout|enter my details|apply\s+(?:for|job|loan|form|membership|card|visa)|load\s+(?:the\s+)?details|take\s+(?:the\s+)?details|populate|transfer\s+details|load\s+into)\b/i.test(text),
       wantsBook: /\b(book|booking|reserve|reservation|order|buy|purchase|tickets?|flights?|hotels?|cabs?|trains?|buses|bus|rides?|flying|stay|stays)\b/i.test(text),
       wantsSearch: false,
       wantsShop: false,
@@ -409,6 +414,12 @@
       }
     }
 
+    // Extract on-page navigation targets (e.g., "go to logs", "into logs", "open history", "switch to telemetry")
+    const onPageTargetMatch = text.match(/\b(?:into|to|go\s+to|open|visit|switch\s+to|navigate\s+to)\s+(logs?|history|settings|overview|profile|comms?|telemetry|dashboard)\b/i);
+    if (onPageTargetMatch && !result.openTargets.includes(onPageTargetMatch[1].toLowerCase())) {
+      result.openTargets.push(onPageTargetMatch[1].toLowerCase());
+    }
+
     return result;
   }
 
@@ -431,14 +442,28 @@
   ]);
 
   const FIELD_LABEL_RULES = [
-    [/user\s*name|username|user id|handle|login\s*id/, "username"],
-    [/e-?mail/, "email"],
-    [/phone|mobile|tel(ephone)?|contact number/, "phone"],
-    [/password|passcode/, "password"],
-    [/address|street|city|postcode|post code|zip|postal/, "address"],
-    [/company|organisation|organization|employer/, "company"],
-    [/about|bio|description|notes/, "about"],
-    [/full\s*name|first\s*name|last\s*name|surname|\bname\b/, "name"],
+    // identity & contact (matched first for general login / registration / profiles)
+    [/user[\s_-]*name|username|user[\s_-]*id|handle|login[\s_-]*id|login|sign[\s_-]*in|roll[\s_-]*no|roll[\s_-]*number|registration[\s_-]*no|reg[\s_-]*no|student[\s_-]*id|staff[\s_-]*id|admission[\s_-]*no|member[\s_-]*id|account[\s_-]*id|user\b/, "username"],
+    [/e-?mail|email[\s_-]*address/, "email"],
+    [/phone|mobile|tel(ephone)?|contact number|cell/, "phone"],
+    [/password|passcode|pwd|pin/, "password"],
+    [/address|street|city|postcode|post code|zip|postal|state|country/, "address"],
+    [/company|organisation|organization|employer|institution|college|university|school/, "company"],
+    [/about|bio|description|notes|message|comment/, "about"],
+    [/full[\s_-]*name|first[\s_-]*name|last[\s_-]*name|surname|\bname\b/, "name"],
+    // satellite & orbital telemetry
+    [/satellite[\s_-]*name|satellite|sat[\s_-]*name/, "satellite_name"],
+    [/mission[\s_-]*id|mission/, "mission_id"],
+    [/operator[\s_-]*on[\s_-]*duty|operator[\s_-]*name|\boperator\b|\bduty\b/, "operator"],
+    [/launch[\s_-]*date|\blaunch\b/, "launch_date"],
+    [/orbit[\s_-]*type|\borbit\b/, "orbit_type"],
+    [/orbital[\s_-]*inclination|\binclination\b/, "orbital_inclination"],
+    [/\bapogee\b/, "apogee"],
+    [/\bperigee\b/, "perigee"],
+    [/tle[\s_-]*line[\s_-]*1|\btle[\s_-]*1\b|\btle1\b/, "tle_line_1"],
+    [/tle[\s_-]*line[\s_-]*2|\btle[\s_-]*2\b|\btle2\b/, "tle_line_2"],
+    [/ground[\s_-]*station[\s_-]*freq(uency)?|ground[\s_-]*station|ground[\s_-]*frequency|\bfreq(uency)?\b/, "ground_station_freq"],
+    [/encryption[\s_-]*key[\s_-]*ref(erence)?|encryption[\s_-]*key|\bencryption\b|key[\s_-]*ref/, "encryption_key_ref"],
   ];
 
   // Fields that hold a personal identifier the vault has no equivalent for. Typing a phone
@@ -446,7 +471,7 @@
   // it: the value is wrong, it is personal, and it goes into a field that may validate it.
   // These are asked about instead.
   const UNKNOWN_IDENTIFIER_RE =
-    /aadhaar|aadhar|\bpan\b|passport|licence|license|voter|ssn|social security|nino|national insurance|tax id|gst|ifsc|upi|account number|card number|cvv|otp|pin\b/i;
+    /aadhaar|aadhar|\bpan\b|passport|licence|license|voter|ssn|social security|nino|national insurance|tax id|gst|ifsc|upi|account number|card number|cvv|otp\b/i;
 
   /**
    * Which vault key a field's own label calls for, judged from the label alone.
@@ -488,19 +513,18 @@
     const parsed = state.parsed || parseTask(state.task);
     const marks = state.marks || [];
     const done = new Set((state.filledIds || []).map(String));
-    const progress = state.progress || {};
-    const url = (state.pageInfo && state.pageInfo.url) || "";
-
     const available = marks.filter((m) => !done.has(String(m.id)));
+    const progress = state.progress || {};
+    const url = state.pageInfo?.url || "";
+
     const first = (pred) => available.find(pred) || null;
 
-    // 1. Navigate to the target site first.
-    if (parsed.siteUrl && !alreadyOnSite(url, parsed.siteUrl) && !progress.navigated) {
+    // 1. Initial navigation if on the wrong site.
+    if (parsed.siteUrl && !progress.navigated && !alreadyOnSite(url, parsed.siteUrl)) {
       return { action: "navigate", value: parsed.siteUrl, reasoning: `Open ${parsed.site}` };
     }
 
     // 2. Booking/travel flow — deterministic city-picker sequence.
-    //    The model cannot reliably handle autocomplete pickers, so we drive this ourselves.
     if (parsed.wantsBook && (parsed.from || parsed.to)) {
       const bookPlan = planBookingStep(parsed, available, done, progress, state.pageInfo);
       if (bookPlan) return bookPlan;
@@ -509,7 +533,6 @@
     // 2b. Messaging / Chat flow (WhatsApp, Telegram, Slack, etc.)
     const isMsgPlatform = /web\.whatsapp\.com|telegram|slack/i.test(url || "");
     if (parsed.wantsMessage || isMsgPlatform) {
-      // Step 0: Recovery if stuck in calls or dialpad screen (e.g. on WhatsApp Web)
       const isDialpadScreen = available.some((m) =>
         /enter a phone number|phone number|voice and video calling|go to calls/i.test(m.label || "")
       );
@@ -524,8 +547,6 @@
         }
       }
 
-      // Step A: If the real Send button is visible, click it to send the message!
-      // Must NOT match attachments like "Send document", "Send photo", etc.
       const isRealSendBtn = (m) => {
         const l = (m.label || "").trim().toLowerCase();
         if (/\b(document|photo|video|contact|location|file|media|audio|voice|call)\b/i.test(l)) return false;
@@ -536,7 +557,6 @@
         return { action: "click", mark_id: sendBtn.id, reasoning: "Click Send to send the message" };
       }
 
-      // Step B: If in chat and message box is available, type message
       const msgBox = first((m) =>
         m.role === "editable" ||
         /type a message/i.test(m.label || "") ||
@@ -546,7 +566,6 @@
         return { action: "type", mark_id: msgBox.id, value: parsed.message, reasoning: `Type "${parsed.message}" into message box` };
       }
 
-      // Step C: If recipient is specified and not yet opened, click contact or use search
       if (parsed.recipient && !progress.contactOpened) {
         const contact = first((m) => {
           const l = (m.label || "").toLowerCase();
@@ -562,27 +581,27 @@
       }
     }
 
-    // 2c. GitHub flow (Search repo, open repo, star, fork, issues, PRs, clone)
+    // 2c. GitHub flow
     const isGitHubSite = (parsed.site && /github/i.test(parsed.site)) || /github\.com/i.test(url || "");
     if (isGitHubSite || parsed.wantsStar || parsed.wantsFork || parsed.wantsIssue || parsed.wantsPR || parsed.wantsClone) {
       const gitPlan = planGitHubStep(parsed, available, done, progress, state.pageInfo);
       if (gitPlan) return gitPlan;
     }
 
-    // 2d. YouTube flow (Search video, play video)
+    // 2d. YouTube flow
     const isYouTubeSite = (parsed.site && /youtube/i.test(parsed.site)) || /youtube\.com/i.test(url || "");
     if (isYouTubeSite) {
       const ytPlan = planYouTubeStep(parsed, available, done, progress, state.pageInfo);
       if (ytPlan) return ytPlan;
     }
 
-    // 2e. Shopping / E-commerce flow (Amazon, Flipkart, etc.)
+    // 2e. Shopping / E-commerce flow
     if (parsed.wantsShop || parsed.wantsAddToCart || isShoppingSite(url)) {
       const shopPlan = planShoppingStep(parsed, available, done, progress, state.pageInfo);
       if (shopPlan) return shopPlan;
     }
 
-    // 3. Run the search, once.
+    // 3. Search query
     if (parsed.query && !progress.searched) {
       const box = first(isSearchBox) || first((m) => FILLABLE_ROLES.has(m.role));
       if (box) {
@@ -590,7 +609,7 @@
       }
     }
 
-    // 4. Open something the user explicitly named.
+    // 4. Explicit follow-up target clicks
     for (const target of parsed.openTargets) {
       if ((progress.opened || []).includes(target)) continue;
       if (/^(?:the\s+)?(?:first|top|1st)\b/.test(target)) {
@@ -609,6 +628,21 @@
 
     // 5. Fill a form from the local vault.
     if (parsed.wantsFill) {
+      // Pass A: Type specific input roles (password, email, tel)
+      for (const m of available) {
+        if (!FILLABLE_ROLES.has(m.role) || isSearchBox(m)) continue;
+        if (m.role === "input:password") {
+          return { action: "type", mark_id: m.id, use_vault_field: "password", reasoning: "Fill password from vault" };
+        }
+        if (m.role === "input:email") {
+          return { action: "type", mark_id: m.id, use_vault_field: "email", reasoning: "Fill email from vault" };
+        }
+        if (m.role === "input:tel") {
+          return { action: "type", mark_id: m.id, use_vault_field: "phone", reasoning: "Fill phone from vault" };
+        }
+      }
+
+      // Pass B: Matched label rules
       for (const m of available) {
         if (!FILLABLE_ROLES.has(m.role) || isSearchBox(m)) continue;
         const label = (m.label || "").toLowerCase();
@@ -619,8 +653,31 @@
           }
         }
       }
+
+      // Pass C: Contextual fallback for remaining unlabeled text fields
       const anyText = first((m) => FILLABLE_ROLES.has(m.role) && !isSearchBox(m));
-      if (anyText) return { action: "type", mark_id: anyText.id, use_vault_field: "name", reasoning: "Fill the next text field" };
+      if (anyText) {
+        const fromLabel = vaultKeyForLabel(anyText.label);
+        const isTelemetryContext = /satellite|satops|telemetry|orbit|ground\s*station/i.test((state.task || "") + " " + (url || ""));
+        const hasPasswordOnPage = available.some((m) => m.role === "input:password" || /password/i.test(m.label || ""));
+        let defaultKey = "name";
+        if (hasPasswordOnPage) {
+          defaultKey = "username";
+        } else if (isTelemetryContext) {
+          defaultKey = "satellite_name";
+        }
+        const key = fromLabel.key || (anyText.label ? anyText.label.toLowerCase().replace(/[^a-z0-9]+/g, "_") : defaultKey) || defaultKey;
+        return { action: "type", mark_id: anyText.id, use_vault_field: key, reasoning: `Fill "${anyText.label || 'field'}" from vault (${key})` };
+      }
+
+      // Pass D: If all inputs are filled, click submit/sign-in button if present
+      const submitBtn = first((m) =>
+        (m.role === "button" || m.role === "clickable" || m.role === "input:submit") &&
+        /^\s*(sign\s*in|log\s*in|submit|continue|next|register|save|create\s*account|submit\s+log\s+entry)\s*$/i.test(m.label || "")
+      );
+      if (submitBtn && (parsed.wantsFill || /\b(login|sign\s*in|submit)\b/i.test(state.task || ""))) {
+        return { action: "click", mark_id: submitBtn.id, reasoning: `Click ${submitBtn.label || 'Submit'} button` };
+      }
     }
 
     // 6. Scroll.

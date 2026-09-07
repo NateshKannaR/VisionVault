@@ -408,6 +408,33 @@
         }
       }
 
+      // ── Rule 2c: vault field sanity check ─────────────────────────────────────────
+      // A model looking at a specialized field (e.g. "Aadhaar number", "PAN", "Account Number")
+      // may propose a generic key like "name". Override it using the field's own label.
+      if (type === "type" && action.use_vault_field) {
+        const target = marks.find((m) => String(m.id) === String(action.mark_id));
+        if (target) {
+          const fromLabel = typeof TaskPlanner !== "undefined" && TaskPlanner.vaultKeyForLabel
+            ? TaskPlanner.vaultKeyForLabel(target.label)
+            : null;
+          if (fromLabel) {
+            if (fromLabel.unknownIdentifier) {
+              const slug = String(target.label || "value").toLowerCase()
+                .replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 40) || "value";
+              if (action.use_vault_field !== slug) {
+                action = { ...action, use_vault_field: slug };
+                substituted = true;
+                reason = `Corrected vault field for "${target.label}" to "${slug}".`;
+              }
+            } else if (fromLabel.key && fromLabel.key !== action.use_vault_field) {
+              action = { ...action, use_vault_field: fromLabel.key };
+              substituted = true;
+              reason = `Corrected vault field for "${target.label}" from "${proposed.use_vault_field}" to "${fromLabel.key}".`;
+            }
+          }
+        }
+      }
+
       // ── Rule 3: never type the user's whole sentence into a search box. ──────────────────
       if (type === "type" && !action.use_vault_field && parsed?.query && action.value) {
         const target = marks.find((m) => String(m.id) === String(action.mark_id));

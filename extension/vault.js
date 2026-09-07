@@ -144,10 +144,46 @@
     pan: "pan",
     "pan-card": "pan",
     "pan-number": "pan",
+    pan_card: "pan",
+    pan_number: "pan",
     aadhaar: "aadhaar",
     aadhar: "aadhaar",
+    aadhaar_number: "aadhaar",
+    "aadhaar-number": "aadhaar",
+    aadhar_number: "aadhaar",
+    "aadhar-number": "aadhaar",
+    account_number: "account_number",
+    "account-number": "account_number",
+    account_no: "account_number",
+    "account-no": "account_number",
+    bank_account: "account_number",
+    "bank-account": "account_number",
+    account: "account_number",
+    ifsc: "ifsc",
+    ifsc_code: "ifsc",
+    "ifsc-code": "ifsc",
+    ifsc_number: "ifsc",
+    customer_id: "customer_id",
+    "customer-id": "customer_id",
+    cust_id: "customer_id",
+    client_id: "customer_id",
+    branch: "branch",
+    branch_name: "branch",
+    "branch-name": "branch",
+    upi: "upi",
+    upi_id: "upi",
+    "upi-id": "upi",
+    vpa: "upi",
     passport: "passport",
-    "passport-number": "passport"
+    "passport-number": "passport",
+    passport_number: "passport",
+    emp_id: "empId",
+    empid: "empId",
+    "emp-id": "empId",
+    employee_id: "empId",
+    "employee-id": "empId",
+    dept: "dept",
+    department: "dept"
   };
 
   // ── Cryptographic Constants & Memory Session State ─────────────────────────
@@ -474,7 +510,7 @@
       if (data.vaultEncrypted) {
         try {
           const decrypted = await decryptVaultData(data.vaultEncrypted, cleanPin);
-          sessionDecryptedVault = Object.assign({}, DEFAULT_MISSION_VAULT, decrypted);
+          sessionDecryptedVault = Object.assign({}, decrypted);
           sessionPin = cleanPin;
           return { success: true, vault: sessionDecryptedVault };
         } catch (e) {

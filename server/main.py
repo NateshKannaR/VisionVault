@@ -642,18 +642,13 @@ INSTRUCTIONS:
 1. Examine the user task and look at the marks.
 2. Select EXACTLY ONE logical next action to make progress towards the user's task.
 3. NEVER invent personal data. For anything personal, set "use_vault_field" and leave "value" null.
-   The client resolves it locally; you never see the real value. Valid keys, and only these:
-     name      full personal name
-     username  login handle / user id  (NOT the person's name)
-     email     email address
-     phone     phone or mobile number
-     address   street address, city, postcode
-     company   employer or organisation
-     about     free-text bio or notes
-     password  password or passcode
-   Choose the key by the FIELD'S OWN LABEL, not by its input type. A field labelled
-   "Username" takes "username" even though it is a plain text input; a field labelled
-   "Full name" takes "name". If no key fits, pick the closest one rather than inventing text.
+   The client resolves it locally; you never see the real value. Common keys:
+     name, username, email, phone, address, city, state, country, zip, company, about, password,
+     pan, aadhaar, account_number, ifsc, customer_id, dob, occupation, annual_income,
+     satellite_name, mission_id, operator, launch_date, apogee, perigee, tle_line_1, tle_line_2.
+   Choose the key by the FIELD'S OWN LABEL. If a personal/form field does not match the list above,
+   set "use_vault_field" to a lowercase snake_case slug of its label (e.g. "pan", "aadhaar", "customer_id").
+   NEVER default to "name" for unrelated fields.
 4. If a button needs to be clicked (e.g., submit, navigation link, search button), choose "click" with its target mark ID.
 5. When typing into a search box, use the SEARCH QUERY above verbatim. Never type the user's whole sentence.
 6. Target elements ONLY by an "id" listed above; those ids are stable across steps.
@@ -668,7 +663,7 @@ Respond in STRICT JSON ONLY:
     "type": "click" | "type" | "scroll_page" | "select" | "press_key" | "done",
     "target": <mark ID integer or null>,
     "value": "<text to enter or null>",
-    "use_vault_field": "<name|email|phone|address|password or null>"
+    "use_vault_field": "<vault_key or slug or null>"
   }}
 }}"""
 
@@ -1250,10 +1245,39 @@ def mock_plan(marks: List[Mark], task: str, filled_ids: Optional[List[int]] = No
             )
         text_field = find_mark(lambda m: m.role in FILLABLE_ROLES)
         if text_field:
+            lbl = (text_field.label or "").lower()
+            vault_key = "name"
+            if "email" in lbl or text_field.role == "input:email":
+                vault_key = "email"
+            elif "phone" in lbl or "mobile" in lbl or text_field.role == "input:tel":
+                vault_key = "phone"
+            elif "password" in lbl or text_field.role == "input:password":
+                vault_key = "password"
+            elif "pan" in lbl:
+                vault_key = "pan"
+            elif "aadhaar" in lbl or "aadhar" in lbl:
+                vault_key = "aadhaar"
+            elif "account" in lbl:
+                vault_key = "account_number"
+            elif "ifsc" in lbl:
+                vault_key = "ifsc"
+            elif "customer" in lbl or "client" in lbl:
+                vault_key = "customer_id"
+            elif "user" in lbl or "login" in lbl:
+                vault_key = "username"
+            elif "city" in lbl:
+                vault_key = "city"
+            elif "state" in lbl:
+                vault_key = "state"
+            elif "address" in lbl or "street" in lbl:
+                vault_key = "address"
+            elif lbl:
+                import re
+                vault_key = re.sub(r"[^a-z0-9]+", "_", lbl).strip("_")[:40] or "name"
             return StepResponse(
-                reasoning="Fill the form field",
+                reasoning=f"Fill {text_field.label or 'form field'} from vault",
                 action=StepAction(type="type", target=text_field.id,
-                                  use_vault_field="name", reasoning="Fill form field")
+                                  use_vault_field=vault_key, reasoning=f"Fill {text_field.label or 'field'}")
             )
 
     # 3. Open something the user NAMED. A link is never clicked merely because a word from the

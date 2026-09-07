@@ -87,10 +87,18 @@
     .btn:hover {
       background: var(--accent-hover);
     }
+    .btn:disabled {
+      opacity: 0.7;
+      cursor: wait;
+    }
     #status {
       margin-top: 18px;
       font-size: 13px;
       min-height: 20px;
+    }
+    #status.info {
+      color: var(--accent);
+      font-weight: 500;
     }
     #status.success {
       color: var(--green);
@@ -120,37 +128,6 @@
     <div id="status"></div>
   </div>
 
-  <script>
-    const allowBtn = document.getElementById("allowBtn");
-    const statusEl = document.getElementById("status");
-
-    async function requestAccess() {
-      statusEl.textContent = "Requesting microphone permission…";
-      statusEl.className = "";
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        stream.getTracks().forEach(t => t.stop());
-        statusEl.textContent = "✓ Microphone access granted! Closing tab…";
-        statusEl.className = "success";
-        allowBtn.style.display = "none";
-        try {
-          chrome.runtime.sendMessage({ type: "MIC_PERMISSION_GRANTED" });
-        } catch (_) {}
-        setTimeout(() => {
-          window.close();
-        }, 1200);
-      } catch (err) {
-        console.warn("Microphone access denied:", err);
-        statusEl.textContent = "Microphone was blocked. Please click \"Allow\" in Chrome permission prompt above.";
-        statusEl.className = "error";
-      }
-    }
-
-    allowBtn.addEventListener("click", requestAccess);
-
-    window.addEventListener("DOMContentLoaded", () => {
-      requestAccess();
-    });
-  </script>
+  <script src="permission.js"></script>
 </body>
 </html>

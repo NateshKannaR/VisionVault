@@ -159,6 +159,7 @@
     if (parsed.wantsScroll && !p.scrolled) return false;
     if (parsed.wantsFill && !p.filledAny) return false;
     if (parsed.wantsMessage && !p.messageSent) return false;
+    if (parsed.wantsStoreVault && !p.vaultStored) return false;
     return true;
   }
 

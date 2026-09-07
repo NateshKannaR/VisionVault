@@ -1443,6 +1443,28 @@ async function phaseRun() {
         continue;
       }
 
+      // ── Store to Vault ──
+      if (actionType === "store_vault") {
+        notifyPopup({ type: "step", step: session.stepCount, status: "Reading page fields and saving to vault..." });
+        await ensureContent(session.tabId);
+        const result = await msgTab(session.tabId, { type: "READ_VAULT_FIELDS" });
+        if (result && result.fields && Object.keys(result.fields).length > 0) {
+          const existing = await getVault();
+          const merged = Object.assign({}, existing || {}, result.fields);
+          if (typeof VaultManager !== "undefined" && typeof VaultManager.saveVault === "function") {
+            await VaultManager.saveVault(merged);
+          } else {
+            await chrome.storage.local.set({ vault: merged });
+          }
+          session.progress.vaultStored = true;
+          session.actionLog.push({ action: "store_vault", count: Object.keys(result.fields).length, serverMs, ok: true });
+          notifyPopup({ type: "step", step: session.stepCount, status: `Stored ${Object.keys(result.fields).length} fields to encrypted vault.` });
+          return finish({ success: true, count: Object.keys(result.fields).length });
+        } else {
+          return finish({ error: "No vault fields or data found on this page to store." });
+        }
+      }
+
       // ── Type ──
       if (actionType === "type") {
         let value = resp.value || null;

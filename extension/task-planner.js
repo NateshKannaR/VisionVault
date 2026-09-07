@@ -500,6 +500,11 @@
       result.wantsFill = true;
     }
 
+    if (/\b(?:store|save)\s+(?:the\s+)?(?:values?|details?|fields?|data)\s+(?:in|to|into)\s+(?:the\s+)?vault\b/i.test(text) ||
+        /\b(?:store|save)\s+(?:to|in|into)\s+(?:the\s+)?vault\b/i.test(text)) {
+      result.wantsStoreVault = true;
+    }
+
     return result;
   }
 
@@ -616,6 +621,14 @@
     const url = state.pageInfo?.url || "";
 
     const first = (pred) => available.find(pred) || null;
+
+    // 0. Store to Vault flow
+    if (parsed.wantsStoreVault) {
+      if (progress.vaultStored) {
+        return { action: "done", reasoning: "Values stored to vault successfully." };
+      }
+      return { action: "store_vault", reasoning: "Read page data and store into encrypted local vault." };
+    }
 
     // 1. Initial navigation if on the wrong site.
     if (parsed.siteUrl && !progress.navigated && !alreadyOnSite(url, parsed.siteUrl)) {

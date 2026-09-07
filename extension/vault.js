@@ -80,11 +80,24 @@
     name: "name",
     fullname: "name",
     "full-name": "name",
+    first_name: "first_name",
+    "first-name": "first_name",
+    firstname: "first_name",
+    last_name: "last_name",
+    "last-name": "last_name",
+    lastname: "last_name",
+    surname: "last_name",
     username: "username",
     user: "username",
     address: "address",
     street: "address",
     "street-address": "address",
+    city: "city",
+    town: "city",
+    state: "state",
+    province: "state",
+    country: "country",
+    nation: "country",
     company: "company",
     org: "company",
     zip: "zip",
@@ -326,10 +339,10 @@
    */
   async function getVault(optionalPin) {
     if (sessionDecryptedVault) {
-      return Object.assign({}, DEFAULT_MISSION_VAULT, sessionDecryptedVault);
+      return { ...sessionDecryptedVault };
     }
     if (typeof chrome === "undefined" || !chrome.storage || !chrome.storage.local) {
-      return { ...DEFAULT_MISSION_VAULT };
+      return {};
     }
 
     const data = await chrome.storage.local.get(["vaultEncrypted", "vault", "vaultPinHash", "vaultSalt", "vaultDeviceKey"]);
@@ -344,49 +357,49 @@
             const decrypted = await decryptVaultData(data.vaultEncrypted, pin);
             sessionDecryptedVault = decrypted;
             sessionPin = pin;
-            return Object.assign({}, DEFAULT_MISSION_VAULT, decrypted);
+            return { ...(decrypted || {}) };
           } catch (_) {
-            return { ...DEFAULT_MISSION_VAULT };
+            return {};
           }
         }
-        // Locked: return default values
-        return { ...DEFAULT_MISSION_VAULT };
+        // Locked: return empty object so locked state does not leak values
+        return {};
       } else {
         // Encrypted with device master secret
         try {
           const deviceKey = data.vaultDeviceKey || (await getOrCreateDeviceMasterSecret());
           const decrypted = await decryptVaultData(data.vaultEncrypted, deviceKey);
           sessionDecryptedVault = decrypted;
-          return Object.assign({}, DEFAULT_MISSION_VAULT, decrypted);
+          return { ...(decrypted || {}) };
         } catch (_) {
-          return { ...DEFAULT_MISSION_VAULT };
+          return {};
         }
       }
     }
 
     // 2. Transparent migration: if legacy plaintext vault exists, encrypt it immediately
     if (data.vault) {
-      const merged = Object.assign({}, DEFAULT_MISSION_VAULT, data.vault);
+      const v = data.vault || {};
       try {
         const secret = hasPin && (optionalPin || sessionPin)
           ? (optionalPin || sessionPin)
           : await getOrCreateDeviceMasterSecret();
-        const envelope = await encryptVaultData(merged, secret);
+        const envelope = await encryptVaultData(v, secret);
         await chrome.storage.local.set({ vaultEncrypted: envelope });
         await chrome.storage.local.remove("vault");
       } catch (_) {}
-      sessionDecryptedVault = merged;
-      return merged;
+      sessionDecryptedVault = v;
+      return { ...v };
     }
 
-    return { ...DEFAULT_MISSION_VAULT };
+    return {};
   }
 
   /**
    * Saves the vault object into chrome.storage.local encrypted with AES-GCM-256.
    */
   async function saveVault(vaultData, optionalPin) {
-    const merged = Object.assign({}, DEFAULT_MISSION_VAULT, vaultData || {});
+    const merged = Object.assign({}, vaultData || {});
     sessionDecryptedVault = merged;
 
     if (typeof chrome === "undefined" || !chrome.storage || !chrome.storage.local) {

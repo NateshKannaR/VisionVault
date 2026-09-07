@@ -622,6 +622,13 @@ is(TaskPlanner.vaultKeyForLabel('Occupation *').key, 'occupation', 'occupation *
 is(TaskPlanner.vaultKeyForLabel('Annual Income *').key, 'annual_income', 'annual income * -> annual_income');
 is(TaskPlanner.vaultKeyForLabel('Marital Status').key, 'marital_status', 'marital status -> marital_status');
 is(TaskPlanner.vaultKeyForLabel('Father Name').key, 'father_name', 'father name -> father_name');
+is(TaskPlanner.vaultKeyForLabel('City').key, 'city', 'city -> city');
+is(TaskPlanner.vaultKeyForLabel('Country').key, 'country', 'country -> country');
+is(TaskPlanner.vaultKeyForLabel('State').key, 'state', 'state -> state');
+is(TaskPlanner.vaultKeyForLabel('Street Address').key, 'address', 'street address -> address');
+is(TaskPlanner.vaultKeyForLabel('Date of Birth').key, 'dob', 'date of birth -> dob');
+is(TaskPlanner.vaultKeyForLabel('First Name').key, 'first_name', 'first name -> first_name');
+is(TaskPlanner.vaultKeyForLabel('Last Name').key, 'last_name', 'last name -> last_name');
 
 // Multi-field Google form planning check: distinct fields must NOT all collapse to "name"
 const googleFormPlan1 = planNextAction({

@@ -536,11 +536,16 @@
     [/e-?mail|email[\s_-]*address/, "email"],
     [/\b(phone|mobile|cell|contact[\s_-]*number)\b|\btel(ephone)?\b/, "phone"],
     [/password|passcode|pwd|\bpin\b(?![\s_-]*code)/, "password"],
-    [/pin[\s_-]*code|pincode|\bzip\b|\bpostal\b/, "zip"],
-    [/postcode|post[\s_-]*code|address|street|city|state|country/, "address"],
+    [/pin[\s_-]*code|pincode|postal[\s_-]*code|\bzip\b|\bpostal\b/, "zip"],
+    [/\bcity\b|\btown\b/, "city"],
+    [/\bstate\b|\bprovince\b|\bregion\b/, "state"],
+    [/\bcountry\b|\bnation\b/, "country"],
+    [/postcode|post[\s_-]*code|street[\s_-]*address|address[\s_-]*line|\baddress\b|\bstreet\b/, "address"],
     [/company|organisation|organization|employer|institution|college|university|school/, "company"],
     [/about|bio|description|notes|message|comment/, "about"],
-    [/full[\s_-]*name|first[\s_-]*name|last[\s_-]*name|surname|\bname\b/, "name"],
+    [/first[\s_-]*name|given[\s_-]*name/, "first_name"],
+    [/last[\s_-]*name|family[\s_-]*name|surname/, "last_name"],
+    [/full[\s_-]*name|\bname\b/, "name"],
   ];
 
   // Fields that hold a personal identifier the vault has no equivalent for. Typing a phone

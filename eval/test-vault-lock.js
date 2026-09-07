@@ -117,7 +117,55 @@ async function runTests() {
   assert.strictEqual(resolvedPassword, "supersecretpassword123");
   console.log("✔ resolveVaultField(): personal credentials resolve safely and accurately");
 
-  console.log("\nAll Vault Lock tests passed successfully (8/8)!");
+  // 9. AES-GCM-256 At-Rest Encryption & Plaintext Storage Elimination
+  assert.strictEqual(store.vault, undefined, "Plaintext vault must NOT be written to chrome.storage.local");
+  assert.strictEqual(typeof store.vaultEncrypted, "object", "Encrypted vault envelope must exist in storage");
+  assert.strictEqual(store.vaultEncrypted.cipher, "AES-GCM-256");
+  assert.strictEqual(store.vaultEncrypted.kdf, "PBKDF2-SHA256");
+  assert.strictEqual(store.vaultEncrypted.iterations, 100000);
+  assert.strictEqual(typeof store.vaultEncrypted.salt, "string");
+  assert.strictEqual(store.vaultEncrypted.salt.length, 32, "Salt should be 16 bytes (32 hex characters)");
+  assert.strictEqual(typeof store.vaultEncrypted.iv, "string");
+  assert.strictEqual(store.vaultEncrypted.iv.length, 24, "IV should be 12 bytes (24 hex characters)");
+  assert.strictEqual(typeof store.vaultEncrypted.ciphertext, "string");
+  console.log("✔ AES-GCM-256: vault is encrypted at rest; plaintext storage eliminated");
+
+  // 10. Direct AES-GCM Encrypt, Decrypt and Tamper Resistance
+  const testSecret = { mission: "GAGANYAAN-01", key: "TOP-SECRET-KEY" };
+  const env = await vm.encryptVaultData(testSecret, "secure-pass-777");
+  assert.strictEqual(env.cipher, "AES-GCM-256");
+  const dec = await vm.decryptVaultData(env, "secure-pass-777");
+  assert.strictEqual(dec.mission, "GAGANYAAN-01");
+  assert.strictEqual(dec.key, "TOP-SECRET-KEY");
+
+  // Wrong password fails
+  let decryptFailed = false;
+  try {
+    await vm.decryptVaultData(env, "wrong-pass");
+  } catch (_) {
+    decryptFailed = true;
+  }
+  assert.strictEqual(decryptFailed, true, "Decrypting with wrong passphrase must fail");
+
+  // Bit flip / tampering detection (AES-GCM authentication tag verification)
+  const tamperedCipher = (env.ciphertext.slice(0, -2) === "00" ? "ff" : "00") + env.ciphertext.slice(2);
+  let tamperDetected = false;
+  try {
+    await vm.decryptVaultData({ ...env, ciphertext: tamperedCipher }, "secure-pass-777");
+  } catch (_) {
+    tamperDetected = true;
+  }
+  assert.strictEqual(tamperDetected, true, "Tampered ciphertext must fail authentication");
+  console.log("✔ AES-GCM-256: authenticated encryption verified; tamper-resistance enforced");
+
+  // 11. Encryption Status API
+  const status = await vm.getVaultEncryptionStatus();
+  assert.strictEqual(status.encrypted, true);
+  assert.strictEqual(status.cipher, "AES-GCM-256");
+  assert.strictEqual(status.iterations, 100000);
+  console.log("✔ getVaultEncryptionStatus(): returned valid cryptographic metadata");
+
+  console.log("\nAll Vault Lock & AES Encryption tests passed successfully (11/11)!");
 }
 
 runTests().catch((err) => {

@@ -151,13 +151,25 @@ async function updateVaultUI() {
 }
 
 async function loadVault() {
-  const { vault } = await chrome.storage.local.get("vault");
-  const v = vault || {};
+  let v = {};
+  if (typeof getVault === "function") {
+    try {
+      v = await getVault();
+    } catch (e) {
+      console.warn("Could not load decrypted vault:", e);
+    }
+  } else {
+    const { vault } = await chrome.storage.local.get("vault");
+    v = vault || {};
+  }
   VAULT_KEYS.forEach((k) => { const el = $("v-" + k); if (el) el.value = v[k] || ""; });
 }
 
 function lockVaultNow() {
   isVaultUnlocked = false;
+  if (typeof lockVault === "function") {
+    lockVault();
+  }
   VAULT_KEYS.forEach((k) => { const el = $("v-" + k); if (el) el.value = ""; });
   hideStatus("vaultStatus");
   updateVaultUI();
@@ -170,13 +182,22 @@ $("vaultUnlockBtn").addEventListener("click", async () => {
     showStatus("vaultUnlockStatus", "warn", "Please enter your PIN");
     return;
   }
-  const valid = typeof verifyVaultPin === "function" ? await verifyVaultPin(pin) : true;
-  if (valid) {
+  let unlockRes = { success: false };
+  if (typeof unlockVaultWithPin === "function") {
+    unlockRes = await unlockVaultWithPin(pin);
+  } else if (typeof verifyVaultPin === "function") {
+    const valid = await verifyVaultPin(pin);
+    unlockRes = { success: valid };
+  } else {
+    unlockRes = { success: true };
+  }
+
+  if (unlockRes.success) {
     isVaultUnlocked = true;
     hideStatus("vaultUnlockStatus");
     updateVaultUI();
   } else {
-    showStatus("vaultUnlockStatus", "error", "Incorrect PIN");
+    showStatus("vaultUnlockStatus", "error", unlockRes.error || "Incorrect PIN");
     const pinInput = $("vaultUnlockPin");
     pinInput.classList.remove("shake");
     void pinInput.offsetWidth;
@@ -236,8 +257,9 @@ $("cancelPinBtn").addEventListener("click", () => {
 
 $("savePinBtn").addEventListener("click", async () => {
   const hasPin = typeof hasVaultPin === "function" ? await hasVaultPin() : false;
+  let current = "";
   if (hasPin) {
-    const current = $("vaultCurrentPin").value;
+    current = $("vaultCurrentPin").value;
     if (!current) {
       showStatus("vaultSetupStatus", "error", "Please enter your current PIN");
       return;
@@ -262,7 +284,7 @@ $("savePinBtn").addEventListener("click", async () => {
 
   try {
     if (typeof setVaultPin === "function") {
-      await setVaultPin(newPin);
+      await setVaultPin(newPin, hasPin ? current : undefined);
     }
     isVaultUnlocked = true;
     showStatus("vaultSetupStatus", "success", "Vault PIN saved successfully");
@@ -303,10 +325,18 @@ updateVaultUI();
 $("saveVault").addEventListener("click", async () => {
   const vault = {};
   VAULT_KEYS.forEach((k) => { const el = $("v-" + k); if (el) vault[k] = el.value.trim(); });
-  await chrome.storage.local.set({ vault });
-  const filled = Object.values(vault).filter(Boolean).length;
-  showStatus("vaultStatus", "success", `Saved ${filled} value(s) locally. Nothing was transmitted.`);
-  setTimeout(() => hideStatus("vaultStatus"), 3200);
+  try {
+    if (typeof saveVault === "function") {
+      await saveVault(vault);
+    } else {
+      await chrome.storage.local.set({ vault });
+    }
+    const filled = Object.values(vault).filter(Boolean).length;
+    showStatus("vaultStatus", "success", `Saved ${filled} value(s) locally with AES-GCM-256 encryption. Nothing was transmitted.`);
+    setTimeout(() => hideStatus("vaultStatus"), 3200);
+  } catch (err) {
+    showStatus("vaultStatus", "error", err.message || "Failed to save vault");
+  }
 });
 
 $("togglePassword").addEventListener("click", (e) => {

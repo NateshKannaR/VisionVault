@@ -179,6 +179,9 @@ function notifyPopup(data) {
 
 // ── Storage ───────────────────────────────────────────────────────────────────
 async function getVault() {
+  if (typeof VaultManager !== "undefined" && typeof VaultManager.getVault === "function") {
+    return await VaultManager.getVault();
+  }
   const { vault } = await chrome.storage.local.get("vault");
   const defaults = typeof DEFAULT_MISSION_VAULT !== "undefined" ? DEFAULT_MISSION_VAULT : {};
   return Object.assign({}, defaults, vault || {});
@@ -2305,9 +2308,13 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         await ensureContent(tab.id);
         const result = await msgTab(tab.id, { type: "READ_VAULT_FIELDS" });
         if (!result || !result.fields) { sendResponse({ ok: false, error: "No vault fields found on page" }); return; }
-        const { vault: existing } = await chrome.storage.local.get("vault");
+        const existing = await getVault();
         const merged = Object.assign({}, existing || {}, result.fields);
-        await chrome.storage.local.set({ vault: merged });
+        if (typeof VaultManager !== "undefined" && typeof VaultManager.saveVault === "function") {
+          await VaultManager.saveVault(merged);
+        } else {
+          await chrome.storage.local.set({ vault: merged });
+        }
         sendResponse({ ok: true, stored: result.fields, count: Object.keys(result.fields).length });
       } catch (e) {
         sendResponse({ ok: false, error: String(e) });

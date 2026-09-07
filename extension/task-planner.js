@@ -558,7 +558,7 @@
     [/\bcountry\b|\bnation\b/, "country"],
     [/postcode|post[\s_-]*code|street[\s_-]*address|address[\s_-]*line|\baddress\b|\bstreet\b/, "address"],
     [/company|organisation|organization|employer|institution|college|university|school/, "company"],
-    [/about|bio|description|notes|message|comment/, "about"],
+    [/\b(about|bio|biography|description|notes|comment|comments|cover[\s_-]*letter)\b/i, "about"],
     [/first[\s_-]*name|given[\s_-]*name/, "first_name"],
     [/last[\s_-]*name|family[\s_-]*name|surname/, "last_name"],
     [/full[\s_-]*name|\bname\b/, "name"],
@@ -653,12 +653,24 @@
         return /^\s*send(\s+message)?\s*$/i.test(l) || (l === "send" && (m.role === "button" || m.role === "clickable"));
       };
       const sendBtn = first(isRealSendBtn);
+
+      if (progress.messageSent) {
+        return { action: "done", reasoning: "WhatsApp message sent successfully" };
+      }
+
       if (sendBtn) {
         return { action: "click", mark_id: sendBtn.id, reasoning: "Click Send to send the message" };
       }
 
+      if (progress.messageTyped) {
+        return { action: "press_key", mark_id: progress.lastTypedMarkId || 1, key: "Enter", reasoning: "Press Enter to send the message" };
+      }
+
       // 3. Open or Search for Recipient Contact first (if not yet opened)
-      if (parsed.recipient && !progress.contactOpened) {
+      const pageTitle = (state.pageInfo?.title || "").toLowerCase();
+      const isContactActive = parsed.recipient && (pageTitle.includes(parsed.recipient.toLowerCase()) || available.some(m => (m.label || "").toLowerCase() === parsed.recipient.toLowerCase() && m.role === "heading"));
+
+      if (parsed.recipient && !progress.contactOpened && !isContactActive) {
         const contact = first((m) => {
           const l = (m.label || "").toLowerCase();
           return l.includes(parsed.recipient.toLowerCase()) && (m.role === "clickable" || m.role === "button" || m.role === "link");

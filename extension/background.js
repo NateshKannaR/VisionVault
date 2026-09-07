@@ -1456,12 +1456,13 @@ async function phaseRun() {
         // and the field may well validate it. So a label that clearly names a different key
         // wins, and a label naming an identifier the vault has no equivalent for is put to the
         // user instead of guessed at.
-        if (fieldKey) {
+        // If the planner asked for a vault field, or if value was omitted/marked as use_vault_field:
+        const needsVaultResolve = fieldKey || !value || value === "use_vault_field";
+        if (needsVaultResolve) {
           const mark = (session.marks || []).find((m) => String(m.id) === String(resp.mark_id));
           if (mark?.vaultKey) {
-            // Explicit data-vault-key on DOM element is the authoritative source
             fieldKey = mark.vaultKey;
-          } else {
+          } else if (fieldKey) {
             const fromLabel = TaskPlanner.vaultKeyForLabel(mark?.label);
             if (fromLabel.unknownIdentifier) {
               const slug = String(mark?.label || "value").toLowerCase()
@@ -1471,12 +1472,7 @@ async function phaseRun() {
               console.log(`[agent] "${mark?.label}" takes ${fromLabel.key}, not ${fieldKey}`);
               fieldKey = fromLabel.key;
             }
-          }
-        } else {
-          const mark = (session.marks || []).find((m) => String(m.id) === String(resp.mark_id));
-          if (mark?.vaultKey) {
-            fieldKey = mark.vaultKey;
-          } else {
+          } else if (session.parsedTask?.wantsFill) {
             const fromLabel = TaskPlanner.vaultKeyForLabel(mark?.label);
             if (fromLabel.key) {
               fieldKey = fromLabel.key;
@@ -1484,9 +1480,7 @@ async function phaseRun() {
               fieldKey = mark.label.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 40);
             }
           }
-        }
 
-        if (!value || value === "use_vault_field" || fieldKey) {
           if (fieldKey && typeof resolveVaultField === "function") {
             value = await resolveVaultField(fieldKey);
           } else if (fieldKey) {

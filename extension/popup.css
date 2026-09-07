@@ -134,31 +134,21 @@ body {
 }
 
 .brand-mark {
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--surface-2);
-  border: 1px solid var(--border-light);
-  border-radius: var(--r);
+  background: rgba(14, 19, 34, 0.85);
+  border: 1px solid rgba(0, 245, 255, 0.25);
+  border-radius: 9px;
   padding: 3px;
-  box-shadow: 0 0 12px var(--accent-glow);
+  box-shadow: 0 0 14px rgba(6, 182, 212, 0.25);
 }
 
 .brand-mark svg {
   width: 100%;
   height: 100%;
-}
-
-.bm-shield {
-  fill: url(#vv-shield-grad);
-}
-.bm-eye {
-  fill: #0b0f17;
-}
-.bm-pupil {
-  fill: #6366f1;
 }
 
 .brand-text {

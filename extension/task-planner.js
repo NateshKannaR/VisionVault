@@ -520,6 +520,17 @@
     [/ground[\s_-]*station[\s_-]*freq(uency)?|ground[\s_-]*station|ground[\s_-]*frequency|\bfreq(uency)?\b/, "ground_station_freq"],
     [/encryption[\s_-]*key[\s_-]*ref(erence)?|encryption[\s_-]*key|\bencryption\b|key[\s_-]*ref/, "encryption_key_ref"],
 
+    // professional, financial & extended form fields
+    [/occupation|job[\s_-]*title|\bjob\b|profession|designation|profession[\s_-]*type|\bwork\b/, "occupation"],
+    [/annual[\s_-]*income|income|salary|annual[\s_-]*salary|ctc|earnings|net[\s_-]*income/, "annual_income"],
+    [/marital[\s_-]*status|marital/, "marital_status"],
+    [/gender|\bsex\b/, "gender"],
+    [/father[\s_-]*name|father/, "father_name"],
+    [/mother[\s_-]*name|mother/, "mother_name"],
+    [/qualification|degree|education/, "qualification"],
+    [/nationality|citizenship/, "nationality"],
+    [/dob|date[\s_-]*of[\s_-]*birth|birth[\s_-]*date/, "dob"],
+
     // identity & contact (matched next for general forms, registrations, profiles)
     [/user[\s_-]*name|username|user[\s_-]*id|handle|login[\s_-]*id|login|sign[\s_-]*in|roll[\s_-]*no|roll[\s_-]*number|registration[\s_-]*no|reg[\s_-]*no|student[\s_-]*id|staff[\s_-]*id|admission[\s_-]*no|member[\s_-]*id|account[\s_-]*id|user\b/, "username"],
     [/e-?mail|email[\s_-]*address/, "email"],
@@ -749,7 +760,7 @@
         }
       }
 
-      // Pass C: Contextual fallback for remaining unlabeled text fields
+      // Pass C: Contextual fallback for remaining text fields
       const anyText = first((m) => FILLABLE_ROLES.has(m.role) && !isSearchBox(m));
       if (anyText) {
         const fromLabel = vaultKeyForLabel(anyText.label);
@@ -761,7 +772,8 @@
         } else if (isTelemetryContext) {
           defaultKey = "satellite_name";
         }
-        const key = fromLabel.key || (anyText.label ? anyText.label.toLowerCase().replace(/[^a-z0-9]+/g, "_") : defaultKey) || defaultKey;
+        const rawCleanLabel = anyText.label ? anyText.label.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 40) : "";
+        const key = fromLabel.key || rawCleanLabel || defaultKey;
         return { action: "type", mark_id: anyText.id, use_vault_field: key, reasoning: `Fill "${anyText.label || 'field'}" from vault (${key})` };
       }
 

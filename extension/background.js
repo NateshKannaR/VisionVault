@@ -2027,9 +2027,13 @@ async function provideInput({ value, saveToVault, fieldKey, mark_id } = {}) {
     const rawKey = String(fieldKey || "custom_field").replace(/^field:/, "").trim();
     if (rawKey) {
       const vault = await getVault();
-      const key = VAULT_KEY_MAP[rawKey] || rawKey;
+      const key = (typeof VAULT_KEY_MAP !== "undefined" && VAULT_KEY_MAP[rawKey]) || rawKey;
       vault[key] = value;
-      await chrome.storage.local.set({ vault });
+      if (typeof VaultManager !== "undefined" && typeof VaultManager.saveVault === "function") {
+        await VaultManager.saveVault(vault);
+      } else {
+        await chrome.storage.local.set({ vault });
+      }
     }
   }
 
@@ -2285,7 +2289,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         if (msg.saveToVault && msg.key && msg.value) {
           const vault = await getVault();
           vault[msg.key] = msg.value;
-          await chrome.storage.local.set({ vault });
+          if (typeof VaultManager !== "undefined" && typeof VaultManager.saveVault === "function") {
+            await VaultManager.saveVault(vault);
+          } else {
+            await chrome.storage.local.set({ vault });
+          }
         }
         await ensureContent(tab.id);
         const result = await msgTab(tab.id, { type: "FILL_SINGLE_VAULT_FIELD", key: msg.key, value: msg.value });
@@ -2307,7 +2315,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         if (!tab) { sendResponse({ ok: false, error: "No active tab" }); return; }
         await ensureContent(tab.id);
         const result = await msgTab(tab.id, { type: "READ_VAULT_FIELDS" });
-        if (!result || !result.fields) { sendResponse({ ok: false, error: "No vault fields found on page" }); return; }
+        if (!result || !result.fields || Object.keys(result.fields).length === 0) {
+          sendResponse({ ok: false, error: "No vault fields or data found on this page." });
+          return;
+        }
         const existing = await getVault();
         const merged = Object.assign({}, existing || {}, result.fields);
         if (typeof VaultManager !== "undefined" && typeof VaultManager.saveVault === "function") {

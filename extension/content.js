@@ -213,6 +213,33 @@ function safeLabel(el) {
 
   const associatedLabel = () => {
     try {
+      // 0. Explicit aria-labelledby (e.g. Google Forms, modern UI libraries)
+      if (el.getAttribute && el.getAttribute("aria-labelledby")) {
+        const ids = el.getAttribute("aria-labelledby").split(/\s+/).filter(Boolean);
+        const parts = [];
+        for (const id of ids) {
+          const target = document.getElementById(id);
+          if (target) {
+            const t = (target.innerText || target.textContent || "").trim();
+            if (t && !parts.includes(t)) parts.push(t);
+          }
+        }
+        if (parts.length) {
+          const joined = parts.join(" ");
+          if (joined.length < 80) return joined;
+        }
+      }
+
+      // 0b. Google Forms / Question item container
+      const questionContainer = el.closest ? el.closest('[role="listitem"], .Qr7Oae, .geS5n, .m2, .freebirdFormviewerViewNumberedItemContainer') : null;
+      if (questionContainer) {
+        const header = questionContainer.querySelector('[role="heading"], .M7eMe, .HoPG3, .freebirdFormviewerComponentsQuestionBaseTitle, h1, h2, h3, h4, h5, h6, strong, b');
+        if (header && !header.contains(el)) {
+          const t = (header.innerText || header.textContent || "").trim();
+          if (t && t.length < 80) return t;
+        }
+      }
+
       // 1. Explicit <label for="..."> or wrapping <label>
       const byFor = el.id ? document.querySelector(`label[for="${CSS.escape(el.id)}"]`) : null;
       const wrapping = el.closest ? el.closest("label") : null;
@@ -1015,12 +1042,133 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
   if (msg.type === "READ_VAULT_FIELDS") {
     const fields = {};
+
+    // 1. Inputs/controls or elements with explicit data-vault-key
     document.querySelectorAll("[data-vault-key]").forEach(el => {
       const key = el.getAttribute("data-vault-key");
-      const val = (el.value || el.textContent || "").trim();
-      if (key && val) fields[key] = val;
+      const val = (el.value || el.innerText || el.textContent || "").trim();
+      if (key && val && val !== "Loading…") fields[key] = val;
     });
-    sendResponse({ fields });
+
+    // 2. Scan localStorage for any stored vault object (e.g. isro_vault_*, vault, mission_vault)
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const lsKey = localStorage.key(i);
+        if (/vault/i.test(lsKey)) {
+          const raw = localStorage.getItem(lsKey);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+              for (const [k, v] of Object.entries(parsed)) {
+                if (v && typeof v === "string" && !fields[k]) {
+                  fields[k] = v.trim();
+                }
+              }
+            }
+          }
+        }
+      }
+    } catch (_) {}
+
+    // 3. Scan window.vaultData or document variables if present
+    try {
+      if (typeof window.vaultData === "object" && window.vaultData !== null) {
+        for (const [k, v] of Object.entries(window.vaultData)) {
+          if (v && typeof v === "string" && !fields[k]) {
+            fields[k] = v.trim();
+          }
+        }
+      }
+    } catch (_) {}
+
+    // 4. Structured Key-Value block parser on the page (messages, datablocks, pre, code, chat bubbles)
+    const KEY_ALIASES = {
+      "satellite": "satellite_name",
+      "satellite name": "satellite_name",
+      "mission id": "mission_id",
+      "mission": "mission_id",
+      "operator": "operator",
+      "operator on duty": "operator",
+      "launch": "launch_date",
+      "launch date": "launch_date",
+      "orbit": "orbit_type",
+      "orbit type": "orbit_type",
+      "inclination": "orbital_inclination",
+      "orbital inclination": "orbital_inclination",
+      "apogee": "apogee",
+      "perigee": "perigee",
+      "freq": "ground_station_freq",
+      "frequency": "ground_station_freq",
+      "ground station freq": "ground_station_freq",
+      "ground station frequency": "ground_station_freq",
+      "enc key ref": "encryption_key_ref",
+      "encryption key ref": "encryption_key_ref",
+      "encryption key": "encryption_key_ref",
+      "tle1": "tle_line_1",
+      "tle 1": "tle_line_1",
+      "tle line 1": "tle_line_1",
+      "tle2": "tle_line_2",
+      "tle 2": "tle_line_2",
+      "tle line 2": "tle_line_2",
+      "name": "name",
+      "full name": "name",
+      "username": "username",
+      "user name": "username",
+      "email": "email",
+      "email address": "email",
+      "phone": "phone",
+      "phone number": "phone",
+      "org": "company",
+      "organisation": "company",
+      "organization": "company",
+      "company": "company",
+      "zip": "zip",
+      "pin": "zip",
+      "pin code": "zip",
+      "postal code": "zip",
+      "address": "address",
+      "password": "password",
+      "designation": "about",
+      "role": "about",
+      "about": "about",
+      "occupation": "occupation",
+      "annual income": "annual_income",
+      "income": "annual_income",
+      "salary": "annual_income"
+    };
+
+    const textContainers = document.querySelectorAll(".datablock, .bubble, pre, code, .msg-row, .card, .chat-col, [role='main'], main, body");
+    for (const container of textContainers) {
+      const text = container.innerText || container.textContent || "";
+      if (!text || text.length < 5) continue;
+
+      // Match patterns like "Key: Value | Key2: Value" or "Key: Value\n"
+      const lines = text.split(/[\r\n|]+/);
+      for (const line of lines) {
+        const match = line.match(/^\s*([A-Za-z0-9\s_-]+)\s*[:=]\s*(.+?)\s*$/);
+        if (match) {
+          const rawKey = match[1].toLowerCase().trim();
+          const rawVal = match[2].trim();
+          const mappedKey = KEY_ALIASES[rawKey] || rawKey.replace(/[^a-z0-9]+/g, "_");
+          if (mappedKey && rawVal && rawVal !== "Loading…" && !fields[mappedKey]) {
+            fields[mappedKey] = rawVal;
+          }
+        }
+      }
+    }
+
+    // 5. Specific regex extraction for TLE lines if present in text
+    const fullBodyText = document.body ? (document.body.innerText || "") : "";
+    if (!fields.tle_line_1) {
+      const tle1Match = fullBodyText.match(/\b(1\s+\d{5}[A-Z]\s+[^\r\n]{30,60})/);
+      if (tle1Match) fields.tle_line_1 = tle1Match[1].trim();
+    }
+    if (!fields.tle_line_2) {
+      const tle2Match = fullBodyText.match(/\b(2\s+\d{5}\s+[^\r\n]{30,60})/);
+      if (tle2Match) fields.tle_line_2 = tle2Match[1].trim();
+    }
+
+    sendResponse({ fields, count: Object.keys(fields).length });
     return true;
   }
 

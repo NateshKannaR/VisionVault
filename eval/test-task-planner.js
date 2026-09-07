@@ -618,6 +618,41 @@ is(TaskPlanner.vaultKeyForLabel('Orbit Type').key, 'orbit_type', 'orbit type -> 
 is(TaskPlanner.vaultKeyForLabel('PIN Code').key, 'zip', 'pin code -> zip');
 is(TaskPlanner.vaultKeyForLabel('Address for Payslips').key, 'address', 'address for payslips -> address');
 is(TaskPlanner.vaultKeyForLabel('Organisation').key, 'company', 'organisation -> company');
+is(TaskPlanner.vaultKeyForLabel('Occupation *').key, 'occupation', 'occupation * -> occupation');
+is(TaskPlanner.vaultKeyForLabel('Annual Income *').key, 'annual_income', 'annual income * -> annual_income');
+is(TaskPlanner.vaultKeyForLabel('Marital Status').key, 'marital_status', 'marital status -> marital_status');
+is(TaskPlanner.vaultKeyForLabel('Father Name').key, 'father_name', 'father name -> father_name');
+
+// Multi-field Google form planning check: distinct fields must NOT all collapse to "name"
+const googleFormPlan1 = planNextAction({
+  task: 'fill this form',
+  parsedTask: TaskPlanner.parseTask('fill this form'),
+  marks: [
+    { id: 101, role: 'input:text', label: 'Occupation *' },
+    { id: 102, role: 'input:text', label: 'Annual Income *' },
+  ],
+  filledIds: [],
+  pageInfo: { url: 'https://docs.google.com/forms/d/e/.../viewform' },
+  progress: {}
+});
+is(googleFormPlan1.action, 'type', 'google form step 1 types');
+is(googleFormPlan1.mark_id, 101, 'google form step 1 targets occupation field');
+is(googleFormPlan1.use_vault_field, 'occupation', 'google form step 1 uses vault field occupation (not name)');
+
+const googleFormPlan2 = planNextAction({
+  task: 'fill this form',
+  parsedTask: TaskPlanner.parseTask('fill this form'),
+  marks: [
+    { id: 101, role: 'input:text', label: 'Occupation *' },
+    { id: 102, role: 'input:text', label: 'Annual Income *' },
+  ],
+  filledIds: [101],
+  pageInfo: { url: 'https://docs.google.com/forms/d/e/.../viewform' },
+  progress: {}
+});
+is(googleFormPlan2.action, 'type', 'google form step 2 types');
+is(googleFormPlan2.mark_id, 102, 'google form step 2 targets annual income field');
+is(googleFormPlan2.use_vault_field, 'annual_income', 'google form step 2 uses vault field annual_income (not name)');
 
 // Prompt variation checks
 const p1 = TaskPlanner.parseTask('fill the form fill form 2');

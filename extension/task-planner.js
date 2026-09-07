@@ -204,19 +204,35 @@
 
 
     // Messaging / Chat task detection:
-    // e.g. "send hi to niswan", "message niswan saying hi", "send a message to niswan"
-    const msgMatch = text.match(/\b(?:send|message|msg|text|dm)\s+(?:a\s+message\s+(?:saying\s+|that\s+)?|message\s+)?['"]?([^'"]+?)['"]?\s+to\s+([a-zA-Z0-9_\s]+?)(?:\s+(?:on|via|in)\s+(?:whatsapp|slack|telegram|teams)|$)/i) ||
-                     text.match(/\b(?:to\s+([a-zA-Z0-9_\s]+?)\s+(?:send|message|msg|text)\s+['"]?([^'"]+?)['"]?)(?:\s+(?:on|via|in)\s+(?:whatsapp|slack|telegram|teams)|$)/i);
+    // e.g. "open whatsapp and send hi message to niswan", "message niswan saying hi", "send a message to niswan"
+    const m1 = text.match(/\b(?:send|post)\s+(?:a\s+)?messages?\s+to\s+([a-zA-Z0-9_\s]+?)\s+(?:saying|with|that)\s+['"]?([^'"]+?)['"]?(?:\s+(?:on|via|in)\s+(?:whatsapp|slack|telegram|teams)|$)/i);
+    const m2 = text.match(/\b(?:message|text|dm|tell)\s+([a-zA-Z0-9_\s]+?)\s+(?:saying|with|that)\s+['"]?([^'"]+?)['"]?(?:\s+(?:on|via|in)\s+(?:whatsapp|slack|telegram|teams)|$)/i);
+    const m3 = text.match(/\b(?:send|message|msg|text|dm)\s+['"]?([^'"]+?)['"]?\s+(?:message\s+)?to\s+([a-zA-Z0-9_\s]+?)(?:\s+(?:on|via|in)\s+(?:whatsapp|slack|telegram|teams)|$)/i);
+    const m4 = text.match(/\bto\s+([a-zA-Z0-9_\s]+?)\s+(?:send|message|msg|text)\s+['"]?([^'"]+?)['"]?(?:\s+(?:on|via|in)\s+(?:whatsapp|slack|telegram|teams)|$)/i);
 
-    if (msgMatch) {
+    if (m1) {
       result.wantsMessage = true;
-      result.message = msgMatch[1].replace(/\s+messages?$/i, "").trim();
-      result.recipient = msgMatch[2].trim();
+      result.recipient = m1[1].trim();
+      result.message = m1[2].trim();
+    } else if (m2) {
+      result.wantsMessage = true;
+      result.recipient = m2[1].trim();
+      result.message = m2[2].trim();
+    } else if (m3) {
+      result.wantsMessage = true;
+      let msg = m3[1].replace(/^(?:a\s+)?messages?\s+(?:saying\s+|that\s+)?/i, "").replace(/\s+messages?$/i, "").trim();
+      result.message = msg || "hi";
+      result.recipient = m3[2].trim();
+    } else if (m4) {
+      result.wantsMessage = true;
+      result.recipient = m4[1].trim();
+      result.message = m4[2].trim();
     } else if (/\b(send|message|msg|text|chat)\b/i.test(text) && /\bto\s+([a-zA-Z0-9_\s]+)/i.test(text)) {
       const rec = text.match(/\bto\s+([a-zA-Z0-9_\s]+?)(?:\s+(?:on|via|in)\s+(?:whatsapp|slack|telegram|teams)|$)/i);
       if (rec) {
         result.wantsMessage = true;
         result.recipient = rec[1].trim();
+        result.message = "hi";
       }
     }
 
@@ -615,6 +631,7 @@
     // 2b. Messaging / Chat flow (WhatsApp, Telegram, Slack, etc.)
     const isMsgPlatform = /web\.whatsapp\.com|telegram|slack/i.test(url || "");
     if (parsed.wantsMessage || isMsgPlatform) {
+      // 1. Recover from dialpad / calls screen if present
       const isDialpadScreen = available.some((m) =>
         /enter a phone number|phone number|voice and video calling|go to calls/i.test(m.label || "")
       );
@@ -629,6 +646,7 @@
         }
       }
 
+      // 2. Real Send button (when visible and message has been typed or send is active)
       const isRealSendBtn = (m) => {
         const l = (m.label || "").trim().toLowerCase();
         if (/\b(document|photo|video|contact|location|file|media|audio|voice|call)\b/i.test(l)) return false;
@@ -639,15 +657,7 @@
         return { action: "click", mark_id: sendBtn.id, reasoning: "Click Send to send the message" };
       }
 
-      const msgBox = first((m) =>
-        m.role === "editable" ||
-        /type a message/i.test(m.label || "") ||
-        (FILLABLE_ROLES.has(m.role) && /message/i.test(m.label || ""))
-      );
-      if (msgBox && parsed.message && !progress.messageTyped) {
-        return { action: "type", mark_id: msgBox.id, value: parsed.message, reasoning: `Type "${parsed.message}" into message box` };
-      }
-
+      // 3. Open or Search for Recipient Contact first (if not yet opened)
       if (parsed.recipient && !progress.contactOpened) {
         const contact = first((m) => {
           const l = (m.label || "").toLowerCase();
@@ -656,10 +666,30 @@
         if (contact) {
           return { action: "click", mark_id: contact.id, reasoning: `Open chat with ${parsed.recipient}` };
         }
-        const searchChat = first((m) => /search or start a new chat/i.test(m.label || "") || /search\s*(contacts|chats)/i.test(m.label || "") || isSearchBox(m));
-        if (searchChat) {
+        const searchChat = first((m) =>
+          /search or start a new chat|search or start new chat|search\s*(contacts|chats)/i.test(m.label || "") ||
+          (isSearchBox(m) && !/type a message/i.test(m.label || ""))
+        );
+        if (searchChat && !progress.contactSearched) {
           return { action: "type", mark_id: searchChat.id, value: parsed.recipient, reasoning: `Search for contact "${parsed.recipient}"` };
         }
+      }
+
+      // 4. Message typing box (Type a message / Chat input)
+      const isMsgBox = (m) => {
+        const l = (m.label || "").toLowerCase();
+        if (/search|find|filter/i.test(l)) return false;
+        return /type a message|type a msg|\bmessage\b|chat input|write a message/i.test(l) ||
+               (m.role === "editable" && !/search/i.test(l));
+      };
+      const msgBox = first(isMsgBox);
+      if (msgBox && parsed.message && !progress.messageTyped) {
+        return { action: "type", mark_id: msgBox.id, value: parsed.message, reasoning: `Type "${parsed.message}" into message box` };
+      }
+
+      // 5. Click Send button if present after typing
+      if (sendBtn) {
+        return { action: "click", mark_id: sendBtn.id, reasoning: "Click Send to send the message" };
       }
     }
 

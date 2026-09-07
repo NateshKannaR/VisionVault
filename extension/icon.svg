@@ -1,26 +1,72 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
   <defs>
-    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#7c3aed"/>
-      <stop offset="48%" stop-color="#4f46e5"/>
-      <stop offset="100%" stop-color="#22d3ee"/>
+    <!-- Background Gradient -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e1b4b"/>
+      <stop offset="50%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#030712"/>
     </linearGradient>
-    <linearGradient id="glass" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#f8fbff" stop-opacity="0.26"/>
-      <stop offset="100%" stop-color="#dfeaff" stop-opacity="0.05"/>
+
+    <!-- Shield Outer Gradient -->
+    <linearGradient id="shieldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#818cf8"/>
+      <stop offset="40%" stop-color="#6366f1"/>
+      <stop offset="80%" stop-color="#a855f7"/>
+      <stop offset="100%" stop-color="#06b6d4"/>
     </linearGradient>
-    <linearGradient id="mark" x1="0%" y1="0%" x2="100%" y2="100%">
+
+    <!-- Shield Inner Fill Gradient -->
+    <linearGradient id="shieldInner" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1e1b4b" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#0f172a" stop-opacity="0.95"/>
+    </linearGradient>
+
+    <!-- Vision Eye Core Gradient -->
+    <linearGradient id="eyeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#22d3ee"/>
+      <stop offset="50%" stop-color="#38bdf8"/>
+      <stop offset="100%" stop-color="#818cf8"/>
+    </linearGradient>
+
+    <!-- Pupil Glow Gradient -->
+    <radialGradient id="pupilGlow" cx="50%" cy="50%" r="50%">
       <stop offset="0%" stop-color="#ffffff"/>
-      <stop offset="100%" stop-color="#dfe7ff"/>
+      <stop offset="40%" stop-color="#22d3ee"/>
+      <stop offset="100%" stop-color="#0284c7"/>
+    </radialGradient>
+
+    <!-- Border Glow -->
+    <linearGradient id="borderGlow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#818cf8" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#06b6d4" stop-opacity="0.3"/>
     </linearGradient>
   </defs>
 
-  <rect width="128" height="128" rx="28" fill="url(#bg)"/>
-  <rect x="10" y="10" width="108" height="108" rx="24" fill="url(#glass)" stroke="rgba(255,255,255,0.22)"/>
+  <!-- Squircle Base -->
+  <rect x="4" y="4" width="120" height="120" rx="28" fill="url(#bgGrad)" stroke="url(#borderGlow)" stroke-width="2"/>
 
-  <path d="M41 33l19 53 15-33 13 33 15-53" fill="none" stroke="url(#mark)" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M31 96h66" stroke="rgba(255,255,255,0.7)" stroke-width="6" stroke-linecap="round"/>
+  <!-- Subtle Cyber Corner Accents -->
+  <path d="M18 36V18h18" stroke="#6366f1" stroke-width="2" stroke-linecap="round" stroke-opacity="0.4" fill="none"/>
+  <path d="M110 36V18H92" stroke="#06b6d4" stroke-width="2" stroke-linecap="round" stroke-opacity="0.4" fill="none"/>
+  <path d="M18 92v18h18" stroke="#a855f7" stroke-width="2" stroke-linecap="round" stroke-opacity="0.4" fill="none"/>
+  <path d="M110 92v18H92" stroke="#6366f1" stroke-width="2" stroke-linecap="round" stroke-opacity="0.4" fill="none"/>
 
-  <circle cx="92" cy="34" r="8" fill="#9ae6b4" opacity="0.95"/>
-  <path d="M92 22v8M92 48v8M80 34h8M104 34h8" stroke="#d1fae5" stroke-width="3" stroke-linecap="round"/>
+  <!-- Shield Outer Glow / Body -->
+  <path d="M64 22 L94 35.5 C94 63.5 81 86 64 96 C47 86 34 63.5 34 35.5 Z" fill="url(#shieldInner)" stroke="url(#shieldGrad)" stroke-width="4.5" stroke-linejoin="round"/>
+
+  <!-- Vision Eye Shape Outer -->
+  <path d="M42 58 C47 48 55 43 64 43 C73 43 81 48 86 58 C81 68 73 73 64 73 C55 73 47 68 42 58 Z" fill="none" stroke="url(#eyeGrad)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Vision Iris & Pupil (Vault Lens) -->
+  <circle cx="64" cy="58" r="9.5" fill="#0f172a" stroke="url(#eyeGrad)" stroke-width="2.5"/>
+  <circle cx="64" cy="58" r="5.5" fill="url(#pupilGlow)"/>
+  <circle cx="62" cy="56" r="1.8" fill="#ffffff" opacity="0.9"/>
+
+  <!-- Security Keyhole / Node Accent -->
+  <path d="M64 73 V83" stroke="url(#eyeGrad)" stroke-width="3" stroke-linecap="round"/>
+  <circle cx="64" cy="84" r="2.5" fill="#22d3ee"/>
+
+  <!-- Cyber Sparkle in top-right corner -->
+  <path d="M98 22 L100 28 L106 30 L100 32 L98 38 L96 32 L90 30 L96 28 Z" fill="#38bdf8" opacity="0.95"/>
+  <circle cx="98" cy="30" r="1.5" fill="#ffffff"/>
 </svg>

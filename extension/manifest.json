@@ -65,7 +65,8 @@
         "models/tessdata/*",
         "vision/*",
         "offscreen.html",
-        "offscreen.js"
+        "offscreen.js",
+        "permission.html"
       ],
       "matches": [
         "<all_urls>",

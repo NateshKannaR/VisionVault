@@ -1301,25 +1301,14 @@ function startDictation() {
   recognition.onerror = (event) => {
     const err = event.error;
     if (err === "not-allowed" || err === "service-not-allowed") {
-      // Attempt browser getUserMedia prompt if available
-      if (navigator.mediaDevices?.getUserMedia) {
-        navigator.mediaDevices.getUserMedia({ audio: true })
-          .then((stream) => {
-            stream.getTracks().forEach((t) => t.stop());
-            showStatus("statusMsg", "info", "Microphone permission granted. Click the mic button again to dictate.");
-          })
-          .catch(() => {
-            showStatus(
-              "statusMsg",
-              "warn",
-              "Microphone blocked. Please allow microphone in Chrome (chrome://settings/content/microphone) for this extension."
-            );
-          });
-      } else {
+      showStatus("statusMsg", "info", "Opening microphone permission tab — please click 'Allow' there.");
+      try {
+        chrome.tabs.create({ url: chrome.runtime.getURL("permission.html") });
+      } catch (openErr) {
         showStatus(
           "statusMsg",
           "warn",
-          "Microphone blocked. Allow it for this extension in Chrome's site settings."
+          "Microphone blocked. Allow it for this extension at chrome://settings/content/microphone."
         );
       }
     } else {
@@ -1483,7 +1472,11 @@ $("exportAudit")?.addEventListener("click", () => {
 
 // ── Live updates from the service worker ──────────────────────────────────────
 chrome.runtime.onMessage.addListener((msg) => {
-  if (msg.type !== "AGENT_UPDATE") return;
+  if (msg?.type === "MIC_PERMISSION_GRANTED") {
+    showStatus("statusMsg", "info", "Microphone access enabled! Click the mic button to dictate.");
+    return;
+  }
+  if (msg?.type !== "AGENT_UPDATE") return;
   const d = msg.data;
 
   if (d.type === "step") {

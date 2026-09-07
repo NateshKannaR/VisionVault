@@ -300,6 +300,7 @@ function safeLabel(el) {
   const candidates = isFormControl
     ? [
         associatedLabel(),
+        el.getAttribute("data-vault-key"),
         el.getAttribute("aria-label"),
         el.getAttribute("placeholder"),
         el.getAttribute("title"),
@@ -309,6 +310,8 @@ function safeLabel(el) {
       ]
     : [
         el.innerText,
+        el.getAttribute("data-page"),
+        el.getAttribute("data-vault-key"),
         el.getAttribute("aria-label"),
         el.getAttribute("title"),
         el.getAttribute("placeholder"),
@@ -751,6 +754,7 @@ function inferRole(el) {
   if (role === "combobox" || el.getAttribute("aria-haspopup") === "listbox") return "combobox";
   if (role === "checkbox" || role === "switch") return "checkbox";
   if (role === "radio") return "radio";
+  if (role === "tab" || (el.classList && (el.classList.contains("tab") || el.classList.contains("nav-item")))) return "clickable";
   if (role === "textbox" || role === "searchbox") return "editable";
   if (el.getAttribute("contenteditable") === "true") return "editable";
   if (aria.includes("message") || placeholder.includes("message")) return "editable";
@@ -764,7 +768,7 @@ function tagInteractiveElements() {
   const seen = new WeakSet();
 
   const candidates = querySelectorAllDeep(
-    'a, button, input:not([type="hidden"]):not([type="file"]), textarea, select, label[for], [role="button"], [role="link"], [role="searchbox"], [role="textbox"], [role="combobox"], [role="checkbox"], [role="radio"], [role="switch"], [role="tab"], [role="menuitem"], [role="option"], [contenteditable="true"], [tabindex="0"], [aria-haspopup="listbox"], [aria-haspopup="true"], .nav-link, .btn, [id*="search" i], [name*="search" i], [name*="keywords" i], [class*="searchCity" i], [class*="searchToCity" i]'
+    'a, button, input:not([type="hidden"]):not([type="file"]), textarea, select, label[for], [role="button"], [role="link"], [role="searchbox"], [role="textbox"], [role="combobox"], [role="checkbox"], [role="radio"], [role="switch"], [role="tab"], [role="menuitem"], [role="option"], [contenteditable="true"], [tabindex="0"], [aria-haspopup="listbox"], [aria-haspopup="true"], .nav-link, .nav-item, [data-page], [onclick], .btn, [id*="search" i], [name*="search" i], [name*="keywords" i], [class*="searchCity" i], [class*="searchToCity" i]'
   );
 
   candidates.forEach((el) => {
@@ -793,7 +797,8 @@ function tagInteractiveElements() {
       id: stableId,
       role,
       box: r,
-      label
+      label,
+      vaultKey: el.getAttribute("data-vault-key") || null
     });
   });
 
@@ -976,6 +981,132 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
   if (msg.type === "GET_PAGE_INFO") {
     sendResponse(getPageInfo());
+    return true;
+  }
+
+  // ── Read all data-vault-key fields from the current page ─────────────────────────
+  // Fill a single field by vault key with human-like typing
+  if (msg.type === "FILL_SINGLE_VAULT_FIELD") {
+    const el = document.querySelector(".page.active input[data-vault-key='" + msg.key + "'], .page.active textarea[data-vault-key='" + msg.key + "']");
+    if (!el) { sendResponse({ ok: false, error: "Field not found" }); return true; }
+    const value = String(msg.value || "");
+    (async () => {
+      el.focus();
+      el.dispatchEvent(new Event("focus", { bubbles: true }));
+      const proto = el.tagName === "TEXTAREA" ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+      const setter = Object.getOwnPropertyDescriptor(proto, "value")?.set;
+      if (setter) setter.call(el, ""); else el.value = "";
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+      for (const char of value) {
+        el.dispatchEvent(new KeyboardEvent("keydown",  { key: char, bubbles: true }));
+        el.dispatchEvent(new KeyboardEvent("keypress", { key: char, bubbles: true }));
+        const current = el.value;
+        if (setter) setter.call(el, current + char); else el.value = current + char;
+        el.dispatchEvent(new Event("input", { bubbles: true }));
+        el.dispatchEvent(new KeyboardEvent("keyup", { key: char, bubbles: true }));
+        await new Promise(r => setTimeout(r, 30 + Math.random() * 40));
+      }
+      el.dispatchEvent(new Event("change", { bubbles: true }));
+      el.dispatchEvent(new Event("blur",   { bubbles: true }));
+      sendResponse({ ok: true, filled: 1 });
+    })();
+    return true;
+  }
+
+  if (msg.type === "READ_VAULT_FIELDS") {
+    const fields = {};
+    document.querySelectorAll("[data-vault-key]").forEach(el => {
+      const key = el.getAttribute("data-vault-key");
+      const val = (el.value || el.textContent || "").trim();
+      if (key && val) fields[key] = val;
+    });
+    sendResponse({ fields });
+    return true;
+  }
+
+  // ── Fill fields from vault data using data-vault-key ────────────────────────────
+  if (msg.type === "FILL_VAULT_FIELDS") {
+    const data = msg.data || {};
+    const targetPage = msg.targetPage || null;
+
+    // Navigate to the named page if specified
+    if (targetPage) {
+      const pageKey = String(targetPage).toLowerCase().trim();
+      const pageAliases = {
+        "form1": ["form-hr", "form1", "hr"],
+        "form-hr": ["form-hr", "form1", "hr"],
+        "hr": ["form-hr", "form1", "hr"],
+        "form2": ["form-payroll", "form2", "payroll"],
+        "form-payroll": ["form-payroll", "form2", "payroll"],
+        "payroll": ["form-payroll", "form2", "payroll"],
+        "form3": ["form-it", "form3", "it"],
+        "form-it": ["form-it", "form3", "it"],
+        "it": ["form-it", "form3", "it"],
+        "form4": ["form-housing", "form4", "housing"],
+        "form-housing": ["form-housing", "form4", "housing"],
+        "housing": ["form-housing", "form4", "housing"],
+        "form5": ["form-medical", "form5", "medical"],
+        "form-medical": ["form-medical", "form5", "medical"],
+        "medical": ["form-medical", "form5", "medical"],
+      };
+      const candidateIds = pageAliases[pageKey] || [pageKey];
+      let navEl = null;
+      let pageEl = null;
+      for (const id of candidateIds) {
+        navEl = document.querySelector(`.nav-item[data-page='${id}'], [data-page='${id}']`);
+        pageEl = document.getElementById("page-" + id) || document.getElementById(id);
+        if (navEl || pageEl) break;
+      }
+      if (navEl) {
+        try { navEl.click(); } catch (_) {}
+      }
+      document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
+      document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
+      if (pageEl) pageEl.classList.add("active");
+      if (navEl) navEl.classList.add("active");
+    }
+
+    const activePage = document.querySelector(".page.active");
+    const container = activePage || document;
+    const allFields = Array.from(container.querySelectorAll("input[data-vault-key], textarea[data-vault-key], select[data-vault-key]"));
+
+    if (!allFields.length) {
+      sendResponse({ ok: false, error: "No fillable fields on this page. Navigate to a form first." });
+      return true;
+    }
+
+    // Split into fields we can fill and fields we need to ask about
+    const fillable = allFields.filter(el => { const k = el.getAttribute("data-vault-key"); return k && data[k] !== undefined && data[k] !== ""; });
+    const missing  = allFields.filter(el => { const k = el.getAttribute("data-vault-key"); return !k || data[k] === undefined || data[k] === ""; })
+      .map(el => ({ key: el.getAttribute("data-vault-key"), label: el.closest(".fg")?.querySelector("label")?.textContent?.trim() || el.getAttribute("data-vault-key") }));
+
+    (async () => {
+      let filled = 0;
+      for (const el of fillable) {
+        const key = el.getAttribute("data-vault-key");
+        const value = String(data[key]);
+        el.focus();
+        el.dispatchEvent(new Event("focus", { bubbles: true }));
+        const proto = el.tagName === "TEXTAREA" ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+        const setter = Object.getOwnPropertyDescriptor(proto, "value")?.set;
+        if (setter) setter.call(el, ""); else el.value = "";
+        el.dispatchEvent(new Event("input", { bubbles: true }));
+        for (const char of value) {
+          el.dispatchEvent(new KeyboardEvent("keydown",  { key: char, bubbles: true }));
+          el.dispatchEvent(new KeyboardEvent("keypress", { key: char, bubbles: true }));
+          const current = el.value;
+          if (setter) setter.call(el, current + char); else el.value = current + char;
+          el.dispatchEvent(new Event("input", { bubbles: true }));
+          el.dispatchEvent(new KeyboardEvent("keyup", { key: char, bubbles: true }));
+          await new Promise(r => setTimeout(r, 30 + Math.random() * 40));
+        }
+        el.dispatchEvent(new Event("change", { bubbles: true }));
+        el.dispatchEvent(new Event("blur",   { bubbles: true }));
+        filled++;
+        await new Promise(r => setTimeout(r, 200 + Math.random() * 300));
+      }
+      sendResponse({ ok: true, filled, missing });
+    })();
     return true;
   }
 });

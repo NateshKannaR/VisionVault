@@ -129,6 +129,11 @@
       wantsIssue: false,
       wantsPR: false,
       wantsClone: false,
+      wantsNewRepo: false,
+      repoName: null,
+      repoDesc: null,
+      wantsReadme: false,
+      wantsPrivate: false,
       // Extracted travel/booking parameters
       category: null,
       from: null,
@@ -320,13 +325,47 @@
     }
 
     // GitHub intent detection:
-    const isGitHub = (result.site && /github/i.test(result.site)) || /\bgithub\b/i.test(text);
-    if (isGitHub || /\b(star\s+(?:the\s+)?(?:repo|repository|it)|stargaze)\b/i.test(text)) {
+    const wantsNewRepo = /\b(?:create|make|add|new|init|initialize)\s+(?:a\s+)?(?:new\s+)?repo(?:sitory)?\b/i.test(text) ||
+                         /\brepo(?:sitory)?\s+creation\b/i.test(text);
+    const isGitHub = (result.site && /github/i.test(result.site)) || /\bgithub\b/i.test(text) || wantsNewRepo;
+    if (isGitHub || /\b(star\s+(?:the\s+)?(?:repo|repository|it)|stargaze)\b/i.test(text) || wantsNewRepo) {
       result.wantsStar = /\b(star|stargaze)\b/i.test(text) && !/\b([1-5]\s*stars?|star\s*rating)\b/i.test(text);
       result.wantsFork = /\bfork\b/i.test(text);
       result.wantsIssue = /\b(issues?|bug\s*report)\b/i.test(text);
       result.wantsPR = /\b(pull\s*requests?|prs?)\b/i.test(text);
       result.wantsClone = /\b(clone|copy\s*url|git\s*clone)\b/i.test(text);
+      result.wantsNewRepo = wantsNewRepo;
+
+      if (wantsNewRepo) {
+        if (!result.site) {
+          result.site = "github";
+        }
+        result.siteUrl = "https://github.com/new";
+
+        // Extract repository name if specified: e.g. named my-app, named my cool-project, called test-repo
+        const nameMatch = text.match(/\b(?:named|called|with\s+(?:the\s+)?name)\s+["']?([a-zA-Z0-9_\-\.\s]+?)["']?(?=\s+(?:with|on|in|at|and|then)\b|\s*$)/i) ||
+                          text.match(/\b(?:create|make|new|add)\s+(?:a\s+)?(?:new\s+)?repo(?:sitory)?\s+(?:for\s+)?["']?([a-zA-Z0-9_\-\.]+)["']?/i);
+        const REPO_STOPWORDS = new Set(["a", "an", "the", "new", "on", "in", "at", "with", "and", "then", "named", "called", "repo", "repository", "for", "using", "it", "to", "github"]);
+        if (nameMatch) {
+          const cleanName = nameMatch[1].trim().replace(/\s+/g, "-");
+          if (cleanName && !REPO_STOPWORDS.has(cleanName.toLowerCase())) {
+            result.repoName = cleanName;
+          } else {
+            result.repoName = null;
+          }
+        } else {
+          result.repoName = null;
+        }
+
+        result.wantsReadme = /\b(?:with\s+(?:a\s+)?readme|add\s+(?:a\s+)?readme)\b/i.test(text);
+        result.wantsPrivate = /\b(?:private|secret)\b/i.test(text);
+
+        const descMatch = text.match(/\b(?:with\s+description|description)\s+["']([^"']+)["']/i);
+        if (descMatch) result.repoDesc = descMatch[1].trim();
+
+        result.query = null;
+        result.wantsSearch = false;
+      }
     }
 
     const ecomSite = (result.site && /amazon|flipkart|myntra|ebay|meesho|walmart|target|bestbuy/i.test(result.site)) ||
@@ -383,7 +422,7 @@
     }
 
     // If no explicit search query found on GitHub, check for repository/target extraction
-    if (!result.query && (isGitHub || result.site === "github")) {
+    if (!result.query && !result.wantsNewRepo && (isGitHub || result.site === "github")) {
       const repoMatch = text.match(/\b(?:star|fork|clone|open|repo|repository)\s+([a-zA-Z0-9_\-\.\/]+)(?:\s+(?:on|in|at)\s+github|$)/i);
       if (repoMatch && !/^(the|a|an|it|this|that|repo|repository)$/i.test(repoMatch[1])) {
         result.query = repoMatch[1].trim();
@@ -392,6 +431,10 @@
 
     // Travel booking route queries are not standard text queries
     if (result.wantsBook && (result.from && result.to)) {
+      result.query = null;
+      result.wantsSearch = false;
+    }
+    if (result.wantsNewRepo) {
       result.query = null;
       result.wantsSearch = false;
     }
@@ -420,6 +463,17 @@
       result.openTargets.push(onPageTargetMatch[1].toLowerCase());
     }
 
+    // Extract form navigation / fill targets (e.g. "fill form 2", "click that form 2 and fill that form", "fill the form 2", "open form 2")
+    const formTargetMatch = text.match(/\b(?:fill|click|open|switch\s+to|navigate\s+to|go\s+to)\s+(?:that\s+)?(?:the\s+)?(form\s*\d+|form\s*-\s*[a-z0-9_-]+)\b/i) ||
+                            text.match(/\b(?:click|open|select|tap)\s+(?:that\s+)?(?:the\s+)?(form\s*\d+|form\s*-\s*[a-z0-9_-]+)\s+and\s+(?:then\s+)?fill\b/i);
+    if (formTargetMatch) {
+      const fTarget = formTargetMatch[1].toLowerCase().trim();
+      if (fTarget && !result.openTargets.includes(fTarget)) {
+        result.openTargets.push(fTarget);
+      }
+      result.wantsFill = true;
+    }
+
     return result;
   }
 
@@ -446,8 +500,8 @@
     [/user[\s_-]*name|username|user[\s_-]*id|handle|login[\s_-]*id|login|sign[\s_-]*in|roll[\s_-]*no|roll[\s_-]*number|registration[\s_-]*no|reg[\s_-]*no|student[\s_-]*id|staff[\s_-]*id|admission[\s_-]*no|member[\s_-]*id|account[\s_-]*id|user\b/, "username"],
     [/e-?mail|email[\s_-]*address/, "email"],
     [/phone|mobile|tel(ephone)?|contact number|cell/, "phone"],
-    [/password|passcode|pwd|pin/, "password"],
-    [/address|street|city|postcode|post code|zip|postal|state|country/, "address"],
+    [/password|passcode|pwd|\bpin\b(?![\s_-]*code)/, "password"],
+    [/pin[\s_-]*code|pincode|address|street|city|postcode|post code|zip|postal|state|country/, "address"],
     [/company|organisation|organization|employer|institution|college|university|school/, "company"],
     [/about|bio|description|notes|message|comment/, "about"],
     [/full[\s_-]*name|first[\s_-]*name|last[\s_-]*name|surname|\bname\b/, "name"],
@@ -583,7 +637,7 @@
 
     // 2c. GitHub flow
     const isGitHubSite = (parsed.site && /github/i.test(parsed.site)) || /github\.com/i.test(url || "");
-    if (isGitHubSite || parsed.wantsStar || parsed.wantsFork || parsed.wantsIssue || parsed.wantsPR || parsed.wantsClone) {
+    if (isGitHubSite || parsed.wantsStar || parsed.wantsFork || parsed.wantsIssue || parsed.wantsPR || parsed.wantsClone || parsed.wantsNewRepo) {
       const gitPlan = planGitHubStep(parsed, available, done, progress, state.pageInfo);
       if (gitPlan) return gitPlan;
     }
@@ -610,6 +664,14 @@
     }
 
     // 4. Explicit follow-up target clicks
+    const FORM_TARGET_ALIASES = {
+      "form 1": ["form 1", "form1", "form-hr", "personal", "hr"],
+      "form 2": ["form 2", "form2", "form-payroll", "payroll", "banking", "salary", "isro mission payroll"],
+      "form 3": ["form 3", "form3", "form-it", "asset", "access", "itam", "mission systems"],
+      "form 4": ["form 4", "form4", "form-housing", "housing", "quarters", "allotment", "staff quarters"],
+      "form 5": ["form 5", "form5", "form-medical", "medical", "insurance", "dependents", "health & welfare", "health and welfare"],
+    };
+
     for (const target of parsed.openTargets) {
       if ((progress.opened || []).includes(target)) continue;
       if (/^(?:the\s+)?(?:first|top|1st)\b/.test(target)) {
@@ -617,17 +679,38 @@
         if (link) return { action: "click", mark_id: link.id, openTarget: target, reasoning: `Open the first result: ${link.label}` };
         continue;
       }
-      const words = target.split(/\s+/).filter((w) => w.length >= 3);
-      const hit = first((m) => {
+
+      const formAliases = FORM_TARGET_ALIASES[target] || [target];
+      let hit = first((m) => {
         const label = (m.label || "").toLowerCase();
         if (!label || (m.role !== "link" && m.role !== "button" && m.role !== "clickable")) return false;
-        return label.includes(target) || (words.length > 0 && words.every((w) => label.includes(w)));
+        return formAliases.some((alias) => label.includes(alias));
       });
+
+      if (!hit) {
+        const targetDigits = (target.match(/\b\d+\b/g) || []);
+        const words = target.split(/\s+/).filter((w) => w.length >= 2 || /\d/.test(w));
+        hit = first((m) => {
+          const label = (m.label || "").toLowerCase();
+          if (!label || (m.role !== "link" && m.role !== "button" && m.role !== "clickable")) return false;
+          if (targetDigits.length > 0 && !targetDigits.every((d) => label.includes(d))) return false;
+          return label.includes(target) || (words.length > 0 && words.every((w) => label.includes(w)));
+        });
+      }
+
       if (hit) return { action: "click", mark_id: hit.id, openTarget: target, reasoning: `Open "${hit.label}"` };
     }
 
     // 5. Fill a form from the local vault.
     if (parsed.wantsFill) {
+      // Pass 0: Explicit mark.vaultKey (directly tagged from data-vault-key)
+      for (const m of available) {
+        if (!FILLABLE_ROLES.has(m.role) || isSearchBox(m)) continue;
+        if (m.vaultKey) {
+          return { action: "type", mark_id: m.id, use_vault_field: m.vaultKey, reasoning: `Fill "${m.label || m.vaultKey}" from vault (${m.vaultKey})` };
+        }
+      }
+
       // Pass A: Type specific input roles (password, email, tel)
       for (const m of available) {
         if (!FILLABLE_ROLES.has(m.role) || isSearchBox(m)) continue;
@@ -673,7 +756,7 @@
       // Pass D: If all inputs are filled, click submit/sign-in button if present
       const submitBtn = first((m) =>
         (m.role === "button" || m.role === "clickable" || m.role === "input:submit") &&
-        /^\s*(sign\s*in|log\s*in|submit|continue|next|register|save|create\s*account|submit\s+log\s+entry)\s*$/i.test(m.label || "")
+        /^\s*(sign\s*in|log\s*in|submit|continue|next|register|save|save\s+changes|save\s+mission\s+payroll|create\s*account|submit\s+log\s+entry|submit\s+update|confirm\s+allotment|save\s+details)\b/i.test(m.label || "")
       );
       if (submitBtn && (parsed.wantsFill || /\b(login|sign\s*in|submit)\b/i.test(state.task || ""))) {
         return { action: "click", mark_id: submitBtn.id, reasoning: `Click ${submitBtn.label || 'Submit'} button` };
@@ -873,6 +956,19 @@
     const isSearchPage = /github\.com\/search/i.test(url);
 
     // 0. Completed conditions
+    if (parsed.wantsNewRepo && progress.repoCreated) {
+      return { action: "done", reasoning: `Repository "${parsed.repoName || "new repository"}" created successfully.` };
+    }
+    if (parsed.wantsNewRepo && (progress.createClicked || progress.repoNameTyped) && isRepoPage && !/\/new(?:\/|$)/i.test(url)) {
+      progress.repoCreated = true;
+      return { action: "done", reasoning: `Repository "${parsed.repoName || "new repository"}" created successfully.` };
+    }
+    if (parsed.wantsNewRepo && /github\.com\/login/i.test(url)) {
+      return {
+        action: "done",
+        reasoning: "GitHub requires you to sign in before creating a repository. Please sign in to your GitHub account and try again."
+      };
+    }
     if (parsed.wantsStar && progress.starred) {
       return { action: "done", reasoning: "Repository starred successfully." };
     }
@@ -890,6 +986,103 @@
     }
     if (progress.repoOpened && !parsed.wantsStar && !parsed.wantsFork && !parsed.wantsIssue && !parsed.wantsPR && !parsed.wantsClone && (!parsed.openTargets || parsed.openTargets.length === 0)) {
       return { action: "done", reasoning: "Repository opened successfully." };
+    }
+
+    // 0b. Create New Repository flow
+    if (parsed.wantsNewRepo) {
+      const isNewPage = /github\.com\/(?:repositories\/new|new)(?:$|[?#])/i.test(url);
+      if (!isNewPage) {
+        const newBtn = available.find(m => {
+          const l = (m.label || "").trim().toLowerCase();
+          return (m.role === "button" || m.role === "link" || m.role === "clickable") &&
+                 (/^\s*new\b/i.test(l) || /new\s+repository/i.test(l) || /create\s+(?:a\s+)?(?:new\s+)?repository/i.test(l));
+        });
+        if (newBtn && !progress.newClicked) {
+          progress.newClicked = true;
+          return { action: "click", mark_id: newBtn.id, reasoning: "Click 'New' button to create a new repository" };
+        }
+        return { action: "navigate", value: "https://github.com/new", reasoning: "Navigate to GitHub New Repository page" };
+      }
+
+      // On https://github.com/new:
+      // Substep A: Type repository name
+      if (!progress.repoNameTyped) {
+        const nameToUse = parsed.repoName || ("repo-" + Math.floor(1000 + Math.random() * 9000));
+        const repoInput = available.find(m => {
+          if (!FILLABLE_ROLES.has(m.role)) return false;
+          const l = (m.label || "").toLowerCase();
+          if (/search/i.test(l)) return false;
+          return /repository\s*name|repo\s*name|name\s*your\s*new|name\s*\*|\brepo\b/i.test(l);
+        }) || available.find(m => {
+          if (!FILLABLE_ROLES.has(m.role) || isSearchBox(m)) return false;
+          const l = (m.label || "").toLowerCase();
+          return !/description|readme/i.test(l);
+        });
+
+        if (repoInput) {
+          return {
+            action: "type",
+            mark_id: repoInput.id,
+            value: nameToUse,
+            isRepoName: true,
+            reasoning: `Type repository name "${nameToUse}"`
+          };
+        }
+      }
+
+      // Substep B: Optional description
+      if (parsed.repoDesc && !progress.repoDescTyped) {
+        const descInput = available.find(m => {
+          if (!FILLABLE_ROLES.has(m.role)) return false;
+          return /description/i.test((m.label || "").toLowerCase());
+        });
+        if (descInput) {
+          progress.repoDescTyped = true;
+          return { action: "type", mark_id: descInput.id, value: parsed.repoDesc, reasoning: "Type repository description" };
+        }
+      }
+
+      // Substep C: Optional private
+      if (parsed.wantsPrivate && !progress.privateSelected) {
+        const privateOpt = available.find(m => {
+          const l = (m.label || "").toLowerCase();
+          return (m.role === "radio" || m.role === "clickable" || m.role === "button") && /\bprivate\b/i.test(l);
+        });
+        if (privateOpt) {
+          progress.privateSelected = true;
+          return { action: "click", mark_id: privateOpt.id, reasoning: "Select Private repository" };
+        }
+      }
+
+      // Substep D: Optional README
+      if (parsed.wantsReadme && !progress.readmeChecked) {
+        const readmeCb = available.find(m => {
+          const l = (m.label || "").toLowerCase();
+          return (m.role === "checkbox" || m.role === "clickable") && /\breadme\b/i.test(l);
+        });
+        if (readmeCb) {
+          progress.readmeChecked = true;
+          return { action: "click", mark_id: readmeCb.id, reasoning: "Check 'Add a README file'" };
+        }
+      }
+
+      // Substep E: Click "Create repository" button
+      if (progress.repoNameTyped) {
+        const createBtn = available.find(m => {
+          const l = (m.label || "").trim().toLowerCase();
+          return (m.role === "button" || m.role === "clickable" || m.role === "input:submit") &&
+                 (/create\s+repository/i.test(l) || /create\s+(?:a\s+)?new\s+repository/i.test(l) || /^\s*create\s+repo\b/i.test(l));
+        });
+        if (createBtn) {
+          progress.createClicked = true;
+          return { action: "click", mark_id: createBtn.id, isCreateRepo: true, reasoning: "Click 'Create repository' button" };
+        }
+
+        if ((progress.createScrolls || 0) < 3) {
+          progress.createScrolls = (progress.createScrolls || 0) + 1;
+          return { action: "scroll_page", value: 500, reasoning: "Scroll down to locate 'Create repository' button" };
+        }
+      }
     }
 
     // 1. Actions on Repository Page

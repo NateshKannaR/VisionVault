@@ -542,6 +542,12 @@ function clearLiveStep() {
 }
 
 // ── Scan ──────────────────────────────────────────────────────────────────────
+// Vault-intent commands: must mention vault/dashboard explicitly, or use "store/save/remember"
+// with "these/this/the" (pointing at the current page). Must NOT fire on normal agent tasks.
+const VAULT_STORE_RE = /\b(store|save|remember|capture|extract|read).{0,30}(vault|dashboard)\b|\b(store|save|remember)\s+(these|this|the)\s+(values?|fields?|data|details?)\b/i;
+// Fill-from-vault: must mention "vault" or "stored/saved values" explicitly.
+const VAULT_FILL_RE  = /\b(fill|populate|autofill|use|apply).{0,30}(vault|stored values?|saved values?|from vault)\b|\bfill.{0,20}from\s+(the\s+)?vault\b/i;
+
 scanBtn.addEventListener("click", () => {
   resetPipeline();
   setProtection("running", "Reading the screen locally");
@@ -550,6 +556,87 @@ scanBtn.addEventListener("click", () => {
   if (!task) {
     showStatus("statusMsg", "warn", "Describe what the agent should do first.");
     taskEl.focus();
+    return;
+  }
+
+  const isVaultStore = VAULT_STORE_RE.test(task);
+  const isVaultFill = VAULT_FILL_RE.test(task);
+
+  if (isVaultStore || isVaultFill) {
+    busy(scanBtn, isVaultStore ? "Scanning & Reading…" : "Scanning & Filling…");
+    idleState.hidden = true;
+    scanSkeleton.hidden = false;
+    runBtn.hidden = true;
+    previewWrap.hidden = true;
+    statsGrid.hidden = true;
+    if ($("scoreCard")) $("scoreCard").hidden = true;
+    timingWrap.hidden = true;
+    confirmWrap.hidden = true;
+    inputPromptWrap.hidden = true;
+    hideStatus("statusMsg");
+
+    chrome.runtime.sendMessage({ type: "SCAN", task }, (scanRes) => {
+      scanSkeleton.hidden = true;
+      if (scanRes && scanRes.ok && scanRes.result) {
+        renderScan(scanRes.result, true);
+      }
+
+      if (isVaultStore) {
+        busy(scanBtn, "Storing to vault…");
+        chrome.runtime.sendMessage({ type: "STORE_PAGE_TO_VAULT" }, (res) => {
+          scanBtn.disabled = false;
+          scanBtn.innerHTML = SCAN_LABEL;
+          if (!res || !res.ok) {
+            showStatus("statusMsg", "error", esc(res?.error || "No data-vault-key fields found on this page."));
+            return;
+          }
+          const n = Object.keys(res.stored || {}).length;
+          showStatus("statusMsg", "success", `Stored ${n} value${n === 1 ? "" : "s"} from this page into vault. Screen masked & recorded.`);
+          loadVault();
+        });
+        return;
+      }
+
+      if (isVaultFill) {
+        const PAGE_MAP = [
+          { re: /form\s*1|personal|hr/i,            page: "form-hr" },
+          { re: /form\s*2|payroll|banking|salary/i,     page: "form-payroll" },
+          { re: /form\s*3|asset|it|system/i,         page: "form-it" },
+          { re: /form\s*4|housing|quarter/i,        page: "form-housing" },
+          { re: /form\s*5|medical|health|depend/i,     page: "form-medical" },
+          { re: /mission\s*reg/i,                    page: "form1" },
+          { re: /frequen/i,                          page: "form2" },
+          { re: /ground\s*station/i,                 page: "form3" },
+          { re: /security|clearance/i,               page: "form4" },
+          { re: /operator|credential/i,              page: "form5" },
+        ];
+        const match = PAGE_MAP.find(p => p.re.test(task));
+        const targetPage = match ? match.page : null;
+        busy(scanBtn, "Filling from vault…");
+        chrome.runtime.sendMessage({ type: "FILL_FROM_VAULT", targetPage }, (res) => {
+          scanBtn.disabled = false;
+          scanBtn.innerHTML = SCAN_LABEL;
+          if (!res || !res.ok) {
+            showStatus("statusMsg", "error", esc(res?.error || "Vault is empty — navigate to the dashboard first."));
+            return;
+          }
+          const n = res.filled || 0;
+          const missing = res.missing || [];
+          if (missing.length) {
+            showStatus("statusMsg", "info", `Filled ${n} field${n===1?"":"s"} from vault. Asking about ${missing.length} missing field${missing.length===1?"":"s"}…`);
+            promptMissingFields(missing, 0);
+          } else {
+            showStatus("statusMsg", "success", `Filled ${n} field${n===1?"":"s"} from vault.`);
+            chrome.runtime.sendMessage({ type: "SCAN", task }, (postScan) => {
+              if (postScan && postScan.ok && postScan.result) {
+                renderScan(postScan.result, false);
+              }
+            });
+          }
+        });
+        return;
+      }
+    });
     return;
   }
 
@@ -717,6 +804,55 @@ runBtn.addEventListener("click", () => {
  * scanning and pressing Run, the scan state is gone and the loop has nothing to work from.
  * Silently re-scanning and trying once more is exactly what the user would do by hand.
  */
+// ── Prompt user for missing vault fields one by one ──────────────────────────
+function promptMissingFields(missing, index) {
+  if (index >= missing.length) {
+    showStatus("statusMsg", "success", "All fields filled.");
+    return;
+  }
+  const field = missing[index];
+  currentMissingField = field.key;
+  currentMissingMarkId = null;
+
+  $("inputPromptText").innerHTML =
+    `The vault has no value for <strong>${esc(field.label || field.key)}</strong>. ` +
+    `Enter it now and the agent will type it into the field.`;
+
+  const saveRow = $("saveMissingToVault")?.closest("label");
+  if (saveRow) saveRow.hidden = false;
+  if ($("saveMissingToVault")) $("saveMissingToVault").checked = true;
+
+  const el = $("missingInputValue");
+  const secret = /password|passcode|pin|otp|cvv|secret/i.test(field.key || "");
+  el.type = secret ? "password" : "text";
+  el.placeholder = secret ? "Enter the value (hidden)" : `Enter your ${esc(field.label || field.key)}`;
+  el.value = "";
+
+  reveal(inputPromptWrap);
+  el.focus();
+
+  // Override submit to type into the page field then continue
+  const onSubmit = () => {
+    const value = $("missingInputValue").value.trim();
+    const saveToVault = $("saveMissingToVault").checked;
+    inputPromptWrap.hidden = true;
+    $("inputPromptSubmit").removeEventListener("click", onSubmit);
+    $("inputPromptSkip").removeEventListener("click", onSkip);
+    if (!value) { promptMissingFields(missing, index + 1); return; }
+    chrome.runtime.sendMessage({ type: "FILL_SINGLE_FIELD", key: field.key, value, saveToVault }, () => {
+      promptMissingFields(missing, index + 1);
+    });
+  };
+  const onSkip = () => {
+    inputPromptWrap.hidden = true;
+    $("inputPromptSubmit").removeEventListener("click", onSubmit);
+    $("inputPromptSkip").removeEventListener("click", onSkip);
+    promptMissingFields(missing, index + 1);
+  };
+  $("inputPromptSubmit").addEventListener("click", onSubmit);
+  $("inputPromptSkip").addEventListener("click", onSkip);
+}
+
 function startRun(allowRescan) {
   chrome.runtime.sendMessage({ type: "RUN" }, (res) => {
     const expired = !res?.ok && /run scan first/i.test(res?.error || "");
@@ -1164,15 +1300,37 @@ function startDictation() {
 
   recognition.onerror = (event) => {
     const err = event.error;
-    const message =
-      err === "not-allowed" || err === "service-not-allowed"
-        ? "Microphone blocked. Allow it for this extension in Chrome's site settings."
-        : err === "no-speech"
+    if (err === "not-allowed" || err === "service-not-allowed") {
+      // Attempt browser getUserMedia prompt if available
+      if (navigator.mediaDevices?.getUserMedia) {
+        navigator.mediaDevices.getUserMedia({ audio: true })
+          .then((stream) => {
+            stream.getTracks().forEach((t) => t.stop());
+            showStatus("statusMsg", "info", "Microphone permission granted. Click the mic button again to dictate.");
+          })
+          .catch(() => {
+            showStatus(
+              "statusMsg",
+              "warn",
+              "Microphone blocked. Please allow microphone in Chrome (chrome://settings/content/microphone) for this extension."
+            );
+          });
+      } else {
+        showStatus(
+          "statusMsg",
+          "warn",
+          "Microphone blocked. Allow it for this extension in Chrome's site settings."
+        );
+      }
+    } else {
+      const message =
+        err === "no-speech"
           ? "Didn't catch anything — try again."
           : err === "network"
             ? "Speech recognition needs a network connection."
             : `Dictation stopped (${err}).`;
-    showStatus("statusMsg", err === "no-speech" ? "info" : "warn", esc(message));
+      showStatus("statusMsg", err === "no-speech" ? "info" : "warn", esc(message));
+    }
     setMicLive(false);
   };
 

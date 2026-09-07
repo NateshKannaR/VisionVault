@@ -152,6 +152,7 @@
     if (parsed.wantsClone && !p.cloned) return false;
     if (parsed.wantsIssue && !p.issueOpened) return false;
     if (parsed.wantsPR && !p.prOpened) return false;
+    if (parsed.wantsNewRepo && !p.repoCreated) return false;
     if ((parsed.openTargets || []).length) {
       if (!parsed.openTargets.every((t) => openTargetMet(t, p))) return false;
     }
@@ -181,12 +182,13 @@
     if (parsed.wantsClone && !progress?.cloned) return false;
     if (parsed.wantsIssue && !progress?.issueOpened) return false;
     if (parsed.wantsPR && !progress?.prOpened) return false;
+    if (parsed.wantsNewRepo && !progress?.repoCreated) return false;
     const hasVerifiableIntent = !!parsed.query || (parsed.openTargets || []).length > 0 || parsed.wantsScroll ||
       (parsed.wantsMessage && progress?.messageSent) || (parsed.wantsAddToCart && progress?.cartAdded) ||
       (parsed.wantsFilter && (progress?.filterApplied || progress?.sortApplied)) ||
       (parsed.wantsStar && progress?.starred) || (parsed.wantsFork && progress?.forked) ||
       (parsed.wantsClone && progress?.cloned) || (parsed.wantsIssue && progress?.issueOpened) ||
-      (parsed.wantsPR && progress?.prOpened);
+      (parsed.wantsPR && progress?.prOpened) || (parsed.wantsNewRepo && progress?.repoCreated);
     if (!hasVerifiableIntent) return false;
     return goalSatisfied(parsed, progress);
   }
@@ -213,6 +215,7 @@
     if (parsed?.wantsClone && !p.cloned) left.push("open clone options");
     if (parsed?.wantsIssue && !p.issueOpened) left.push("open issues tab");
     if (parsed?.wantsPR && !p.prOpened) left.push("open pull requests tab");
+    if (parsed?.wantsNewRepo && !p.repoCreated) left.push(`create repository "${parsed.repoName || "new repository"}"`);
     if (parsed?.wantsNonStop && !p.nonStopFiltered) left.push("filter non-stop flights");
     for (const t of parsed?.openTargets || []) if (!openTargetMet(t, p)) left.push(`open "${t}"`);
     if (parsed?.wantsScroll && !p.scrolled) left.push("scroll the page");
@@ -267,6 +270,7 @@
     if (p.cloned) bits.push("opened clone options");
     if (p.issueOpened) bits.push("opened issues");
     if (p.prOpened) bits.push("opened pull requests");
+    if (p.repoCreated) bits.push(`created repository "${parsed?.repoName || "new repository"}"`);
     if (p.nonStopFiltered) bits.push("filtered non-stop flights");
     if ((p.opened || []).length) bits.push(`opened ${p.opened.length} item(s)`);
     if (p.scrolled) bits.push("scrolled the page");

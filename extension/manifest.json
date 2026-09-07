@@ -11,7 +11,9 @@
     "sidePanel",
     "offscreen",
     "debugger",
-    "downloads"
+    "downloads",
+    "audioCapture",
+    "microphone"
   ],
   "host_permissions": [
     "<all_urls>",

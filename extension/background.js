@@ -747,6 +747,7 @@ async function phaseScan(task) {
       queryLanded: false, querySubmitted: false, filledAny: false,
       searchOpenAttempts: 0, siteSearchUrlTried: false, fillScrolls: 0,
       bookingStep: 0, fromTyped: false, toTyped: false, bookingCompleted: false,
+      repoCreated: false, repoNameTyped: false, createClicked: false,
     },
     // Supervises the planner for this task; recreated per scan so a new task starts clean.
     guard: null,
@@ -1604,6 +1605,9 @@ async function phaseRun() {
           if (session.parsedTask?.message && valLower.includes(session.parsedTask.message.toLowerCase())) {
             session.progress.messageTyped = true;
           }
+          if (resp.isRepoName) {
+            session.progress.repoNameTyped = true;
+          }
           if (resp.isFilter) {
             session.progress.filterApplied = true;
             // A control the planner could not find earlier has now been used. Leaving the
@@ -1783,6 +1787,9 @@ async function phaseRun() {
           }
           if (resp.isRepoSelection) {
             session.progress.repoOpened = true;
+          }
+          if (resp.isCreateRepo || /\bcreate\s+repository\b/i.test(tLabel)) {
+            session.progress.repoCreated = true;
           }
         }
         session.actionLog.push({ action: "click", mark_id: resp.mark_id, serverMs, ok: clickOk, error: clickOk ? undefined : exec?.error });
@@ -2252,6 +2259,72 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     AuditLog.exportJson()
       .then((json) => sendResponse({ ok: true, json }))
       .catch((err) => sendResponse({ ok: false, error: String(err && err.message || err) }));
+    return true;
+  }
+
+  // ── SatOps: fill a single field by vault key with a user-provided value ────────────
+  if (msg.type === "FILL_SINGLE_FIELD") {
+    (async () => {
+      try {
+        const allTabs = await chrome.tabs.query({ active: true });
+        const tab = allTabs.find(t => !t.url?.startsWith("chrome-extension://")) ||
+                    (await chrome.tabs.query({})).filter(t => !t.url?.startsWith("chrome-extension://") && !t.url?.startsWith("chrome://")).sort((a,b) => b.lastAccessed - a.lastAccessed)[0];
+        if (!tab) { sendResponse({ ok: false, error: "No active tab" }); return; }
+        if (msg.saveToVault && msg.key && msg.value) {
+          const vault = await getVault();
+          vault[msg.key] = msg.value;
+          await chrome.storage.local.set({ vault });
+        }
+        await ensureContent(tab.id);
+        const result = await msgTab(tab.id, { type: "FILL_SINGLE_VAULT_FIELD", key: msg.key, value: msg.value });
+        sendResponse({ ok: true, filled: result?.filled || 0 });
+      } catch (e) {
+        sendResponse({ ok: false, error: String(e) });
+      }
+    })();
+    return true;
+  }
+
+  // ── SatOps: read all data-vault-key fields from current tab and store in vault ────────────
+  if (msg.type === "STORE_PAGE_TO_VAULT") {
+    (async () => {
+      try {
+        const allTabs = await chrome.tabs.query({ active: true });
+        const tab = allTabs.find(t => !t.url?.startsWith("chrome-extension://")) ||
+                    (await chrome.tabs.query({})).filter(t => !t.url?.startsWith("chrome-extension://") && !t.url?.startsWith("chrome://")).sort((a,b) => b.lastAccessed - a.lastAccessed)[0];
+        if (!tab) { sendResponse({ ok: false, error: "No active tab" }); return; }
+        await ensureContent(tab.id);
+        const result = await msgTab(tab.id, { type: "READ_VAULT_FIELDS" });
+        if (!result || !result.fields) { sendResponse({ ok: false, error: "No vault fields found on page" }); return; }
+        const { vault: existing } = await chrome.storage.local.get("vault");
+        const merged = Object.assign({}, existing || {}, result.fields);
+        await chrome.storage.local.set({ vault: merged });
+        sendResponse({ ok: true, stored: result.fields, count: Object.keys(result.fields).length });
+      } catch (e) {
+        sendResponse({ ok: false, error: String(e) });
+      }
+    })();
+    return true;
+  }
+
+  // ── SatOps: fill current tab's data-vault-key fields from vault ────────────────────────
+  if (msg.type === "FILL_FROM_VAULT") {
+    (async () => {
+      try {
+        const allTabs = await chrome.tabs.query({ active: true });
+        const tab = allTabs.find(t => !t.url?.startsWith("chrome-extension://")) ||
+                    (await chrome.tabs.query({})).filter(t => !t.url?.startsWith("chrome-extension://") && !t.url?.startsWith("chrome://")).sort((a,b) => b.lastAccessed - a.lastAccessed)[0];
+        if (!tab) { sendResponse({ ok: false, error: "No active tab" }); return; }
+        const vault = await getVault();
+        if (!vault || !Object.keys(vault).length) { sendResponse({ ok: false, error: "Vault is empty." }); return; }
+        await ensureContent(tab.id);
+        const targetPage = msg.targetPage || null;
+        const result = await msgTab(tab.id, { type: "FILL_VAULT_FIELDS", data: vault, targetPage });
+        sendResponse({ ok: true, filled: result?.filled || 0 });
+      } catch (e) {
+        sendResponse({ ok: false, error: String(e) });
+      }
+    })();
     return true;
   }
 });

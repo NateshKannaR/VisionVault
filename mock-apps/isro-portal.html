@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ISRO Satellite Operations Portal</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lucide-static@0.441.0/font/lucide.min.css" />
+<style>
+:root {
+  --bg:#050a14; --card:#0d1b2a; --sidebar:#080f1e;
+  --accent:#00b4d8; --accent2:#48cae4;
+  --green:#06d6a0; --yellow:#ffd166; --red:#ef476f;
+  --text:#e0f2fe; --muted:#7ea8be; --border:#1a3a5c; --input:#0a1628;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column;}
+
+/* ── Top bar ── */
+.topbar{display:flex;align-items:center;gap:14px;padding:12px 24px;background:var(--sidebar);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;}
+.logo{width:42px;height:42px;background:linear-gradient(135deg,#ff6b35,#f7c59f);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
+.topbar-title{font-size:15px;font-weight:700;color:var(--accent);letter-spacing:.5px;}
+.topbar-sub{font-size:11px;color:var(--muted);}
+.status-pill{margin-left:auto;display:flex;align-items:center;gap:6px;padding:4px 12px;background:rgba(6,214,160,.1);border:1px solid rgba(6,214,160,.25);border-radius:20px;}
+.sdot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green);animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.status-pill span{font-size:11px;color:var(--green);font-weight:600;}
+
+/* ── Layout ── */
+.layout{display:flex;flex:1;}
+
+/* ── Sidebar ── */
+.sidebar{width:220px;flex-shrink:0;background:var(--sidebar);border-right:1px solid var(--border);padding:16px 0;}
+.nav-section{font-size:10px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);padding:0 16px;margin:16px 0 6px;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 16px;font-size:13px;color:var(--muted);cursor:pointer;border-left:3px solid transparent;transition:all .15s;}
+.nav-item:hover{color:var(--text);background:rgba(0,180,216,.06);}
+.nav-item.active{color:var(--accent);background:rgba(0,180,216,.1);border-left-color:var(--accent);}
+.ni{display:flex;align-items:center;justify-content:center;width:20px;font-size:16px;}
+
+/* ── Main ── */
+.main{flex:1;padding:28px;overflow-y:auto;}
+
+/* ── Pages ── */
+.page{display:none;}.page.active{display:block;}
+
+/* ── Dashboard cards ── */
+.dash-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;}
+.card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:20px;}
+.card-title{font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--accent);margin-bottom:14px;display:flex;align-items:center;gap:8px;}
+.card-title::after{content:"";flex:1;height:1px;background:var(--border);}
+.field-row{display:flex;justify-content:space-between;align-items:baseline;padding:6px 0;border-bottom:1px solid rgba(26,58,92,.5);font-size:13px;}
+.field-row:last-child{border-bottom:none;}
+.fl{color:var(--muted);font-size:11px;}
+.fv{color:var(--text);font-weight:600;text-align:right;max-width:62%;word-break:break-all;}
+.fv.mono{font-family:'Courier New',monospace;font-size:11px;color:var(--accent2);}
+.fv.green{color:var(--green);}
+.fv.yellow{color:var(--yellow);}
+.tle-block{background:rgba(0,180,216,.05);border:1px solid var(--border);border-radius:6px;padding:10px 12px;font-family:'Courier New',monospace;font-size:11px;color:var(--accent2);line-height:1.8;margin-top:8px;}
+.telem-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:4px;}
+.tbox{background:rgba(0,180,216,.06);border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center;}
+.tval{font-size:18px;font-weight:700;color:var(--accent);}
+.tunit{font-size:10px;color:var(--muted);margin-top:2px;}
+
+/* ── Forms ── */
+.form-wrap{max-width:580px;}
+.page-badge{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;background:rgba(0,180,216,.12);border:1px solid rgba(0,180,216,.3);border-radius:20px;font-size:11px;font-weight:700;color:var(--accent);margin-bottom:12px;}
+.page-title{font-size:22px;font-weight:700;margin-bottom:6px;}
+.page-sub{font-size:12px;color:var(--muted);margin-bottom:24px;}
+.fsection{font-size:10px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--accent);margin:20px 0 12px;display:flex;align-items:center;gap:8px;}
+.fsection::after{content:"";flex:1;height:1px;background:var(--border);}
+.fg{margin-bottom:14px;}
+.fg label{display:block;font-size:12px;font-weight:500;color:#b0c4d8;margin-bottom:5px;}
+input,textarea,select{width:100%;padding:10px 13px;background:var(--input);border:1px solid var(--border);border-radius:7px;color:var(--text);font-size:13px;outline:none;transition:border-color .15s;font-family:inherit;}
+input:focus,textarea:focus,select:focus{border-color:var(--accent);}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.card-title svg,.fsection svg{vertical-align:-2px;margin-right:4px;opacity:.85;}
+.submit-btn{width:100%;padding:12px;background:linear-gradient(135deg,#00b4d8,#0077b6);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;margin-top:8px;transition:opacity .15s;display:flex;align-items:center;justify-content:center;gap:8px;}
+.submit-btn:hover{opacity:.88;}
+.warn-box{font-size:11px;color:var(--yellow);background:rgba(255,209,102,.08);border:1px solid rgba(255,209,102,.2);border-radius:6px;padding:8px 12px;margin-bottom:16px;}
+.toast{display:none;margin-top:12px;padding:11px 14px;background:rgba(6,214,160,.12);border:1px solid rgba(6,214,160,.3);border-radius:7px;color:var(--green);font-size:13px;text-align:center;display:none;align-items:center;justify-content:center;gap:8px;}
+.toast.show{display:flex;}
+</style>
+</head>
+<body>
+
+<!-- Top bar -->
+<div class="topbar">
+  <div class="logo"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1a0a00" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg></div>
+  <div>
+    <div class="topbar-title">ISRO SATELLITE OPERATIONS PORTAL</div>
+    <div class="topbar-sub">Master Control Facility — Hassan, Karnataka &nbsp;|&nbsp; SIH PS 26171</div>
+  </div>
+  <div class="status-pill"><div class="sdot"></div><span>NOMINAL</span></div>
+</div>
+
+<div class="layout">
+
+<!-- Sidebar -->
+<nav class="sidebar">
+  <div class="nav-section">Overview</div>
+  <div class="nav-item active" data-page="dashboard"><span class="ni"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg></span>Dashboard</div>
+
+  <div class="nav-section">Project Forms</div>
+  <div class="nav-item" data-page="form1"><span class="ni"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg></span>Mission Registration</div>
+  <div class="nav-item" data-page="form2"><span class="ni"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M10.54 16.1a6 6 0 0 1 2.92 0"/><line x1="12" y1="20" x2="12" y2="20"/></svg></span>Frequency Allocation</div>
+  <div class="nav-item" data-page="form3"><span class="ni"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></span>Ground Station Ops</div>
+  <div class="nav-item" data-page="form4"><span class="ni"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>Security Clearance</div>
+  <div class="nav-item" data-page="form5"><span class="ni"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>Operator Credentials</div>
+</nav>
+
+<!-- Main content -->
+<main class="main">
+
+  <!-- DASHBOARD -->
+  <div class="page active" id="page-dashboard">
+    <div class="dash-grid">
+
+      <div class="card">
+        <div class="card-title"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>Mission Identity</div>
+        <div class="field-row"><span class="fl">Satellite Name</span><span class="fv" data-vault-key="satellite_name">INSAT-4B</span></div>
+        <div class="field-row"><span class="fl">Mission ID</span><span class="fv mono" data-vault-key="mission_id">INSAT-4B / M-201</span></div>
+        <div class="field-row"><span class="fl">Operator on Duty</span><span class="fv" data-vault-key="operator">R. Sharma</span></div>
+        <div class="field-row"><span class="fl">Launch Date</span><span class="fv green" data-vault-key="launch_date">2007-03-12</span></div>
+        <div class="field-row"><span class="fl">Orbit Type</span><span class="fv" data-vault-key="orbit_type">Geostationary (GEO)</span></div>
+        <div class="field-row"><span class="fl">Orbital Inclination</span><span class="fv mono" data-vault-key="orbital_inclination">0.05°</span></div>
+        <div class="field-row"><span class="fl">Apogee</span><span class="fv mono" data-vault-key="apogee">35,786 km</span></div>
+        <div class="field-row"><span class="fl">Perigee</span><span class="fv mono" data-vault-key="perigee">35,786 km</span></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M10.54 16.1a6 6 0 0 1 2.92 0"/><line x1="12" y1="20" x2="12" y2="20"/></svg>Ground Station &amp; Security</div>
+        <div class="field-row"><span class="fl">Ground Station Freq.</span><span class="fv mono" data-vault-key="ground_station_freq">14.250 GHz (Ku-Band)</span></div>
+        <div class="field-row"><span class="fl">Encryption Key Ref</span><span class="fv mono yellow" data-vault-key="encryption_key_ref">ISRO-KMS-EK-2026-04871</span></div>
+        <div class="field-row"><span class="fl">Organisation</span><span class="fv" data-vault-key="company">ISRO Master Control Facility (MCF)</span></div>
+        <div class="field-row"><span class="fl">Address</span><span class="fv" data-vault-key="address">MCF Salgame Road, Hassan, Karnataka, India</span></div>
+        <div class="field-row"><span class="fl">PIN Code</span><span class="fv mono" data-vault-key="zip">573201</span></div>
+        <div class="field-row"><span class="fl">Contact Email</span><span class="fv mono" data-vault-key="email">r.sharma@isro.gov.in</span></div>
+        <div class="field-row"><span class="fl">Phone</span><span class="fv mono" data-vault-key="phone">+91 80 2217 2296</span></div>
+        <div class="field-row"><span class="fl">Username</span><span class="fv mono" data-vault-key="username">rsharma_mcc</span></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Two-Line Element Set (TLE)</div>
+        <div class="tle-block">
+          <div data-vault-key="tle_line_1">1 30798U 07007A   26248.51249811 -.00000124  00000-0  10000-4 0  9991</div>
+          <div data-vault-key="tle_line_2">2 30798   0.0512  87.2145 0001248 145.2104 214.8901  1.00273412 71234</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Live Telemetry</div>
+        <div class="telem-grid">
+          <div class="tbox"><div class="tval">+24.3</div><div class="tunit">°C Bus Temp</div></div>
+          <div class="tbox"><div class="tval">98.7</div><div class="tunit">% Battery</div></div>
+          <div class="tbox"><div class="tval">2.4</div><div class="tunit">kW Solar</div></div>
+          <div class="tbox"><div class="tval">74.1°E</div><div class="tunit">Longitude</div></div>
+          <div class="tbox"><div class="tval">0.05°</div><div class="tunit">Inclination</div></div>
+          <div class="tbox"><div class="tval">NOMINAL</div><div class="tunit">Status</div></div>
+        </div>
+      </div>
+
+    </div>
+    <div style="background:rgba(0,180,216,.08);border:1px solid rgba(0,180,216,.25);border-radius:10px;padding:14px 18px;font-size:13px;line-height:1.8;display:flex;gap:12px;align-items:flex-start;">
+      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#00b4d8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:2px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      <div><strong style="color:var(--accent);">Using with VisionVault:</strong><br>
+      On this page type <em>"store these values in vault"</em> in the Run tab &rarr; then open any form and type <em>"fill the form from vault"</em>.</div>
+    </div>
+  </div>
+
+  <!-- FORM 1 -->
+  <div class="page" id="page-form1">
+    <div class="form-wrap">
+      <div class="page-badge"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> Form 1 of 5</div>
+      <div class="page-title">Mission Registration</div>
+      <p class="page-sub">Register a new satellite mission with ISRO Mission Control.</p>
+      <form onsubmit="handleSubmit(event,'toast-f1')">
+        <div class="fsection">Mission Details</div>
+        <div class="fg"><label>Satellite Name</label><input type="text" placeholder="e.g. INSAT-4B" data-vault-key="satellite_name" /></div>
+        <div class="grid2">
+          <div class="fg"><label>Mission ID</label><input type="text" placeholder="e.g. INSAT-4B / M-201" data-vault-key="mission_id" /></div>
+          <div class="fg"><label>Launch Date</label><input type="text" placeholder="YYYY-MM-DD" data-vault-key="launch_date" /></div>
+        </div>
+        <div class="grid2">
+          <div class="fg"><label>Orbit Type</label><input type="text" placeholder="e.g. Geostationary" data-vault-key="orbit_type" /></div>
+          <div class="fg"><label>Orbital Inclination</label><input type="text" placeholder="e.g. 0.05°" data-vault-key="orbital_inclination" /></div>
+        </div>
+        <div class="grid2">
+          <div class="fg"><label>Apogee</label><input type="text" placeholder="km" data-vault-key="apogee" /></div>
+          <div class="fg"><label>Perigee</label><input type="text" placeholder="km" data-vault-key="perigee" /></div>
+        </div>
+        <div class="fsection">Operator</div>
+        <div class="fg"><label>Operator Name</label><input type="text" autocomplete="name" placeholder="Full name" data-vault-key="operator" /></div>
+        <div class="fg"><label>Organisation</label><input type="text" autocomplete="organization" placeholder="Organisation" data-vault-key="company" /></div>
+        <button type="submit" class="submit-btn"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>Submit Mission Registration</button>
+        <div class="toast" id="toast-f1"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Mission registration submitted successfully!</div>
+      </form>
+    </div>
+  </div>
+
+  <!-- FORM 2 -->
+  <div class="page" id="page-form2">
+    <div class="form-wrap">
+      <div class="page-badge"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> Form 2 of 5</div>
+      <div class="page-title">Frequency Allocation Request</div>
+      <p class="page-sub">Apply for ITU frequency band allocation for satellite operations.</p>
+      <form onsubmit="handleSubmit(event,'toast-f2')">
+        <div class="fsection">Satellite &amp; Frequency</div>
+        <div class="fg"><label>Satellite Name</label><input type="text" placeholder="Satellite name" data-vault-key="satellite_name" /></div>
+        <div class="fg"><label>Mission ID</label><input type="text" placeholder="Mission ID" data-vault-key="mission_id" /></div>
+        <div class="fg"><label>Ground Station Frequency</label><input type="text" placeholder="e.g. 14.250 GHz (Ku-Band)" data-vault-key="ground_station_freq" /></div>
+        <div class="grid2">
+          <div class="fg"><label>Orbit Type</label><input type="text" placeholder="Orbit type" data-vault-key="orbit_type" /></div>
+          <div class="fg"><label>Launch Date</label><input type="text" placeholder="YYYY-MM-DD" data-vault-key="launch_date" /></div>
+        </div>
+        <div class="fsection">TLE Data</div>
+        <div class="fg"><label>TLE Line 1</label><input type="text" placeholder="TLE Line 1" data-vault-key="tle_line_1" style="font-family:monospace;font-size:11px;" /></div>
+        <div class="fg"><label>TLE Line 2</label><input type="text" placeholder="TLE Line 2" data-vault-key="tle_line_2" style="font-family:monospace;font-size:11px;" /></div>
+        <div class="fsection">Applicant</div>
+        <div class="fg"><label>Operator Name</label><input type="text" autocomplete="name" placeholder="Operator name" data-vault-key="operator" /></div>
+        <div class="fg"><label>Contact Email</label><input type="email" autocomplete="email" placeholder="Email address" data-vault-key="email" /></div>
+        <button type="submit" class="submit-btn"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>Submit Frequency Allocation Request</button>
+        <div class="toast" id="toast-f2"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Frequency allocation request submitted!</div>
+      </form>
+    </div>
+  </div>
+
+  <!-- FORM 3 -->
+  <div class="page" id="page-form3">
+    <div class="form-wrap">
+      <div class="page-badge"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> Form 3 of 5</div>
+      <div class="page-title">Ground Station Operations</div>
+      <p class="page-sub">Log ground station operational parameters and contact details.</p>
+      <form onsubmit="handleSubmit(event,'toast-f3')">
+        <div class="fsection">Station Details</div>
+        <div class="fg"><label>Organisation</label><input type="text" autocomplete="organization" placeholder="Organisation name" data-vault-key="company" /></div>
+        <div class="fg"><label>Station Address</label><textarea rows="2" autocomplete="street-address" placeholder="Full address" data-vault-key="address"></textarea></div>
+        <div class="fg"><label>PIN / ZIP Code</label><input type="text" autocomplete="postal-code" placeholder="PIN code" data-vault-key="zip" /></div>
+        <div class="fg"><label>Operating Frequency</label><input type="text" placeholder="e.g. 14.250 GHz (Ku-Band)" data-vault-key="ground_station_freq" /></div>
+        <div class="fsection">Satellite Link</div>
+        <div class="fg"><label>Satellite Name</label><input type="text" placeholder="Satellite name" data-vault-key="satellite_name" /></div>
+        <div class="grid2">
+          <div class="fg"><label>Apogee</label><input type="text" placeholder="km" data-vault-key="apogee" /></div>
+          <div class="fg"><label>Perigee</label><input type="text" placeholder="km" data-vault-key="perigee" /></div>
+        </div>
+        <div class="fsection">Contact</div>
+        <div class="fg"><label>Operator Name</label><input type="text" autocomplete="name" placeholder="Operator name" data-vault-key="operator" /></div>
+        <div class="grid2">
+          <div class="fg"><label>Email</label><input type="email" autocomplete="email" placeholder="Email" data-vault-key="email" /></div>
+          <div class="fg"><label>Phone</label><input type="tel" autocomplete="tel" placeholder="Phone" data-vault-key="phone" /></div>
+        </div>
+        <button type="submit" class="submit-btn"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>Submit Ground Station Form</button>
+        <div class="toast" id="toast-f3"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Ground station operations form submitted!</div>
+      </form>
+    </div>
+  </div>
+
+  <!-- FORM 4 -->
+  <div class="page" id="page-form4">
+    <div class="form-wrap">
+      <div class="page-badge"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> Form 4 of 5</div>
+      <div class="page-title">Security Clearance Request</div>
+      <p class="page-sub">Submit encryption key references and security credentials for mission clearance.</p>
+      <div class="warn-box"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> Sensitive — handled by VisionVault. Real values stay on-device.</div>
+      <form onsubmit="handleSubmit(event,'toast-f4')">
+        <div class="fsection">Mission Reference</div>
+        <div class="fg"><label>Satellite Name</label><input type="text" placeholder="Satellite name" data-vault-key="satellite_name" /></div>
+        <div class="fg"><label>Mission ID</label><input type="text" placeholder="Mission ID" data-vault-key="mission_id" /></div>
+        <div class="fsection">Security Credentials</div>
+        <div class="fg"><label>Encryption Key Reference</label><input type="text" placeholder="e.g. ISRO-KMS-EK-2026-XXXXX" data-vault-key="encryption_key_ref" style="font-family:monospace;" /></div>
+        <div class="fg"><label>System Username</label><input type="text" autocomplete="username" placeholder="Username" data-vault-key="username" /></div>
+        <div class="fg"><label>Access Password</label><input type="password" autocomplete="current-password" placeholder="••••••••" data-vault-key="password" /></div>
+        <div class="fsection">Authorising Officer</div>
+        <div class="fg"><label>Operator Name</label><input type="text" autocomplete="name" placeholder="Operator name" data-vault-key="operator" /></div>
+        <div class="grid2">
+          <div class="fg"><label>Email</label><input type="email" autocomplete="email" placeholder="Email" data-vault-key="email" /></div>
+          <div class="fg"><label>Phone</label><input type="tel" autocomplete="tel" placeholder="Phone" data-vault-key="phone" /></div>
+        </div>
+        <button type="submit" class="submit-btn"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>Submit Security Clearance</button>
+        <div class="toast" id="toast-f4"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Security clearance request submitted!</div>
+      </form>
+    </div>
+  </div>
+
+  <!-- FORM 5 -->
+  <div class="page" id="page-form5">
+    <div class="form-wrap">
+      <div class="page-badge"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> Form 5 of 5</div>
+      <div class="page-title">Operator Credentials</div>
+      <p class="page-sub">Register operator profile and access credentials for mission systems.</p>
+      <form onsubmit="handleSubmit(event,'toast-f5')">
+        <div class="fsection">Personal Details</div>
+        <div class="fg"><label>Full Name</label><input type="text" autocomplete="name" placeholder="Full name" data-vault-key="operator" /></div>
+        <div class="grid2">
+          <div class="fg"><label>Email Address</label><input type="email" autocomplete="email" placeholder="Email" data-vault-key="email" /></div>
+          <div class="fg"><label>Phone Number</label><input type="tel" autocomplete="tel" placeholder="Phone" data-vault-key="phone" /></div>
+        </div>
+        <div class="fg"><label>Organisation</label><input type="text" autocomplete="organization" placeholder="Organisation" data-vault-key="company" /></div>
+        <div class="fg"><label>Address</label><textarea rows="2" autocomplete="street-address" placeholder="Address" data-vault-key="address"></textarea></div>
+        <div class="fsection">System Access</div>
+        <div class="grid2">
+          <div class="fg"><label>Username</label><input type="text" autocomplete="username" placeholder="Username" data-vault-key="username" /></div>
+          <div class="fg"><label>Password</label><input type="password" autocomplete="new-password" placeholder="••••••••" data-vault-key="password" /></div>
+        </div>
+        <div class="fsection">Mission Assignment</div>
+        <div class="fg"><label>Assigned Satellite</label><input type="text" placeholder="Satellite name" data-vault-key="satellite_name" /></div>
+        <div class="fg"><label>Mission ID</label><input type="text" placeholder="Mission ID" data-vault-key="mission_id" /></div>
+        <div class="fg"><label>Role / Bio</label><textarea rows="2" placeholder="Describe your role" data-vault-key="about"></textarea></div>
+        <button type="submit" class="submit-btn"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>Submit Operator Credentials</button>
+        <div class="toast" id="toast-f5"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Operator credentials registered successfully!</div>
+      </form>
+    </div>
+  </div>
+
+</main>
+</div>
+
+<script>
+document.querySelectorAll('.nav-item').forEach(item => {
+  item.addEventListener('click', () => {
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    item.classList.add('active');
+    document.getElementById('page-' + item.dataset.page).classList.add('active');
+  });
+});
+
+function handleSubmit(e, toastId) {
+  e.preventDefault();
+  const t = document.getElementById(toastId);
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 4000);
+}
+</script>
+</body>
+</html>

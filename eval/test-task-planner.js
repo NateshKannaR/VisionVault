@@ -473,6 +473,144 @@ is(sortStep.action, 'select', 'selects sort option');
 is(sortStep.mark_id, 501, 'targets sort select');
 is(sortStep.value, 'price-asc-rank', 'selects price-asc-rank');
 
+// ── GitHub: Create Repository ─────────────────────────────────────────────
+console.log('\nGitHub: Create Repository pipeline\n');
+const newRepoTask = 'open github and create a new repository named vision-demo';
+const newRepoParsed = TaskPlanner.parseTask(newRepoTask);
+
+is(newRepoParsed.site, 'github', 'site is github');
+is(newRepoParsed.siteUrl, 'https://github.com/new', 'siteUrl is https://github.com/new');
+is(newRepoParsed.wantsNewRepo, true, 'wantsNewRepo is true');
+is(newRepoParsed.repoName, 'vision-demo', 'repoName is extracted as vision-demo');
+is(newRepoParsed.query, null, 'query is null');
+
+// Prompt without explicit name:
+const unnamedTask = 'open github and create a new repository';
+const unnamedParsed = TaskPlanner.parseTask(unnamedTask);
+is(unnamedParsed.wantsNewRepo, true, 'unnamed task wantsNewRepo is true');
+is(unnamedParsed.site, 'github', 'unnamed task site is github');
+is(unnamedParsed.query, null, 'unnamed task query is null');
+
+// Prompt with compound name with space:
+const spacedTask = 'open github and create a new repository named my cool-project';
+const spacedParsed = TaskPlanner.parseTask(spacedTask);
+is(spacedParsed.repoName, 'my-cool-project', 'repoName with space normalized to my-cool-project');
+
+// Step 1: Navigate from external site
+const crStep1 = TaskPlanner.planNextAction({
+  task: newRepoTask,
+  marks: [],
+  filledIds: [],
+  pageInfo: { url: 'https://www.google.com' },
+  progress: {},
+});
+is(crStep1.action, 'navigate', 'cr step 1 navigates to GitHub new repo page');
+is(crStep1.value, 'https://github.com/new', 'navigates to https://github.com/new');
+
+// Step 2: On github.com/new, types repository name
+const crStep2 = TaskPlanner.planNextAction({
+  task: newRepoTask,
+  marks: [
+    { id: 601, role: 'input:text', label: 'Repository name *' },
+    { id: 602, role: 'input:text', label: 'Description' },
+    { id: 603, role: 'button', label: 'Create repository' },
+  ],
+  filledIds: [],
+  pageInfo: { url: 'https://github.com/new' },
+  progress: { navigated: true },
+});
+is(crStep2.action, 'type', 'cr step 2 types repository name');
+is(crStep2.value, 'vision-demo', 'types "vision-demo"');
+is(crStep2.mark_id, 601, 'targets repository name input');
+
+// Step 3: Click Create repository button
+const crStep3 = TaskPlanner.planNextAction({
+  task: newRepoTask,
+  marks: [
+    { id: 601, role: 'input:text', label: 'Repository name *' },
+    { id: 602, role: 'input:text', label: 'Description' },
+    { id: 603, role: 'button', label: 'Create repository' },
+  ],
+  filledIds: [601],
+  pageInfo: { url: 'https://github.com/new' },
+  progress: { navigated: true, repoNameTyped: true },
+});
+is(crStep3.action, 'click', 'cr step 3 clicks Create repository button');
+is(crStep3.mark_id, 603, 'targets Create repository button');
+
+// Step 4: After navigation to repo page, completes with done
+const crStep4 = TaskPlanner.planNextAction({
+  task: newRepoTask,
+  marks: [
+    { id: 701, role: 'button', label: 'Code' },
+  ],
+  filledIds: [601, 603],
+  pageInfo: { url: 'https://github.com/NateshKannaR/vision-demo' },
+  progress: { navigated: true, repoNameTyped: true, createClicked: true },
+});
+is(crStep4.action, 'done', 'cr step 4 completes with done');
+
+console.log('\nForm 2 Navigation & Fill pipeline');
+console.log('---------------------------------');
+const form2Task = parseTask('fill form 2');
+is(form2Task.wantsFill, true, 'fill form 2 has wantsFill true');
+is(form2Task.openTargets.includes('form 2'), true, 'fill form 2 has form 2 in openTargets');
+
+const form2VoiceTask = parseTask('click that form 2 and fill that form');
+is(form2VoiceTask.wantsFill, true, 'click that form 2 and fill that form has wantsFill true');
+is(form2VoiceTask.openTargets.some(t => t.includes('form 2')), true, 'openTargets includes form 2');
+
+// Step 1: When on Messages tab, Form 2 nav tab is visible
+const f2Step1 = planNextAction({
+  task: 'fill form 2',
+  parsedTask: form2Task,
+  marks: [
+    { id: 10, role: 'clickable', label: 'Secure Messages' },
+    { id: 11, role: 'clickable', label: 'Form 1 — HR Personal' },
+    { id: 12, role: 'clickable', label: 'Form 2 — ISRO Mission Payroll' },
+    { id: 13, role: 'clickable', label: 'Form 3 — ISRO Mission Systems' },
+  ],
+  filledIds: [],
+  pageInfo: { url: 'http://localhost:3000/employee-portal.html' },
+  progress: { opened: [] }
+});
+is(f2Step1.action, 'click', 'form 2 step 1 clicks form 2 nav tab');
+is(f2Step1.mark_id, 12, 'form 2 step 1 targets Form 2 mark (id 12, not id 11)');
+
+// Step 2: On Form 2, fills inputs from vault
+const f2Step2 = planNextAction({
+  task: 'fill form 2',
+  parsedTask: form2Task,
+  marks: [
+    { id: 12, role: 'clickable', label: 'Form 2 — ISRO Mission Payroll' },
+    { id: 21, role: 'input:text', label: 'Full Name', vaultKey: 'name' },
+    { id: 22, role: 'input:tel', label: 'Phone', vaultKey: 'phone' },
+    { id: 23, role: 'textarea', label: 'Address for Payslips', vaultKey: 'address' },
+    { id: 24, role: 'input:text', label: 'PIN Code', vaultKey: 'zip' },
+  ],
+  filledIds: [],
+  pageInfo: { url: 'http://localhost:3000/employee-portal.html' },
+  progress: { opened: ['form 2'] }
+});
+is(f2Step2.action, 'type', 'form 2 step 2 types field');
+is(f2Step2.use_vault_field, 'name', 'form 2 step 2 uses vault key name');
+
+// Step 3: When all inputs filled, clicks submit
+const f2Step3 = planNextAction({
+  task: 'fill form 2',
+  parsedTask: form2Task,
+  marks: [
+    { id: 21, role: 'input:text', label: 'Full Name', vaultKey: 'name' },
+    { id: 22, role: 'input:tel', label: 'Phone', vaultKey: 'phone' },
+    { id: 30, role: 'button', label: 'Save Mission Payroll' },
+  ],
+  filledIds: [21, 22],
+  pageInfo: { url: 'http://localhost:3000/employee-portal.html' },
+  progress: { opened: ['form 2'] }
+});
+is(f2Step3.action, 'click', 'form 2 step 3 clicks submit button');
+is(f2Step3.mark_id, 30, 'form 2 step 3 targets Save Mission Payroll button');
+
 console.log('\n' + '='.repeat(60));
 if (failures.length) {
   console.log(`${failures.length} of ${checks} checks FAILED`);

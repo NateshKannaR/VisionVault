@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ISRO Satellite Operations Dashboard</title>
+  <style>
+    :root {
+      --bg: #050a14;
+      --card: #0d1b2a;
+      --accent: #00b4d8;
+      --accent2: #48cae4;
+      --green: #06d6a0;
+      --yellow: #ffd166;
+      --red: #ef476f;
+      --text: #e0f2fe;
+      --muted: #7ea8be;
+      --border: #1a3a5c;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Courier New', monospace;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 20px;
+    }
+    header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 16px 24px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      margin-bottom: 24px;
+    }
+    .isro-logo {
+      width: 56px;
+      height: 56px;
+      background: linear-gradient(135deg, #ff6b35, #f7c59f);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      font-weight: 900;
+      color: #1a0a00;
+      flex-shrink: 0;
+    }
+    header h1 { font-size: 20px; color: var(--accent); letter-spacing: 1px; }
+    header p { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .status-bar {
+      display: flex;
+      gap: 8px;
+      margin-left: auto;
+      align-items: center;
+    }
+    .status-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 8px var(--green);
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+    .status-label { font-size: 11px; color: var(--green); }
+
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px;
+    }
+    .card-title {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .card-title::after { content:""; flex:1; height:1px; background:var(--border); }
+
+    .field-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      padding: 7px 0;
+      border-bottom: 1px solid rgba(26,58,92,0.5);
+      font-size: 13px;
+    }
+    .field-row:last-child { border-bottom: none; }
+    .field-label { color: var(--muted); font-size: 11px; }
+    .field-value {
+      color: var(--text);
+      font-weight: 600;
+      text-align: right;
+      max-width: 60%;
+      word-break: break-all;
+    }
+    .field-value.mono { font-family: 'Courier New', monospace; font-size: 11px; color: var(--accent2); }
+    .field-value.green { color: var(--green); }
+    .field-value.yellow { color: var(--yellow); }
+
+    .tle-block {
+      background: rgba(0,180,216,0.05);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px 12px;
+      font-family: 'Courier New', monospace;
+      font-size: 11px;
+      color: var(--accent2);
+      line-height: 1.8;
+      margin-top: 8px;
+    }
+
+    .telemetry-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px;
+      margin-top: 4px;
+    }
+    .telem-box {
+      background: rgba(0,180,216,0.06);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px;
+      text-align: center;
+    }
+    .telem-val { font-size: 18px; font-weight: 700; color: var(--accent); }
+    .telem-unit { font-size: 10px; color: var(--muted); margin-top: 2px; }
+
+    .vault-btn {
+      display: block;
+      width: 100%;
+      padding: 13px;
+      background: linear-gradient(135deg, #00b4d8, #0077b6);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      letter-spacing: 0.5px;
+      margin-top: 24px;
+      transition: opacity 0.15s;
+    }
+    .vault-btn:hover { opacity: 0.88; }
+    .vault-btn.secondary {
+      background: linear-gradient(135deg, #06d6a0, #028a6a);
+      margin-top: 10px;
+    }
+
+    .toast {
+      display: none;
+      margin-top: 14px;
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      text-align: center;
+    }
+    .toast.ok { background: rgba(6,214,160,0.12); border:1px solid rgba(6,214,160,0.3); color: var(--green); }
+    .toast.err { background: rgba(239,71,111,0.12); border:1px solid rgba(239,71,111,0.3); color: var(--red); }
+
+    .links { display: flex; gap: 10px; margin-top: 24px; flex-wrap: wrap; }
+    .link-btn {
+      padding: 9px 16px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--accent);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      transition: border-color 0.15s;
+    }
+    .link-btn:hover { border-color: var(--accent); }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="isro-logo">🛰</div>
+  <div>
+    <h1>ISRO SATELLITE OPERATIONS DASHBOARD</h1>
+    <p>Master Control Facility — Hassan, Karnataka &nbsp;|&nbsp; SIH PS 26171</p>
+  </div>
+  <div class="status-bar">
+    <div class="status-dot"></div>
+    <span class="status-label">NOMINAL</span>
+  </div>
+</header>
+
+<div class="grid">
+
+  <!-- Mission Identity -->
+  <div class="card">
+    <div class="card-title">Mission Identity</div>
+
+    <div class="field-row">
+      <span class="field-label">Satellite Name</span>
+      <span class="field-value" data-vault-key="satellite_name">INSAT-4B</span>
+    </div>
+    <div class="field-row">
+      <span class="field-label">Mission ID</span>
+      <span class="field-value mono" data-vault-key="mission_id">INSAT-4B / M-201</span>
+    </div>
+    <div class="field-row">
+      <span class="field-label">Operator on Duty</span>
+      <span class="field-value" data-vault-key="operator">R. Sharma</span>
+    </div>
+    <div class="field-row">
+      <span class="field-label">Launch Date</span>
+      <span class="field-value green" data-vault-key="launch_date">2007-03-12</span>
+    </div>
+    <div class="field-row">
+      <span class="field-label">Orbit Type</span>
+      <span class="field-value" data-vault-key="orbit_type">Geostationary (GEO)</span>
+    </div>
+    <div class="field-row">
+      <span class="field-label">Orbital Inclination</span>
+      <span class="field-value mono" data-vault-key="orbital_inclination">0.05°</span>
+    </div>
+    <div class="field-row">
+      <span class="field-label">Apogee</span>
+      <span class="field-value mono" data-vault-key="apogee">35,786 km</span>
+    </div>
+    <div class="field-row">
+      <span class="field-label">Perigee</span>
+      <span class="field-value mono" data-vault-key="perigee">35,786 km</span>
+    </div>
+  </div>
+
+  <!-- Ground Station & Security -->
+  <div class="card">
+    <div class="card-title">Ground Station &amp; Security</div>
+
+    <div class="field-row">
+      <span class="field-label">Ground Station Freq.</span>
+      <span class="field-value mono" data-vault-key="ground_station_freq">14.250 GHz (Ku-Band)</span>
+    </div>
+    <div class="field-row">
+      <span class="field-label">Encryption Key Ref</span>
+      <span class="field-value mono yellow" data-vault-key="encryption_key_ref">ISRO-KMS-EK-2026-04871</span>
+    </div>
+    <div class="field-row">
+      <span class="field-label">Organisation</span>
+      <span class="field-value" data-vault-key="company">ISRO Master Control Facility (MCF)</span>
+    </div>
+    <div class="field-row">
+      <span class="field-label">Address</span>
+      <span class="field-value" data-vault-key="address">MCF Salgame Road, Hassan, Karnataka, India</span>
+    </div>
+    <div class="field-row">
+      <span class="field-label">PIN Code</span>
+      <span class="field-value mono" data-vault-key="zip">573201</span>
+    </div>
+    <div class="field-row">
+      <span class="field-label">Contact Email</span>
+      <span class="field-value mono" data-vault-key="email">r.sharma@isro.gov.in</span>
+    </div>
+    <div class="field-row">
+      <span class="field-label">Phone</span>
+      <span class="field-value mono" data-vault-key="phone">+91 80 2217 2296</span>
+    </div>
+    <div class="field-row">
+      <span class="field-label">Username</span>
+      <span class="field-value mono" data-vault-key="username">rsharma_mcc</span>
+    </div>
+  </div>
+
+  <!-- TLE Data -->
+  <div class="card">
+    <div class="card-title">Two-Line Element Set (TLE)</div>
+    <div class="tle-block">
+      <div data-vault-key="tle_line_1">1 30798U 07007A   26248.51249811 -.00000124  00000-0  10000-4 0  9991</div>
+      <div data-vault-key="tle_line_2">2 30798   0.0512  87.2145 0001248 145.2104 214.8901  1.00273412 71234</div>
+    </div>
+  </div>
+
+  <!-- Live Telemetry -->
+  <div class="card">
+    <div class="card-title">Live Telemetry</div>
+    <div class="telemetry-grid">
+      <div class="telem-box">
+        <div class="telem-val">+24.3</div>
+        <div class="telem-unit">°C Bus Temp</div>
+      </div>
+      <div class="telem-box">
+        <div class="telem-val">98.7</div>
+        <div class="telem-unit">% Battery</div>
+      </div>
+      <div class="telem-box">
+        <div class="telem-val">2.4</div>
+        <div class="telem-unit">kW Solar</div>
+      </div>
+      <div class="telem-box">
+        <div class="telem-val">74.1°E</div>
+        <div class="telem-unit">Longitude</div>
+      </div>
+      <div class="telem-box">
+        <div class="telem-val">0.05°</div>
+        <div class="telem-unit">Inclination</div>
+      </div>
+      <div class="telem-box">
+        <div class="telem-val">NOMINAL</div>
+        <div class="telem-unit">Status</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- How-to banner -->
+<div style="background:rgba(0,180,216,0.08);border:1px solid rgba(0,180,216,0.25);border-radius:10px;padding:14px 18px;margin-bottom:24px;font-size:13px;line-height:1.7;">
+  <strong style="color:#00b4d8;">How to use with VisionVault:</strong><br>
+  1. Open the extension side panel → go to the <strong>Vault</strong> tab<br>
+  2. Click <strong>"Store from current page"</strong> — all values below are saved to your local vault<br>
+  3. Open any project form, then click <strong>"Fill page from vault"</strong> in the Vault tab<br>
+  <span style="color:#7ea8be;">Or type <em>"store these values"</em> / <em>"fill the form from vault"</em> in the Run tab task box.</span>
+</div>
+<div class="links">
+  <a class="link-btn" href="project-form-1.html" target="_blank">📄 Project Form 1 — Mission Registration</a>
+  <a class="link-btn" href="project-form-2.html" target="_blank">📄 Project Form 2 — Frequency Allocation</a>
+  <a class="link-btn" href="project-form-3.html" target="_blank">📄 Project Form 3 — Ground Station Ops</a>
+  <a class="link-btn" href="project-form-4.html" target="_blank">📄 Project Form 4 — Security Clearance</a>
+  <a class="link-btn" href="project-form-5.html" target="_blank">📄 Project Form 5 — Operator Credentials</a>
+</div>
+
+<script>
+  // No chrome.runtime here — use the extension panel's Vault tab buttons instead.
+</script>
+</body>
+</html>

@@ -675,6 +675,20 @@ test('an unconstrained search is still complete once it lands', () => {
     'no constraint means nothing extra is owed');
 });
 
+test('github create repository task refuses premature done before repo is created', () => {
+  const parsed = TaskPlanner.parseTask('open github and create a new repository named my-app');
+  assert.strictEqual(AgentGuard.goalSatisfied(parsed, { navigated: true, repoNameTyped: true, repoCreated: false }), false,
+    'goal should not be satisfied before repoCreated is true');
+  assert.match(AgentGuard.describeRemaining(parsed, { navigated: true, repoNameTyped: true, repoCreated: false }), /create repository/,
+    'describeRemaining should mention repository creation');
+});
+
+test('github create repository task accepts done once repoCreated is true', () => {
+  const parsed = TaskPlanner.parseTask('open github and create a new repository named my-app');
+  assert.strictEqual(AgentGuard.goalSatisfied(parsed, { navigated: true, repoNameTyped: true, repoCreated: true }), true,
+    'goal should be satisfied once repoCreated is true');
+});
+
 console.log(`\n${passed} passed, ${failed} failed\n`);
 process.exit(failed ? 1 : 0);
 

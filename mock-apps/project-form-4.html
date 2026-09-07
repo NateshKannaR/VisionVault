@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Project Form 4 — Security Clearance</title>
+  <style>
+    :root { --bg:#050a14; --card:#0d1b2a; --accent:#00b4d8; --text:#e0f2fe; --muted:#7ea8be; --border:#1a3a5c; --input:#0a1628; }
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; background:var(--bg); color:var(--text); min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px; }
+    .container { width:100%; max-width:560px; background:var(--card); border:1px solid var(--border); border-radius:14px; padding:32px; }
+    .badge { display:inline-flex; align-items:center; gap:6px; padding:4px 10px; background:rgba(0,180,216,0.12); border:1px solid rgba(0,180,216,0.3); border-radius:20px; font-size:11px; font-weight:700; color:var(--accent); margin-bottom:14px; }
+    h1 { font-size:20px; font-weight:700; margin-bottom:6px; }
+    .sub { font-size:12px; color:var(--muted); margin-bottom:24px; }
+    .section { font-size:10px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase; color:var(--accent); margin:20px 0 12px; display:flex; align-items:center; gap:8px; }
+    .section::after { content:""; flex:1; height:1px; background:var(--border); }
+    .fg { margin-bottom:14px; }
+    label { display:block; font-size:12px; font-weight:500; color:#b0c4d8; margin-bottom:5px; }
+    input, textarea, select { width:100%; padding:10px 13px; background:var(--input); border:1px solid var(--border); border-radius:7px; color:var(--text); font-size:13px; outline:none; transition:border-color .15s; }
+    input:focus, textarea:focus, select:focus { border-color:var(--accent); }
+    .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    .btn { width:100%; padding:12px; background:linear-gradient(135deg,#00b4d8,#0077b6); color:#fff; border:none; border-radius:8px; font-size:14px; font-weight:700; cursor:pointer; margin-top:8px; }
+    .btn:hover { opacity:.88; }
+    .toast { display:none; margin-top:12px; padding:11px 14px; background:rgba(6,214,160,.12); border:1px solid rgba(6,214,160,.3); border-radius:7px; color:#06d6a0; font-size:13px; text-align:center; }
+    .back { display:inline-block; margin-bottom:16px; font-size:12px; color:var(--accent); text-decoration:none; }
+    .back:hover { text-decoration:underline; }
+    .warn { font-size:11px; color:#ffd166; background:rgba(255,209,102,.08); border:1px solid rgba(255,209,102,.2); border-radius:6px; padding:8px 12px; margin-bottom:16px; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <a class="back" href="isro-dashboard.html">← Back to Dashboard</a>
+  <div class="badge">📄 Form 4 of 5</div>
+  <h1>Security Clearance Request</h1>
+  <p class="sub">Submit encryption key references and security credentials for mission clearance.</p>
+  <div class="warn">⚠ Sensitive — this form is handled by the VisionVault extension. Real values stay on-device.</div>
+
+  <form onsubmit="handleSubmit(event)">
+    <div class="section">Mission Reference</div>
+    <div class="fg">
+      <label for="f4_sat">Satellite Name</label>
+      <input type="text" id="f4_sat" name="satellite_name" autocomplete="off" placeholder="Satellite name" data-vault-key="satellite_name" />
+    </div>
+    <div class="fg">
+      <label for="f4_mid">Mission ID</label>
+      <input type="text" id="f4_mid" name="mission_id" autocomplete="off" placeholder="Mission ID" data-vault-key="mission_id" />
+    </div>
+
+    <div class="section">Security Credentials</div>
+    <div class="fg">
+      <label for="f4_enc">Encryption Key Reference</label>
+      <input type="text" id="f4_enc" name="encryption_key_ref" autocomplete="off" placeholder="e.g. ISRO-KMS-EK-2026-XXXXX" data-vault-key="encryption_key_ref" style="font-family:monospace;" />
+    </div>
+    <div class="fg">
+      <label for="f4_user">System Username</label>
+      <input type="text" id="f4_user" name="username" autocomplete="username" placeholder="Username" data-vault-key="username" />
+    </div>
+    <div class="fg">
+      <label for="f4_pass">Access Password</label>
+      <input type="password" id="f4_pass" name="password" autocomplete="current-password" placeholder="••••••••" data-vault-key="password" />
+    </div>
+
+    <div class="section">Authorising Officer</div>
+    <div class="fg">
+      <label for="f4_op">Operator Name</label>
+      <input type="text" id="f4_op" name="operator" autocomplete="name" placeholder="Operator name" data-vault-key="operator" />
+    </div>
+    <div class="grid2">
+      <div class="fg">
+        <label for="f4_email">Email</label>
+        <input type="email" id="f4_email" name="email" autocomplete="email" placeholder="Email" data-vault-key="email" />
+      </div>
+      <div class="fg">
+        <label for="f4_phone">Phone</label>
+        <input type="tel" id="f4_phone" name="phone" autocomplete="tel" placeholder="Phone" data-vault-key="phone" />
+      </div>
+    </div>
+
+    <button type="submit" class="btn">Submit Security Clearance</button>
+    <div class="toast" id="toast">✓ Security clearance request submitted!</div>
+  </form>
+</div>
+<script>
+  function handleSubmit(e) {
+    e.preventDefault();
+    const t = document.getElementById('toast');
+    t.style.display = 'block';
+    setTimeout(() => t.style.display = 'none', 4000);
+  }
+</script>
+</body>
+</html>

@@ -1455,22 +1455,31 @@ async function phaseRun() {
         // user instead of guessed at.
         if (fieldKey) {
           const mark = (session.marks || []).find((m) => String(m.id) === String(resp.mark_id));
-          const fromLabel = TaskPlanner.vaultKeyForLabel(mark?.label);
-          if (fromLabel.unknownIdentifier) {
-            const slug = String(mark?.label || "value").toLowerCase()
-              .replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 40) || "value";
-            fieldKey = slug;
-          } else if (fromLabel.key && fromLabel.key !== fieldKey) {
-            console.log(`[agent] "${mark?.label}" takes ${fromLabel.key}, not ${fieldKey}`);
-            fieldKey = fromLabel.key;
+          if (mark?.vaultKey) {
+            // Explicit data-vault-key on DOM element is the authoritative source
+            fieldKey = mark.vaultKey;
+          } else {
+            const fromLabel = TaskPlanner.vaultKeyForLabel(mark?.label);
+            if (fromLabel.unknownIdentifier) {
+              const slug = String(mark?.label || "value").toLowerCase()
+                .replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 40) || "value";
+              fieldKey = slug;
+            } else if (fromLabel.key && fromLabel.key !== fieldKey) {
+              console.log(`[agent] "${mark?.label}" takes ${fromLabel.key}, not ${fieldKey}`);
+              fieldKey = fromLabel.key;
+            }
           }
         } else {
           const mark = (session.marks || []).find((m) => String(m.id) === String(resp.mark_id));
-          const fromLabel = TaskPlanner.vaultKeyForLabel(mark?.label);
-          if (fromLabel.key) {
-            fieldKey = fromLabel.key;
-          } else if (mark?.label) {
-            fieldKey = mark.label.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 40);
+          if (mark?.vaultKey) {
+            fieldKey = mark.vaultKey;
+          } else {
+            const fromLabel = TaskPlanner.vaultKeyForLabel(mark?.label);
+            if (fromLabel.key) {
+              fieldKey = fromLabel.key;
+            } else if (mark?.label) {
+              fieldKey = mark.label.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 40);
+            }
           }
         }
 

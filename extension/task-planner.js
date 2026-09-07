@@ -463,14 +463,24 @@
       result.openTargets.push(onPageTargetMatch[1].toLowerCase());
     }
 
-    // Extract form navigation / fill targets (e.g. "fill form 2", "click that form 2 and fill that form", "fill the form 2", "open form 2")
-    const formTargetMatch = text.match(/\b(?:fill|click|open|switch\s+to|navigate\s+to|go\s+to)\s+(?:that\s+)?(?:the\s+)?(form\s*\d+|form\s*-\s*[a-z0-9_-]+)\b/i) ||
-                            text.match(/\b(?:click|open|select|tap)\s+(?:that\s+)?(?:the\s+)?(form\s*\d+|form\s*-\s*[a-z0-9_-]+)\s+and\s+(?:then\s+)?fill\b/i);
-    if (formTargetMatch) {
-      const fTarget = formTargetMatch[1].toLowerCase().trim();
-      if (fTarget && !result.openTargets.includes(fTarget)) {
-        result.openTargets.push(fTarget);
-      }
+    // Extract form navigation / fill targets (e.g. "fill form 2", "fill the form fill form 2", "click that form 2 and fill that form", "open form 2")
+    const formNumMatch = text.match(/\bform\s*(\d+)\b/i);
+    const formSlugMatch = text.match(/\bform\s*-\s*([a-z0-9_-]+)\b/i);
+    const formNamedMatch = text.match(/\b(payroll|hr|mission\s*systems?|it\b|housing|medical)\b/i);
+
+    if (formNumMatch) {
+      const fTarget = `form ${formNumMatch[1]}`;
+      if (!result.openTargets.includes(fTarget)) result.openTargets.push(fTarget);
+      result.wantsFill = true;
+    } else if (formSlugMatch) {
+      const fTarget = `form-${formSlugMatch[1].toLowerCase()}`;
+      if (!result.openTargets.includes(fTarget)) result.openTargets.push(fTarget);
+      result.wantsFill = true;
+    } else if (formNamedMatch && /\b(fill|form|click|open|switch)\b/i.test(text)) {
+      const fTarget = formNamedMatch[1].toLowerCase();
+      if (!result.openTargets.includes(fTarget)) result.openTargets.push(fTarget);
+      result.wantsFill = true;
+    } else if (/\bfill\s+(?:the\s+)?(?:form|details|fields|values)\b/i.test(text) || /\b(fill|autofill)\b/i.test(text)) {
       result.wantsFill = true;
     }
 
@@ -496,16 +506,7 @@
   ]);
 
   const FIELD_LABEL_RULES = [
-    // identity & contact (matched first for general login / registration / profiles)
-    [/user[\s_-]*name|username|user[\s_-]*id|handle|login[\s_-]*id|login|sign[\s_-]*in|roll[\s_-]*no|roll[\s_-]*number|registration[\s_-]*no|reg[\s_-]*no|student[\s_-]*id|staff[\s_-]*id|admission[\s_-]*no|member[\s_-]*id|account[\s_-]*id|user\b/, "username"],
-    [/e-?mail|email[\s_-]*address/, "email"],
-    [/phone|mobile|tel(ephone)?|contact number|cell/, "phone"],
-    [/password|passcode|pwd|\bpin\b(?![\s_-]*code)/, "password"],
-    [/pin[\s_-]*code|pincode|address|street|city|postcode|post code|zip|postal|state|country/, "address"],
-    [/company|organisation|organization|employer|institution|college|university|school/, "company"],
-    [/about|bio|description|notes|message|comment/, "about"],
-    [/full[\s_-]*name|first[\s_-]*name|last[\s_-]*name|surname|\bname\b/, "name"],
-    // satellite & orbital telemetry
+    // satellite & orbital telemetry (matched FIRST so specific terms are never shadowed by generic words)
     [/satellite[\s_-]*name|satellite|sat[\s_-]*name/, "satellite_name"],
     [/mission[\s_-]*id|mission/, "mission_id"],
     [/operator[\s_-]*on[\s_-]*duty|operator[\s_-]*name|\boperator\b|\bduty\b/, "operator"],
@@ -518,6 +519,17 @@
     [/tle[\s_-]*line[\s_-]*2|\btle[\s_-]*2\b|\btle2\b/, "tle_line_2"],
     [/ground[\s_-]*station[\s_-]*freq(uency)?|ground[\s_-]*station|ground[\s_-]*frequency|\bfreq(uency)?\b/, "ground_station_freq"],
     [/encryption[\s_-]*key[\s_-]*ref(erence)?|encryption[\s_-]*key|\bencryption\b|key[\s_-]*ref/, "encryption_key_ref"],
+
+    // identity & contact (matched next for general forms, registrations, profiles)
+    [/user[\s_-]*name|username|user[\s_-]*id|handle|login[\s_-]*id|login|sign[\s_-]*in|roll[\s_-]*no|roll[\s_-]*number|registration[\s_-]*no|reg[\s_-]*no|student[\s_-]*id|staff[\s_-]*id|admission[\s_-]*no|member[\s_-]*id|account[\s_-]*id|user\b/, "username"],
+    [/e-?mail|email[\s_-]*address/, "email"],
+    [/\b(phone|mobile|cell|contact[\s_-]*number)\b|\btel(ephone)?\b/, "phone"],
+    [/password|passcode|pwd|\bpin\b(?![\s_-]*code)/, "password"],
+    [/pin[\s_-]*code|pincode|\bzip\b|\bpostal\b/, "zip"],
+    [/postcode|post[\s_-]*code|address|street|city|state|country/, "address"],
+    [/company|organisation|organization|employer|institution|college|university|school/, "company"],
+    [/about|bio|description|notes|message|comment/, "about"],
+    [/full[\s_-]*name|first[\s_-]*name|last[\s_-]*name|surname|\bname\b/, "name"],
   ];
 
   // Fields that hold a personal identifier the vault has no equivalent for. Typing a phone

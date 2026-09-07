@@ -611,6 +611,21 @@ const f2Step3 = planNextAction({
 is(f2Step3.action, 'click', 'form 2 step 3 clicks submit button');
 is(f2Step3.mark_id, 30, 'form 2 step 3 targets Save Mission Payroll button');
 
+// Label resolution checks for Form 2
+is(TaskPlanner.vaultKeyForLabel('Satellite Name').key, 'satellite_name', 'satellite name -> satellite_name (not phone or name)');
+is(TaskPlanner.vaultKeyForLabel('Mission ID').key, 'mission_id', 'mission id -> mission_id');
+is(TaskPlanner.vaultKeyForLabel('Orbit Type').key, 'orbit_type', 'orbit type -> orbit_type');
+is(TaskPlanner.vaultKeyForLabel('PIN Code').key, 'zip', 'pin code -> zip');
+is(TaskPlanner.vaultKeyForLabel('Address for Payslips').key, 'address', 'address for payslips -> address');
+is(TaskPlanner.vaultKeyForLabel('Organisation').key, 'company', 'organisation -> company');
+
+// Prompt variation checks
+const p1 = TaskPlanner.parseTask('fill the form fill form 2');
+is(p1.wantsFill, true, 'fill the form fill form 2 sets wantsFill');
+is(p1.openTargets.includes('form 2'), true, 'fill the form fill form 2 includes form 2');
+const p2 = TaskPlanner.parseTask('fill the form 2');
+is(p2.openTargets.includes('form 2'), true, 'fill the form 2 includes form 2');
+
 console.log('\n' + '='.repeat(60));
 if (failures.length) {
   console.log(`${failures.length} of ${checks} checks FAILED`);

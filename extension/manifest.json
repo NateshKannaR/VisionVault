@@ -54,6 +54,9 @@
         "action-executor.js",
         "content.js"
       ],
+      "css": [
+        "in-page-shield.css"
+      ],
       "run_at": "document_idle",
       "all_frames": true
     }

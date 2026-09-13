@@ -4,7 +4,8 @@
   "private": true,
   "description": "Privacy-preserving browser vision agent \u2014 local PII detection and redaction, cloud planning over a sanitized view (SIH PS 26171).",
   "scripts": {
-    "test": "node eval/test-source-hygiene.js && node eval/test-panel-wiring.js && node eval/test-prompt-scrubber.js && node eval/test-vision-pipeline.js && node eval/test-coordinate-mapping.js && node eval/test-task-planner.js && node eval/test-agent-guard.js",
+    "test": "node eval/test-source-hygiene.js && node eval/test-panel-wiring.js && node eval/test-prompt-scrubber.js && node eval/test-mcp-server.js && node eval/test-vision-pipeline.js && node eval/test-coordinate-mapping.js && node eval/test-task-planner.js && node eval/test-agent-guard.js",
+    "mcp": "node server/mcp-server.js",
     "eval": "node eval/run-full-eval.js --repeats 3",
     "report": "node eval/generate-report.js",
     "verify": "node eval/verify-live.js",

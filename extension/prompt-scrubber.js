@@ -17,16 +17,16 @@
   // ── Secret & Credential Regex Patterns ─────────────────────────────────────────
   const SECRET_PATTERNS = [
     {
-      type: "openai_key",
-      label: "OpenAI API Key",
-      token: "OPENAI_API_KEY",
-      regex: /\b(sk-(?:proj-|svcacct-)?[a-zA-Z0-9_\-]{20,})\b/g,
-    },
-    {
       type: "anthropic_key",
       label: "Anthropic API Key",
       token: "ANTHROPIC_API_KEY",
       regex: /\b(sk-ant-[a-zA-Z0-9_\-]{20,})\b/g,
+    },
+    {
+      type: "openai_key",
+      label: "OpenAI API Key",
+      token: "OPENAI_API_KEY",
+      regex: /\b(sk-(?!ant-)(?:proj-|svcacct-)?[a-zA-Z0-9_\-]{20,})\b/g,
     },
     {
       type: "aws_access_key",
@@ -147,7 +147,7 @@
    */
   function scrub(text, existingTokenMap = {}) {
     if (!text || typeof text !== "string") {
-      return { cleanText: "", findings: [], tokenMap: {}, stats: { total: 0, secrets: 0, pii: 0 } };
+      return { cleanText: "", sanitized: "", findings: [], matches: [], tokenMap: {}, stats: { total: 0, secrets: 0, pii: 0 } };
     }
 
     let cleanText = text;
@@ -215,7 +215,9 @@
 
     return {
       cleanText,
+      sanitized: cleanText,
       findings,
+      matches: findings,
       tokenMap,
       stats: {
         total: findings.length,

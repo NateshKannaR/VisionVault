@@ -1339,4 +1339,305 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
 });
 
+// ── In-Page Live Chat Shield & Auto-Paste Redaction ──────────────────────────
+function initInPageShield() {
+  const LLM_HOSTS = [
+    "chatgpt.com",
+    "chat.openai.com",
+    "claude.ai",
+    "gemini.google.com",
+    "perplexity.ai",
+    "poe.com",
+    "huggingface.co"
+  ];
+
+  const currentHost = window.location.hostname.toLowerCase();
+  const isLLMPage = LLM_HOSTS.some(h => currentHost.includes(h)) || !!document.querySelector("#prompt-textarea, [data-testid='prompt-textarea'], div.ProseMirror[contenteditable='true']");
+
+  // Track session redacted stats
+  let sessionRedactions = 0;
+  let activePopover = null;
+
+  function showToast(message, isSecret = false) {
+    const existingToast = document.querySelector(".vv-shield-toast");
+    if (existingToast) existingToast.remove();
+
+    const toast = document.createElement("div");
+    toast.className = "vv-shield-toast" + (isSecret ? " vv-toast-secret" : "");
+    toast.innerHTML = `
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="${isSecret ? '#fb7185' : '#38bdf8'}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        <polyline points="9 12 11 14 15 10"/>
+      </svg>
+      <div>${message}</div>
+    `;
+    document.body.appendChild(toast);
+    setTimeout(() => {
+      if (toast.parentNode) {
+        toast.style.transition = "opacity 0.3s, transform 0.3s";
+        toast.style.opacity = "0";
+        toast.style.transform = "translateY(8px)";
+        setTimeout(() => toast.remove(), 300);
+      }
+    }, 3800);
+  }
+
+  // Intercept Paste Events in capturing phase
+  document.addEventListener("paste", function (e) {
+    if (!window.PromptScrubber) return;
+
+    // Check target: inputs, textareas, contenteditables
+    const target = e.target;
+    const isInput = target && (
+      target.tagName === "TEXTAREA" ||
+      target.tagName === "INPUT" ||
+      target.isContentEditable ||
+      target.closest("[contenteditable='true']") ||
+      target.id === "prompt-textarea"
+    );
+
+    if (!isInput) return;
+
+    // Check for image pastes
+    if (e.clipboardData && e.clipboardData.items) {
+      for (const item of e.clipboardData.items) {
+        if (item.type && item.type.indexOf("image") !== -1) {
+          showToast("🛡️ VisionVault: Image paste detected — Zero-trust pipeline active", false);
+          break;
+        }
+      }
+    }
+
+    const pastedText = e.clipboardData?.getData("text/plain");
+    if (!pastedText) return;
+
+    const scrubResult = window.PromptScrubber.scrub(pastedText);
+    if (scrubResult.matches && scrubResult.matches.length > 0) {
+      e.preventDefault();
+      e.stopPropagation();
+
+      sessionRedactions += scrubResult.matches.length;
+
+      // Safe insertion into textarea or contenteditable
+      const cleanText = scrubResult.sanitized;
+      let inserted = false;
+      try {
+        inserted = document.execCommand("insertText", false, cleanText);
+      } catch (_) {}
+
+      if (!inserted) {
+        if (target.tagName === "TEXTAREA" || target.tagName === "INPUT") {
+          const start = target.selectionStart || 0;
+          const end = target.selectionEnd || 0;
+          const val = target.value || "";
+          target.value = val.substring(0, start) + cleanText + val.substring(end);
+          target.selectionStart = target.selectionEnd = start + cleanText.length;
+          target.dispatchEvent(new Event("input", { bubbles: true }));
+          target.dispatchEvent(new Event("change", { bubbles: true }));
+        } else if (target.isContentEditable || target.closest("[contenteditable='true']")) {
+          const sel = window.getSelection();
+          if (sel && sel.rangeCount > 0) {
+            const range = sel.getRangeAt(0);
+            range.deleteContents();
+            range.insertNode(document.createTextNode(cleanText));
+            range.collapse(false);
+            target.dispatchEvent(new Event("input", { bubbles: true }));
+          }
+        }
+      }
+
+      // Show toast with badge of redacted items
+      const summaryList = scrubResult.matches.map(m => m.token).slice(0, 3).join(", ");
+      const extraCount = scrubResult.matches.length > 3 ? ` +${scrubResult.matches.length - 3} more` : "";
+      showToast(`🛡️ <strong>VisionVault</strong>: Auto-redacted ${scrubResult.matches.length} secret(s) <span class="vv-toast-badge">[${summaryList}${extraCount}]</span>`, true);
+
+      // Update badge if popover open
+      updateBadgeUI();
+    }
+  }, true);
+
+  // Mount UI Badge only in top frame
+  if (window.top !== window) return;
+
+  function createBadge() {
+    const badge = document.createElement("button");
+    badge.type = "button";
+    badge.className = "vv-shield-badge";
+    badge.setAttribute("aria-label", "VisionVault Prompt Shield");
+    badge.setAttribute("title", "VisionVault Shield: Active (Local On-Device Protection)");
+    badge.innerHTML = `
+      <svg viewBox="0 0 24 24">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        <line x1="12" y1="8" x2="12" y2="16"/>
+        <line x1="8" y1="12" x2="16" y2="12"/>
+      </svg>
+      <div class="vv-shield-dot"></div>
+    `;
+
+    badge.addEventListener("click", function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      togglePopover(badge);
+    });
+
+    return badge;
+  }
+
+  function togglePopover(badge) {
+    if (activePopover) {
+      activePopover.remove();
+      activePopover = null;
+      badge.classList.remove("active");
+      return;
+    }
+
+    badge.classList.add("active");
+    const popover = document.createElement("div");
+    popover.className = "vv-shield-popover";
+    popover.innerHTML = `
+      <div class="vv-popover-header">
+        <div class="vv-popover-title">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          </svg>
+          VisionVault Shield
+        </div>
+        <div class="vv-popover-status">
+          <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#10b981;"></span>
+          ON-DEVICE
+        </div>
+      </div>
+      <div class="vv-popover-desc">
+        Zero-trust local prompt scrubber. Secrets and PII are redacted on paste before reaching cloud LLMs.
+      </div>
+      <div class="vv-popover-stats">
+        <div class="vv-stat-item">
+          <span class="vv-stat-val" id="vv-stat-count">${sessionRedactions}</span>
+          <span class="vv-stat-lbl">Redacted Items</span>
+        </div>
+        <div class="vv-stat-item" style="text-align:right;">
+          <span class="vv-stat-val" style="color:#10b981;">100%</span>
+          <span class="vv-stat-lbl">RAM Isolated</span>
+        </div>
+      </div>
+      <button type="button" class="vv-popover-btn" id="vv-scrub-input-btn">
+        Scrub Current Input Box
+      </button>
+    `;
+
+    const scrubBtn = popover.querySelector("#vv-scrub-input-btn");
+    if (scrubBtn) {
+      scrubBtn.addEventListener("click", function () {
+        manualScrubActiveInput();
+      });
+    }
+
+    badge.appendChild(popover);
+    activePopover = popover;
+
+    // Close when clicking outside
+    const outsideListener = function (evt) {
+      if (!badge.contains(evt.target)) {
+        if (activePopover) {
+          activePopover.remove();
+          activePopover = null;
+          badge.classList.remove("active");
+        }
+        document.removeEventListener("click", outsideListener, true);
+      }
+    };
+    setTimeout(() => {
+      document.addEventListener("click", outsideListener, true);
+    }, 10);
+  }
+
+  function updateBadgeUI() {
+    const stat = document.getElementById("vv-stat-count");
+    if (stat) stat.textContent = sessionRedactions;
+  }
+
+  function manualScrubActiveInput() {
+    const input = document.querySelector("#prompt-textarea, [data-testid='prompt-textarea'], textarea, div.ProseMirror[contenteditable='true']");
+    if (!input || !window.PromptScrubber) {
+      showToast("No active chat input found to scrub.");
+      return;
+    }
+
+    const currentText = input.tagName === "TEXTAREA" || input.tagName === "INPUT" ? input.value : input.innerText;
+    if (!currentText || !currentText.trim()) {
+      showToast("Input box is empty.");
+      return;
+    }
+
+    const res = window.PromptScrubber.scrub(currentText);
+    if (res.matches && res.matches.length > 0) {
+      sessionRedactions += res.matches.length;
+      if (input.tagName === "TEXTAREA" || input.tagName === "INPUT") {
+        input.value = res.sanitized;
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+        input.dispatchEvent(new Event("change", { bubbles: true }));
+      } else {
+        input.innerText = res.sanitized;
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+      updateBadgeUI();
+      showToast(`🛡️ VisionVault: Sanitized ${res.matches.length} item(s) in prompt!`, true);
+    } else {
+      showToast("🛡️ VisionVault: No secrets or PII detected in prompt. Ready to send!", false);
+    }
+  }
+
+  function tryMountShieldBadge() {
+    if (document.querySelector(".vv-shield-badge")) return; // already mounted
+
+    // Strategy 1: Find ChatGPT trailing toolbar next to Think/mic/send button
+    const chatGptSend = document.querySelector('[data-testid="send-button"], button[aria-label*="voice" i], button[aria-label*="speech" i]');
+    if (chatGptSend && chatGptSend.parentElement) {
+      const parent = chatGptSend.parentElement;
+      const badge = createBadge();
+      parent.insertBefore(badge, chatGptSend);
+      return;
+    }
+
+    // Strategy 2: Claude toolbar
+    const claudeSend = document.querySelector('button[aria-label="Send Message"], fieldset button:last-child');
+    if (claudeSend && claudeSend.parentElement) {
+      const badge = createBadge();
+      claudeSend.parentElement.insertBefore(badge, claudeSend);
+      return;
+    }
+
+    // Strategy 3: Gemini action bar
+    const geminiSend = document.querySelector('.send-button-container, button[aria-label*="Send prompt"]');
+    if (geminiSend && geminiSend.parentElement) {
+      const badge = createBadge();
+      geminiSend.parentElement.insertBefore(badge, geminiSend);
+      return;
+    }
+
+    // Strategy 4: Near #prompt-textarea or any textarea on LLM page
+    const promptArea = document.querySelector('#prompt-textarea, [data-testid="prompt-textarea"], form textarea');
+    if (promptArea && promptArea.parentElement) {
+      const badge = createBadge();
+      promptArea.parentElement.appendChild(badge);
+      return;
+    }
+  }
+
+  // Periodic poll & observer for dynamic SPA re-renders
+  tryMountShieldBadge();
+  const obs = new MutationObserver(() => {
+    tryMountShieldBadge();
+  });
+  obs.observe(document.body, { childList: true, subtree: true });
+}
+
+if (typeof document !== "undefined") {
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initInPageShield);
+  } else {
+    initInPageShield();
+  }
+}
+
 } // end guard

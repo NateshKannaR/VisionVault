@@ -1,0 +1,214 @@
+/* in-page-shield.css — Styles for VisionVault In-Page Shield on ChatGPT, Claude, and Gemini */
+
+.vv-shield-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: rgba(14, 165, 233, 0.12);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  color: #38bdf8;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+  margin: 0 4px;
+  vertical-align: middle;
+  position: relative;
+  z-index: 9999;
+}
+
+.vv-shield-badge:hover {
+  background: rgba(14, 165, 233, 0.24);
+  border-color: #38bdf8;
+  transform: translateY(-1px);
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.45);
+}
+
+.vv-shield-badge.active {
+  border-color: #38bdf8;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.4);
+}
+
+.vv-shield-badge svg {
+  width: 17px;
+  height: 17px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.vv-shield-dot {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #10b981;
+  border: 2px solid #0f172a;
+  box-shadow: 0 0 6px #10b981;
+}
+
+/* In-Page Popover Window */
+.vv-shield-popover {
+  position: absolute;
+  bottom: 42px;
+  right: 0;
+  width: 280px;
+  background: #0f172a;
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  border-radius: 12px;
+  padding: 14px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6), 0 0 16px rgba(56, 189, 248, 0.2);
+  color: #f8fafc;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 12px;
+  z-index: 100000;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  animation: vvPopIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  text-align: left;
+}
+
+@keyframes vvPopIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.vv-popover-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding-bottom: 8px;
+}
+
+.vv-popover-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  font-size: 13px;
+  color: #38bdf8;
+}
+
+.vv-popover-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  padding: 2px 6px;
+  border-radius: 9999px;
+}
+
+.vv-popover-desc {
+  color: #94a3b8;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.vv-popover-stats {
+  display: flex;
+  justify-content: space-between;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.vv-stat-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.vv-stat-val {
+  font-size: 14px;
+  font-weight: 700;
+  color: #f8fafc;
+}
+
+.vv-stat-lbl {
+  font-size: 10px;
+  color: #64748b;
+}
+
+.vv-popover-btn {
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-weight: 600;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+}
+
+.vv-popover-btn:hover {
+  background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+  box-shadow: 0 0 10px rgba(14, 165, 233, 0.4);
+}
+
+/* Floating on-page toast notification */
+.vv-shield-toast {
+  position: fixed;
+  bottom: 84px;
+  right: 28px;
+  background: #0f172a;
+  color: #f8fafc;
+  border: 1px solid #38bdf8;
+  padding: 10px 16px;
+  border-radius: 10px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6), 0 0 14px rgba(56, 189, 248, 0.35);
+  z-index: 999999;
+  animation: vvSlideUp 0.25s ease-out;
+  pointer-events: none;
+  max-width: 360px;
+}
+
+.vv-shield-toast.vv-toast-secret {
+  border-color: #f43f5e;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6), 0 0 14px rgba(244, 63, 94, 0.4);
+}
+
+.vv-toast-badge {
+  background: rgba(244, 63, 94, 0.2);
+  color: #fb7185;
+  border: 1px solid rgba(244, 63, 94, 0.4);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+@keyframes vvSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

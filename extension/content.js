@@ -1452,9 +1452,19 @@ function initInPageShield() {
         const chEvt = new Event("change", { bubbles: true });
         chEvt.isVvSynthetic = true;
         fileInput.dispatchEvent(chEvt);
+
+        // Restore native HTMLInputElement.prototype.files getter and reset value
+        // so subsequent file uploads work cleanly without needing page refresh.
+        setTimeout(() => {
+          try {
+            delete fileInput.files;
+            fileInput.value = "";
+          } catch (_) {}
+        }, 50);
         return;
       }
     }
+
 
     if (mode === "drop") {
       const dropTarget = targetEl || document.querySelector("#prompt-textarea, [data-testid='prompt-textarea'], textarea, form") || document.body;

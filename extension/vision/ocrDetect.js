@@ -100,24 +100,37 @@
   // Values that are sensitive because of the words printed next to them, not their shape.
   const LABELLED_VALUE_RE = /\b(billed to|bill to|invoice to|sold to|customer|client|account holder|card ?holder|patient|employee|member|full name|name|operator on duty|operator|duty|mission id|mission|officer|supervisor|pilot|commander|technician|personnel|satellite name|satellite|orbit type|launch date|orbital inclination|apogee|perigee|tle line 1|tle line 2|tle|ground station freq|ground station|encryption key ref|encryption key|encryption|recipient|addressed to|deliver to|ship to)\s*[:\-]\s*([^\r\n]{2,60})/gi;
 
+  // Secrets, API Keys, Tokens & Postal Codes
+  const OPENAI_KEY_RE = /sk-[a-zA-Z0-9]{20,}/g;
+  const AWS_KEY_RE    = /AKIA[0-9A-Z]{16}/g;
+  const GITHUB_PAT_RE = /ghp_[a-zA-Z0-9]{36}/g;
+  const JWT_RE        = /eyJ[a-zA-Z0-9_-]{10,}\.eyJ[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9_-]{10,}/g;
+  const PINCODE_RE    = /\b[1-9][0-9]{5}\b/g;
+
   const PII_PATTERNS = [
-    { label: "email",    regex: EMAIL_RE },
-    { label: "card",     regex: CARD_RE },
-    { label: "ssn",      regex: SSN_RE },
-    { label: "vid",      regex: VID_RE },
-    { label: "aadhaar",  regex: AADHAAR_RE },
-    { label: "pan",      regex: PAN_RE },
-    { label: "dob",      regex: DOB_RE },
-    { label: "gender",   regex: GENDER_RE },
+    { label: "openai_key", regex: OPENAI_KEY_RE },
+    { label: "aws_key",    regex: AWS_KEY_RE },
+    { label: "github_pat", regex: GITHUB_PAT_RE },
+    { label: "jwt_token",  regex: JWT_RE },
+    { label: "pincode",    regex: PINCODE_RE },
+    { label: "email",      regex: EMAIL_RE },
+    { label: "card",       regex: CARD_RE },
+    { label: "ssn",        regex: SSN_RE },
+    { label: "vid",        regex: VID_RE },
+    { label: "aadhaar",    regex: AADHAAR_RE },
+    { label: "pan",        regex: PAN_RE },
+    { label: "dob",        regex: DOB_RE },
+    { label: "gender",     regex: GENDER_RE },
     { label: "driving_licence", regex: DL_RE },
     { label: "vehicle_reg", regex: VEHICLE_RE },
     { label: "bank_account", regex: ACCOUNT_RE, valueGroup: 1 },
-    { label: "passport", regex: PASSPORT_RE },
-    { label: "ifsc",     regex: IFSC_RE },
-    { label: "upi",      regex: UPI_RE },
-    { label: "phone",    regex: PHONE_RE },
+    { label: "passport",   regex: PASSPORT_RE },
+    { label: "ifsc",       regex: IFSC_RE },
+    { label: "upi",        regex: UPI_RE },
+    { label: "phone",      regex: PHONE_RE },
     { label: "labelled_value", regex: LABELLED_VALUE_RE, valueGroup: 2 }
   ];
+
 
   // Recognition languages, most-likely first. Devanagari covers Hindi and Marathi, which is
   // where an Indian document is most likely to print an identifier in non-Latin digits.

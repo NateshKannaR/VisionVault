@@ -1437,11 +1437,28 @@ function initInPageShield() {
   }
 
   // ── Dispatch Clean Synthetic File to Chat (ChatGPT / Claude / Gemini) ──
-  function dispatchCleanFileToChat(cleanFile) {
+  function dispatchCleanFileToChat(cleanFile, mode = "paste", targetEl = null) {
     const dt = new DataTransfer();
     dt.items.add(cleanFile);
 
-    // Update any hidden file input on page
+    const target = targetEl || document.querySelector("#prompt-textarea, [data-testid='prompt-textarea'], textarea, div.ProseMirror[contenteditable='true']") || document.activeElement || document.body;
+
+    // 1. If file was dropped, dispatch synthetic drop to the target
+    if (mode === "drop" && target) {
+      try {
+        const dropEvt = new DragEvent("drop", {
+          bubbles: true,
+          cancelable: true,
+          composed: true,
+          dataTransfer: dt
+        });
+        dropEvt.isVvSynthetic = true;
+        dropEvt.__vvRedacted = true;
+        target.dispatchEvent(dropEvt);
+      } catch (_) {}
+    }
+
+    // 2. Update any hidden file input on page
     const fileInput = document.querySelector('input[type="file"]');
     if (fileInput) {
       try {
@@ -1452,12 +1469,12 @@ function initInPageShield() {
       } catch (_) {}
     }
 
-    // Also dispatch synthetic paste to the prompt composer
-    const target = document.querySelector("#prompt-textarea, [data-testid='prompt-textarea'], textarea, div.ProseMirror[contenteditable='true']") || document.activeElement || document.body;
+    // 3. Dispatch synthetic paste to the prompt composer
     try {
       const pasteEvt = new ClipboardEvent("paste", {
         bubbles: true,
         cancelable: true,
+        composed: true,
         clipboardData: dt
       });
       pasteEvt.isVvSynthetic = true;
@@ -1465,6 +1482,7 @@ function initInPageShield() {
       target.dispatchEvent(pasteEvt);
     } catch (_) {}
   }
+
 
   // ── Inject Scrubbed Text into React / ProseMirror Composers ──
   function injectScrubbedTextToComposer(text) {
@@ -1530,8 +1548,9 @@ function initInPageShield() {
               const cleanFile = new File([cleanBlob], file.name || "redacted_image.png", { type: "image/png" });
               cleanFile.isVvSynthetic = true;
               cleanFile.__vvRedacted = true;
-              dispatchCleanFileToChat(cleanFile);
+              dispatchCleanFileToChat(cleanFile, mode, targetEl);
             } catch (_) {}
+
           } else {
             showToast(`🛡️ VisionVault: Image "${file.name}" clean. Zero secrets detected.`, false);
           }
@@ -1953,15 +1972,17 @@ function initInPageShield() {
   function tryMountComposerPill() {
     if (document.querySelector(".vv-composer-pill")) return;
 
-    // ChatGPT composer controls
-    const chatGptSend = document.querySelector('[data-testid="send-button"], button[aria-label*="voice" i], button[aria-label*="speech" i], button[data-testid="composer-send-button"]');
+    // Strategy 1: Modern ChatGPT composer action controls container
+    const chatGptSend = document.querySelector(
+      'button[data-testid="send-button"], button[data-testid="composer-send-button"], button[data-testid="fruitjuice-send-button"], button[aria-label*="voice" i], button[aria-label*="speech" i], button[aria-label="Send prompt"], button[aria-label="Send message"], button[aria-label="Send"], form button[type="submit"], button[class*="send"][class*="button"]'
+    );
     if (chatGptSend && chatGptSend.parentElement) {
       const pill = createComposerPill();
       chatGptSend.parentElement.insertBefore(pill, chatGptSend);
       return;
     }
 
-    // Claude controls
+    // Strategy 2: Claude controls
     const claudeSend = document.querySelector('button[aria-label="Send Message"], fieldset button:last-child');
     if (claudeSend && claudeSend.parentElement) {
       const pill = createComposerPill();
@@ -1969,29 +1990,60 @@ function initInPageShield() {
       return;
     }
 
-    // Gemini controls
+    // Strategy 3: Gemini controls
     const geminiSend = document.querySelector('.send-button-container, button[aria-label*="Send prompt"]');
     if (geminiSend && geminiSend.parentElement) {
-      const badge = createBadge();
-      geminiSend.parentElement.insertBefore(badge, geminiSend);
+      const pill = createComposerPill();
+      geminiSend.parentElement.insertBefore(pill, geminiSend);
       return;
     }
 
-    // Strategy 4: Near #prompt-textarea or any textarea on LLM page
+    // Strategy 4: Relative / absolute positioning inside composer wrapper (PrivacyScrubber style fallback)
+    const composerWrapper = document.querySelector(
+      'form:has(#prompt-textarea), #composer-background, [class*="composer-background"], div:has(> #prompt-textarea)'
+    );
+    if (composerWrapper) {
+      const pill = createComposerPill();
+      pill.style.position = "absolute";
+      pill.style.bottom = "10px";
+      pill.style.right = "145px";
+      pill.style.zIndex = "100";
+      composerWrapper.style.position = composerWrapper.style.position || "relative";
+      composerWrapper.appendChild(pill);
+      return;
+    }
+
+    // Strategy 5: Near #prompt-textarea or any textarea on LLM page
     const promptArea = document.querySelector('#prompt-textarea, [data-testid="prompt-textarea"], form textarea');
     if (promptArea && promptArea.parentElement) {
-      const badge = createBadge();
-      promptArea.parentElement.appendChild(badge);
+      const pill = createComposerPill();
+      promptArea.parentElement.appendChild(pill);
       return;
     }
   }
 
+  // Initialize mid-flight prompt submit interceptors
+  setupSubmitInterceptors();
+
   // Periodic poll & observer for dynamic SPA re-renders
-  tryMountShieldBadge();
+  tryMountComposerPill();
   const obs = new MutationObserver(() => {
-    tryMountShieldBadge();
+    tryMountComposerPill();
   });
   obs.observe(document.body, { childList: true, subtree: true });
+
+  // Re-check on input, keyup, focusin (matching PrivacyScrubber ChatGPT fallback)
+  const onUserActivity = (e) => {
+    const target = e.target;
+    if (target && (target.closest?.('#prompt-textarea, [data-testid="prompt-textarea"]') || target.id === 'prompt-textarea' || target.closest?.('form'))) {
+      tryMountComposerPill();
+      updateComposerPillUI();
+    }
+  };
+  document.addEventListener("input", onUserActivity, { capture: true, passive: true });
+  document.addEventListener("keyup", onUserActivity, { capture: true, passive: true });
+  document.addEventListener("focusin", onUserActivity, { capture: true, passive: true });
+  document.addEventListener("paste", onUserActivity, { capture: true, passive: true });
 }
 
 if (typeof document !== "undefined") {
@@ -2001,5 +2053,6 @@ if (typeof document !== "undefined") {
     initInPageShield();
   }
 }
+
 
 } // end guard

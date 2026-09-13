@@ -520,22 +520,22 @@
 
     if (isAadhaarCard) {
       console.log("[vision] Aadhaar card identity layout detected. Enforcing full card PII coverage.");
+      // 1. Line-level cardholder identity redaction
       for (const line of lines) {
         const lt = (line.text || "").trim();
         if (!lt) continue;
 
-        // Skip standard non-sensitive card institution headers and slogan
-        if (/government of india|bharat sarkar|mera aadhaar|meri pehchan|my aadhaar|unique identification authority/i.test(lt)) {
+        // Skip ONLY pure non-sensitive card institution headers and slogan
+        if (/^(government of india|bharat sarkar|mera aadhaar|meri pehchan|my aadhaar|unique identification authority)[\s,.:/-]*$/i.test(lt)) {
           continue;
         }
 
-        // On an Aadhaar card, any remaining line with text is cardholder identity data:
-        // Name (e.g. SAMARTH SHARMA), DOB, Gender, or UIDAI Number.
+        // On an Aadhaar card, any line containing personal identity data (Name, DOB, Gender, UIDAI)
         const box = line.bbox;
         if (box) {
           const rx = Math.max(0, Math.round(box.x0 * toVpX));
           const ry = Math.max(0, Math.round(box.y0 * toVpY));
-          const rw = Math.max(12, Math.round((box.x1 - box.x0) * toVpX));
+          const rw = Math.max(16, Math.round((box.x1 - box.x0) * toVpX));
           const rh = Math.max(12, Math.round((box.y1 - box.y0) * toVpY));
 
           const dup = piiRegions.some(r => Math.abs(r.x - rx) < 15 && Math.abs(r.y - ry) < 15);
@@ -555,7 +555,39 @@
           }
         }
       }
+
+      // 2. Word-level cardholder coverage (catches orphan name tokens like "HARMA" or split digits)
+      const headerWordRe = /^(government|govt|of|india|bharat|sarkar|mera|aadhaar|meri|pehchan|unique|identification|authority|uidai|help|www|gov|in|enrollment|download)$/i;
+      for (const word of words) {
+        const wt = (word.text || "").trim();
+        if (!wt || wt.length < 2) continue;
+        if (headerWordRe.test(wt)) continue;
+        const bbox = word.bbox;
+        if (!bbox) continue;
+
+        const rx = Math.max(0, Math.round(bbox.x0 * toVpX));
+        const ry = Math.max(0, Math.round(bbox.y0 * toVpY));
+        const rw = Math.max(14, Math.round((bbox.x1 - bbox.x0) * toVpX));
+        const rh = Math.max(12, Math.round((bbox.y1 - bbox.y0) * toVpY));
+
+        const dup = piiRegions.some(r => Math.abs(r.x - rx) < 10 && Math.abs(r.y - ry) < 10);
+        if (!dup) {
+          piiRegions.push({
+            x: rx,
+            y: ry,
+            w: rw,
+            h: rh,
+            type: "text",
+            reason: "aadhaar_card_word",
+            label: "aadhaar_card_pii",
+            text: wt,
+            confidence: 0.95,
+            source: "vision_ocr"
+          });
+        }
+      }
     }
+
 
     if (needClose && bitmap && typeof bitmap.close === "function") {
       bitmap.close();

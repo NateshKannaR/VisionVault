@@ -488,13 +488,19 @@
         // ascenders, descenders and antialiased edges visible — the evaluation measured only
         // ~82% of a text region actually covered. Scaling the pad with the region's height
         // closes that gap without smothering neighbouring elements.
-        // Boundary dilation: Generous padding ensures numbers and glyph edges are 100% swallowed
-        const padX = Math.max(8, Math.min(24, Math.round(Math.max(rw, 16) * 0.08)));
-        const padY = Math.max(6, Math.min(18, Math.round(Math.max(rh, 8) * 0.25)));
+        // Boundary dilation: Generous padding ensures numbers, names, and glyph edges are 100% swallowed
+        const isAadhaarField = (r.label === "aadhaar_card_pii" || r.label === "aadhaar" || r.label === "vid" || (r.reason && r.reason.includes("aadhaar")));
+        const padX = isAadhaarField
+          ? Math.max(16, Math.min(48, Math.round(Math.max(rw, 24) * 0.18)))
+          : Math.max(8, Math.min(24, Math.round(Math.max(rw, 16) * 0.08)));
+        const padY = isAadhaarField
+          ? Math.max(8, Math.min(24, Math.round(Math.max(rh, 12) * 0.35)))
+          : Math.max(6, Math.min(18, Math.round(Math.max(rh, 8) * 0.25)));
         const x0 = clamp(Math.round(rx) - padX, 0, bitmap.width - 1);
         const y0 = clamp(Math.round(ry) - padY, 0, bitmap.height - 1);
         const w0 = Math.max(1, Math.min(bitmap.width - x0, Math.round(rw) + padX * 2));
         const h0 = Math.max(1, Math.min(bitmap.height - y0, Math.round(rh) + padY * 2));
+
 
         if ((mode || "black") === "blur") {
           const step = 12;

@@ -1120,6 +1120,39 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 
+  if (msg.type === "INSERT_TEXT_TO_INPUT" && msg.text) {
+    try {
+      const chatInput = document.querySelector(
+        '#prompt-textarea, [data-testid="prompt-textarea"], ' +
+        'div[contenteditable="true"].ProseMirror, div[contenteditable="true"][enterkeyhint="enter"], ' +
+        '.textarea[contenteditable="true"], div.ql-editor[contenteditable="true"], ' +
+        'textarea:focus, textarea[placeholder*="message" i], textarea[placeholder*="ask" i], textarea'
+      );
+      if (!chatInput) {
+        sendResponse({ ok: false, error: "No active chat prompt textarea found on this page." });
+        return true;
+      }
+
+      chatInput.focus();
+      const isContentEditable = chatInput.isContentEditable;
+      if (isContentEditable) {
+        document.execCommand("insertText", false, (chatInput.innerText?.trim() ? "\n\n" : "") + msg.text);
+        chatInput.dispatchEvent(new Event("input", { bubbles: true }));
+      } else {
+        const proto = chatInput.tagName === "TEXTAREA" ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+        const setter = Object.getOwnPropertyDescriptor(proto, "value")?.set;
+        const newText = (chatInput.value?.trim() ? chatInput.value + "\n\n" : "") + msg.text;
+        if (setter) setter.call(chatInput, newText); else chatInput.value = newText;
+        chatInput.dispatchEvent(new Event("input", { bubbles: true }));
+        chatInput.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+      sendResponse({ ok: true });
+    } catch (err) {
+      sendResponse({ ok: false, error: err.message || String(err) });
+    }
+    return true;
+  }
+
   if (msg.type === "READ_VAULT_FIELDS") {
     const fields = {};
 
@@ -1357,6 +1390,54 @@ function initInPageShield() {
   // Track session redacted stats
   let sessionRedactions = 0;
   let activePopover = null;
+  let lastRedactedDoc = null;
+
+  async function handleInterceptedFile(file) {
+    const Scrubber = window.PdfScrubber || globalThis.PdfScrubber;
+    if (!Scrubber || !file) return;
+
+    const ext = (file.name || "").toLowerCase().split(".").pop();
+    const isDoc = ["pdf", "txt", "csv", "json", "md", "py", "js", "ts", "log"].includes(ext) || (file.type && file.type.includes("pdf"));
+    if (!isDoc) return;
+
+    showToast(`🛡️ VisionVault: Scanning document "${file.name}" locally in RAM...`, false);
+
+    try {
+      const res = await Scrubber.redactDocument(file, file.name);
+      if (res && res.findings && res.findings.length > 0) {
+        sessionRedactions += res.findings.length;
+        lastRedactedDoc = res;
+        updateBadgeUI();
+
+        const summaryTokens = res.findings.map(f => f.token).slice(0, 3).join(", ");
+        const extra = res.findings.length > 3 ? ` +${res.findings.length - 3} more` : "";
+        showToast(`🛡️ <strong>VisionVault</strong>: Auto-redacted ${res.findings.length} secret(s) in "${file.name}" <span class="vv-toast-badge">[${summaryTokens}${extra}]</span>`, true);
+      } else {
+        showToast(`🛡️ VisionVault: Document "${file.name}" clean. Zero secrets detected.`, false);
+      }
+    } catch (err) {
+      console.warn("[VisionVault] Document scan warning:", err);
+    }
+  }
+
+  // Intercept file input change events (e.g. ChatGPT + / upload button)
+  document.addEventListener("change", async function (e) {
+    const target = e.target;
+    if (target && target.tagName === "INPUT" && target.type === "file" && target.files && target.files.length > 0) {
+      for (const file of target.files) {
+        await handleInterceptedFile(file);
+      }
+    }
+  }, true);
+
+  // Intercept file drag-and-drop
+  document.addEventListener("drop", async function (e) {
+    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      for (const file of e.dataTransfer.files) {
+        await handleInterceptedFile(file);
+      }
+    }
+  }, true);
 
   function showToast(message, isSecret = false) {
     const existingToast = document.querySelector(".vv-shield-toast");
@@ -1520,10 +1601,42 @@ function initInPageShield() {
           <span class="vv-stat-lbl">RAM Isolated</span>
         </div>
       </div>
+      ${lastRedactedDoc ? `
+        <div style="background:rgba(56,189,248,0.08);border:1px solid rgba(56,189,248,0.25);border-radius:8px;padding:8px 10px;">
+          <div style="font-weight:600;color:#38bdf8;font-size:11px;margin-bottom:2px;">📄 ${lastRedactedDoc.fileName}</div>
+          <div style="font-size:10px;color:#94a3b8;">${lastRedactedDoc.findings?.length || 0} secret(s) redacted in RAM</div>
+          <button type="button" class="vv-popover-btn" id="vv-insert-doc-btn" style="margin-top:6px;width:100%;background:linear-gradient(135deg,#059669 0%,#047857 100%);">
+            Insert Sanitized Text to Chat
+          </button>
+        </div>
+      ` : ''}
       <button type="button" class="vv-popover-btn" id="vv-scrub-input-btn">
         Scrub Current Input Box
       </button>
     `;
+
+    const insertDocBtn = popover.querySelector("#vv-insert-doc-btn");
+    if (insertDocBtn && lastRedactedDoc) {
+      insertDocBtn.addEventListener("click", function () {
+        const input = document.querySelector("#prompt-textarea, [data-testid='prompt-textarea'], textarea, div.ProseMirror[contenteditable='true']");
+        if (input) {
+          if (input.tagName === "TEXTAREA" || input.tagName === "INPUT") {
+            input.value = (input.value ? input.value + "\n\n" : "") + lastRedactedDoc.sanitizedText;
+            input.dispatchEvent(new Event("input", { bubbles: true }));
+            input.dispatchEvent(new Event("change", { bubbles: true }));
+          } else {
+            input.innerText = (input.innerText ? input.innerText + "\n\n" : "") + lastRedactedDoc.sanitizedText;
+            input.dispatchEvent(new Event("input", { bubbles: true }));
+          }
+          showToast(`🛡️ Inserted sanitized "${lastRedactedDoc.fileName}" to prompt!`, false);
+          if (activePopover) {
+            activePopover.remove();
+            activePopover = null;
+            badge.classList.remove("active");
+          }
+        }
+      });
+    }
 
     const scrubBtn = popover.querySelector("#vv-scrub-input-btn");
     if (scrubBtn) {

@@ -1672,3 +1672,108 @@ if ($("unmaskBtn")) {
     $("unmaskedWrap").hidden = false;
   });
 }
+
+// ── Offline Document & PDF Redactor ──────────────────────────────────────────
+async function handleProcessDocFile(file) {
+  if (!globalThis.PdfScrubber) return;
+  const dropTitle = $("pdfDropZoneTitle");
+  if (dropTitle) dropTitle.textContent = `Processing "${file.name}" locally in RAM...`;
+
+  try {
+    const res = await globalThis.PdfScrubber.redactDocument(file, file.name);
+    activeTokenMap = { ...activeTokenMap, ...res.tokenMap };
+
+    if ($("pdfFileNameDisplay")) $("pdfFileNameDisplay").textContent = file.name;
+    if ($("pdfFindingsCount")) $("pdfFindingsCount").textContent = String(res.stats?.total || res.findings?.length || 0);
+    if ($("pdfSanitizedOutput")) $("pdfSanitizedOutput").value = res.sanitizedText;
+
+    const list = $("pdfFindingsList");
+    if (list) {
+      list.innerHTML = "";
+      if (!res.findings || res.findings.length === 0) {
+        list.innerHTML = '<span style="font-size:11px;color:var(--ok,#4ade80);">Clean document — 0 secrets or PII detected.</span>';
+      } else {
+        res.findings.forEach((f) => {
+          const span = document.createElement("span");
+          span.className = "badge";
+          span.style.background = f.category === "secret" ? "rgba(244,63,94,0.2)" : "rgba(234,179,8,0.2)";
+          span.style.color = f.category === "secret" ? "#f43f5e" : "#eab308";
+          span.style.border = "1px solid currentColor";
+          span.textContent = `${f.label}: ${f.token}`;
+          list.appendChild(span);
+        });
+      }
+    }
+
+    if ($("pdfResultWrap")) $("pdfResultWrap").hidden = false;
+    if (dropTitle) dropTitle.textContent = `Ready: "${file.name}" sanitized`;
+  } catch (err) {
+    if (dropTitle) dropTitle.textContent = `Error: ${err.message}`;
+  }
+}
+
+if ($("pdfDropZone") && $("pdfFileInput")) {
+  $("pdfDropZone").addEventListener("click", () => {
+    $("pdfFileInput").click();
+  });
+
+  $("pdfDropZone").addEventListener("dragover", (e) => {
+    e.preventDefault();
+    $("pdfDropZone").style.borderColor = "#38bdf8";
+    $("pdfDropZone").style.background = "rgba(14, 165, 233, 0.12)";
+  });
+
+  $("pdfDropZone").addEventListener("dragleave", () => {
+    $("pdfDropZone").style.borderColor = "rgba(56, 189, 248, 0.4)";
+    $("pdfDropZone").style.background = "rgba(14, 165, 233, 0.05)";
+  });
+
+  $("pdfDropZone").addEventListener("drop", (e) => {
+    e.preventDefault();
+    $("pdfDropZone").style.borderColor = "rgba(56, 189, 248, 0.4)";
+    $("pdfDropZone").style.background = "rgba(14, 165, 233, 0.05)";
+    const file = e.dataTransfer?.files?.[0];
+    if (file) handleProcessDocFile(file);
+  });
+
+  $("pdfFileInput").addEventListener("change", (e) => {
+    const file = e.target?.files?.[0];
+    if (file) handleProcessDocFile(file);
+  });
+}
+
+if ($("copyCleanDocBtn")) {
+  $("copyCleanDocBtn").addEventListener("click", async () => {
+    const text = $("pdfSanitizedOutput")?.value || "";
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      const span = $("copyCleanDocBtn").querySelector("span");
+      if (span) {
+        const orig = span.textContent;
+        span.textContent = "Copied!";
+        setTimeout(() => { span.textContent = orig; }, 2000);
+      }
+    } catch (_) {}
+  });
+}
+
+if ($("sendDocToChatBtn")) {
+  $("sendDocToChatBtn").addEventListener("click", () => {
+    const text = $("pdfSanitizedOutput")?.value;
+    if (!text || typeof chrome === "undefined" || !chrome.tabs) return;
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      const tabId = tabs?.[0]?.id;
+      if (!tabId) return;
+      chrome.tabs.sendMessage(tabId, { type: "INSERT_TEXT_TO_INPUT", text: text }, (res) => {
+        const span = $("sendDocToChatBtn").querySelector("span");
+        if (span) {
+          const orig = span.textContent;
+          span.textContent = (res && res.ok) ? "Inserted to Chat!" : "Sent!";
+          setTimeout(() => { span.textContent = orig; }, 2000);
+        }
+      });
+    });
+  });
+}
+

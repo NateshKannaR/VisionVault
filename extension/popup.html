@@ -47,6 +47,7 @@
     <g id="i-layers"><path d="M12 3.6l8.4 4.2-8.4 4.2L3.6 7.8z"/><path d="M3.6 12.4L12 16.6l8.4-4.2M3.6 16.6L12 20.8l8.4-4.2"/></g>
     <g id="i-sparkle"><path d="M12 4.2l1.7 4.6 4.6 1.7-4.6 1.7L12 16.8l-1.7-4.6L5.7 10.5l4.6-1.7z"/><path d="M18.5 15.5l.7 1.9 1.9.7-1.9.7-.7 1.9-.7-1.9-1.9-.7 1.9-.7z"/></g>
     <g id="i-chevron"><path d="M9 5.5l6.5 6.5L9 18.5"/></g>
+    <g id="i-file"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></g>
   </defs>
 </svg>
 
@@ -747,6 +748,46 @@
       </div>
     </div>
 
+    <!-- Offline PDF & Document Redactor -->
+    <div class="card">
+      <div class="card-head">
+        <span><svg class="ic" viewBox="0 0 24 24"><use href="#i-file"/></svg> Offline PDF &amp; Document Redactor</span>
+        <span class="pill ok">Zero-Upload</span>
+      </div>
+      <p style="font-size: 11px; color: var(--fg-muted, #94a3b8); margin-bottom: 8px;">
+        Sanitize resumes, invoices, PDFs, or code files in local RAM before attaching to AI:
+      </p>
+
+      <div class="drop-zone" id="pdfDropZone" style="border: 1.5px dashed rgba(56, 189, 248, 0.4); border-radius: 8px; padding: 14px 10px; text-align: center; cursor: pointer; background: rgba(14, 165, 233, 0.05); transition: all 0.2s;">
+        <input type="file" id="pdfFileInput" accept=".pdf,.txt,.csv,.json,.md,.py,.js,.ts,.log" style="display: none;" />
+        <svg class="ic" viewBox="0 0 24 24" style="width: 22px; height: 22px; color: #38bdf8; margin-bottom: 4px;"><use href="#i-file"/></svg>
+        <div style="font-size: 11px; font-weight: 600; color: #f8fafc;" id="pdfDropZoneTitle">Drop PDF / document here or click to browse</div>
+        <div style="font-size: 10px; color: #64748b; margin-top: 2px;">Supports PDF, TXT, CSV, JSON, Markdown, Code</div>
+      </div>
+
+      <div id="pdfResultWrap" hidden style="margin-top: 10px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: var(--fg-muted, #94a3b8); margin-bottom: 4px;">
+          <span id="pdfFileNameDisplay" style="font-weight: 600; color: #38bdf8;">document.pdf</span>
+          <span id="pdfFindingsCount" class="badge">0</span>
+        </div>
+        <div id="pdfFindingsList" style="display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px;"></div>
+        
+        <div style="font-size: 11px; color: var(--fg-muted, #94a3b8); margin-bottom: 4px;">Sanitized Content:</div>
+        <textarea id="pdfSanitizedOutput" readonly class="task-input" style="min-height: 80px; width: 100%; background: rgba(0,0,0,0.2); font-family: monospace; font-size: 11px;"></textarea>
+
+        <div style="display: flex; gap: 6px; margin-top: 8px;">
+          <button class="btn btn-primary btn-sm" id="sendDocToChatBtn" style="flex: 1;">
+            <svg class="ic" viewBox="0 0 24 24"><use href="#i-shield"/></svg>
+            <span>Insert to Chat</span>
+          </button>
+          <button class="btn btn-secondary btn-sm" id="copyCleanDocBtn" style="flex: 1;">
+            <svg class="ic" viewBox="0 0 24 24"><use href="#i-check"/></svg>
+            <span>Copy Text</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- De-Scrub / Unmasking Card -->
     <div class="card">
       <div class="card-head">
@@ -771,6 +812,7 @@
 </main>
 
 <script src="prompt-scrubber.js"></script>
+<script src="pdf-scrubber.js"></script>
 <script src="vault.js"></script>
 <script src="popup.js"></script>
 </body>

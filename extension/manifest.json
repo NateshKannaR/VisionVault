@@ -51,6 +51,7 @@
       ],
       "js": [
         "prompt-scrubber.js",
+        "pdf-scrubber.js",
         "action-executor.js",
         "content.js"
       ],

@@ -63,6 +63,16 @@
     return text.replace(INDIC_DIGIT_RE, (d) => INDIC_DIGITS[d] || d);
   }
 
+  function cleanOcrDigits(str) {
+    if (!str || typeof str !== "string") return "";
+    return str
+      .replace(/[Il|!\]\[]/g, "1")
+      .replace(/[OoQ]/g, "0")
+      .replace(/[Ss]/g, "5")
+      .replace(/[Bb]/g, "8")
+      .replace(/[Zz]/g, "2");
+  }
+
   const EMAIL_RE    = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
   const PHONE_RE    = /(\+?\d[\d\s\-().]{7,}\d)/g;
   const CARD_RE     = /\b(?:\d{4}[- ]?){3}\d{4}\b/g;
@@ -75,24 +85,21 @@
   const PASSPORT_RE = /\b[A-Z][0-9]{7}\b/g;
   const IFSC_RE     = /\b[A-Z]{4}0[A-Z0-9]{6}\b/g;
   const UPI_RE      = /\b[a-zA-Z0-9.\-_]{2,40}@(okhdfcbank|okaxis|oksbi|okicici|paytm|ybl|ibl|axl|upi)\b/gi;
-  // State code, RTO code, then year and serial: TN-01-2011-0012345, written with or without
-  // separators depending on who printed it.
+  // State code, RTO code, then year and serial: TN-01-2011-0012345
   const DL_RE       = /\b[A-Z]{2}[-\s]?\d{2}[-\s]?\d{4}[-\s]?\d{7}\b|\b[A-Z]{2}[-\s]?\d{2}[-\s]?\d{11}\b/g;
-  // TN 01 AB 1234, and the older single-letter series.
   const VEHICLE_RE  = /\b[A-Z]{2}[\s-]?\d{1,2}[\s-]?[A-Z]{1,3}[\s-]?\d{4}\b/g;
-  // A bare run of digits is only an account number when something nearby says so; without the
-  // cue this would mask every long number on the page and cost more precision than it buys.
   const ACCOUNT_RE  = /\b(?:a\/c|acc(?:oun)?t(?:\s*(?:no|number|#))?|bank\s*a\/?c)\s*[:.#-]?\s*(\d{9,18})\b/gi;
 
+  // DOB & Gender patterns common on Indian national IDs
+  const DOB_RE      = /\b(?:dob|date of birth|year of birth|birth|d\.o\.b)?[\s:/-]*((?:0?[1-9]|[12]\d|3[01])[\s/.-](?:0?[1-9]|1[0-2])[\s/.-](?:19|20)\d{2}|(?:19|20)\d{2}[\s/.-](?:0?[1-9]|1[0-2])[\s/.-](?:0?[1-9]|[12]\d|3[01]))\b/gi;
+  const GENDER_RE   = /\b(male|female|transgender|पुरुष|महिला)\b/gi;
+
+  // Name patterns on identity cards (e.g. "SAMARTH SHARMA", "JOHN DOE")
+  const ID_NAME_RE  = /\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3}|[A-Z]{3,}(?:\s+[A-Z]{2,}){1,3})\b/g;
+
   // Values that are sensitive because of the words printed next to them, not their shape.
-  // A personal name matches no pattern — "R. Sharma" is just two words — so
-  // the only way to recognise it in a flattened image is the field label rendered beside it.
-  // Capture group 2 is the value; group 1 is the label, which is not itself sensitive.
   const LABELLED_VALUE_RE = /\b(billed to|bill to|invoice to|sold to|customer|client|account holder|card ?holder|patient|employee|member|full name|name|operator on duty|operator|duty|mission id|mission|officer|supervisor|pilot|commander|technician|personnel|satellite name|satellite|orbit type|launch date|orbital inclination|apogee|perigee|tle line 1|tle line 2|tle|ground station freq|ground station|encryption key ref|encryption key|encryption|recipient|addressed to|deliver to|ship to)\s*[:\-]\s*([^\r\n]{2,60})/gi;
 
-  // Order is significant: the first pattern to claim a span keeps it (see isCovered), so the
-  // more specific shapes are tried before the looser ones. PHONE_RE in particular will happily
-  // swallow a driving licence or an account number if it is given the chance.
   const PII_PATTERNS = [
     { label: "email",    regex: EMAIL_RE },
     { label: "card",     regex: CARD_RE },
@@ -100,6 +107,8 @@
     { label: "vid",      regex: VID_RE },
     { label: "aadhaar",  regex: AADHAAR_RE },
     { label: "pan",      regex: PAN_RE },
+    { label: "dob",      regex: DOB_RE },
+    { label: "gender",   regex: GENDER_RE },
     { label: "driving_licence", regex: DL_RE },
     { label: "vehicle_reg", regex: VEHICLE_RE },
     { label: "bank_account", regex: ACCOUNT_RE, valueGroup: 1 },
@@ -107,7 +116,6 @@
     { label: "ifsc",     regex: IFSC_RE },
     { label: "upi",      regex: UPI_RE },
     { label: "phone",    regex: PHONE_RE },
-    // Checked last so a value that already matched a specific pattern keeps that label.
     { label: "labelled_value", regex: LABELLED_VALUE_RE, valueGroup: 2 }
   ];
 
@@ -456,6 +464,95 @@
             confidence: Math.round((word.confidence || 85)) / 100,
             source: "vision_ocr"
           });
+        }
+      }
+    }
+
+    // 3. Multi-word Sliding Window checks (detects numbers and names split across word tokens)
+    const windowSizes = [2, 3, 4, 5];
+    for (const k of windowSizes) {
+      for (let i = 0; i <= words.length - k; i++) {
+        const slice = words.slice(i, i + k);
+        const avgH = slice.reduce((acc, w) => acc + (w.bbox ? w.bbox.y1 - w.bbox.y0 : 0), 0) / k;
+        const minY = Math.min(...slice.map(w => w.bbox ? w.bbox.y0 : 0));
+        const maxY = Math.max(...slice.map(w => w.bbox ? w.bbox.y1 : 0));
+        if (maxY - minY > avgH * 2.2) continue; // Words are on different lines
+
+        const combinedRaw = slice.map(w => w.text || "").join(" ");
+        const combinedClean = cleanOcrDigits(combinedRaw);
+
+        const matches = [...findPiiInText(combinedRaw), ...findPiiInText(combinedClean)];
+        for (const m of matches) {
+          const x0 = Math.min(...slice.map(w => w.bbox ? w.bbox.x0 : 0));
+          const y0 = Math.min(...slice.map(w => w.bbox ? w.bbox.y0 : 0));
+          const x1 = Math.max(...slice.map(w => w.bbox ? w.bbox.x1 : 0));
+          const y1 = Math.max(...slice.map(w => w.bbox ? w.bbox.y1 : 0));
+
+          const rx = Math.max(0, Math.round(x0 * toVpX));
+          const ry = Math.max(0, Math.round(y0 * toVpY));
+          const rw = Math.max(12, Math.round((x1 - x0) * toVpX));
+          const rh = Math.max(12, Math.round((y1 - y0) * toVpY));
+
+          const dup = piiRegions.some(r => Math.abs(r.x - rx) < 15 && Math.abs(r.y - ry) < 15);
+          if (!dup) {
+            piiRegions.push({
+              x: rx,
+              y: ry,
+              w: rw,
+              h: rh,
+              type: "text",
+              reason: "ocr_multiword_pii",
+              label: m.label,
+              text: m.text || combinedRaw,
+              confidence: 0.92,
+              source: "vision_ocr"
+            });
+          }
+        }
+      }
+    }
+
+    // 4. Aadhaar Card & National ID Comprehensive Layout Guard
+    // When an Aadhaar card or National ID is identified, redact all cardholder identity fields
+    // (Aadhaar number, Name, DOB, Gender, and QR code) so zero personal data leaks.
+    const isAadhaarCard = /aadhaar|uidai|government of india|mera aadhaar|unique identification|help@uidai|my aadhaar/i.test(fullText) ||
+                          piiRegions.some(r => r.label === "aadhaar" || r.label === "vid");
+
+    if (isAadhaarCard) {
+      console.log("[vision] Aadhaar card identity layout detected. Enforcing full card PII coverage.");
+      for (const line of lines) {
+        const lt = (line.text || "").trim();
+        if (!lt) continue;
+
+        // Skip standard non-sensitive card institution headers and slogan
+        if (/government of india|bharat sarkar|mera aadhaar|meri pehchan|my aadhaar|unique identification authority/i.test(lt)) {
+          continue;
+        }
+
+        // On an Aadhaar card, any remaining line with text is cardholder identity data:
+        // Name (e.g. SAMARTH SHARMA), DOB, Gender, or UIDAI Number.
+        const box = line.bbox;
+        if (box) {
+          const rx = Math.max(0, Math.round(box.x0 * toVpX));
+          const ry = Math.max(0, Math.round(box.y0 * toVpY));
+          const rw = Math.max(12, Math.round((box.x1 - box.x0) * toVpX));
+          const rh = Math.max(12, Math.round((box.y1 - box.y0) * toVpY));
+
+          const dup = piiRegions.some(r => Math.abs(r.x - rx) < 15 && Math.abs(r.y - ry) < 15);
+          if (!dup) {
+            piiRegions.push({
+              x: rx,
+              y: ry,
+              w: rw,
+              h: rh,
+              type: "text",
+              reason: "aadhaar_card_field",
+              label: "aadhaar_card_pii",
+              text: lt,
+              confidence: 0.95,
+              source: "vision_ocr"
+            });
+          }
         }
       }
     }

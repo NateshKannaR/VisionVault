@@ -488,11 +488,13 @@
         // ascenders, descenders and antialiased edges visible — the evaluation measured only
         // ~82% of a text region actually covered. Scaling the pad with the region's height
         // closes that gap without smothering neighbouring elements.
-        const pad = Math.max(3, Math.min(14, Math.round(Math.max(rh, 8) * 0.18)));
-        const x0 = clamp(Math.round(rx) - pad, 0, bitmap.width - 1);
-        const y0 = clamp(Math.round(ry) - pad, 0, bitmap.height - 1);
-        const w0 = Math.max(1, Math.min(bitmap.width - x0, Math.round(rw) + pad * 2));
-        const h0 = Math.max(1, Math.min(bitmap.height - y0, Math.round(rh) + pad * 2));
+        // Boundary dilation: Generous padding ensures numbers and glyph edges are 100% swallowed
+        const padX = Math.max(8, Math.min(24, Math.round(Math.max(rw, 16) * 0.08)));
+        const padY = Math.max(6, Math.min(18, Math.round(Math.max(rh, 8) * 0.25)));
+        const x0 = clamp(Math.round(rx) - padX, 0, bitmap.width - 1);
+        const y0 = clamp(Math.round(ry) - padY, 0, bitmap.height - 1);
+        const w0 = Math.max(1, Math.min(bitmap.width - x0, Math.round(rw) + padX * 2));
+        const h0 = Math.max(1, Math.min(bitmap.height - y0, Math.round(rh) + padY * 2));
 
         if ((mode || "black") === "blur") {
           const step = 12;

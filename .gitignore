@@ -20,3 +20,5 @@ eval/results/*.png
 
 # Local scratch
 *.log
+scratch/
+

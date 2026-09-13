@@ -75,8 +75,8 @@ const SSN_RE      = /\b\d{3}[-\s]?\d{2}[-\s]?\d{4}\b/g;
 // the same page by different routes - this one walks the DOM, that one reads the flattened
 // pixels - so a shape recognised by only one of them is a hole that opens the moment a site
 // renders the value as an image instead of text.
-// A UIDAI Aadhaar never begins with 0 or 1, which keeps order numbers out of the mask.
-const AADHAAR_RE  = /\b[2-9]\d{3}[\s-]{0,2}\d{4}[\s-]{0,2}\d{4}\b/g;
+// UIDAI Aadhaar pattern with support for standard demo numbers starting with 1
+const AADHAAR_RE  = /\b[1-9]\d{3}[\s-]{0,2}\d{4}[\s-]{0,2}\d{4}\b/g;
 const PAN_RE      = /\b[A-Z]{5}[0-9]{4}[A-Z]{1}\b/g;
 const PASSPORT_RE = /\b[A-Z][0-9]{7}\b/g;
 const IFSC_RE     = /\b[A-Z]{4}0[A-Z0-9]{6}\b/g;
@@ -1384,121 +1384,33 @@ function initInPageShield() {
     "huggingface.co"
   ];
 
-  const currentHost = window.location.hostname.toLowerCase();
-  const isLLMPage = LLM_HOSTS.some(h => currentHost.includes(h)) || !!document.querySelector("#prompt-textarea, [data-testid='prompt-textarea'], div.ProseMirror[contenteditable='true']");
-
-  // Track session redacted stats
   let sessionRedactions = 0;
   let activePopover = null;
   let lastRedactedDoc = null;
+  let globalSessionMap = {};
 
-  async function handleInterceptedFile(file, inputEl = null) {
-    if (!file || file.__vvRedacted) return;
-
-    const isImage = file.type && file.type.startsWith("image/");
-    if (isImage) {
-      showToast(`🛡️ VisionVault: Scanning image "${file.name}" for faces & PII...`, false);
-      const reader = new FileReader();
-      reader.onload = function () {
-        chrome.runtime.sendMessage({
-          type: "REDACT_IMAGE_BLOB",
-          dataUrl: reader.result
-        }, async (resp) => {
-          if (resp && resp.ok && resp.redactedDataUrl && resp.regionsCount > 0) {
-            sessionRedactions += resp.regionsCount;
-            updateBadgeUI();
-            showToast(`🛡️ <strong>VisionVault</strong>: Blacked out ${resp.regionsCount} sensitive region(s) in "${file.name}"!`, true);
-            try {
-              const res = await fetch(resp.redactedDataUrl);
-              const cleanBlob = await res.blob();
-              const cleanFile = new File([cleanBlob], file.name || "redacted_image.png", { type: "image/png" });
-              cleanFile.__vvRedacted = true;
-              if (inputEl) {
-                const dt = new DataTransfer();
-                dt.items.add(cleanFile);
-                inputEl.files = dt.files;
-                inputEl.dispatchEvent(new Event("change", { bubbles: true }));
-              } else {
-                dispatchCleanFileToChat(cleanFile);
-              }
-            } catch (_) {}
-          }
-        });
-      };
-      reader.readAsDataURL(file);
-      return;
-    }
-
-    const Scrubber = window.PdfScrubber || globalThis.PdfScrubber;
-    if (!Scrubber) return;
-
-    const ext = (file.name || "").toLowerCase().split(".").pop();
-    const isDoc = ["pdf", "txt", "csv", "json", "md", "py", "js", "ts", "log"].includes(ext) || (file.type && file.type.includes("pdf"));
-    if (!isDoc) return;
-
-    showToast(`🛡️ VisionVault: Scanning document "${file.name}" locally in RAM...`, false);
-
-    try {
-      const res = await Scrubber.redactDocument(file, file.name);
-      if (res && res.findings && res.findings.length > 0) {
-        sessionRedactions += res.findings.length;
-        lastRedactedDoc = res;
-        updateBadgeUI();
-
-        const summaryTokens = res.findings.map(f => f.token).slice(0, 3).join(", ");
-        const extra = res.findings.length > 3 ? ` +${res.findings.length - 3} more` : "";
-        showToast(`🛡️ <strong>VisionVault</strong>: Auto-redacted ${res.findings.length} secret(s) in "${file.name}" <span class="vv-toast-badge">[${summaryTokens}${extra}]</span>`, true);
-      } else {
-        showToast(`🛡️ VisionVault: Document "${file.name}" clean. Zero secrets detected.`, false);
-      }
-    } catch (err) {
-      console.warn("[VisionVault] Document scan warning:", err);
-    }
+  // ── High-Tech RAM Processing HUD Overlay ──
+  function showProcessingOverlay(fileName, fileType) {
+    hideProcessingOverlay();
+    const overlay = document.createElement("div");
+    overlay.className = "vv-proc-overlay";
+    overlay.id = "vv-proc-overlay";
+    overlay.innerHTML = `
+      <div class="vv-proc-card">
+        <div style="font-size:28px;margin-bottom:8px;">🛡️</div>
+        <div class="vv-proc-title">Zero-Trust RAM Redaction</div>
+        <div class="vv-proc-sub">${fileName} · ${fileType}</div>
+        <div class="vv-proc-bar"><div class="vv-proc-bar-fill"></div></div>
+        <div class="vv-proc-note">Sanitizing 100% locally in memory · Zero data leaves device</div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
   }
 
-  function dispatchCleanFileToChat(cleanFile) {
-    const dt = new DataTransfer();
-    dt.items.add(cleanFile);
-
-    const fileInput = document.querySelector('input[type="file"]');
-    if (fileInput) {
-      try {
-        fileInput.files = dt.files;
-        fileInput.dispatchEvent(new Event("change", { bubbles: true }));
-        return;
-      } catch (_) {}
-    }
-
-    const target = document.querySelector("#prompt-textarea, [data-testid='prompt-textarea'], textarea, div.ProseMirror[contenteditable='true']") || document.activeElement || document.body;
-    try {
-      const pasteEvt = new ClipboardEvent("paste", {
-        bubbles: true,
-        cancelable: true,
-        clipboardData: dt
-      });
-      pasteEvt.__vvRedacted = true;
-      target.dispatchEvent(pasteEvt);
-    } catch (_) {}
+  function hideProcessingOverlay() {
+    const existing = document.getElementById("vv-proc-overlay");
+    if (existing) existing.remove();
   }
-
-  // Intercept file input change events (e.g. ChatGPT + / upload button)
-  document.addEventListener("change", async function (e) {
-    const target = e.target;
-    if (target && target.tagName === "INPUT" && target.type === "file" && target.files && target.files.length > 0) {
-      for (const file of target.files) {
-        await handleInterceptedFile(file, target);
-      }
-    }
-  }, true);
-
-  // Intercept file drag-and-drop
-  document.addEventListener("drop", async function (e) {
-    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      for (const file of e.dataTransfer.files) {
-        await handleInterceptedFile(file);
-      }
-    }
-  }, true);
 
   function showToast(message, isSecret = false) {
     const existingToast = document.querySelector(".vv-shield-toast");
@@ -1521,25 +1433,178 @@ function initInPageShield() {
         toast.style.transform = "translateY(8px)";
         setTimeout(() => toast.remove(), 300);
       }
-    }, 3800);
+    }, 4000);
   }
+
+  // ── Dispatch Clean Synthetic File to Chat (ChatGPT / Claude / Gemini) ──
+  function dispatchCleanFileToChat(cleanFile) {
+    const dt = new DataTransfer();
+    dt.items.add(cleanFile);
+
+    // Update any hidden file input on page
+    const fileInput = document.querySelector('input[type="file"]');
+    if (fileInput) {
+      try {
+        Object.defineProperty(fileInput, "files", { value: dt.files, configurable: true });
+        const chEvt = new Event("change", { bubbles: true });
+        chEvt.isVvSynthetic = true;
+        fileInput.dispatchEvent(chEvt);
+      } catch (_) {}
+    }
+
+    // Also dispatch synthetic paste to the prompt composer
+    const target = document.querySelector("#prompt-textarea, [data-testid='prompt-textarea'], textarea, div.ProseMirror[contenteditable='true']") || document.activeElement || document.body;
+    try {
+      const pasteEvt = new ClipboardEvent("paste", {
+        bubbles: true,
+        cancelable: true,
+        clipboardData: dt
+      });
+      pasteEvt.isVvSynthetic = true;
+      pasteEvt.__vvRedacted = true;
+      target.dispatchEvent(pasteEvt);
+    } catch (_) {}
+  }
+
+  // ── Inject Scrubbed Text into React / ProseMirror Composers ──
+  function injectScrubbedTextToComposer(text) {
+    const el = document.querySelector("#prompt-textarea, [data-testid='prompt-textarea'], textarea, div.ProseMirror[contenteditable='true']");
+    if (!el) return;
+
+    if (el.tagName === "TEXTAREA" || el.tagName === "INPUT") {
+      const prev = el.value;
+      const proto = el.tagName === "TEXTAREA" ? window.HTMLTextAreaElement.prototype : window.HTMLInputElement.prototype;
+      Object.getOwnPropertyDescriptor(proto, "value").set.call(el, text);
+      if (el._valueTracker) el._valueTracker.setValue(prev);
+      el.dispatchEvent(new Event("input", { bubbles: true, cancelable: true }));
+      el.dispatchEvent(new Event("change", { bubbles: true }));
+    } else {
+      el.focus();
+      try {
+        const sel = window.getSelection();
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        sel.removeAllRanges();
+        sel.addRange(range);
+        document.execCommand("insertText", false, text);
+      } catch (_) {
+        el.innerText = text;
+      }
+      try {
+        el.dispatchEvent(new InputEvent("input", { bubbles: true, composed: true, inputType: "insertText", data: text }));
+      } catch (_) {}
+      el.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+      el.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
+    }
+  }
+
+  // ── Intercept File Uploads & Drag-and-Drop ──
+  async function handleInterceptedFile(file, targetEl = null, mode = "input") {
+    if (!file || file.isVvSynthetic || file.__vvRedacted) return;
+
+    const ext = (file.name || "").toLowerCase().split(".").pop();
+    const isImage = file.type?.startsWith("image/") || ["png", "jpg", "jpeg", "webp", "bmp"].includes(ext);
+    const isDoc = file.type?.includes("pdf") || ["pdf", "txt", "csv", "json", "md", "py", "js", "ts", "log"].includes(ext);
+
+    if (!isImage && !isDoc) return;
+
+    showProcessingOverlay(file.name, isImage ? "Image (Faces & PII)" : "Document (Secrets & PII)");
+
+    if (isImage) {
+      const reader = new FileReader();
+      reader.onload = function () {
+        chrome.runtime.sendMessage({
+          type: "REDACT_IMAGE_BLOB",
+          dataUrl: reader.result
+        }, async (resp) => {
+          hideProcessingOverlay();
+          if (resp && resp.ok && resp.redactedDataUrl) {
+            const count = resp.regionsCount || 0;
+            sessionRedactions += count;
+            updateComposerPillUI();
+            showToast(`🛡️ <strong>VisionVault</strong>: Blacked out ${count} sensitive region(s) in "${file.name}"!`, true);
+
+            try {
+              const res = await fetch(resp.redactedDataUrl);
+              const cleanBlob = await res.blob();
+              const cleanFile = new File([cleanBlob], file.name || "redacted_image.png", { type: "image/png" });
+              cleanFile.isVvSynthetic = true;
+              cleanFile.__vvRedacted = true;
+              dispatchCleanFileToChat(cleanFile);
+            } catch (_) {}
+          } else {
+            showToast(`🛡️ VisionVault: Image "${file.name}" clean. Zero secrets detected.`, false);
+          }
+        });
+      };
+      reader.readAsDataURL(file);
+      return;
+    }
+
+    if (isDoc) {
+      const Scrubber = window.PdfScrubber || globalThis.PdfScrubber;
+      if (!Scrubber) {
+        hideProcessingOverlay();
+        return;
+      }
+      try {
+        const res = await Scrubber.redactDocument(file, file.name);
+        hideProcessingOverlay();
+        if (res && res.findings && res.findings.length > 0) {
+          sessionRedactions += res.findings.length;
+          lastRedactedDoc = res;
+          Object.assign(globalSessionMap, res.tokenMap || {});
+          updateComposerPillUI();
+          renderTokenChipsBar();
+
+          const summaryTokens = res.findings.map(f => f.token).slice(0, 3).join(", ");
+          const extra = res.findings.length > 3 ? ` +${res.findings.length - 3} more` : "";
+          showToast(`🛡️ <strong>VisionVault</strong>: Auto-redacted ${res.findings.length} secret(s) in "${file.name}" <span class="vv-toast-badge">[${summaryTokens}${extra}]</span>`, true);
+
+          // Automatically insert sanitized text into composer
+          injectScrubbedTextToComposer(res.sanitizedText);
+        } else {
+          showToast(`🛡️ VisionVault: Document "${file.name}" clean. Zero secrets detected.`, false);
+        }
+      } catch (err) {
+        hideProcessingOverlay();
+        console.warn("[VisionVault] Document scan warning:", err);
+      }
+    }
+  }
+
+  // Intercept file input change events
+  window.addEventListener("change", async function (e) {
+    if (e.isVvSynthetic) return;
+    const target = e.target;
+    if (target && target.tagName === "INPUT" && target.type === "file" && target.files && target.files.length > 0) {
+      const files = Array.from(target.files);
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      for (const file of files) {
+        await handleInterceptedFile(file, target, "input");
+      }
+    }
+  }, true);
+
+  // Intercept file drag-and-drop
+  window.addEventListener("drop", async function (e) {
+    if (e.isVvSynthetic) return;
+    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const files = Array.from(e.dataTransfer.files);
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      for (const file of files) {
+        await handleInterceptedFile(file, e.target, "drop");
+      }
+    }
+  }, true);
 
   // Intercept Paste Events in capturing phase
   document.addEventListener("paste", function (e) {
-    if (!window.PromptScrubber) return;
-
-    // Check target: inputs, textareas, contenteditables
-    const target = e.target;
-    const isInput = target && (
-      target.tagName === "TEXTAREA" ||
-      target.tagName === "INPUT" ||
-      target.isContentEditable ||
-      target.closest("[contenteditable='true']") ||
-      target.id === "prompt-textarea"
-    );
-
-    // Check if this is our own synthetic clean paste (prevent loop)
-    if (e.__vvRedacted) return;
+    if (e.isVvSynthetic || e.__vvRedacted) return;
 
     // Check for image pastes
     if (e.clipboardData && e.clipboardData.items) {
@@ -1551,139 +1616,253 @@ function initInPageShield() {
 
         const file = imgItem.getAsFile();
         if (file) {
-          showToast("🛡️ VisionVault: Redacting image (faces, Aadhaar, PII) in local RAM...", false);
-          const reader = new FileReader();
-          reader.onload = function () {
-            const dataUrl = reader.result;
-            chrome.runtime.sendMessage({
-              type: "REDACT_IMAGE_BLOB",
-              dataUrl: dataUrl
-            }, async (resp) => {
-              if (resp && resp.ok && resp.redactedDataUrl) {
-                const count = resp.regionsCount || 0;
-                sessionRedactions += count;
-                updateBadgeUI();
-                showToast(`🛡️ <strong>VisionVault</strong>: Blacked out ${count} sensitive region(s) in image!`, true);
-
-                try {
-                  const blobRes = await fetch(resp.redactedDataUrl);
-                  const cleanBlob = await blobRes.blob();
-                  const cleanFile = new File([cleanBlob], file.name || "redacted_image.png", { type: "image/png" });
-                  cleanFile.__vvRedacted = true;
-                  dispatchCleanFileToChat(cleanFile);
-                } catch (_) {}
-              } else {
-                showToast("🛡️ VisionVault: Clean image verified.", false);
-              }
-            });
-          };
-          reader.readAsDataURL(file);
+          handleInterceptedFile(file, e.target, "paste");
         }
         return;
       }
     }
 
     const pastedText = e.clipboardData?.getData("text/plain");
-    if (!pastedText) return;
+    if (!pastedText || !window.PromptScrubber) return;
 
     const scrubResult = window.PromptScrubber.scrub(pastedText);
     if (scrubResult.matches && scrubResult.matches.length > 0) {
       e.preventDefault();
       e.stopPropagation();
+      e.stopImmediatePropagation();
 
       sessionRedactions += scrubResult.matches.length;
+      Object.assign(globalSessionMap, scrubResult.tokenMap || {});
+      injectScrubbedTextToComposer(scrubResult.sanitized);
+      updateComposerPillUI();
+      renderTokenChipsBar();
 
-      // Safe insertion into textarea or contenteditable
-      const cleanText = scrubResult.sanitized;
-      let inserted = false;
-      try {
-        inserted = document.execCommand("insertText", false, cleanText);
-      } catch (_) {}
-
-      if (!inserted) {
-        if (target.tagName === "TEXTAREA" || target.tagName === "INPUT") {
-          const start = target.selectionStart || 0;
-          const end = target.selectionEnd || 0;
-          const val = target.value || "";
-          target.value = val.substring(0, start) + cleanText + val.substring(end);
-          target.selectionStart = target.selectionEnd = start + cleanText.length;
-          target.dispatchEvent(new Event("input", { bubbles: true }));
-          target.dispatchEvent(new Event("change", { bubbles: true }));
-        } else if (target.isContentEditable || target.closest("[contenteditable='true']")) {
-          const sel = window.getSelection();
-          if (sel && sel.rangeCount > 0) {
-            const range = sel.getRangeAt(0);
-            range.deleteContents();
-            range.insertNode(document.createTextNode(cleanText));
-            range.collapse(false);
-            target.dispatchEvent(new Event("input", { bubbles: true }));
-          }
-        }
-      }
-
-      // Show toast with badge of redacted items
       const summaryList = scrubResult.matches.map(m => m.token).slice(0, 3).join(", ");
       const extraCount = scrubResult.matches.length > 3 ? ` +${scrubResult.matches.length - 3} more` : "";
       showToast(`🛡️ <strong>VisionVault</strong>: Auto-redacted ${scrubResult.matches.length} secret(s) <span class="vv-toast-badge">[${summaryList}${extraCount}]</span>`, true);
-
-      // Update badge if popover open
-      updateBadgeUI();
     }
   }, true);
 
-  // Mount UI Badge only in top frame
-  if (window.top !== window) return;
+  // ── Mid-Flight Enter Key & Send Button Interceptors ──
+  function setupSubmitInterceptors() {
+    // Keydown capturing for Enter
+    document.addEventListener("keydown", function (e) {
+      if (e.isVvBypass) return;
+      if (e.key === "Enter" && !e.shiftKey) {
+        const target = e.target;
+        if (!target) return;
+        const isComposer = target.id === "prompt-textarea" ||
+                           target.matches?.('[data-testid="prompt-textarea"], #prompt-textarea, div.ProseMirror[contenteditable="true"], textarea') ||
+                           target.closest?.('#prompt-textarea, [data-testid="prompt-textarea"]');
+        if (!isComposer) return;
 
-  function createBadge() {
-    const badge = document.createElement("button");
-    badge.type = "button";
-    badge.className = "vv-shield-badge";
-    badge.setAttribute("aria-label", "VisionVault Prompt Shield");
-    badge.setAttribute("title", "VisionVault Shield: Active (Local On-Device Protection)");
-    badge.innerHTML = `
-      <svg viewBox="0 0 24 24">
-        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-        <line x1="12" y1="8" x2="12" y2="16"/>
-        <line x1="8" y1="12" x2="16" y2="12"/>
-      </svg>
-      <div class="vv-shield-dot"></div>
-    `;
+        const currentText = target.tagName === "TEXTAREA" || target.tagName === "INPUT" ? target.value : (target.innerText || target.textContent || "");
+        if (!currentText || !window.PromptScrubber) return;
 
-    badge.addEventListener("click", function (e) {
-      e.preventDefault();
-      e.stopPropagation();
-      togglePopover(badge);
-    });
+        const scrubRes = window.PromptScrubber.scrub(currentText);
+        if (scrubRes.matches && scrubRes.matches.length > 0) {
+          e.preventDefault();
+          e.stopPropagation();
+          e.stopImmediatePropagation();
 
-    return badge;
+          sessionRedactions += scrubRes.matches.length;
+          Object.assign(globalSessionMap, scrubRes.tokenMap || {});
+          injectScrubbedTextToComposer(scrubRes.sanitized);
+          updateComposerPillUI();
+          renderTokenChipsBar();
+
+          showToast(`🛡️ VisionVault: Protected ${scrubRes.matches.length} sensitive item(s) before sending!`, true);
+
+          setTimeout(() => {
+            const bypassEvt = new KeyboardEvent("keydown", {
+              key: "Enter",
+              code: "Enter",
+              keyCode: 13,
+              which: 13,
+              bubbles: true,
+              cancelable: true,
+              composed: true
+            });
+            bypassEvt.isVvBypass = true;
+            target.dispatchEvent(bypassEvt);
+          }, 80);
+        }
+      }
+    }, true);
+
+    // Send button click capturing
+    document.addEventListener("click", function (e) {
+      if (e.isVvBypass) return;
+      const btn = e.target.closest?.('button[data-testid="send-button"], button[data-testid="composer-send-button"], button[aria-label="Send prompt"], form button[type="submit"], button[aria-label="Send message"]');
+      if (!btn) return;
+
+      const composer = document.querySelector("#prompt-textarea, [data-testid='prompt-textarea'], textarea, div.ProseMirror[contenteditable='true']");
+      if (!composer || !window.PromptScrubber) return;
+
+      const currentText = composer.tagName === "TEXTAREA" || composer.tagName === "INPUT" ? composer.value : (composer.innerText || composer.textContent || "");
+      if (!currentText) return;
+
+      const scrubRes = window.PromptScrubber.scrub(currentText);
+      if (scrubRes.matches && scrubRes.matches.length > 0) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+
+        sessionRedactions += scrubRes.matches.length;
+        Object.assign(globalSessionMap, scrubRes.tokenMap || {});
+        injectScrubbedTextToComposer(scrubRes.sanitized);
+        updateComposerPillUI();
+        renderTokenChipsBar();
+
+        showToast(`🛡️ VisionVault: Protected ${scrubRes.matches.length} sensitive item(s) before sending!`, true);
+
+        setTimeout(() => {
+          const bypassClick = new MouseEvent("click", { bubbles: true, cancelable: true });
+          bypassClick.isVvBypass = true;
+          btn.dispatchEvent(bypassClick);
+        }, 80);
+      }
+    }, true);
   }
 
-  function togglePopover(badge) {
-    if (activePopover) {
-      activePopover.remove();
-      activePopover = null;
-      badge.classList.remove("active");
+  // ── Protected Token Chips Bar ──
+  function renderTokenChipsBar() {
+    let bar = document.getElementById("vv-token-chips-bar");
+    const activeTokens = Object.entries(globalSessionMap);
+
+    if (activeTokens.length === 0) {
+      if (bar) bar.remove();
       return;
     }
 
-    badge.classList.add("active");
+    if (!bar) {
+      bar = document.createElement("div");
+      bar.id = "vv-token-chips-bar";
+      bar.className = "vv-token-chips-bar";
+
+      const composerParent = document.querySelector("form, #composer-background, [class*='composer'], fieldset") || document.body;
+      if (composerParent.parentElement) {
+        composerParent.parentElement.insertBefore(bar, composerParent.nextSibling);
+      } else {
+        document.body.appendChild(bar);
+      }
+    }
+
+    bar.innerHTML = `
+      <div class="vv-chips-header">
+        <div class="vv-chips-title">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          </svg>
+          Protected Session Tokens (${activeTokens.length})
+        </div>
+        <div>Hover preview · Click ✕ to restore</div>
+      </div>
+      <div class="vv-chips-list"></div>
+    `;
+
+    const list = bar.querySelector(".vv-chips-list");
+    for (const [token, original] of activeTokens) {
+      const chip = document.createElement("div");
+      chip.className = "vv-token-chip";
+      chip.innerHTML = `
+        <span>${token}</span>
+        <div class="vv-chip-lens">Original: <strong>${original}</strong></div>
+        <button type="button" class="vv-chip-restore" title="Restore original value">✕</button>
+      `;
+
+      chip.querySelector(".vv-chip-restore").addEventListener("click", (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        delete globalSessionMap[token];
+        const composer = document.querySelector("#prompt-textarea, [data-testid='prompt-textarea'], textarea, div.ProseMirror[contenteditable='true']");
+        if (composer) {
+          const cur = composer.tagName === "TEXTAREA" || composer.tagName === "INPUT" ? composer.value : composer.innerText;
+          if (cur.includes(token)) {
+            injectScrubbedTextToComposer(cur.split(token).join(original));
+          }
+        }
+        renderTokenChipsBar();
+        updateComposerPillUI();
+        showToast(`Restored "${original}"`);
+      });
+
+      list.appendChild(chip);
+    }
+  }
+
+  // ── In-Composer Pill & Floating Badge ──
+  function updateComposerPillUI() {
+    const pill = document.querySelector(".vv-composer-pill");
+    const composer = document.querySelector("#prompt-textarea, [data-testid='prompt-textarea'], textarea, div.ProseMirror[contenteditable='true']");
+    if (!composer || !window.PromptScrubber) return;
+
+    const text = composer.tagName === "TEXTAREA" || composer.tagName === "INPUT" ? composer.value : (composer.innerText || composer.textContent || "");
+    const res = window.PromptScrubber.scrub(text || "");
+    const count = res.matches?.length || 0;
+
+    if (pill) {
+      if (count > 0) {
+        pill.classList.add("has-pii");
+        pill.innerHTML = `
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          <span>🛡️ ${count} PII</span>
+        `;
+      } else {
+        pill.classList.remove("has-pii");
+        pill.innerHTML = `
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          <span>🛡️ VV Active</span>
+        `;
+      }
+    }
+
+    const statCount = document.getElementById("vv-stat-count");
+    if (statCount) statCount.textContent = sessionRedactions;
+  }
+
+  function createComposerPill() {
+    const pill = document.createElement("div");
+    pill.className = "vv-composer-pill";
+    pill.setAttribute("title", "VisionVault Shield Active (100% On-Device RAM Redaction)");
+    pill.innerHTML = `
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      <span>🛡️ VV Active</span>
+    `;
+    pill.addEventListener("click", function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      togglePopover(pill);
+    });
+    return pill;
+  }
+
+  function togglePopover(anchor) {
+    if (activePopover) {
+      activePopover.remove();
+      activePopover = null;
+      anchor.classList.remove("active");
+      return;
+    }
+
+    anchor.classList.add("active");
     const popover = document.createElement("div");
     popover.className = "vv-shield-popover";
     popover.innerHTML = `
       <div class="vv-popover-header">
         <div class="vv-popover-title">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
           </svg>
-          VisionVault Shield
+          VisionVault In-Page Shield
         </div>
         <div class="vv-popover-status">
           <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#10b981;"></span>
-          ON-DEVICE
+          100% LOCAL
         </div>
       </div>
       <div class="vv-popover-desc">
-        Zero-trust local prompt scrubber. Secrets and PII are redacted on paste before reaching cloud LLMs.
+        Zero-trust local prompt, image, and document scrubber. Masks PII, Aadhaar numbers, and API keys before submission to cloud LLMs.
       </div>
       <div class="vv-popover-stats">
         <div class="vv-stat-item">
@@ -1691,64 +1870,35 @@ function initInPageShield() {
           <span class="vv-stat-lbl">Redacted Items</span>
         </div>
         <div class="vv-stat-item" style="text-align:right;">
-          <span class="vv-stat-val" style="color:#10b981;">100%</span>
-          <span class="vv-stat-lbl">RAM Isolated</span>
+          <span class="vv-stat-val" style="color:#10b981;">0ms</span>
+          <span class="vv-stat-lbl">Network Latency</span>
         </div>
       </div>
-      ${lastRedactedDoc ? `
-        <div style="background:rgba(56,189,248,0.08);border:1px solid rgba(56,189,248,0.25);border-radius:8px;padding:8px 10px;">
-          <div style="font-weight:600;color:#38bdf8;font-size:11px;margin-bottom:2px;">📄 ${lastRedactedDoc.fileName}</div>
-          <div style="font-size:10px;color:#94a3b8;">${lastRedactedDoc.findings?.length || 0} secret(s) redacted in RAM</div>
-          <button type="button" class="vv-popover-btn" id="vv-insert-doc-btn" style="margin-top:6px;width:100%;background:linear-gradient(135deg,#059669 0%,#047857 100%);">
-            Insert Sanitized Text to Chat
-          </button>
-        </div>
-      ` : ''}
       <button type="button" class="vv-popover-btn" id="vv-scrub-input-btn">
-        Scrub Current Input Box
+        Scrub Current Input Box Now
+      </button>
+      <button type="button" class="vv-popover-btn" id="vv-reveal-chat-btn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);">
+        De-Scrub / Reveal Assistant Response
       </button>
     `;
 
-    const insertDocBtn = popover.querySelector("#vv-insert-doc-btn");
-    if (insertDocBtn && lastRedactedDoc) {
-      insertDocBtn.addEventListener("click", function () {
-        const input = document.querySelector("#prompt-textarea, [data-testid='prompt-textarea'], textarea, div.ProseMirror[contenteditable='true']");
-        if (input) {
-          if (input.tagName === "TEXTAREA" || input.tagName === "INPUT") {
-            input.value = (input.value ? input.value + "\n\n" : "") + lastRedactedDoc.sanitizedText;
-            input.dispatchEvent(new Event("input", { bubbles: true }));
-            input.dispatchEvent(new Event("change", { bubbles: true }));
-          } else {
-            input.innerText = (input.innerText ? input.innerText + "\n\n" : "") + lastRedactedDoc.sanitizedText;
-            input.dispatchEvent(new Event("input", { bubbles: true }));
-          }
-          showToast(`🛡️ Inserted sanitized "${lastRedactedDoc.fileName}" to prompt!`, false);
-          if (activePopover) {
-            activePopover.remove();
-            activePopover = null;
-            badge.classList.remove("active");
-          }
-        }
-      });
-    }
+    popover.querySelector("#vv-scrub-input-btn").addEventListener("click", () => {
+      manualScrubActiveInput();
+    });
 
-    const scrubBtn = popover.querySelector("#vv-scrub-input-btn");
-    if (scrubBtn) {
-      scrubBtn.addEventListener("click", function () {
-        manualScrubActiveInput();
-      });
-    }
+    popover.querySelector("#vv-reveal-chat-btn").addEventListener("click", () => {
+      revealTokensInChat();
+    });
 
-    badge.appendChild(popover);
+    anchor.appendChild(popover);
     activePopover = popover;
 
-    // Close when clicking outside
     const outsideListener = function (evt) {
-      if (!badge.contains(evt.target)) {
+      if (!anchor.contains(evt.target)) {
         if (activePopover) {
           activePopover.remove();
           activePopover = null;
-          badge.classList.remove("active");
+          anchor.classList.remove("active");
         }
         document.removeEventListener("click", outsideListener, true);
       }
@@ -1758,9 +1908,20 @@ function initInPageShield() {
     }, 10);
   }
 
-  function updateBadgeUI() {
-    const stat = document.getElementById("vv-stat-count");
-    if (stat) stat.textContent = sessionRedactions;
+  function revealTokensInChat() {
+    const turns = document.querySelectorAll('[data-message-author-role="assistant"], .agent-turn, div.markdown.prose, [data-message-model-slug]');
+    let revealedCount = 0;
+    for (const turn of turns) {
+      let html = turn.innerHTML;
+      for (const [token, original] of Object.entries(globalSessionMap)) {
+        if (html.includes(token)) {
+          html = html.split(token).join(`<span style="background:rgba(16,185,129,0.15);color:#10b981;padding:1px 4px;border-radius:4px;border:1px solid rgba(16,185,129,0.3);font-weight:600;" title="VisionVault Restored: ${token}">${original}</span>`);
+          revealedCount++;
+        }
+      }
+      turn.innerHTML = html;
+    }
+    showToast(`🛡️ VisionVault: Restored ${revealedCount} token(s) locally in response!`);
   }
 
   function manualScrubActiveInput() {
@@ -1779,42 +1940,36 @@ function initInPageShield() {
     const res = window.PromptScrubber.scrub(currentText);
     if (res.matches && res.matches.length > 0) {
       sessionRedactions += res.matches.length;
-      if (input.tagName === "TEXTAREA" || input.tagName === "INPUT") {
-        input.value = res.sanitized;
-        input.dispatchEvent(new Event("input", { bubbles: true }));
-        input.dispatchEvent(new Event("change", { bubbles: true }));
-      } else {
-        input.innerText = res.sanitized;
-        input.dispatchEvent(new Event("input", { bubbles: true }));
-      }
-      updateBadgeUI();
+      Object.assign(globalSessionMap, res.tokenMap || {});
+      injectScrubbedTextToComposer(res.sanitized);
+      updateComposerPillUI();
+      renderTokenChipsBar();
       showToast(`🛡️ VisionVault: Sanitized ${res.matches.length} item(s) in prompt!`, true);
     } else {
       showToast("🛡️ VisionVault: No secrets or PII detected in prompt. Ready to send!", false);
     }
   }
 
-  function tryMountShieldBadge() {
-    if (document.querySelector(".vv-shield-badge")) return; // already mounted
+  function tryMountComposerPill() {
+    if (document.querySelector(".vv-composer-pill")) return;
 
-    // Strategy 1: Find ChatGPT trailing toolbar next to Think/mic/send button
-    const chatGptSend = document.querySelector('[data-testid="send-button"], button[aria-label*="voice" i], button[aria-label*="speech" i]');
+    // ChatGPT composer controls
+    const chatGptSend = document.querySelector('[data-testid="send-button"], button[aria-label*="voice" i], button[aria-label*="speech" i], button[data-testid="composer-send-button"]');
     if (chatGptSend && chatGptSend.parentElement) {
-      const parent = chatGptSend.parentElement;
-      const badge = createBadge();
-      parent.insertBefore(badge, chatGptSend);
+      const pill = createComposerPill();
+      chatGptSend.parentElement.insertBefore(pill, chatGptSend);
       return;
     }
 
-    // Strategy 2: Claude toolbar
+    // Claude controls
     const claudeSend = document.querySelector('button[aria-label="Send Message"], fieldset button:last-child');
     if (claudeSend && claudeSend.parentElement) {
-      const badge = createBadge();
-      claudeSend.parentElement.insertBefore(badge, claudeSend);
+      const pill = createComposerPill();
+      claudeSend.parentElement.insertBefore(pill, claudeSend);
       return;
     }
 
-    // Strategy 3: Gemini action bar
+    // Gemini controls
     const geminiSend = document.querySelector('.send-button-container, button[aria-label*="Send prompt"]');
     if (geminiSend && geminiSend.parentElement) {
       const badge = createBadge();

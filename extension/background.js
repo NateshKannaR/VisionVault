@@ -2201,6 +2201,58 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       .catch(e => sendResponse({ ok: false, error: e.message }));
     return true;
   }
+  if (msg.type === "REDACT_IMAGE_BLOB") {
+    (async () => {
+      try {
+        if (typeof ensureOffscreenDocument === "function") {
+          await ensureOffscreenDocument();
+        }
+        const rawScreenshot = msg.dataUrl;
+        if (!rawScreenshot) {
+          sendResponse({ ok: false, error: "Missing dataUrl in request" });
+          return;
+        }
+
+        const visionResp = await new Promise((resolve) => {
+          chrome.runtime.sendMessage({
+            target: "offscreen",
+            type: "DETECT_PII",
+            payload: {
+              rawScreenshot,
+              domRegions: [],
+              enableOCR: true,
+              enableFaceDetection: true
+            }
+          }, (res) => {
+            if (chrome.runtime.lastError) {
+              resolve({ ok: false, error: chrome.runtime.lastError.message });
+            } else {
+              resolve(res || { ok: false });
+            }
+          });
+        });
+
+        const mergedRegions = visionResp?.result?.mergedRegions || [];
+        console.log(`[vision] In-page image scan detected ${mergedRegions.length} sensitive region(s).`);
+
+        if (mergedRegions.length === 0) {
+          sendResponse({ ok: true, redactedDataUrl: rawScreenshot, regionsCount: 0 });
+          return;
+        }
+
+        const redactedImage = await redactImage(rawScreenshot, mergedRegions, 0, 0, "black");
+        sendResponse({
+          ok: true,
+          redactedDataUrl: redactedImage,
+          regionsCount: mergedRegions.length
+        });
+      } catch (err) {
+        console.error("[vision] REDACT_IMAGE_BLOB error:", err);
+        sendResponse({ ok: false, error: err.message || String(err) });
+      }
+    })();
+    return true;
+  }
   if (msg.type === "PROVIDE_INPUT") {
     provideInput(msg.payload || {})
       .then(r => sendResponse(r))

@@ -1392,9 +1392,45 @@ function initInPageShield() {
   let activePopover = null;
   let lastRedactedDoc = null;
 
-  async function handleInterceptedFile(file) {
+  async function handleInterceptedFile(file, inputEl = null) {
+    if (!file || file.__vvRedacted) return;
+
+    const isImage = file.type && file.type.startsWith("image/");
+    if (isImage) {
+      showToast(`🛡️ VisionVault: Scanning image "${file.name}" for faces & PII...`, false);
+      const reader = new FileReader();
+      reader.onload = function () {
+        chrome.runtime.sendMessage({
+          type: "REDACT_IMAGE_BLOB",
+          dataUrl: reader.result
+        }, async (resp) => {
+          if (resp && resp.ok && resp.redactedDataUrl && resp.regionsCount > 0) {
+            sessionRedactions += resp.regionsCount;
+            updateBadgeUI();
+            showToast(`🛡️ <strong>VisionVault</strong>: Blacked out ${resp.regionsCount} sensitive region(s) in "${file.name}"!`, true);
+            try {
+              const res = await fetch(resp.redactedDataUrl);
+              const cleanBlob = await res.blob();
+              const cleanFile = new File([cleanBlob], file.name || "redacted_image.png", { type: "image/png" });
+              cleanFile.__vvRedacted = true;
+              if (inputEl) {
+                const dt = new DataTransfer();
+                dt.items.add(cleanFile);
+                inputEl.files = dt.files;
+                inputEl.dispatchEvent(new Event("change", { bubbles: true }));
+              } else {
+                dispatchCleanFileToChat(cleanFile);
+              }
+            } catch (_) {}
+          }
+        });
+      };
+      reader.readAsDataURL(file);
+      return;
+    }
+
     const Scrubber = window.PdfScrubber || globalThis.PdfScrubber;
-    if (!Scrubber || !file) return;
+    if (!Scrubber) return;
 
     const ext = (file.name || "").toLowerCase().split(".").pop();
     const isDoc = ["pdf", "txt", "csv", "json", "md", "py", "js", "ts", "log"].includes(ext) || (file.type && file.type.includes("pdf"));
@@ -1420,12 +1456,37 @@ function initInPageShield() {
     }
   }
 
+  function dispatchCleanFileToChat(cleanFile) {
+    const dt = new DataTransfer();
+    dt.items.add(cleanFile);
+
+    const fileInput = document.querySelector('input[type="file"]');
+    if (fileInput) {
+      try {
+        fileInput.files = dt.files;
+        fileInput.dispatchEvent(new Event("change", { bubbles: true }));
+        return;
+      } catch (_) {}
+    }
+
+    const target = document.querySelector("#prompt-textarea, [data-testid='prompt-textarea'], textarea, div.ProseMirror[contenteditable='true']") || document.activeElement || document.body;
+    try {
+      const pasteEvt = new ClipboardEvent("paste", {
+        bubbles: true,
+        cancelable: true,
+        clipboardData: dt
+      });
+      pasteEvt.__vvRedacted = true;
+      target.dispatchEvent(pasteEvt);
+    } catch (_) {}
+  }
+
   // Intercept file input change events (e.g. ChatGPT + / upload button)
   document.addEventListener("change", async function (e) {
     const target = e.target;
     if (target && target.tagName === "INPUT" && target.type === "file" && target.files && target.files.length > 0) {
       for (const file of target.files) {
-        await handleInterceptedFile(file);
+        await handleInterceptedFile(file, target);
       }
     }
   }, true);
@@ -1477,15 +1538,48 @@ function initInPageShield() {
       target.id === "prompt-textarea"
     );
 
-    if (!isInput) return;
+    // Check if this is our own synthetic clean paste (prevent loop)
+    if (e.__vvRedacted) return;
 
     // Check for image pastes
     if (e.clipboardData && e.clipboardData.items) {
-      for (const item of e.clipboardData.items) {
-        if (item.type && item.type.indexOf("image") !== -1) {
-          showToast("🛡️ VisionVault: Image paste detected — Zero-trust pipeline active", false);
-          break;
+      const imgItem = Array.from(e.clipboardData.items).find(it => it.type && it.type.startsWith("image/"));
+      if (imgItem) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+
+        const file = imgItem.getAsFile();
+        if (file) {
+          showToast("🛡️ VisionVault: Redacting image (faces, Aadhaar, PII) in local RAM...", false);
+          const reader = new FileReader();
+          reader.onload = function () {
+            const dataUrl = reader.result;
+            chrome.runtime.sendMessage({
+              type: "REDACT_IMAGE_BLOB",
+              dataUrl: dataUrl
+            }, async (resp) => {
+              if (resp && resp.ok && resp.redactedDataUrl) {
+                const count = resp.regionsCount || 0;
+                sessionRedactions += count;
+                updateBadgeUI();
+                showToast(`🛡️ <strong>VisionVault</strong>: Blacked out ${count} sensitive region(s) in image!`, true);
+
+                try {
+                  const blobRes = await fetch(resp.redactedDataUrl);
+                  const cleanBlob = await blobRes.blob();
+                  const cleanFile = new File([cleanBlob], file.name || "redacted_image.png", { type: "image/png" });
+                  cleanFile.__vvRedacted = true;
+                  dispatchCleanFileToChat(cleanFile);
+                } catch (_) {}
+              } else {
+                showToast("🛡️ VisionVault: Clean image verified.", false);
+              }
+            });
+          };
+          reader.readAsDataURL(file);
         }
+        return;
       }
     }
 

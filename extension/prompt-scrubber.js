@@ -104,7 +104,7 @@
       type: "aadhaar",
       label: "Aadhaar Number",
       token: "AADHAAR_NUMBER",
-      regex: /\b([2-9]\d{3}[\s-]{0,2}\d{4}[\s-]{0,2}\d{4})\b/g,
+      regex: /\b([1-9]\d{3}[\s-]{0,2}\d{4}[\s-]{0,2}\d{4})\b/g,
     },
     {
       type: "pan",

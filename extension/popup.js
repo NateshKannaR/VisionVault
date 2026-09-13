@@ -1543,3 +1543,132 @@ chrome.runtime.onMessage.addListener((msg) => {
     addLogEntry("refresh", `${label} (${d.markCount} elements, ${d.piiCount} masked)`, d.timings?.total || null);
   }
 });
+
+// ── Prompt Privacy Shield ───────────────────────────────────────────────────
+let activeTokenMap = {};
+
+function checkActiveAiChat() {
+  if (typeof chrome === "undefined" || !chrome.tabs) return;
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    const tab = tabs?.[0];
+    const url = tab?.url || "";
+    const card = $("chatDetectedCard");
+    const badge = $("activeChatBadge");
+    const btnLabel = $("scrubActiveChatBtnLabel");
+    if (!card) return;
+
+    if (/chatgpt\.com|chat\.openai\.com/i.test(url)) {
+      card.hidden = false;
+      if (badge) badge.textContent = "ChatGPT";
+      if (btnLabel) btnLabel.textContent = "Scrub Active ChatGPT Input";
+    } else if (/claude\.ai/i.test(url)) {
+      card.hidden = false;
+      if (badge) badge.textContent = "Claude";
+      if (btnLabel) btnLabel.textContent = "Scrub Active Claude Input";
+    } else if (/gemini\.google\.com/i.test(url)) {
+      card.hidden = false;
+      if (badge) badge.textContent = "Gemini";
+      if (btnLabel) btnLabel.textContent = "Scrub Active Gemini Input";
+    } else {
+      card.hidden = true;
+    }
+  });
+}
+checkActiveAiChat();
+
+// Scrub active chat input directly on the webpage
+if ($("scrubActiveChatBtn")) {
+  $("scrubActiveChatBtn").addEventListener("click", () => {
+    if (typeof chrome === "undefined" || !chrome.tabs) return;
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      const tabId = tabs?.[0]?.id;
+      if (!tabId) return;
+
+      chrome.tabs.sendMessage(tabId, { type: "SCRUB_CHAT_INPUT" }, (res) => {
+        if (chrome.runtime.lastError || !res || !res.ok) {
+          showStatus("chatScrubStatus", "error", res?.error || "Could not access chat input on this tab.");
+          setTimeout(() => hideStatus("chatScrubStatus"), 3000);
+          return;
+        }
+
+        if (res.tokenMap) {
+          activeTokenMap = { ...activeTokenMap, ...res.tokenMap };
+        }
+
+        const msg = res.stats.total > 0
+          ? `Scrubbed ${res.stats.secrets} secret(s) and ${res.stats.pii} PII item(s) in-place!`
+          : "No secrets or PII detected in chat input.";
+        showStatus("chatScrubStatus", "success", msg);
+        setTimeout(() => hideStatus("chatScrubStatus"), 3500);
+      });
+    });
+  });
+}
+
+// Interactive Prompt Scrubber
+if ($("scrubPromptBtn")) {
+  $("scrubPromptBtn").addEventListener("click", () => {
+    const raw = $("rawPromptInput")?.value || "";
+    if (!raw.trim()) return;
+
+    const res = globalThis.PromptScrubber ? globalThis.PromptScrubber.scrub(raw, activeTokenMap) : { cleanText: raw, findings: [], tokenMap: {}, stats: { total: 0, secrets: 0, pii: 0 } };
+    activeTokenMap = { ...activeTokenMap, ...res.tokenMap };
+
+    $("scrubbedPromptOutput").value = res.cleanText;
+    $("scrubFindingsCount").textContent = String(res.stats.total);
+
+    const list = $("scrubFindingsList");
+    list.innerHTML = "";
+    if (res.findings.length === 0) {
+      list.innerHTML = '<span style="font-size:11px;color:var(--ok,#4ade80);">No secrets or PII detected — prompt is safe!</span>';
+    } else {
+      res.findings.forEach((f) => {
+        const span = document.createElement("span");
+        span.className = "badge";
+        span.style.background = f.category === "secret" ? "rgba(244,63,94,0.2)" : "rgba(234,179,8,0.2)";
+        span.style.color = f.category === "secret" ? "#f43f5e" : "#eab308";
+        span.style.border = "1px solid currentColor";
+        span.textContent = `${f.label}: ${f.token}`;
+        list.appendChild(span);
+      });
+    }
+
+    $("scrubFindingsWrap").hidden = false;
+  });
+}
+
+if ($("clearPromptBtn")) {
+  $("clearPromptBtn").addEventListener("click", () => {
+    if ($("rawPromptInput")) $("rawPromptInput").value = "";
+    if ($("scrubFindingsWrap")) $("scrubFindingsWrap").hidden = true;
+    if ($("scrubbedPromptOutput")) $("scrubbedPromptOutput").value = "";
+  });
+}
+
+if ($("copyCleanPromptBtn")) {
+  $("copyCleanPromptBtn").addEventListener("click", async () => {
+    const text = $("scrubbedPromptOutput")?.value || "";
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      const span = $("copyCleanPromptBtn").querySelector("span");
+      if (span) {
+        const originalText = span.textContent;
+        span.textContent = "Copied to clipboard!";
+        setTimeout(() => { span.textContent = originalText; }, 2000);
+      }
+    } catch (_) {}
+  });
+}
+
+// De-Scrub / Unmask
+if ($("unmaskBtn")) {
+  $("unmaskBtn").addEventListener("click", () => {
+    const resp = $("llmResponseInput")?.value || "";
+    if (!resp.trim()) return;
+
+    const restored = globalThis.PromptScrubber ? globalThis.PromptScrubber.unmask(resp, activeTokenMap) : resp;
+    $("unmaskedOutput").value = restored;
+    $("unmaskedWrap").hidden = false;
+  });
+}

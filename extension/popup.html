@@ -84,6 +84,7 @@
   <button class="tab" data-tab="vault" role="tab" aria-selected="false" aria-controls="panel-vault">Vault</button>
   <button class="tab" data-tab="history" role="tab" aria-selected="false" aria-controls="panel-history">History</button>
   <button class="tab" data-tab="privacy" role="tab" aria-selected="false" aria-controls="panel-privacy">Privacy</button>
+  <button class="tab" data-tab="shield" role="tab" aria-selected="false" aria-controls="panel-shield">Prompt Shield</button>
   <button class="tab" data-tab="settings" role="tab" aria-selected="false" aria-controls="panel-settings">Settings</button>
 </nav>
 
@@ -683,8 +684,93 @@
       <p class="diag-body" id="serverInfo">Checking…</p>
     </div>
   </section>
+
+  <!-- ── PROMPT PRIVACY SHIELD ────────────────────────────────────────────── -->
+  <section id="panel-shield" class="panel" role="tabpanel" tabindex="0">
+    <div class="protect-banner">
+      <span class="protect-dot" aria-hidden="true"></span>
+      <div class="protect-text">
+        <strong>Prompt Privacy Shield</strong>
+        <span>100% in-memory secret &amp; PII sanitization for LLMs</span>
+      </div>
+    </div>
+
+    <!-- Active Chat Detector & 1-Click Scrubber -->
+    <div class="card" id="chatDetectedCard">
+      <div class="card-head">
+        <span><svg class="ic" viewBox="0 0 24 24"><use href="#i-shield"/></svg> Active AI Chat Detected</span>
+        <span class="pill ok" id="activeChatBadge">ChatGPT</span>
+      </div>
+      <p style="font-size: 11px; color: var(--fg-muted, #94a3b8); margin: 6px 0 10px 0;">
+        Sanitize prompt directly inside the active chat page before sending.
+      </p>
+      <button class="btn btn-primary" id="scrubActiveChatBtn" style="width: 100%;">
+        <svg class="ic" viewBox="0 0 24 24"><use href="#i-shield"/></svg>
+        <span id="scrubActiveChatBtnLabel">Scrub Active Chat Input</span>
+      </button>
+      <div class="toast" id="chatScrubStatus" role="status" aria-live="polite"></div>
+    </div>
+
+    <!-- Interactive Prompt Scrubber -->
+    <div class="card">
+      <div class="card-head">
+        <span><svg class="ic" viewBox="0 0 24 24"><use href="#i-type"/></svg> Scrub Any Prompt / Code</span>
+      </div>
+      <p style="font-size: 11px; color: var(--fg-muted, #94a3b8); margin-bottom: 8px;">
+        Paste your prompt or code with API keys, credentials, or personal info:
+      </p>
+      <textarea id="rawPromptInput" class="task-input" style="min-height: 80px; width: 100%; resize: vertical;" placeholder="e.g. my api key is sk-46dfgh... or AWS key AKIA..."></textarea>
+      
+      <div style="display: flex; gap: 8px; margin-top: 8px;">
+        <button class="btn btn-primary" id="scrubPromptBtn" style="flex: 1;">
+          <svg class="ic" viewBox="0 0 24 24"><use href="#i-shield"/></svg>
+          <span>Scrub Prompt</span>
+        </button>
+        <button class="btn btn-ghost btn-sm" id="clearPromptBtn">Clear</button>
+      </div>
+
+      <!-- Findings Badges -->
+      <div id="scrubFindingsWrap" hidden style="margin-top: 10px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: var(--fg-muted, #94a3b8); margin-bottom: 4px;">
+          <span>Detected Secrets &amp; PII:</span>
+          <span id="scrubFindingsCount" class="badge">0</span>
+        </div>
+        <div id="scrubFindingsList" style="display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px;"></div>
+
+        <div style="font-size: 11px; color: var(--fg-muted, #94a3b8); margin-bottom: 4px;">Sanitized Prompt:</div>
+        <textarea id="scrubbedPromptOutput" readonly class="task-input" style="min-height: 70px; width: 100%; background: rgba(0,0,0,0.2); font-family: monospace; font-size: 11px;"></textarea>
+
+        <button class="btn btn-secondary" id="copyCleanPromptBtn" style="width: 100%; margin-top: 8px;">
+          <svg class="ic" viewBox="0 0 24 24"><use href="#i-check"/></svg>
+          <span>Copy Clean Prompt</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- De-Scrub / Unmasking Card -->
+    <div class="card">
+      <div class="card-head">
+        <span><svg class="ic" viewBox="0 0 24 24"><use href="#i-unlock"/></svg> De-Scrub / Unmask Response</span>
+      </div>
+      <p style="font-size: 11px; color: var(--fg-muted, #94a3b8); margin-bottom: 6px;">
+        When the LLM replies referencing your tokens (e.g. [OPENAI_API_KEY_1]), paste it here to restore original values locally:
+      </p>
+      <textarea id="llmResponseInput" class="task-input" style="min-height: 60px; width: 100%; resize: vertical;" placeholder="Paste LLM response with [TOKENS] here..."></textarea>
+      
+      <button class="btn btn-secondary btn-sm" id="unmaskBtn" style="width: 100%; margin-top: 6px;">
+        <svg class="ic" viewBox="0 0 24 24"><use href="#i-refresh"/></svg>
+        <span>Restore Original Values</span>
+      </button>
+
+      <div id="unmaskedWrap" hidden style="margin-top: 8px;">
+        <div style="font-size: 11px; color: var(--fg-muted, #94a3b8); margin-bottom: 4px;">Restored Text:</div>
+        <textarea id="unmaskedOutput" readonly class="task-input" style="min-height: 60px; width: 100%; background: rgba(0,0,0,0.2); font-size: 11px;"></textarea>
+      </div>
+    </div>
+  </section>
 </main>
 
+<script src="prompt-scrubber.js"></script>
 <script src="vault.js"></script>
 <script src="popup.js"></script>
 </body>

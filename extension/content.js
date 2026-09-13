@@ -1059,6 +1059,67 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 
+  if (msg.type === "SCRUB_CHAT_INPUT") {
+    try {
+      // Target active chat inputs on ChatGPT, Claude, Gemini, or standard textareas
+      const chatInput = document.querySelector(
+        '#prompt-textarea, [data-testid="prompt-textarea"], ' +
+        'div[contenteditable="true"].ProseMirror, div[contenteditable="true"][enterkeyhint="enter"], ' +
+        '.textarea[contenteditable="true"], div.ql-editor[contenteditable="true"], ' +
+        'textarea:focus, textarea[placeholder*="message" i], textarea[placeholder*="ask" i], textarea'
+      );
+
+      if (!chatInput) {
+        sendResponse({ ok: false, error: "No active chat prompt textarea found on this page." });
+        return true;
+      }
+
+      const isContentEditable = chatInput.isContentEditable;
+      const rawText = isContentEditable ? (chatInput.innerText || chatInput.textContent || "") : (chatInput.value || "");
+
+      if (!rawText.trim()) {
+        sendResponse({ ok: false, error: "Chat input is currently empty." });
+        return true;
+      }
+
+      const scrubber = window.PromptScrubber || globalThis.PromptScrubber;
+      if (!scrubber) {
+        sendResponse({ ok: false, error: "PromptScrubber engine is initializing." });
+        return true;
+      }
+
+      const scrubRes = scrubber.scrub(rawText);
+
+      // Update the input field with the sanitized text
+      if (isContentEditable) {
+        chatInput.focus();
+        const selection = window.getSelection();
+        const range = document.createRange();
+        range.selectNodeContents(chatInput);
+        selection.removeAllRanges();
+        selection.addRange(range);
+        document.execCommand("insertText", false, scrubRes.cleanText);
+        chatInput.dispatchEvent(new Event("input", { bubbles: true }));
+      } else {
+        const proto = chatInput.tagName === "TEXTAREA" ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+        const setter = Object.getOwnPropertyDescriptor(proto, "value")?.set;
+        if (setter) setter.call(chatInput, scrubRes.cleanText); else chatInput.value = scrubRes.cleanText;
+        chatInput.dispatchEvent(new Event("input", { bubbles: true }));
+        chatInput.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+
+      sendResponse({
+        ok: true,
+        stats: scrubRes.stats,
+        tokenMap: scrubRes.tokenMap,
+        cleanText: scrubRes.cleanText
+      });
+    } catch (err) {
+      sendResponse({ ok: false, error: err.message || String(err) });
+    }
+    return true;
+  }
+
   if (msg.type === "READ_VAULT_FIELDS") {
     const fields = {};
 

@@ -50,6 +50,7 @@
         "<all_urls>"
       ],
       "js": [
+        "prompt-scrubber.js",
         "action-executor.js",
         "content.js"
       ],

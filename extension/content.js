@@ -1441,35 +1441,39 @@ function initInPageShield() {
     const dt = new DataTransfer();
     dt.items.add(cleanFile);
 
-    const target = targetEl || document.querySelector("#prompt-textarea, [data-testid='prompt-textarea'], textarea, div.ProseMirror[contenteditable='true']") || document.activeElement || document.body;
+    if (mode === "input") {
+      const fileInput = (targetEl && targetEl.tagName === "INPUT" && targetEl.type === "file")
+        ? targetEl
+        : document.querySelector('input[type="file"]');
+      if (fileInput) {
+        try {
+          Object.defineProperty(fileInput, "files", { value: dt.files, configurable: true });
+        } catch (_) {}
+        const chEvt = new Event("change", { bubbles: true });
+        chEvt.isVvSynthetic = true;
+        fileInput.dispatchEvent(chEvt);
+        return;
+      }
+    }
 
-    // 1. If file was dropped, dispatch synthetic drop to the target
-    if (mode === "drop" && target) {
+    if (mode === "drop") {
+      const dropTarget = targetEl || document.querySelector("#prompt-textarea, [data-testid='prompt-textarea'], textarea, form") || document.body;
       try {
         const dropEvt = new DragEvent("drop", {
           bubbles: true,
           cancelable: true,
-          composed: true,
           dataTransfer: dt
         });
         dropEvt.isVvSynthetic = true;
-        dropEvt.__vvRedacted = true;
-        target.dispatchEvent(dropEvt);
+        dropTarget.dispatchEvent(dropEvt);
+        return;
       } catch (_) {}
     }
 
-    // 2. Update any hidden file input on page
-    const fileInput = document.querySelector('input[type="file"]');
-    if (fileInput) {
-      try {
-        Object.defineProperty(fileInput, "files", { value: dt.files, configurable: true });
-        const chEvt = new Event("change", { bubbles: true });
-        chEvt.isVvSynthetic = true;
-        fileInput.dispatchEvent(chEvt);
-      } catch (_) {}
-    }
-
-    // 3. Dispatch synthetic paste to the prompt composer
+    // mode === "paste" or universal fallback
+    const pasteTarget = (targetEl && targetEl !== document.body)
+      ? targetEl
+      : (document.querySelector("#prompt-textarea, [data-testid='prompt-textarea'], textarea, div.ProseMirror[contenteditable='true']") || document.activeElement || document.body);
     try {
       const pasteEvt = new ClipboardEvent("paste", {
         bubbles: true,
@@ -1478,11 +1482,9 @@ function initInPageShield() {
         clipboardData: dt
       });
       pasteEvt.isVvSynthetic = true;
-      pasteEvt.__vvRedacted = true;
-      target.dispatchEvent(pasteEvt);
+      pasteTarget.dispatchEvent(pasteEvt);
     } catch (_) {}
   }
-
 
   // ── Inject Scrubbed Text into React / ProseMirror Composers ──
   function injectScrubbedTextToComposer(text) {
@@ -1536,7 +1538,7 @@ function initInPageShield() {
           dataUrl: reader.result
         }, async (resp) => {
           hideProcessingOverlay();
-          if (resp && resp.ok && resp.redactedDataUrl) {
+          if (resp && resp.ok && resp.redactedDataUrl && (resp.regionsCount > 0)) {
             const count = resp.regionsCount || 0;
             sessionRedactions += count;
             updateComposerPillUI();
@@ -1550,9 +1552,11 @@ function initInPageShield() {
               cleanFile.__vvRedacted = true;
               dispatchCleanFileToChat(cleanFile, mode, targetEl);
             } catch (_) {}
-
           } else {
             showToast(`🛡️ VisionVault: Image "${file.name}" clean. Zero secrets detected.`, false);
+            file.isVvSynthetic = true;
+            file.__vvRedacted = true;
+            dispatchCleanFileToChat(file, mode, targetEl);
           }
         });
       };
@@ -1564,6 +1568,8 @@ function initInPageShield() {
       const Scrubber = window.PdfScrubber || globalThis.PdfScrubber;
       if (!Scrubber) {
         hideProcessingOverlay();
+        file.isVvSynthetic = true;
+        dispatchCleanFileToChat(file, mode, targetEl);
         return;
       }
       try {
@@ -1580,14 +1586,24 @@ function initInPageShield() {
           const extra = res.findings.length > 3 ? ` +${res.findings.length - 3} more` : "";
           showToast(`🛡️ <strong>VisionVault</strong>: Auto-redacted ${res.findings.length} secret(s) in "${file.name}" <span class="vv-toast-badge">[${summaryTokens}${extra}]</span>`, true);
 
-          // Automatically insert sanitized text into composer
-          injectScrubbedTextToComposer(res.sanitizedText);
+          // Upload sanitized document file to ChatGPT (PrivacyScrubber pattern)
+          const baseName = file.name.replace(/\.[^/.]+$/, "");
+          const scrubbedFileName = `${baseName}_scrubbed.txt`;
+          const cleanDocFile = new File([res.sanitizedText], scrubbedFileName, { type: "text/plain" });
+          cleanDocFile.isVvSynthetic = true;
+          cleanDocFile.__vvRedacted = true;
+          dispatchCleanFileToChat(cleanDocFile, mode, targetEl);
         } else {
           showToast(`🛡️ VisionVault: Document "${file.name}" clean. Zero secrets detected.`, false);
+          file.isVvSynthetic = true;
+          file.__vvRedacted = true;
+          dispatchCleanFileToChat(file, mode, targetEl);
         }
       } catch (err) {
         hideProcessingOverlay();
         console.warn("[VisionVault] Document scan warning:", err);
+        file.isVvSynthetic = true;
+        dispatchCleanFileToChat(file, mode, targetEl);
       }
     }
   }
@@ -1598,6 +1614,12 @@ function initInPageShield() {
     const target = e.target;
     if (target && target.tagName === "INPUT" && target.type === "file" && target.files && target.files.length > 0) {
       const files = Array.from(target.files);
+      const hasInterceptable = files.some(f => {
+        const ext = (f.name || "").toLowerCase().split(".").pop();
+        return ["pdf", "txt", "csv", "json", "md", "py", "js", "ts", "log", "png", "jpg", "jpeg", "webp", "bmp"].includes(ext);
+      });
+      if (!hasInterceptable) return;
+
       e.preventDefault();
       e.stopPropagation();
       e.stopImmediatePropagation();
@@ -1606,6 +1628,7 @@ function initInPageShield() {
       }
     }
   }, true);
+
 
   // Intercept file drag-and-drop
   window.addEventListener("drop", async function (e) {

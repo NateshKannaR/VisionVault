@@ -37,8 +37,30 @@
         }
         return new TextDecoder("latin1").decode(result);
       } catch (_) {
-        // Fallback: raw text decoding if not compressed
-        return new TextDecoder("latin1").decode(bytes);
+        try {
+          const dsRaw = new DecompressionStream("deflate-raw");
+          const writer = dsRaw.writable.getWriter();
+          writer.write(bytes);
+          writer.close();
+          const reader = dsRaw.readable.getReader();
+          const chunks = [];
+          let totalLen = 0;
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            chunks.push(value);
+            totalLen += value.byteLength;
+          }
+          const result = new Uint8Array(totalLen);
+          let offset = 0;
+          for (const c of chunks) {
+            result.set(c, offset);
+            offset += c.byteLength;
+          }
+          return new TextDecoder("latin1").decode(result);
+        } catch (__) {
+          return new TextDecoder("latin1").decode(bytes);
+        }
       }
     } else if (typeof require !== "undefined") {
       const zlib = require("zlib");

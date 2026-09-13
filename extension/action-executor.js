@@ -682,12 +682,21 @@
    */
   async function clickNearbySearchControl(el) {
     let scope = el.parentElement;
-    for (let depth = 0; depth < 4 && scope; depth++) {
+    for (let depth = 0; depth < 5 && scope; depth++) {
       const candidates = Array.from(scope.querySelectorAll(
-        'button[type="submit"], input[type="submit"], ' +
-        '[aria-label*="search" i], [title*="search" i], [data-testid*="search" i], button'
+        'button[type="submit"], input[type="submit"], [role="button"], ' +
+        '[aria-label*="search" i], [title*="search" i], [data-testid*="search" i], button, ' +
+        '[class*="search-btn" i], [class*="searchBtn" i], [class*="search_btn" i], [class*="search-icon" i], ' +
+        '[class*="submit" i]'
       )).filter((c) => c !== el && isVisible(c) && !NEVER_DISMISS_RE.test(controlText(c)));
-      const best = candidates.find((c) => SEARCH_TEXT_RE.test(controlText(c)) || c.type === "submit");
+
+      const best = candidates.find((c) =>
+        SEARCH_TEXT_RE.test(controlText(c)) ||
+        c.type === "submit" ||
+        (c.getAttribute && /search|submit/i.test(c.getAttribute("aria-label") || c.getAttribute("title") || "")) ||
+        (c.querySelector && !!c.querySelector('svg, i[class*="search" i], [data-icon*="search" i]'))
+      );
+
       if (best) {
         await realisticClick(best, "Search");
         return true;
@@ -1165,10 +1174,10 @@
     try {
       await delay(450);
       if (urlOrTitleHas(value) || !el.isConnected) return;
-      submitOwningForm(el);
+      await submitOwningForm(el);
       await delay(500);
       if (urlOrTitleHas(value) || !el.isConnected) return;
-      clickNearbySearchControl(el);
+      await clickNearbySearchControl(el);
     } catch (_) {
       // The page navigated mid-escalation. That is the outcome we wanted anyway.
     }

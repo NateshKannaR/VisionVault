@@ -347,10 +347,13 @@ function safeLabel(el) {
         dataIcon(),
       ];
 
+  const PROMPT_INJECTION_RE = /\b(?:system:|assistant:|human:|user:|ignore\s+(?:all\s+)?previous\s+instructions?|disregard\s+(?:all\s+)?prior\s+instructions?|developer\s+mode|jailbreak|<\|im_start\|>|<\|im_end\|>|<\|system\|>|\[\/?inst\]|admin\s+override)\b/i;
+
   for (const raw of candidates) {
     let text = (raw || "").trim();
     if (!text) continue;
     if (testPII(text)) continue; // never let a detected PII string become a label
+    if (PROMPT_INJECTION_RE.test(text)) continue; // prevent indirect prompt injection via DOM labels
     text = text.replace(/[\r\n\t]+/g, " ").replace(/[*:]+/g, "").replace(/\s+/g, " ").trim();
     if (text.length > 50) text = text.substring(0, 50);
     if (text) return text.toLowerCase();
@@ -716,19 +719,35 @@ function scanForPII() {
     addRegion(el, "text", "context_labelled_pii", label.slice(0, 30));
   });
 
-  // 3. Text nodes matching regexes
+  // 3. Text nodes matching regexes (including open shadow roots)
   if (document.body) {
-    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
-    let node;
-    while ((node = walker.nextNode())) {
-      nodeCount++;
-      if (nodeCount > MAX_DOM_NODES) break;
-      const text = node.nodeValue || "";
-      if (text.trim().length < 4) continue;
-      if (testPII(text)) {
-        addRegion(node.parentElement, "text", "pii_text_match", "regex_pii");
-      }
+    function walkTextNodes(root) {
+      try {
+        const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+        let node;
+        while ((node = walker.nextNode())) {
+          nodeCount++;
+          if (nodeCount > MAX_DOM_NODES) return;
+          const text = node.nodeValue || "";
+          if (text.trim().length < 4) continue;
+          if (testPII(text)) {
+            addRegion(node.parentElement, "text", "pii_text_match", "regex_pii");
+          }
+        }
+      } catch (_) {}
+
+      try {
+        const elWalker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
+        let elNode = elWalker.nextNode();
+        while (elNode && nodeCount <= MAX_DOM_NODES) {
+          if (elNode.shadowRoot) {
+            walkTextNodes(elNode.shadowRoot);
+          }
+          elNode = elWalker.nextNode();
+        }
+      } catch (_) {}
     }
+    walkTextNodes(document.body);
   }
 
   // 4. Media that could hold a face or an identity document.

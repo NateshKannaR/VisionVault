@@ -653,8 +653,10 @@
             });
           });
 
+          let offscreenBackend = "wasm_simd";
           if (response) {
             visionWarmedUp = true;
+            if (response.backend) offscreenBackend = response.backend;
             faceBoxes = response.faceBoxes || [];
             ocrRegions = response.ocrRegions || [];
             offscreenTimings = response.timings || offscreenTimings;
@@ -742,14 +744,30 @@
       console.log(`[vision] 🧠 Face Detection (UltraFace): ${timings.faceInference}ms -> ${faceBoxes.length} face(s) found`);
       console.log(`[vision] 🔤 OCR PII Detection (Tesseract): ${timings.ocrInference}ms -> ${ocrRegions.length} text match(es)`);
       console.log(`[vision] 🔒 Redaction Canvas: ${timings.redact}ms -> ${mergedRegions.length} total PII regions blacked out`);
-      console.log(`[vision] ⚡ Full Pipeline Finished in ${timings.total}ms (Vision ML: ${timings.visionInference}ms)`);
-      console.log("[vision] ========================================");
+      let screenEvaluation = null;
+      try {
+        const classifier = global.ScreenClassifier || (typeof require !== "undefined" ? require("./vision/screenClassifier.js") : null);
+        if (classifier && typeof classifier.classifyScreenState === "function") {
+          screenEvaluation = classifier.classifyScreenState({
+            marks,
+            piiRegions: mergedRegions,
+            pageInfo: {
+              title: mainDomScan?.title || "",
+              url_path: mainDomScan?.url || "",
+              viewport_height: viewportHeight,
+              viewport_width: viewportWidth
+            }
+          });
+        }
+      } catch (_) {}
 
       return {
         redactedImage,
         redactionOk: true,
         regions: mergedRegions,
         sourceBreakdown,
+        screenEvaluation,
+        engine: offscreenBackend,
         timings,
         marks,
         frameStats,

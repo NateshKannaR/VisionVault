@@ -1,0 +1,90 @@
+{
+  "manifest_version": 3,
+  "name": "VisionVault",
+  "version": "1.0.0",
+  "description": "Privacy-Preserving Vision Agent — Firefox Edition (SIH PS 26171)",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "visionvault@nateshkanna.local",
+      "strict_min_version": "109.0"
+    }
+  },
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "tabs",
+    "storage",
+    "downloads"
+  ],
+  "host_permissions": [
+    "<all_urls>",
+    "file://*/*"
+  ],
+  "background": {
+    "scripts": ["background.js"]
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+  },
+  "sidebar_action": {
+    "default_panel": "popup.html",
+    "default_icon": {
+      "16": "icon16.png",
+      "32": "icon32.png",
+      "48": "icon48.png"
+    },
+    "default_title": "VisionVault"
+  },
+  "icons": {
+    "16": "icon16.png",
+    "32": "icon32.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "VisionVault",
+    "default_icon": {
+      "16": "icon16.png",
+      "32": "icon32.png",
+      "48": "icon48.png",
+      "128": "icon128.png"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "prompt-scrubber.js",
+        "pdf-scrubber.js",
+        "action-executor.js",
+        "content.js"
+      ],
+      "css": [
+        "in-page-shield.css"
+      ],
+      "run_at": "document_idle",
+      "all_frames": true
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "lib/*",
+        "models/*",
+        "models/tessdata/*",
+        "vision/*",
+        "offscreen.html",
+        "offscreen.js",
+        "permission.html",
+        "permission.js"
+      ],
+      "matches": [
+        "<all_urls>",
+        "file://*/*"
+      ]
+    }
+  ]
+}

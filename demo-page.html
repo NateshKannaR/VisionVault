@@ -320,9 +320,22 @@
 
       <aside class="panel sidebar">
         <div class="pii-card">
-          <strong>⚠ PII Test Block</strong><br />
-          Support: <strong>support@example.com</strong> &nbsp;|&nbsp; Helpline: <strong>+1 415-555-0132</strong><br />
-          Card on file: <strong>4111 1111 1111 1111</strong>
+          <strong>⚠ PII &amp; Secrets Test Block</strong><br />
+          Email: <strong>support@example.com</strong> &nbsp;|&nbsp; Phone: <strong>+91 98765 43210</strong><br />
+          Card: <strong>4111 1111 1111 1111</strong><br />
+          Aadhaar: <strong>9876 5432 1098</strong> &nbsp;|&nbsp; PAN: <strong>ABCDE1234F</strong>
+        </div>
+
+        <!-- Face Avatar Test Element (Target for UltraFace ONNX) -->
+        <div style="display: flex; align-items: center; gap: 12px; margin-top: 14px; padding: 10px 12px; border-radius: 12px; background: rgba(255, 255, 255, 0.04); border: 1px solid var(--line);">
+          <svg width="40" height="40" viewBox="0 0 48 48" style="border-radius: 50%; background: #4f46e5; flex-shrink: 0;" aria-label="Profile Avatar Face">
+            <circle cx="24" cy="18" r="8" fill="#f8fafc"/>
+            <path d="M10 38c0-7.7 6.3-14 14-14s14 6.3 14 14" fill="#f8fafc"/>
+          </svg>
+          <div style="font-size: 11px; line-height: 1.4;">
+            <strong style="color: #e2e8f0;">User Profile Photo</strong><br />
+            <span style="color: var(--muted);">Auto-masked on-device via UltraFace ONNX</span>
+          </div>
         </div>
 
         <div class="stats">
@@ -331,17 +344,27 @@
             <strong>12</strong>
           </div>
           <div class="stat">
-            <small>PII</small>
-            <strong>3</strong>
+            <small>PII Items</small>
+            <strong>5</strong>
           </div>
           <div class="stat">
-            <small>Mode</small>
-            <strong>Local</strong>
+            <small>Engine</small>
+            <strong style="color: #34d399;">WebGPU</strong>
           </div>
           <div class="stat">
             <small>Status</small>
             <strong>Ready</strong>
           </div>
+        </div>
+
+        <!-- SIH Judge Quick Guide -->
+        <div style="margin-top: 16px; padding: 12px; border-radius: 12px; background: rgba(139, 92, 246, 0.08); border: 1px solid rgba(139, 92, 246, 0.25); font-size: 11.5px;">
+          <strong style="color: #c4b5fd;">🏆 SIH PS 26171 Evaluation Guide</strong>
+          <ol style="margin: 6px 0 0 0; padding-left: 16px; color: var(--muted); line-height: 1.5;">
+            <li>Click VisionVault extension in toolbar.</li>
+            <li>Press <strong>Scan &amp; redact screen</strong> to view instant 0-leak masking.</li>
+            <li>Press <strong>Run live benchmark</strong> to verify all 5 evaluation rubrics.</li>
+          </ol>
         </div>
 
         <div id="result">✓ Form submitted! (demo only — no data was sent anywhere)</div>

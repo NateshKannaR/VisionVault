@@ -4,7 +4,7 @@
   "private": true,
   "description": "Privacy-preserving browser vision agent \u2014 local PII detection and redaction, cloud planning over a sanitized view (SIH PS 26171).",
   "scripts": {
-    "test": "node eval/test-source-hygiene.js && node eval/test-panel-wiring.js && node eval/test-prompt-scrubber.js && node eval/test-pdf-scrubber.js && node eval/test-mcp-server.js && node eval/test-vision-pipeline.js && node eval/test-coordinate-mapping.js && node eval/test-task-planner.js && node eval/test-agent-guard.js",
+    "test": "node eval/test-source-hygiene.js && node eval/test-panel-wiring.js && node eval/test-prompt-scrubber.js && node eval/test-pdf-scrubber.js && node eval/test-screen-classifier.js && node eval/test-mcp-server.js && node eval/test-vision-pipeline.js && node eval/test-coordinate-mapping.js && node eval/test-task-planner.js && node eval/test-agent-guard.js",
     "mcp": "node server/mcp-server.js",
     "eval": "node eval/run-full-eval.js --repeats 3",
     "report": "node eval/generate-report.js",
@@ -16,7 +16,8 @@
     "probe": "node eval/probe-search-dom.js",
     "server": "node -e \"process.platform === 'win32' ? require('child_process').execSync('powershell -ExecutionPolicy Bypass -File server/restart.ps1', {stdio:'inherit'}) : require('child_process').execSync('bash server/restart.sh', {stdio:'inherit'})\"",
     "server:linux": "bash server/restart.sh",
-    "server:win": "powershell -ExecutionPolicy Bypass -File server/restart.ps1"
+    "server:win": "powershell -ExecutionPolicy Bypass -File server/restart.ps1",
+    "build:firefox": "node -e \"const fs = require('fs'); fs.cpSync('extension', 'extension-firefox', { recursive: true }); fs.copyFileSync('extension/manifest.firefox.json', 'extension-firefox/manifest.json'); console.log('[OK] Firefox extension prepared in extension-firefox/ (load via about:debugging)')\""
   },
   "devDependencies": {
     "puppeteer-core": "^23.0.0"

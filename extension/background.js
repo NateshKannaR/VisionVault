@@ -15,7 +15,7 @@ const DEFAULT_SERVER_URL = "http://127.0.0.1:8000/api/agent/step";
 // detection-orchestrator.js -> capture + local ML + fail-closed redaction
 // NOTE: action-executor.js is deliberately NOT imported here. It is a content script
 // (see manifest.json) because it needs a DOM; the service worker has none.
-importScripts("./vault.js", "./task-planner.js", "./agent-guard.js", "./detection-orchestrator.js", "./audit-log.js");
+importScripts("./vault.js", "./task-planner.js", "./agent-guard.js", "./vision/screenClassifier.js", "./detection-orchestrator.js", "./audit-log.js");
 
 // Pre-initialize offscreen document for local ML vision models
 (async () => {

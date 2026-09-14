@@ -95,6 +95,7 @@
       // depend on the second, never the first.
       faceOk: enableFaceDetection && faceResult.backend !== "error",
       ocrOk: enableOCR && !ocrResult.skipped,
+      backend: faceResult.backend || "wasm",
       timings: {
         faceInference: faceResult.inferenceMs || 0,
         ocrInference: ocrResult.inferenceMs || 0,
@@ -110,6 +111,18 @@
 
     if (msg.type === "PING") {
       sendResponse({ ok: true, status: "ready" });
+      return true;
+    }
+
+    if (msg.type === "GET_ENGINE_INFO") {
+      const hasWebGpu = typeof navigator !== "undefined" && !!navigator.gpu;
+      const backend = globalThis.FaceDetector?.backend || (hasWebGpu ? "webgpu" : "wasm_simd");
+      sendResponse({
+        ok: true,
+        hasWebGpu,
+        backend,
+        label: hasWebGpu ? "WebGPU (Hardware Accelerated)" : "WASM SIMD (Multi-threaded)"
+      });
       return true;
     }
 

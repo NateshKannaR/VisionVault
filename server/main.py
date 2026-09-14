@@ -623,7 +623,10 @@ def plan_with_gemini(req: AgentStepRequest) -> Optional[StepResponse]:
     marks_summary = marks_for_prompt(req, with_boxes=bool(img_b64))
 
     prompt_text = f"""You are VisionVault: a visual AI browser agent designed for privacy-preserving web automation.
-You receive a sanitized, on-device blacked-out screenshot (where all private credentials & faces have been redacted) and Set-of-Marks numerical element tags.
+REDACTION SCHEME AWARENESS:
+- You receive a sanitized, on-device blacked-out/mosaic screenshot where all sensitive credentials, faces, cards, and PII have been scrubbed by the client's local computer vision & OCR models.
+- You are fully aware of this client-side redaction scheme: blacked-out zones represent protected sensitive elements.
+- Never attempt to hallucinate or unmask redacted areas. Reason purely over clean visual landmarks, navigation elements, and the Set-of-Marks numerical tags below.
 
 USER TASK: "{req.task}"
 STEP NUMBER: {req.step}
@@ -639,7 +642,7 @@ AVAILABLE INTERACTIVE ELEMENTS:
 {json.dumps(marks_summary, indent=2)}
 
 INSTRUCTIONS:
-1. Examine the user task and look at the marks.
+1. Examine the user task, note any client-redacted zones, and look at the marks.
 2. Select EXACTLY ONE logical next action to make progress towards the user's task.
 3. NEVER invent personal data. For anything personal, set "use_vault_field" and leave "value" null.
    The client resolves it locally; you never see the real value. Common keys:
@@ -1109,6 +1112,7 @@ AVAILABLE INTERACTIVE ELEMENTS (choose "target" from these ids ONLY):
 {json.dumps(marks_summary, indent=2)}
 
 RULES:
+0. PRIVACY & REDACTION SCHEME AWARENESS: You are operating on an on-device sanitized visual screen. Blacked-out or mosaic regions correspond to sensitive credentials/PII/faces removed by client ML. Respect the client's privacy perimeter: never guess or unmask these zones.
 1. Choose exactly ONE action that makes progress on the task.
 2. Never invent personal data. For anything personal set "use_vault_field" and leave "value" null.
    Valid keys: name, username, email, phone, address, company, about, password.

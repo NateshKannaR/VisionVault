@@ -924,11 +924,20 @@ function scanPage() {
 async function executeActionInFrame(payload = {}) {
   const actionType = (payload.action || payload.type || "").toLowerCase();
   const targetId = payload.mark_id ?? payload.target;
+
+  if (actionType === "batch") {
+    const executor = globalThis.ActionExecutor && globalThis.ActionExecutor.executeAction;
+    if (typeof executor !== "function") {
+      return { ok: false, error: "ActionExecutor not loaded in this frame." };
+    }
+    return executor(payload, resolveMarkElement);
+  }
+
   // The executor owns the definition of which actions need a marked element; asking it keeps
   // the two from drifting apart. The fallback covers the (impossible in practice) case of
   // this frame having content.js without action-executor.js.
   const targetless = globalThis.ActionExecutor?.TARGETLESS_ACTIONS ||
-    new Set(["scroll_page", "wait", "done", "dismiss_overlays", "open_search", "probe_query"]);
+    new Set(["scroll_page", "wait", "done", "dismiss_overlays", "open_search", "probe_query", "batch"]);
 
   // "scroll" with no id is a page scroll, so it needs no element either.
   const needsElement = !targetless.has(actionType) && !(actionType === "scroll" && targetId == null);

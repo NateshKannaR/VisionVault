@@ -523,7 +523,7 @@
   }
 
   const FILLABLE_ROLES = new Set([
-    "input:text", "input:email", "input:tel", "input:password", "textarea", "editable", "input:search", "combobox", "select",
+    "input", "input:text", "input:email", "input:tel", "input:password", "textarea", "editable", "input:search", "combobox", "select",
   ]);
 
   const FIELD_LABEL_RULES = [
@@ -599,6 +599,83 @@
     if (mark.role === "input:search") return true;
     const label = (mark.label || "").toLowerCase();
     return (mark.role === "input:text" || mark.role === "editable") && /search|find|query|keyword/.test(label);
+  }
+
+  /**
+   * Generates a single-pass compound batch of actions to fill all fields on the current screen.
+   */
+  function planBatchFormFill(state) {
+    const parsed = state.parsed || parseTask(state.task || "");
+    const marks = state.marks || [];
+    const filled = new Set((state.filledIds || []).map(Number));
+    const available = marks.filter((m) => !filled.has(Number(m.id)));
+    const fillable = available.filter((m) => FILLABLE_ROLES.has(m.role) && !isSearchBox(m));
+
+    if (fillable.length === 0) return null;
+
+    const batchActions = [];
+    for (const m of fillable) {
+      let key = m.vaultKey || null;
+      if (!key) {
+        if (m.role === "input:password") key = "password";
+        else if (m.role === "input:email") key = "email";
+        else if (m.role === "input:tel") key = "phone";
+      }
+
+      if (!key && m.label) {
+        const label = m.label.toLowerCase();
+        for (const [pattern, ruleKey] of FIELD_LABEL_RULES) {
+          if (pattern.test(label)) {
+            key = ruleKey;
+            break;
+          }
+        }
+      }
+
+      if (!key) {
+        const fromLabel = vaultKeyForLabel(m.label);
+        key = fromLabel.key || null;
+      }
+
+      if (!key && m.label) {
+        key = m.label.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 30);
+      }
+
+      if (key) {
+        batchActions.push({
+          action: "type",
+          type: "type",
+          mark_id: m.id,
+          target: m.id,
+          use_vault_field: key,
+          reasoning: `Fill "${m.label || key}" from vault (${key})`
+        });
+      }
+    }
+
+    const submitBtn = available.find((m) =>
+      (m.role === "button" || m.role === "clickable" || m.role === "input:submit") &&
+      /^\s*(sign\s*in|log\s*in|submit|continue|next|register|save|save\s+changes|save\s+mission\s+payroll|create\s*account|submit\s+log\s+entry|submit\s+update|confirm\s+allotment|save\s+details)\b/i.test(m.label || "")
+    );
+    if (submitBtn && batchActions.length > 0) {
+      batchActions.push({
+        action: "click",
+        type: "click",
+        mark_id: submitBtn.id,
+        target: submitBtn.id,
+        reasoning: `Submit form (${submitBtn.label || 'Submit'})`
+      });
+    }
+
+    if (batchActions.length >= 2) {
+      return {
+        action: "batch",
+        type: "batch",
+        actions: batchActions,
+        reasoning: `Batch filling ${batchActions.length} fields from vault in one pass`
+      };
+    }
+    return null;
   }
 
   /**
@@ -785,7 +862,11 @@
     }
 
     // 5. Fill a form from the local vault.
-    if (parsed.wantsFill) {
+  if (parsed.wantsFill) {
+    if (state.allowBatch) {
+      const batchPlan = planBatchFormFill(state);
+      if (batchPlan) return batchPlan;
+    }
       // Pass 0: Explicit mark.vaultKey (directly tagged from data-vault-key)
       for (const m of available) {
         if (!FILLABLE_ROLES.has(m.role) || isSearchBox(m)) continue;
@@ -1676,7 +1757,7 @@
   }
 
   const TaskPlanner = {
-    parseTask, planNextAction, alreadyOnSite, siteUrlFor, vaultKeyForLabel, KNOWN_SITES,
+    parseTask, planNextAction, planBatchFormFill, alreadyOnSite, siteUrlFor, vaultKeyForLabel, KNOWN_SITES,
     isShoppingSite, planShoppingStep, planGitHubStep, planBookingStep, planYouTubeStep,
   };
 

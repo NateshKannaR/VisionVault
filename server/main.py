@@ -84,15 +84,17 @@ class Mark(BaseModel):
     label: Optional[str] = None
 
 class StepAction(BaseModel):
-    type: str  # "click" | "type" | "scroll" | "select" | "press_key" | "done"
+    type: str  # "click" | "type" | "scroll" | "select" | "press_key" | "done" | "batch"
     target: Optional[int] = None
     value: Optional[str] = None
     use_vault_field: Optional[str] = None
     reasoning: Optional[str] = None
+    actions: Optional[List[Dict[str, Any]]] = None
 
 class StepResponse(BaseModel):
     reasoning: str
     action: StepAction
+    actions: Optional[List[Dict[str, Any]]] = None
     # Which tier of the planning chain answered. Metadata about the server's own routing —
     # it carries nothing about the page or the user — and the panel shows it so a silent
     # failover to the local model is visible rather than mysterious.

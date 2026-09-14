@@ -325,6 +325,34 @@
     return { dismissed: labels.length, labels };
   }
 
+  /**
+   * Checks if an overlay (cookie notice, modal backdrop, popup) is obstructing the target element.
+   * If detected, automatically dismisses it before the action proceeds.
+   */
+  async function checkAndDismissObstructingOverlay(targetEl) {
+    if (!targetEl || !targetEl.getBoundingClientRect) return false;
+    try {
+      const r = targetEl.getBoundingClientRect();
+      const cx = r.left + r.width / 2;
+      const cy = r.top + r.height / 2;
+      if (cx > 0 && cy > 0 && cx < innerWidth && cy < innerHeight) {
+        const topEl = document.elementFromPoint(cx, cy);
+        if (topEl && topEl !== targetEl && !targetEl.contains(topEl) && !topEl.contains(targetEl)) {
+          const blocker = topEl.closest('dialog, [role="dialog"], [aria-modal="true"], [class*="cookie" i], [class*="consent" i], [id*="cookie" i], [class*="modal" i], [class*="overlay" i], [class*="popup" i], .backdrop');
+          if (blocker) {
+            console.log("[vagent] Obstructing overlay detected covering target. Auto-dismissing...");
+            const res = dismissOverlays(2);
+            if (res && res.dismissed > 0) {
+              await delay(120);
+              return true;
+            }
+          }
+        }
+      }
+    } catch (_) {}
+    return false;
+  }
+
   // ── Search affordances ───────────────────────────────────────────────────────────────────
 
   const SEARCH_TEXT_RE = /\b(?:search|find|look ?up|query)\b|🔍/i;
@@ -510,11 +538,14 @@
     }
     target = target.replace(/\b(?:the|a|an|flights?|tickets?|hotels?|cabs?)\b/gi, "").trim();
 
-    // Common suggestion list selectors across travel sites
+    // Common suggestion list selectors across travel, shopping, and search sites
     const listSelectors = [
       '.react-autosuggest__suggestions-list li',
       '[role="listbox"] [role="option"]',
       '[role="listbox"] li',
+      '.s-suggestion',
+      '.s-suggestion-container',
+      '.autocomplete-results li',
       '.react-autosuggest__suggestion',
       '.autocomplete-suggestion',
       '.suggestion-item',
@@ -886,6 +917,10 @@
   async function realisticClick(el, label = "Click") {
     if (!el) return;
     try { el.scrollIntoView({ block: "center", behavior: "instant" }); } catch (_) {}
+
+    // Auto-dismiss obstructing overlays before clicking
+    await checkAndDismissObstructingOverlay(el);
+
     const r = el.getBoundingClientRect();
     const x = Math.max(0, Math.min(window.innerWidth - 10, r.left + r.width / 2));
     const y = Math.max(0, Math.min(window.innerHeight - 10, r.top + r.height / 2));
@@ -895,7 +930,6 @@
     highlightElement(el);
 
     // 1. Attempt Native Hardware-Level OS Mouse Click via Chrome DevTools Protocol (CDP)
-    // Dispatches authentic isTrusted: true OS events through Chromium's native hardware input pipeline.
     let cdpSuccess = false;
     try {
       if (typeof chrome !== "undefined" && chrome?.runtime?.sendMessage) {
@@ -921,8 +955,26 @@
       el.click();
     }
 
-    // Toggle ARIA checkbox / switch if applicable
+    // 3. Self-healing escalation:
+    // If target is inside a clickable container (button, link, role=button), also trigger click on parent
+    const clickableParent = el.closest('button, a[href], [role="button"], input[type="submit"], [tabindex="0"]');
+    if (clickableParent && clickableParent !== el) {
+      try { clickableParent.click(); } catch (_) {}
+    }
+
+    // If target is a submit button in a form, ensure form submits if click was swallowed
     const role = el.getAttribute ? (el.getAttribute("role") || "").toLowerCase() : "";
+    if ((el.type === "submit" || role === "button" || /submit|sign\s*in|login|register/i.test(el.textContent || "")) && el.form) {
+      setTimeout(() => {
+        try {
+          if (el.form && !el.form.__vvSubmitted) {
+            submitOwningForm(el);
+          }
+        } catch (_) {}
+      }, 150);
+    }
+
+    // Toggle ARIA checkbox / switch if applicable
     if (role === "checkbox" || role === "switch") {
       const isChecked = el.getAttribute("aria-checked") === "true";
       el.setAttribute("aria-checked", String(!isChecked));
@@ -936,7 +988,7 @@
   // silently disagreeing meant every page-level probe was rejected as "not in this frame".
   const TARGETLESS_ACTIONS = new Set([
     "scroll_page", "wait", "done", "dismiss_overlays", "open_search", "probe_query",
-    "search_url", "detect_bot_wall",
+    "search_url", "detect_bot_wall", "batch"
   ]);
 
   /**
@@ -969,6 +1021,17 @@
 
     try {
       switch (actionType) {
+        case "batch": {
+          const subActions = Array.isArray(action.actions) ? action.actions : [];
+          const results = [];
+          for (const sub of subActions) {
+            const res = await executeAction(sub, elementResolver);
+            results.push(res);
+            await delay(50 + Math.random() * 40);
+          }
+          return { ok: true, batch: true, results, count: results.length };
+        }
+
         case "click":
           await realisticClick(el, "Click");
           return { ok: true };
@@ -985,7 +1048,7 @@
             /react-autosuggest|autosuggest|city|airport|suggest/i.test((el.className || "") + " " + (el.id || "")) ||
             /city|origin|destination|from|to|source|depart|arriv/i.test(
               el.getAttribute("placeholder") || el.getAttribute("name") || el.getAttribute("aria-label") || el.id || el.textContent || ""
-            ) || !!document.querySelector('.react-autosuggest__suggestions-list, [role="listbox"], .suggestion-item');
+            ) || !!document.querySelector('.react-autosuggest__suggestions-list, [role="listbox"], .suggestion-item, .s-suggestion');
 
           if (isAutocomplete && value) {
             // Wait for dropdown to appear
@@ -1000,6 +1063,13 @@
               const labelText = (suggestion.textContent || "").trim().slice(0, 16);
               await realisticClick(suggestion, `Select "${labelText}"`);
               return { ok: true, typed: true, clickedSuggestion: true };
+            } else {
+              // Smart keyboard navigation fallback for autocompletes
+              await delay(80);
+              dispatchKey(el, "ArrowDown");
+              await delay(120);
+              dispatchKey(el, "Enter");
+              return { ok: true, typed: true, keyboardNavigated: true };
             }
           }
 

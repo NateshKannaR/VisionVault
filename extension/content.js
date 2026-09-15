@@ -1505,9 +1505,36 @@ function initInPageShield() {
     } catch (_) {}
   }
 
-  // ── Inject Scrubbed Text into React / ProseMirror Composers ──
+  // ── Find Active Prompt Composer Across LLM Platforms ──
+  function findComposerElement() {
+    const selectors = [
+      "#prompt-textarea",
+      "[data-testid='prompt-textarea']",
+      "div.ProseMirror[contenteditable='true']",
+      "div[contenteditable='true'][role='textbox']",
+      "div[contenteditable='true'][aria-label*='prompt' i]",
+      "div[contenteditable='true'][aria-label*='message' i]",
+      "rich-textarea .textarea",
+      "div.ql-editor",
+      "div[contenteditable='true']",
+      "textarea",
+      "input[type='text']"
+    ];
+    for (const sel of selectors) {
+      const el = document.querySelector(sel);
+      if (el) {
+        const r = el.getBoundingClientRect();
+        if (r.width > 0 && r.height >= 12) return el;
+      }
+    }
+    return document.activeElement && (document.activeElement.isContentEditable || document.activeElement.tagName === "TEXTAREA" || document.activeElement.tagName === "INPUT")
+      ? document.activeElement
+      : null;
+  }
+
+  // ── Inject Scrubbed Text into React / ProseMirror Composers (Whole Replacement) ──
   function injectScrubbedTextToComposer(text) {
-    const el = document.querySelector("#prompt-textarea, [data-testid='prompt-textarea'], textarea, div.ProseMirror[contenteditable='true']");
+    const el = findComposerElement();
     if (!el) return;
 
     if (el.tagName === "TEXTAREA" || el.tagName === "INPUT") {
@@ -1519,22 +1546,126 @@ function initInPageShield() {
       el.dispatchEvent(new Event("change", { bubbles: true }));
     } else {
       el.focus();
+      let ok = false;
       try {
         const sel = window.getSelection();
         const range = document.createRange();
         range.selectNodeContents(el);
         sel.removeAllRanges();
         sel.addRange(range);
-        document.execCommand("insertText", false, text);
+        document.execCommand("delete", false);
+        ok = document.execCommand("insertText", false, text.replace(/\r\n/g, "\n"));
       } catch (_) {
-        el.innerText = text;
+        ok = false;
       }
+
+      if (!ok) {
+        try {
+          const dt = new DataTransfer();
+          dt.setData("text/plain", text);
+          const pasteEvt = new ClipboardEvent("paste", {
+            bubbles: true,
+            cancelable: true,
+            composed: true,
+            clipboardData: dt
+          });
+          pasteEvt.isVvSynthetic = true;
+          pasteEvt.isVvBypass = true;
+          pasteEvt.__vvRedacted = true;
+          el.dispatchEvent(pasteEvt);
+        } catch (_) {}
+      }
+
+      const cur = (el.innerText || el.textContent || "").trim();
+      if (!cur && text.trim()) {
+        try {
+          let p = el.querySelector("p");
+          if (!p) {
+            p = document.createElement("p");
+            el.innerHTML = "";
+            el.appendChild(p);
+          }
+          p.textContent = text;
+          p.classList.remove("placeholder");
+          p.removeAttribute("data-placeholder");
+        } catch (_) {
+          el.innerText = text;
+        }
+      }
+
       try {
         el.dispatchEvent(new InputEvent("input", { bubbles: true, composed: true, inputType: "insertText", data: text }));
       } catch (_) {}
       el.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
       el.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
     }
+  }
+
+  // ── Paste Scrubbed Text at Active Caret Position ──
+  function insertPastedScrubbedText(target, text) {
+    if (!target) {
+      target = document.activeElement || findComposerElement();
+    }
+    if (!target) return false;
+
+    // A. Native Input or Textarea
+    if (target.tagName === "TEXTAREA" || target.tagName === "INPUT") {
+      const start = target.selectionStart ?? target.value.length;
+      const end = target.selectionEnd ?? target.value.length;
+      const val = target.value || "";
+      const nextVal = val.slice(0, start) + text + val.slice(end);
+      const proto = target.tagName === "TEXTAREA" ? window.HTMLTextAreaElement.prototype : window.HTMLInputElement.prototype;
+      Object.getOwnPropertyDescriptor(proto, "value").set.call(target, nextVal);
+      if (target._valueTracker) target._valueTracker.setValue(val);
+      target.selectionStart = target.selectionEnd = start + text.length;
+      target.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+      target.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
+      return true;
+    }
+
+    // B. Rich-text contenteditable (ChatGPT ProseMirror, Claude, etc.)
+    if (typeof target.focus === "function") {
+      try { target.focus(); } catch (_) {}
+    }
+
+    // Step 1: Native execCommand("insertText") at active selection/caret
+    let ok = false;
+    try {
+      ok = document.execCommand("insertText", false, text);
+    } catch (_) {
+      ok = false;
+    }
+
+    // Step 2: If execCommand returned false, dispatch synthetic paste with DataTransfer
+    if (!ok) {
+      try {
+        const dt = new DataTransfer();
+        dt.setData("text/plain", text);
+        const pasteEvt = new ClipboardEvent("paste", {
+          bubbles: true,
+          cancelable: true,
+          composed: true,
+          clipboardData: dt
+        });
+        pasteEvt.isVvSynthetic = true;
+        pasteEvt.isVvBypass = true;
+        pasteEvt.__vvRedacted = true;
+        target.dispatchEvent(pasteEvt);
+        ok = true;
+      } catch (_) {}
+    }
+
+    // Step 3: Check if text actually landed in composer
+    const composer = target.closest?.('#prompt-textarea, [data-testid="prompt-textarea"], div.ProseMirror, [contenteditable="true"]') ||
+                     findComposerElement() ||
+                     target;
+    const composerText = (composer.innerText || composer.textContent || "").trim();
+    if (!composerText && text.trim()) {
+      // Step 4: Fallback to whole-composer injection
+      injectScrubbedTextToComposer(text);
+    }
+
+    return true;
   }
 
   // ── Intercept File Uploads & Drag-and-Drop ──
@@ -1665,7 +1796,7 @@ function initInPageShield() {
 
   // Intercept Paste Events in capturing phase
   document.addEventListener("paste", function (e) {
-    if (e.isVvSynthetic || e.__vvRedacted) return;
+    if (e.isVvSynthetic || e.isVvBypass || e.__vvRedacted) return;
 
     // Check for image pastes
     if (e.clipboardData && e.clipboardData.items) {
@@ -1694,7 +1825,7 @@ function initInPageShield() {
 
       sessionRedactions += scrubResult.matches.length;
       Object.assign(globalSessionMap, scrubResult.tokenMap || {});
-      injectScrubbedTextToComposer(scrubResult.sanitized);
+      insertPastedScrubbedText(e.target, scrubResult.sanitized);
       updateComposerPillUI();
       renderTokenChipsBar();
 
@@ -1757,7 +1888,7 @@ function initInPageShield() {
       const btn = e.target.closest?.('button[data-testid="send-button"], button[data-testid="composer-send-button"], button[aria-label="Send prompt"], form button[type="submit"], button[aria-label="Send message"]');
       if (!btn) return;
 
-      const composer = document.querySelector("#prompt-textarea, [data-testid='prompt-textarea'], textarea, div.ProseMirror[contenteditable='true']");
+      const composer = findComposerElement();
       if (!composer || !window.PromptScrubber) return;
 
       const currentText = composer.tagName === "TEXTAREA" || composer.tagName === "INPUT" ? composer.value : (composer.innerText || composer.textContent || "");
@@ -1836,9 +1967,9 @@ function initInPageShield() {
         ev.preventDefault();
         ev.stopPropagation();
         delete globalSessionMap[token];
-        const composer = document.querySelector("#prompt-textarea, [data-testid='prompt-textarea'], textarea, div.ProseMirror[contenteditable='true']");
+        const composer = findComposerElement();
         if (composer) {
-          const cur = composer.tagName === "TEXTAREA" || composer.tagName === "INPUT" ? composer.value : composer.innerText;
+          const cur = composer.tagName === "TEXTAREA" || composer.tagName === "INPUT" ? composer.value : (composer.innerText || composer.textContent || "");
           if (cur.includes(token)) {
             injectScrubbedTextToComposer(cur.split(token).join(original));
           }
@@ -1855,7 +1986,7 @@ function initInPageShield() {
   // ── In-Composer Pill & Floating Badge ──
   function updateComposerPillUI() {
     const pill = document.querySelector(".vv-composer-pill");
-    const composer = document.querySelector("#prompt-textarea, [data-testid='prompt-textarea'], textarea, div.ProseMirror[contenteditable='true']");
+    const composer = findComposerElement();
     if (!composer || !window.PromptScrubber) return;
 
     const text = composer.tagName === "TEXTAREA" || composer.tagName === "INPUT" ? composer.value : (composer.innerText || composer.textContent || "");
@@ -1986,13 +2117,13 @@ function initInPageShield() {
   }
 
   function manualScrubActiveInput() {
-    const input = document.querySelector("#prompt-textarea, [data-testid='prompt-textarea'], textarea, div.ProseMirror[contenteditable='true']");
+    const input = findComposerElement();
     if (!input || !window.PromptScrubber) {
       showToast("No active chat input found to scrub.");
       return;
     }
 
-    const currentText = input.tagName === "TEXTAREA" || input.tagName === "INPUT" ? input.value : input.innerText;
+    const currentText = input.tagName === "TEXTAREA" || input.tagName === "INPUT" ? input.value : (input.innerText || input.textContent || "");
     if (!currentText || !currentText.trim()) {
       showToast("Input box is empty.");
       return;

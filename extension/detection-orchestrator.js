@@ -634,6 +634,7 @@
       let faceModelRan = false;
       let mergedRegions = domPii;
       let offscreenTimings = { faceInference: 0, ocrInference: 0, visionInference: 0, merge: 0 };
+      let offscreenBackend = "wasm_simd";
 
       const chromeApi = safeGetChrome();
       const cacheKey = visionCacheKey(rawScreenshot, settings);
@@ -644,6 +645,7 @@
         faceBoxes = cached.faceBoxes;
         ocrRegions = cached.ocrRegions;
         faceModelRan = cached.faceOk;
+        if (cached.backend) offscreenBackend = cached.backend;
         offscreenTimings = { ...cached.timings, cached: true };
         domPii = filterMediaRegions(rawDomPii, faceModelRan);
         mergedRegions = mergeRegions(domPii, faceBoxes, ocrRegions);
@@ -690,7 +692,6 @@
             });
           });
 
-          let offscreenBackend = "wasm_simd";
           if (response) {
             visionWarmedUp = true;
             if (response.backend) offscreenBackend = response.backend;

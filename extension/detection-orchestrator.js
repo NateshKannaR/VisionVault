@@ -502,13 +502,50 @@
         const h0 = Math.max(1, Math.min(bitmap.height - y0, Math.round(rh) + padY * 2));
 
 
+        const isFaceOrMedia = (r.type === "face" || r.type === "media" || r.reason === "face_detection" || r.reason === "possible_face_or_media" || (r.label && /avatar|face|profile/i.test(r.label)));
+
         if ((mode || "black") === "blur") {
-          const step = 12;
+          const step = Math.max(8, Math.min(20, Math.round(Math.min(w0, h0) / 4)));
           for (let bx = x0; bx < x0 + w0; bx += step) {
             for (let by = y0; by < y0 + h0; by += step) {
-              const px = ctx.getImageData(Math.min(bx + 6, bitmap.width - 1), Math.min(by + 6, bitmap.height - 1), 1, 1).data;
+              const sw = Math.min(step, x0 + w0 - bx);
+              const sh = Math.min(step, y0 + h0 - by);
+              const px = ctx.getImageData(Math.min(bx + Math.floor(sw / 2), bitmap.width - 1), Math.min(by + Math.floor(sh / 2), bitmap.height - 1), 1, 1).data;
               ctx.fillStyle = `rgb(${px[0]},${px[1]},${px[2]})`;
-              ctx.fillRect(bx, by, step, step);
+              ctx.fillRect(bx, by, sw, sh);
+            }
+          }
+        } else if ((mode || "black") === "synthetic") {
+          if (isFaceOrMedia) {
+            ctx.fillStyle = "#1e293b";
+            ctx.fillRect(x0, y0, w0, h0);
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(x0, y0, w0, h0);
+            ctx.clip();
+            const cx = x0 + w0 / 2;
+            const cy = y0 + h0 / 2;
+            const radius = Math.min(w0, h0) * 0.22;
+            ctx.fillStyle = "#64748b";
+            ctx.beginPath();
+            ctx.arc(cx, cy - radius * 0.4, Math.max(4, radius), 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(cx, cy + radius * 1.6, Math.max(6, radius * 1.5), Math.PI, 0, false);
+            ctx.fill();
+            ctx.restore();
+          } else {
+            ctx.fillStyle = "#0f172a";
+            ctx.fillRect(x0, y0, w0, h0);
+            ctx.strokeStyle = "#38bdf8";
+            ctx.lineWidth = 1;
+            ctx.strokeRect(x0 + 0.5, y0 + 0.5, w0 - 1, h0 - 1);
+            if (w0 > 40 && h0 > 14) {
+              ctx.fillStyle = "#38bdf8";
+              ctx.font = `bold ${Math.max(9, Math.min(13, Math.round(h0 * 0.5)))}px monospace`;
+              ctx.textBaseline = "middle";
+              ctx.textAlign = "center";
+              ctx.fillText("[MASKED]", x0 + w0 / 2, y0 + h0 / 2);
             }
           }
         } else {
@@ -763,6 +800,7 @@
 
       return {
         redactedImage,
+        ...(settings.includeRawForXRay === true ? { rawImage: rawScreenshot } : {}),
         redactionOk: true,
         regions: mergedRegions,
         sourceBreakdown,

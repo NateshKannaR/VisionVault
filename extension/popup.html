@@ -239,15 +239,34 @@
           <svg class="ic" viewBox="0 0 24 24"><use href="#i-eye"/></svg>
           What the server receives
         </span>
-        <button class="toggle" id="overlayToggle" aria-pressed="true" title="Outline the masked regions">
-          <svg class="ic" viewBox="0 0 24 24"><use href="#i-layers"/></svg>
-          <span>Regions</span>
-        </button>
+        <div style="display:flex; gap:6px; align-items:center;">
+          <button class="toggle" id="xrayToggle" aria-pressed="false" title="Interactive Before vs After X-Ray Split Lens">
+            <svg class="ic" viewBox="0 0 24 24"><use href="#i-sparkle"/></svg>
+            <span>X-Ray Lens</span>
+          </button>
+          <button class="toggle" id="overlayToggle" aria-pressed="true" title="Outline the masked regions">
+            <svg class="ic" viewBox="0 0 24 24"><use href="#i-layers"/></svg>
+            <span>Regions</span>
+          </button>
+        </div>
       </figcaption>
+
+      <!-- X-Ray Lens Slider Control Bar -->
+      <div id="xrayControlBar" hidden style="margin-bottom: 6px; padding: 6px 8px; background: rgba(15,23,42,0.8); border: 1px solid rgba(56,189,248,0.3); border-radius: 6px; display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+        <span style="font-size: 10px; font-weight: 600; color: #94a3b8; display: flex; align-items: center; gap: 4px;">
+          <span style="color: #ef4444;">Raw</span>
+          <input type="range" id="xraySlider" min="0" max="100" value="50" style="width: 80px; cursor: pointer;" />
+          <span style="color: #38bdf8;">Masked</span>
+        </span>
+        <span id="xrayZeroByteBadge" class="score-badge" style="background: rgba(16,185,129,0.2); color: #34d399; font-size: 9.5px; border: 1px solid #10b981; padding: 2px 6px;">
+          🔒 0 Bytes PII Sent
+        </span>
+      </div>
 
       <div class="preview-frame">
         <div class="preview-stage" id="previewStage">
           <img id="preview" alt="Redacted screenshot — every sensitive region is painted over" />
+          <canvas id="xrayCanvas" class="xray-canvas" hidden style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; border-radius: 6px;"></canvas>
           <svg class="overlay" id="regionOverlay" preserveAspectRatio="none" aria-hidden="true"></svg>
         </div>
       </div>
@@ -289,6 +308,10 @@
       </div>
       <div class="score-sources" id="scoreSources"></div>
       <p class="score-note" id="scoreNote"></p>
+      <button class="btn btn-ghost btn-sm" id="scoreCertBtn" style="margin-top: 8px; width: 100%; border: 1px solid rgba(56,189,248,0.3);">
+        <svg class="ic" viewBox="0 0 24 24"><use href="#i-shield"/></svg>
+        <span>Generate DPDP Act 2023 Certificate</span>
+      </button>
     </div>
 
     <div class="metrics" id="statsGrid" hidden>
@@ -417,6 +440,21 @@
         <span class="mono" id="logCount"></span>
       </div>
       <div class="log-entries" id="logEntries"></div>
+    </div>
+
+    <!-- Visual Audit Trail & Session Replay -->
+    <div class="card" id="auditTrailCard" hidden style="margin-top: 10px;">
+      <div class="card-head" style="display:flex; justify-content:space-between; align-items:center;">
+        <span><svg class="ic" viewBox="0 0 24 24"><use href="#i-eye"/></svg> Visual Audit Trail</span>
+        <button class="btn btn-ghost btn-sm" id="exportVisualAuditBtn" type="button">
+          <svg class="ic" viewBox="0 0 24 24"><use href="#i-download"/></svg>
+          <span>Export Trail</span>
+        </button>
+      </div>
+      <p style="font-size: 11px; color: var(--text-muted); margin: 4px 0 8px 0;">
+        Step-by-step visual proof showing redacted frame transmitted vs on-device execution.
+      </p>
+      <div class="audit-timeline" id="auditTimeline" style="display: flex; flex-direction: column; gap: 8px; max-height: 220px; overflow-y: auto;"></div>
     </div>
   </section>
 
@@ -577,6 +615,19 @@
         <svg class="ic" viewBox="0 0 24 24"><use href="#i-check"/></svg>
         <span>Save vault</span>
       </button>
+
+      <div style="display: flex; gap: 8px; margin-top: 8px;">
+        <button class="btn btn-secondary btn-sm" id="exportVaultBackupBtn" type="button" style="flex: 1;">
+          <svg class="ic" viewBox="0 0 24 24"><use href="#i-download"/></svg>
+          <span>Export Backup</span>
+        </button>
+        <button class="btn btn-ghost btn-sm" id="importVaultBackupBtn" type="button" style="flex: 1;">
+          <svg class="ic" viewBox="0 0 24 24"><use href="#i-lock"/></svg>
+          <span>Import Backup</span>
+        </button>
+        <input type="file" id="vaultBackupFileInput" accept=".json" style="display: none;" />
+      </div>
+
       <div class="toast" id="vaultStatus" role="status" aria-live="polite"></div>
     </div>
   </section>
@@ -637,6 +688,20 @@
       </span>
     </div>
 
+    <div class="card" style="margin-top: 10px; border: 1px solid rgba(16,185,129,0.4); background: rgba(16,185,129,0.04);">
+      <div class="card-head" style="display:flex; justify-content:space-between; align-items:center;">
+        <span><svg class="ic" viewBox="0 0 24 24"><use href="#i-shield"/></svg> Sovereign Compliance Audit</span>
+        <span class="badge" style="background: rgba(16,185,129,0.2); color: #34d399; font-weight: 700; border: 1px solid #10b981;">DPDP Act 2023 &amp; GDPR</span>
+      </div>
+      <p style="font-size: 11px; color: var(--text-muted); margin: 6px 0 10px 0;">
+        Generate formal cryptographically hashed compliance audit certificate proving zero plaintext PII transmission across network.
+      </p>
+      <button class="btn btn-primary" id="generateDpdpBtn" style="width: 100%;">
+        <svg class="ic" viewBox="0 0 24 24"><use href="#i-shield"/></svg>
+        <span>Generate DPDP Act 2023 Certificate</span>
+      </button>
+    </div>
+
     <div id="auditList">
       <p class="hint" style="padding:12px 0">
         Nothing has been transmitted yet. Run a task and every request will appear here.
@@ -662,7 +727,8 @@
       <label class="field-label" for="s-redactMode">Redaction style</label>
       <select class="input" id="s-redactMode">
         <option value="black">Solid black — highest assurance</option>
-        <option value="blur">Mosaic — keeps layout readable</option>
+        <option value="blur">Mosaic blur — keeps layout readable</option>
+        <option value="synthetic">Synthetic avatar &amp; badges — cleanest preview</option>
       </select>
     </div>
 
@@ -854,6 +920,7 @@
   </section>
 </main>
 
+<script src="vault-crypto.js"></script>
 <script src="prompt-scrubber.js"></script>
 <script src="pdf-scrubber.js"></script>
 <script src="vault.js"></script>

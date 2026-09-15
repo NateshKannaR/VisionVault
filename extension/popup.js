@@ -512,6 +512,294 @@ $("overlayToggle").addEventListener("click", (e) => {
   overlayEl.classList.toggle("dim", !on);
 });
 
+// ── Visual Privacy X-Ray Split Lens ──────────────────────────────────────────
+let currentScanData = null;
+let isXRayActive = false;
+
+function updateXRaySplit() {
+  if (!currentScanData || !isXRayActive) return;
+  const canvas = $("xrayCanvas");
+  if (!canvas) return;
+
+  const sliderVal = Number($("xraySlider")?.value || 50);
+  const rawSrc = currentScanData.rawImage || currentScanData.preview;
+  const redSrc = currentScanData.preview;
+  if (!rawSrc || !redSrc) return;
+
+  const rawImg = new Image();
+  const redImg = new Image();
+  let loaded = 0;
+
+  const onLoaded = () => {
+    loaded++;
+    if (loaded < 2) return;
+
+    canvas.width = redImg.naturalWidth || 600;
+    canvas.height = redImg.naturalHeight || 400;
+    const ctx = canvas.getContext("2d");
+    const w = canvas.width;
+    const h = canvas.height;
+    const splitX = Math.round((sliderVal / 100) * w);
+
+    ctx.clearRect(0, 0, w, h);
+
+    // 1. Draw raw image on left side
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 0, splitX, h);
+    ctx.clip();
+    ctx.drawImage(rawImg, 0, 0, w, h);
+
+    // Highlight sensitive boxes in raw side
+    if (currentScanData.regions && currentScanData.viewport) {
+      const sx = w / (currentScanData.viewport.w || w);
+      const sy = h / (currentScanData.viewport.h || h);
+      ctx.strokeStyle = "rgba(239, 68, 68, 0.9)";
+      ctx.lineWidth = 2;
+      ctx.fillStyle = "rgba(239, 68, 68, 0.18)";
+      for (const r of currentScanData.regions) {
+        const rx = r.x * sx;
+        const ry = r.y * sy;
+        const rw = r.w * sx;
+        const rh = r.h * sy;
+        ctx.fillRect(rx, ry, rw, rh);
+        ctx.strokeRect(rx, ry, rw, rh);
+      }
+    }
+    ctx.restore();
+
+    // 2. Draw sanitized / redacted image on right side
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(splitX, 0, w - splitX, h);
+    ctx.clip();
+    ctx.drawImage(redImg, 0, 0, w, h);
+    ctx.restore();
+
+    // 3. Draw divider line
+    ctx.strokeStyle = "#38bdf8";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(splitX, 0);
+    ctx.lineTo(splitX, h);
+    ctx.stroke();
+
+    // Divider handle
+    ctx.fillStyle = "#38bdf8";
+    ctx.beginPath();
+    ctx.arc(splitX, h / 2, 8, 0, Math.PI * 2);
+    ctx.fill();
+  };
+
+  rawImg.onload = onLoaded;
+  redImg.onload = onLoaded;
+  rawImg.src = rawSrc;
+  redImg.src = redSrc;
+}
+
+if ($("xrayToggle")) {
+  $("xrayToggle").addEventListener("click", (e) => {
+    isXRayActive = !isXRayActive;
+    e.currentTarget.setAttribute("aria-pressed", String(isXRayActive));
+    const controlBar = $("xrayControlBar");
+    const canvas = $("xrayCanvas");
+    const previewImg = $("preview");
+    const overlay = $("regionOverlay");
+
+    if (controlBar) controlBar.hidden = !isXRayActive;
+    if (canvas) canvas.hidden = !isXRayActive;
+    if (previewImg) previewImg.style.opacity = isXRayActive ? "0" : "1";
+    if (overlay) overlay.style.display = isXRayActive ? "none" : "";
+
+    if (isXRayActive) {
+      updateXRaySplit();
+    }
+  });
+}
+
+if ($("xraySlider")) {
+  $("xraySlider").addEventListener("input", updateXRaySplit);
+}
+
+// ── Visual Audit Trail & Session Replay ──────────────────────────────────────
+const visualAuditEvents = [];
+
+function recordVisualAuditStep(actionName, target, details, screenshot) {
+  const stepNumber = visualAuditEvents.length + 1;
+  const event = {
+    step: stepNumber,
+    timestamp: new Date().toISOString(),
+    action: actionName,
+    target: target || "page",
+    details: details || "",
+    screenshot: screenshot || (currentScanData ? currentScanData.preview : null),
+    piiCount: currentScanData?.piiCount || 0
+  };
+  visualAuditEvents.push(event);
+
+  const card = $("auditTrailCard");
+  const timeline = $("auditTimeline");
+  if (card) card.hidden = false;
+
+  if (timeline) {
+    const item = document.createElement("div");
+    item.className = "audit-entry";
+    item.innerHTML = `
+      <div class="audit-entry-head">
+        <strong style="color: #38bdf8;">Step #${stepNumber}: ${esc(actionName)}</strong>
+        <span style="font-size: 9.5px; color: #94a3b8;">${new Date().toLocaleTimeString()}</span>
+      </div>
+      <div style="font-size: 10.5px; color: #cbd5e1; margin-bottom: 4px;">Target: <code>${esc(target || "page")}</code> — ${esc(details || "")}</div>
+      ${event.screenshot ? `<img src="${event.screenshot}" class="audit-entry-thumb" alt="Step ${stepNumber} redacted frame" />` : ""}
+    `;
+    timeline.appendChild(item);
+  }
+}
+
+if ($("exportVisualAuditBtn")) {
+  $("exportVisualAuditBtn").addEventListener("click", () => {
+    if (visualAuditEvents.length === 0) {
+      showStatus("statusMsg", "info", "No visual audit steps recorded in this session yet.");
+      return;
+    }
+    const auditData = {
+      title: "VisionVault Visual Audit Trail & Session Replay",
+      version: "2.0.0-enterprise",
+      exportTime: new Date().toISOString(),
+      task: taskEl?.value || "Autonomous Agent Run",
+      totalSteps: visualAuditEvents.length,
+      events: visualAuditEvents
+    };
+    const blob = new Blob([JSON.stringify(auditData, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `visionvault-visual-audit-${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showStatus("statusMsg", "success", "Visual audit trail exported successfully.");
+  });
+}
+
+// ── DPDP Act 2023 & GDPR Art 25 Sovereign Compliance Certificate ─────────────
+async function handleGenerateDpdpCertificate() {
+  if (typeof VaultCrypto === "undefined" || !VaultCrypto.generateDpdpComplianceCertificate) {
+    showStatus("statusMsg", "error", "VaultCrypto module not loaded.");
+    return;
+  }
+
+  const sessionData = {
+    task: taskEl?.value || "Vision Agent Autonomous Workflow",
+    url: currentScanData?.pageUrl || (typeof window !== "undefined" ? window.location?.href : "active-tab"),
+    piiCount: currentScanData?.piiCount || 0,
+    marksCount: currentScanData?.markCount || 0,
+    timings: currentScanData?.timings || {},
+    actions: visualAuditEvents
+  };
+
+  showStatus("statusMsg", "info", "Generating DPDP Act 2023 & GDPR Compliance Certificate...");
+  const cert = await VaultCrypto.generateDpdpComplianceCertificate(sessionData);
+
+  const win = window.open("", "_blank");
+  if (win) {
+    win.document.write(cert.htmlCertificate);
+    win.document.close();
+  }
+
+  const blob = new Blob([JSON.stringify(cert.auditReport, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `visionvault-dpdp-audit-${Date.now()}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+
+  showStatus("statusMsg", "success", `Sovereign certificate generated! Hash: ${cert.auditReport.cryptographicIntegrity.sha256Hash.slice(0, 16)}...`);
+}
+
+if ($("generateDpdpBtn")) {
+  $("generateDpdpBtn").addEventListener("click", handleGenerateDpdpCertificate);
+}
+if ($("scoreCertBtn")) {
+  $("scoreCertBtn").addEventListener("click", handleGenerateDpdpCertificate);
+}
+
+// ── Zero-Knowledge AES-256-GCM Vault Backup ──────────────────────────────────
+if ($("exportVaultBackupBtn")) {
+  $("exportVaultBackupBtn").addEventListener("click", async () => {
+    if (typeof VaultCrypto === "undefined" || !VaultCrypto.exportEncryptedVaultBackup) {
+      showStatus("vaultStatus", "error", "VaultCrypto module not available.");
+      return;
+    }
+    const password = prompt("Enter a master password / passphrase to encrypt your vault backup (AES-256-GCM + PBKDF2 100k rounds):");
+    if (!password) {
+      showStatus("vaultStatus", "info", "Backup export cancelled.");
+      return;
+    }
+
+    try {
+      let v = {};
+      if (typeof getVault === "function") v = await getVault();
+      else {
+        const { vault } = await chrome.storage.local.get("vault");
+        v = vault || {};
+      }
+
+      const backup = await VaultCrypto.exportEncryptedVaultBackup(v, password);
+      const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `visionvault-encrypted-backup-${Date.now()}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+
+      showStatus("vaultStatus", "success", "Encrypted vault backup exported successfully.");
+    } catch (err) {
+      showStatus("vaultStatus", "error", "Backup export failed: " + err.message);
+    }
+  });
+}
+
+if ($("importVaultBackupBtn")) {
+  $("importVaultBackupBtn").addEventListener("click", () => {
+    const fileInput = $("vaultBackupFileInput");
+    if (fileInput) fileInput.click();
+  });
+}
+
+if ($("vaultBackupFileInput")) {
+  $("vaultBackupFileInput").addEventListener("change", async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const password = prompt("Enter the master password / passphrase to decrypt and restore this backup:");
+    if (!password) {
+      showStatus("vaultStatus", "info", "Import cancelled.");
+      e.target.value = "";
+      return;
+    }
+
+    try {
+      const text = await file.text();
+      const restored = await VaultCrypto.importEncryptedVaultBackup(text, password);
+      
+      if (typeof saveVaultData === "function") {
+        await saveVaultData(restored);
+      } else {
+        await chrome.storage.local.set({ vault: restored });
+      }
+
+      await loadVault();
+      showStatus("vaultStatus", "success", "Vault restored and decrypted successfully!");
+    } catch (err) {
+      showStatus("vaultStatus", "error", "Backup restoration failed: " + err.message);
+    } finally {
+      e.target.value = "";
+    }
+  });
+}
+
 // ── Timing bar ────────────────────────────────────────────────────────────────
 function renderTimings(t) {
   if (!t) return;
@@ -556,6 +844,9 @@ function addLogEntry(iconName, html, ms, isError) {
   actionCount += 1;
   setStat("s-actions", actionCount);
   $("logCount").textContent = `${actionCount} action${actionCount === 1 ? "" : "s"}`;
+  if (typeof recordVisualAuditStep === "function") {
+    recordVisualAuditStep(iconName, html, ms ? `${ms}ms` : "");
+  }
 }
 
 /** A single in-progress row at the tail of the log, replaced as the step advances. */
@@ -804,10 +1095,15 @@ function renderScorecard(d) {
 /** Paints a scan result into the panel. Shared by the Scan button and the run-time recovery. */
 function renderScan(d, announce) {
   if (!d) return;
+  currentScanData = d;
   $("preview").src = d.preview;
   previewWrap.hidden = false;
   statsGrid.hidden = false;
   idleState.hidden = true;
+
+  if (isXRayActive && typeof updateXRaySplit === "function") {
+    updateXRaySplit();
+  }
 
   renderRegions(d.regions, d.viewport);
 
@@ -1391,7 +1687,15 @@ function startDictation() {
     setMicLive(false);
   };
 
-  recognition.onend = () => setMicLive(false);
+  recognition.onend = () => {
+    setMicLive(false);
+    if (taskEl && taskEl.value.trim().length > 0 && typeof autoAgentMode === "function" && autoAgentMode()) {
+      showStatus("statusMsg", "info", "Voice command recognized. Launching agent...");
+      setTimeout(() => {
+        if ($("scanBtn")) $("scanBtn").click();
+      }, 600);
+    }
+  };
 
   try {
     recognition.start();

@@ -453,6 +453,7 @@ async function scanTab(tabId, windowId, settings, retries = SCAN_ATTEMPT_DELAYS_
       devicePixelRatio: pageInfo.device_pixel_ratio || 1,
       enableOCR: settings.enableOCR !== false,
       enableFaceDetection: settings.enableFaceDetection !== false,
+      includeRawForXRay: true,
     });
 
     // Marks sent to the server carry NO frame routing and NO raw page text beyond a safe label.
@@ -479,6 +480,7 @@ async function scanTab(tabId, windowId, settings, retries = SCAN_ATTEMPT_DELAYS_
 
     last = {
       redacted: result.redactedImage,
+      rawImage: result.rawImage || null,
       previewRegions,
       redactionOk: result.redactionOk !== false,
       redactionError: result.redactionError || null,
@@ -796,6 +798,7 @@ async function phaseScan(task) {
   return {
     preview: scan.redacted,
     redactedImagePreview: scan.redacted,
+    rawImage: scan.rawImage || null,
     regions: scan.previewRegions || [],
     viewport: {
       w: scan.pageInfo?.viewport_width || scan.tab?.width || 0,

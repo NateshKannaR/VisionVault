@@ -353,6 +353,31 @@
     return false;
   }
 
+  /**
+   * Detects blocking bot walls, Cloudflare Turnstiles, reCAPTCHA, hCaptcha, or 2FA verification modals.
+   * Returns { blocked: boolean, type: string, description: string }
+   */
+  function detectObstacleOrCaptcha() {
+    if (typeof document === "undefined") return { blocked: false, type: null, description: null };
+    const cf = document.querySelector('iframe[src*="turnstile"], div.cf-turnstile, #cf-turnstile, [class*="cf-browser-verification"], #challenge-running, [id*="cf-challenge"]');
+    if (cf && isVisible(cf)) {
+      return { blocked: true, type: "cloudflare", description: "Cloudflare Turnstile verification challenge detected." };
+    }
+    const recaptcha = document.querySelector('iframe[src*="recaptcha"], .g-recaptcha, #recaptcha, [class*="recaptcha"]');
+    if (recaptcha && isVisible(recaptcha)) {
+      return { blocked: true, type: "recaptcha", description: "Google reCAPTCHA challenge detected." };
+    }
+    const hcaptcha = document.querySelector('iframe[src*="hcaptcha"], .h-captcha, #hcaptcha');
+    if (hcaptcha && isVisible(hcaptcha)) {
+      return { blocked: true, type: "hcaptcha", description: "hCaptcha verification challenge detected." };
+    }
+    const twoFactor = document.querySelector('[data-testid*="otp"], [id*="2fa" i], [class*="2fa" i], [id*="otp" i], [class*="otp-modal" i]');
+    if (twoFactor && isVisible(twoFactor)) {
+      return { blocked: true, type: "2fa", description: "Two-Factor (2FA/OTP) verification prompt detected." };
+    }
+    return { blocked: false, type: null, description: null };
+  }
+
   // ── Search affordances ───────────────────────────────────────────────────────────────────
 
   const SEARCH_TEXT_RE = /\b(?:search|find|look ?up|query)\b|🔍/i;
@@ -1269,6 +1294,7 @@
     queryLanded,
     searchUrlFromOpenSearch,
     detectBotWall,
+    detectObstacleOrCaptcha,
     visibleTextInputs,
     looksLikeSearchInput,
   };

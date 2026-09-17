@@ -15,7 +15,19 @@ const DEFAULT_SERVER_URL = "http://127.0.0.1:8000/api/agent/step";
 // detection-orchestrator.js -> capture + local ML + fail-closed redaction
 // NOTE: action-executor.js is deliberately NOT imported here. It is a content script
 // (see manifest.json) because it needs a DOM; the service worker has none.
-importScripts("./vault.js", "./task-planner.js", "./agent-guard.js", "./vision/screenClassifier.js", "./detection-orchestrator.js", "./audit-log.js");
+importScripts(
+  "./vault.js",
+  "./planner/task-parser.js",
+  "./planner/task-checklist.js",
+  "./planner/visual-grounding.js",
+  "./task-planner.js",
+  "./agent-guard.js",
+  "./vision/screenClassifier.js",
+  "./vision/region-merger.js",
+  "./vision/redaction-engine.js",
+  "./detection-orchestrator.js",
+  "./audit-log.js"
+);
 
 // Pre-initialize offscreen document for local ML vision models
 (async () => {
@@ -174,7 +186,11 @@ globalThis.isAgentBusy = () => agentBusy;
 
 // ── Notify popup of live status updates ──────────────────────────────────────
 function notifyPopup(data) {
-  chrome.runtime.sendMessage({ type: "AGENT_UPDATE", data }).catch(() => {});
+  const enriched = { ...data };
+  if (session && session.checklist && !enriched.checklist) {
+    enriched.checklist = session.checklist;
+  }
+  chrome.runtime.sendMessage({ type: "AGENT_UPDATE", data: enriched }).catch(() => {});
 }
 
 // ── Storage ───────────────────────────────────────────────────────────────────
@@ -547,6 +563,8 @@ async function callServer(payload, serverUrl) {
       image: payload.image || "",
       marks: payload.marks || [],
       filled_mark_ids: payload.filled_mark_ids || [],
+      checklist: payload.checklist || session?.checklist || [],
+      grounded_candidates: payload.grounded_candidates || [],
       step: payload.step || 1,
       page_info: payload.page_info || {}
     };
@@ -742,9 +760,15 @@ async function phaseScan(task) {
   // Any tab recorded during an earlier run belongs to that run.
   _openedTabIds.length = 0;
 
+  const parsedTask = TaskPlanner.parseTask(task);
+  const checklist = (typeof TaskChecklist !== "undefined" && TaskChecklist.generateTaskChecklist)
+    ? TaskChecklist.generateTaskChecklist(task, parsedTask)
+    : [];
+
   session = {
     task,
-    parsedTask: TaskPlanner.parseTask(task),
+    parsedTask,
+    checklist,
     // What the instruction has actually achieved so far. The planner reads this to decide
     // whether anything remains to be done, which is what makes the loop terminate.
     progress: {
@@ -1284,7 +1308,9 @@ async function phaseRun() {
         resp = deterministic;
         plannerSource = "on-device";
       } else {
-        try {
+          const groundedCandidates = (typeof VisualGrounding !== "undefined" && VisualGrounding.proposeGroundedCandidates)
+            ? VisualGrounding.proposeGroundedCandidates(session.marks, session.parsedTask, session.ocrRegions || [])
+            : [];
           resp = await callServer({
             task: session.task,
             task_hints: session.parsedTask ? {
@@ -1317,6 +1343,8 @@ async function phaseRun() {
             redactionVerified: session.redactionOk === true,
             marks: session.marks,
             filled_mark_ids: session.filledIds,
+            checklist: session.checklist || [],
+            grounded_candidates: groundedCandidates,
             page_info: session.pageInfo || {},
             step: session.stepCount,
           }, session.serverUrl);
@@ -1332,6 +1360,13 @@ async function phaseRun() {
         }
       }
       const serverMs = Math.round(performance.now() - t0);
+
+      if (session && session.checklist && typeof TaskChecklist !== "undefined") {
+        session.checklist = TaskChecklist.updateChecklist(session.checklist, resp, {
+          currentUrl: session.pageInfo?.url || "",
+          progress: session.progress
+        });
+      }
 
       // ── Supervision. The guard may substitute or veto the proposed action. ───────────────
       const verdict = guard.review(resp, {

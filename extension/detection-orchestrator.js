@@ -464,6 +464,9 @@
    * throw as "abort the request; transmit nothing".
    */
   async function redactImage(rawScreenshot, regions = [], vpW, vpH, mode = "black") {
+    if (global.RedactionEngine && typeof global.RedactionEngine.redactImage === "function") {
+      return await global.RedactionEngine.redactImage(rawScreenshot, regions, vpW, vpH, mode);
+    }
     if (!rawScreenshot) throw new RedactionError("No screenshot supplied to redactImage().");
     try {
       const blob = await (await fetch(rawScreenshot)).blob();

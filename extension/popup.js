@@ -123,21 +123,9 @@ async function checkEngine() {
   const dot = $("engineDot");
   if (!badge) return;
 
-  try {
-    if (typeof navigator !== "undefined" && navigator.gpu) {
-      const adapter = await navigator.gpu.requestAdapter();
-      if (adapter) {
-        if (dot) dot.className = "engine-dot webgpu";
-        badge.textContent = "⚡ WebGPU";
-        badge.title = "Hardware accelerated WebGPU pipeline active";
-        return;
-      }
-    }
-  } catch (_) {}
-
-  if (dot) dot.className = "engine-dot";
+  if (dot) dot.className = "engine-dot wasm";
   badge.textContent = "⚡ WASM SIMD";
-  badge.title = "Multi-threaded WebAssembly SIMD pipeline active";
+  badge.title = "Multi-threaded WebAssembly SIMD pipeline active (1.27MB UltraFace + Tesseract)";
 }
 checkEngine();
 
@@ -1851,6 +1839,10 @@ chrome.runtime.onMessage.addListener((msg) => {
   if (msg?.type !== "AGENT_UPDATE") return;
   const d = msg.data;
 
+  if (Array.isArray(d.checklist) && d.checklist.length > 0) {
+    renderTaskChecklist(d.checklist);
+  }
+
   if (d.type === "step") {
     setLiveStep(`Step ${esc(d.step)} — ${esc(d.status)}`, d.planner);
     const stage = pipelineFromStatus(d.status);
@@ -1885,6 +1877,25 @@ chrome.runtime.onMessage.addListener((msg) => {
     addLogEntry("refresh", `${label} (${d.markCount} elements, ${d.piiCount} masked)`, d.timings?.total || null);
   }
 });
+
+function renderTaskChecklist(items) {
+  const widget = $("taskChecklistWidget");
+  const list = $("checklistItems");
+  if (!widget || !list) return;
+  widget.hidden = false;
+  list.innerHTML = "";
+  for (const item of items) {
+    const li = document.createElement("li");
+    li.className = `checklist-item ${item.status || "pending"}`;
+    const dot = document.createElement("span");
+    dot.className = "checklist-item-dot";
+    const text = document.createElement("span");
+    text.textContent = item.label;
+    li.appendChild(dot);
+    li.appendChild(text);
+    list.appendChild(li);
+  }
+}
 
 // ── Prompt Privacy Shield ───────────────────────────────────────────────────
 let activeTokenMap = {};

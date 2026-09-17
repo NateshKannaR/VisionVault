@@ -1284,6 +1284,13 @@
     return l.inUrl || l.inTitle;
   }
 
+  let CursorOverlay = global.CursorOverlay;
+  let ObstacleDetector = global.ObstacleDetector;
+  if (typeof require !== "undefined") {
+    try { CursorOverlay = CursorOverlay || require("./cursor-overlay.js"); } catch (_) {}
+    try { ObstacleDetector = ObstacleDetector || require("./obstacle-detector.js"); } catch (_) {}
+  }
+
   const ActionExecutor = {
     executeAction,
     TARGETLESS_ACTIONS,
@@ -1297,6 +1304,8 @@
     detectObstacleOrCaptcha,
     visibleTextInputs,
     looksLikeSearchInput,
+    CursorOverlay,
+    ObstacleDetector,
   };
 
   global.ActionExecutor = ActionExecutor;

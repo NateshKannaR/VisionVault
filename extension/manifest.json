@@ -11,9 +11,7 @@
     "sidePanel",
     "offscreen",
     "debugger",
-    "downloads",
-    "audioCapture",
-    "microphone"
+    "downloads"
   ],
   "host_permissions": [
     "<all_urls>",
@@ -52,6 +50,8 @@
       "js": [
         "prompt-scrubber.js",
         "pdf-scrubber.js",
+        "cursor-overlay.js",
+        "obstacle-detector.js",
         "action-executor.js",
         "content.js"
       ],

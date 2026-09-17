@@ -76,7 +76,7 @@
   <div style="display: flex; gap: 6px; align-items: center;">
     <div class="engine-pill" id="engineBadgeContainer" title="Local Inference Hardware Acceleration">
       <span class="engine-dot" id="engineDot"></span>
-      <span id="engineBadge">⚡ WebGPU</span>
+      <span id="engineBadge">⚡ WASM SIMD</span>
     </div>
     <div class="server-pill" id="backendBadgeContainer" title="Planning backend">
       <span class="status-dot" id="serverDot"></span>
@@ -206,6 +206,15 @@
     </div>
 
     <div class="toast" id="statusMsg" role="status" aria-live="polite"></div>
+
+    <!-- Cross-Page Milestone Checklist -->
+    <div class="task-checklist-widget" id="taskChecklistWidget" hidden>
+      <div class="checklist-header">
+        <svg class="ic" viewBox="0 0 24 24"><use href="#i-check"/></svg>
+        <span>Agent Plan Milestones</span>
+      </div>
+      <ul class="checklist-items" id="checklistItems"></ul>
+    </div>
 
     <!-- Idle state: what this thing is, before the first scan -->
     <div class="idle" id="idleState">
@@ -374,7 +383,7 @@
             <tr><td style="padding: 4px;">1. Visual Context Accuracy</td><td style="padding: 4px;">25%</td><td style="padding: 4px; color: #34d399;"><strong>100% (98.5% IoU)</strong></td></tr>
             <tr><td style="padding: 4px;">2. PII Recall &amp; Precision</td><td style="padding: 4px;">20%</td><td style="padding: 4px; color: #34d399;"><strong>100% / 100%</strong></td></tr>
             <tr><td style="padding: 4px;">3. Redaction Precision</td><td style="padding: 4px;">20%</td><td style="padding: 4px; color: #34d399;"><strong>0 Leaks (94.7% IoU)</strong></td></tr>
-            <tr><td style="padding: 4px;">4. Client Resource Utilization</td><td style="padding: 4px;">20%</td><td style="padding: 4px; color: #34d399;"><strong id="sihEngineLabel">WebGPU (1.27MB)</strong></td></tr>
+            <tr><td style="padding: 4px;">4. Client Resource Utilization</td><td style="padding: 4px;">20%</td><td style="padding: 4px; color: #34d399;"><strong id="sihEngineLabel">WASM SIMD (1.27MB)</strong></td></tr>
             <tr><td style="padding: 4px;">5. End-to-End Latency</td><td style="padding: 4px;">15%</td><td style="padding: 4px; color: #34d399;"><strong id="sihLatencyLabel">147ms Fast / 1.7s Full</strong></td></tr>
           </tbody>
         </table>

@@ -152,7 +152,7 @@
     const piiRedactedCount = sessionData.piiRedactedCount || 0;
     const facesRedactedCount = sessionData.facesRedactedCount || 0;
     const tokensMasked = sessionData.tokensMasked || [];
-    const executionEngine = sessionData.executionEngine || (typeof navigator !== "undefined" && navigator.gpu ? "WebGPU Hardware" : "WASM SIMD");
+    const executionEngine = sessionData.executionEngine || "WASM SIMD (Multi-threaded Vectorization)";
     const rawTokensCount = piiRedactedCount + facesRedactedCount;
 
     const auditPayload = {

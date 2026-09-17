@@ -1469,3 +1469,70 @@ kbd {
   margin-top: 4px;
 }
 
+/* ── Live Task Checklist Widget ────────────────────────────────────────── */
+.task-checklist-widget {
+  background: var(--surface);
+  border: 1px solid var(--border-light);
+  border-radius: var(--r);
+  padding: 10px 12px;
+  margin-top: 10px;
+  backdrop-filter: blur(12px);
+}
+.checklist-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+.checklist-items {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.checklist-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text);
+  transition: opacity 0.2s ease;
+}
+.checklist-item.done {
+  color: var(--text-muted);
+  text-decoration: line-through;
+  opacity: 0.75;
+}
+.checklist-item.in_progress {
+  color: #38bdf8;
+  font-weight: 600;
+}
+.checklist-item-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1.5px solid var(--text-faint);
+  flex-shrink: 0;
+}
+.checklist-item.done .checklist-item-dot {
+  background: var(--safe);
+  border-color: var(--safe);
+}
+.checklist-item.in_progress .checklist-item-dot {
+  background: #38bdf8;
+  border-color: #38bdf8;
+  box-shadow: 0 0 8px rgba(56, 189, 248, 0.6);
+  animation: pulseDot 1.5s infinite;
+}
+@keyframes pulseDot {
+  0% { transform: scale(0.9); opacity: 0.8; }
+  50% { transform: scale(1.2); opacity: 1; }
+  100% { transform: scale(0.9); opacity: 0.8; }
+}
+
+

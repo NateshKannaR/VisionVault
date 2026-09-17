@@ -56,7 +56,7 @@ async function runTests() {
     url: 'https://isro.gov.in/portal/login',
     piiRedactedCount: 4,
     facesRedactedCount: 1,
-    executionEngine: 'WebGPU Hardware Acceleration'
+    executionEngine: 'WASM SIMD (Multi-threaded)'
   });
 
   assert.ok(certificateResult, 'Certificate result generated');

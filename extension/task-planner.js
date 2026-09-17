@@ -1756,9 +1756,19 @@
     return bits.length ? `Task complete — ${bits.join(", ")}.` : "Nothing further to do for this task.";
   }
 
+  let TaskChecklist = global.TaskChecklist;
+  let VisualGrounding = global.VisualGrounding;
+  let TaskParser = global.TaskParser;
+  if (typeof require !== "undefined") {
+    try { TaskChecklist = TaskChecklist || require("./planner/task-checklist.js"); } catch (_) {}
+    try { VisualGrounding = VisualGrounding || require("./planner/visual-grounding.js"); } catch (_) {}
+    try { TaskParser = TaskParser || require("./planner/task-parser.js"); } catch (_) {}
+  }
+
   const TaskPlanner = {
     parseTask, planNextAction, planBatchFormFill, alreadyOnSite, siteUrlFor, vaultKeyForLabel, KNOWN_SITES,
     isShoppingSite, planShoppingStep, planGitHubStep, planBookingStep, planYouTubeStep,
+    TaskChecklist, VisualGrounding, TaskParser,
   };
 
   global.TaskPlanner = TaskPlanner;

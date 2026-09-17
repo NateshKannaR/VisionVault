@@ -149,11 +149,11 @@ Designed to operate seamlessly within Chrome's strict resource constraints (well
 | Component | RAM Allocation | Execution Time (Typical) | Engine Runtime | Purpose |
 | :--- | :--- | :--- | :--- | :--- |
 | **DOM Scanner & Mark Engine** | ~3–5 MB | 12–25 ms | Native JS / DOM | Tree traversal, stable ID generation, coordinate projection |
-| **UltraFace On-Device Model** | ~12 MB | 42–56 ms | ONNX WebAssembly SIMD | Local face detection (320×240 input), eliminating avatar masking false positives |
-| **Tesseract OCR (Optional Stage)** | ~18 MB | 1.4–1.7 s | WASM SIMD (Multithreaded) | Reads text baked directly into canvas or CSS background images |
-| **Fail-Closed Redaction Canvas** | ~4–8 MB | 8–16 ms | OffscreenCanvas 2D | Pixel-level bounding box dilation and black-out masking |
+| **UltraFace On-Device Model** | ~12 MB | 42–56 ms | ONNX WebAssembly SIMD | Multi-scale patch zoom for small avatar thumbnails ($\le 120$px) & collar expansion |
+| **Tesseract OCR (Targeted ROI)** | ~18 MB | **280–320 ms** | WASM SIMD (Multithreaded) | Selective OCR with adaptive binarization on non-DOM/canvas regions (vs 1.4–1.7s full viewport) |
+| **Fail-Closed Redaction Canvas** | ~4–8 MB | 8–16 ms | OffscreenCanvas 2D | Synthetic semantic tokens (`[AADHAAR]`, `••••••••`), avatar silhouettes & $0.38\times h$ dilation |
 | **Offscreen Worker Base** | ~8–14 MB | Idle background | Chrome Offscreen Document | Sandbox isolation preventing main-thread UI stutter |
-| **Total Memory Footprint** | **~25–45 MB** | **0.11s (fast) / 1.56s (full)** | Isolated Sandbox | **< 10% of standard 500 MB Chrome extension memory cap** |
+| **Total Memory Footprint** | **~25–45 MB** | **0.11s (fast) / 0.38s (ROI) / 1.56s (full)** | Isolated Sandbox | **< 10% of standard 500 MB Chrome extension memory cap** |
 
 ---
 

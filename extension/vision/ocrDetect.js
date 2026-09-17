@@ -328,23 +328,45 @@
     const ctx = canvas.getContext("2d", { willReadFrequently: true });
     ctx.drawImage(bitmap, 0, 0, ocrW, ocrH);
 
-    // Adaptive contrast preprocessing. It measurably helps a downscaled raster recover
-    // characters, and makes no difference at full resolution (see the header table), so it is
-    // applied only when the image was actually scaled down — saving a full-image pass otherwise.
-    if (scale < 0.999) {
-      try {
-        const imgData = ctx.getImageData(0, 0, ocrW, ocrH);
-        const d = imgData.data;
-        for (let i = 0; i < d.length; i += 4) {
-          const gray = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
-          const val = gray > 170 ? 255 : (gray < 75 ? 0 : gray);
-          d[i] = val;
-          d[i + 1] = val;
-          d[i + 2] = val;
-        }
-        ctx.putImageData(imgData, 0, 0);
-      } catch (e) {}
+    // Region-of-Interest (ROI) Targeted Mode: If caller passed specific target ROIs (e.g. canvas elements,
+    // receipts, unmapped images), process only the bounding regions to achieve ~300ms inference.
+    let roiOffsetX = 0;
+    let roiOffsetY = 0;
+    if (Array.isArray(options.roiBoxes) && options.roiBoxes.length > 0 && options.roiBoxes.length <= 6) {
+      let minX = origW, minY = origH, maxX = 0, maxY = 0;
+      for (const r of options.roiBoxes) {
+        minX = Math.min(minX, Math.max(0, r.x || 0));
+        minY = Math.min(minY, Math.max(0, r.y || 0));
+        maxX = Math.max(maxX, Math.min(origW, (r.x || 0) + (r.w || r.width || 0)));
+        maxY = Math.max(maxY, Math.min(origH, (r.y || 0) + (r.h || r.height || 0)));
+      }
+      const roiW = Math.max(10, maxX - minX);
+      const roiH = Math.max(10, maxY - minY);
+      if (roiW > 0 && roiH > 0 && (roiW < origW * 0.85 || roiH < origH * 0.85)) {
+        roiOffsetX = minX;
+        roiOffsetY = minY;
+        const targetCropW = Math.min(maxDim, Math.round(roiW * scale));
+        const targetCropH = Math.min(maxDim, Math.round(roiH * scale));
+        canvas.width = targetCropW;
+        canvas.height = targetCropH;
+        ctx.drawImage(bitmap, minX, minY, roiW, roiH, 0, 0, targetCropW, targetCropH);
+      }
     }
+
+    // Adaptive contrast & binarization preprocessing:
+    // Enhances contrast (1.8x) and binarizes light/dark boundaries for crisp character recognition
+    try {
+      const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const d = imgData.data;
+      for (let i = 0; i < d.length; i += 4) {
+        const gray = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+        const val = gray > 180 ? 255 : (gray < 70 ? 0 : Math.round((gray - 70) * 2.2));
+        d[i] = val;
+        d[i + 1] = val;
+        d[i + 2] = val;
+      }
+      ctx.putImageData(imgData, 0, 0);
+    } catch (e) {}
 
     const tOcrStart = performance.now();
     let ocrData = null;

@@ -275,7 +275,7 @@
     const decodedBoxes = decodeBoxes(boxesData, priors);
 
     const candidates = [];
-    const scoreThreshold = options.scoreThreshold || CONFIDENCE_THRESHOLD;
+    const scoreThreshold = options.scoreThreshold || (options.highRecall ? 0.38 : CONFIDENCE_THRESHOLD);
 
     for (let i = 0; i < decodedBoxes.length; i++) {
       const faceScore = scoresData[i * 2 + 1];
@@ -294,7 +294,7 @@
     const targetH = options.viewportHeight || options.targetHeight || (imageEl.height || MODEL_INPUT_HEIGHT);
 
     // Convert normalized [xmin, ymin, xmax, ymax] boxes to { x, y, w, h, type: "face" }
-    // Adding 10% safety margin around detected face box
+    // Head & Neck boundary dilation: expands upward for hair/forehead and downward for neckline/collar/ID photo frames
     const boxes = filtered.map(item => {
       const b = item.box;
       const rawX = b[0] * targetW;
@@ -302,13 +302,14 @@
       const rawW = (b[2] - b[0]) * targetW;
       const rawH = (b[3] - b[1]) * targetH;
 
-      const padX = rawW * 0.10;
-      const padY = rawH * 0.12;
+      const padX = rawW * 0.12;
+      const padTop = rawH * 0.15;
+      const padBottom = rawH * 0.35;
 
       const x = Math.max(0, Math.round(rawX - padX));
-      const y = Math.max(0, Math.round(rawY - padY));
+      const y = Math.max(0, Math.round(rawY - padTop));
       const w = Math.min(targetW - x, Math.round(rawW + 2 * padX));
-      const h = Math.min(targetH - y, Math.round(rawH + 2 * padY));
+      const h = Math.min(targetH - y, Math.round(rawH + padTop + padBottom));
 
       return {
         x,
@@ -322,6 +323,48 @@
         source: "vision_face"
       };
     });
+
+    // Adaptive multi-scale patch inference for small avatar regions (zooms 2x into candidate thumbnails)
+    if (Array.isArray(options.avatarPatches) && options.avatarPatches.length > 0 && typeof OffscreenCanvas !== "undefined") {
+      for (const patch of options.avatarPatches.slice(0, 4)) {
+        if (patch.w >= 20 && patch.w <= 120 && patch.h >= 20 && patch.h <= 120) {
+          try {
+            const pCanvas = new OffscreenCanvas(MODEL_INPUT_WIDTH, MODEL_INPUT_HEIGHT);
+            const pCtx = pCanvas.getContext("2d");
+            const cropX = Math.max(0, patch.x - patch.w * 0.25);
+            const cropY = Math.max(0, patch.y - patch.h * 0.25);
+            const cropW = Math.min(targetW - cropX, patch.w * 1.5);
+            const cropH = Math.min(targetH - cropY, patch.h * 1.5);
+            pCtx.drawImage(imageEl, cropX, cropY, cropW, cropH, 0, 0, MODEL_INPUT_WIDTH, MODEL_INPUT_HEIGHT);
+            const pTensor = prepareInputTensor(pCanvas);
+            const pRes = await session.run({ input: pTensor });
+            const pScores = pRes.scores.data;
+            const pBoxes = decodeBoxes(pRes.boxes.data, priors);
+            for (let k = 0; k < pBoxes.length; k++) {
+              if (pScores[k * 2 + 1] >= 0.36) {
+                const pb = pBoxes[k];
+                const realX = Math.max(0, Math.round(cropX + pb[0] * cropW));
+                const realY = Math.max(0, Math.round(cropY + pb[1] * cropH));
+                const realW = Math.round((pb[2] - pb[0]) * cropW);
+                const realH = Math.round((pb[3] - pb[1]) * cropH);
+                boxes.push({
+                  x: realX,
+                  y: realY,
+                  w: Math.max(4, realW),
+                  h: Math.max(4, realH),
+                  type: "face",
+                  reason: "face_detection_patch",
+                  label: "face",
+                  confidence: Math.round(pScores[k * 2 + 1] * 100) / 100,
+                  source: "vision_face"
+                });
+                break;
+              }
+            }
+          } catch (_) {}
+        }
+      }
+    }
 
     if (needCleanUp && imageEl && typeof imageEl.close === "function") {
       imageEl.close();

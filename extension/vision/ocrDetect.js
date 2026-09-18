@@ -365,9 +365,8 @@
     let ocrData = null;
     try {
       // Budget: full-viewport recognition on a 640px-wide raster takes roughly 400-900 ms on a
-      // mid-range laptop. The previous 1.2 s cap fired mid-recognition and silently returned
-      // zero regions, so OCR contributed nothing. Callers can tighten this per call.
-      const budgetMs = options.timeoutMs || 8000;
+      // mid-range laptop. Callers can pass tighter timeouts per call.
+      const budgetMs = options.timeoutMs || 25000;
       const ocrTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error("OCR_TIMEOUT")), budgetMs));
       const result = await Promise.race([
         worker.recognize(canvas),
@@ -688,6 +687,58 @@
       }
     }
 
+
+    // 6. Auto-Orientation Fallback for sideways / rotated photos of ID cards and documents
+    if (piiRegions.length === 0 && !options._isRotated && origW >= 250 && origH >= 250 && typeof OffscreenCanvas !== "undefined") {
+      try {
+        const rotCanvas = new OffscreenCanvas(origH, origW);
+        const rCtx = rotCanvas.getContext("2d");
+        // Rotate 90 degrees CCW (maps portrait sideways photo of landscape card to horizontal landscape)
+        rCtx.translate(0, origW);
+        rCtx.rotate(-Math.PI / 2);
+        rCtx.drawImage(bitmap, 0, 0);
+
+        const rotResult = await detectOCR(rotCanvas, {
+          ...options,
+          _isRotated: true,
+          viewportWidth: origH,
+          viewportHeight: origW,
+          timeoutMs: 15000
+        });
+
+        if (rotResult && rotResult.regions && rotResult.regions.length > 0) {
+          console.log(`[vision] Auto-orientation found ${rotResult.regions.length} region(s) at 90° CCW rotation. Mapping back to original frame.`);
+          // Inverse transform:
+          // x_orig = origW - (y_rot + h_rot)
+          // y_orig = x_rot
+          // w_orig = h_rot
+          // h_orig = w_rot
+          for (const r of rotResult.regions) {
+            const rx = Math.max(0, Math.round(origW - (r.y + r.h)));
+            const ry = Math.max(0, Math.round(r.x));
+            const rw = Math.max(8, Math.round(r.h));
+            const rh = Math.max(8, Math.round(r.w));
+
+            const dup = piiRegions.some(ex => Math.abs(ex.x - rx) < 15 && Math.abs(ex.y - ry) < 15);
+            if (!dup) {
+              piiRegions.push({
+                ...r,
+                x: rx,
+                y: ry,
+                w: rw,
+                h: rh,
+                source: "vision_ocr_rot90"
+              });
+            }
+          }
+          if (rotResult.text) {
+            fullText = rotResult.text;
+          }
+        }
+      } catch (rotErr) {
+        console.warn("[vision] Auto-orientation OCR fallback failed:", rotErr);
+      }
+    }
 
     if (needClose && bitmap && typeof bitmap.close === "function") {
       bitmap.close();

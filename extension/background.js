@@ -2296,7 +2296,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
               rawScreenshot,
               domRegions: [],
               enableOCR: true,
-              enableFaceDetection: true
+              enableFaceDetection: true,
+              timeoutMs: 30000
             }
           }, (res) => {
             if (chrome.runtime.lastError) {

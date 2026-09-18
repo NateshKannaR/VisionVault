@@ -1912,6 +1912,12 @@ function initInPageShield() {
           dataUrl: reader.result
         }, async (resp) => {
           hideProcessingOverlay();
+          if (chrome.runtime.lastError || !resp || !resp.ok) {
+            console.warn("[VisionVault] REDACT_IMAGE_BLOB notice:", chrome.runtime.lastError?.message || resp?.error);
+            showToast(`⚠️ <strong>VisionVault Reloaded</strong>: Please refresh this page (F5) to re-arm the shield before pasting!`, true);
+            return;
+          }
+
           if (resp && resp.ok && resp.redactedDataUrl && (resp.regionsCount > 0)) {
             const count = resp.regionsCount || 0;
             sessionRedactions += count;

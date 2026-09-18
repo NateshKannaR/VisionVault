@@ -706,7 +706,13 @@ function restrictedPageReason(url) {
   return "";
 }
 
-async function getTargetTab() {
+async function getTargetTab(preferredTabId = null) {
+  if (preferredTabId) {
+    try {
+      const t = await new Promise(r => chrome.tabs.get(preferredTabId, tab => r(chrome.runtime.lastError ? null : tab)));
+      if (t && t.url && !t.url.startsWith("chrome-extension://")) return t;
+    } catch (_) {}
+  }
   const focusedTabs = (await chrome.tabs.query({ active: true, lastFocusedWindow: true })).filter(t => t.url && !t.url.startsWith("chrome-extension://"));
   const allTabs = (await chrome.tabs.query({ active: true })).filter(t => t.url && !t.url.startsWith("chrome-extension://"));
   return (focusedTabs.length ? focusedTabs[0] : null) || allTabs[0] ||
@@ -716,13 +722,13 @@ async function getTargetTab() {
 }
 
 // ── PHASE 1: Initial scan (just preview, nothing sent) ────────────────────────
-async function phaseScan(task) {
+async function phaseScan(task, preferredTabId = null) {
   const t0 = performance.now();
   const settings = await getSettings();
   const parsedTask = TaskPlanner.parseTask(task);
 
   // Find the active tab in the focused window that is NOT the side panel / popup
-  let tab = await getTargetTab();
+  let tab = await getTargetTab(preferredTabId);
   if (!tab) throw new Error("No active tab.");
 
   let navigatedInitial = false;
@@ -1316,6 +1322,7 @@ async function phaseRun() {
         resp = deterministic;
         plannerSource = "on-device";
       } else {
+        try {
           const groundedCandidates = (typeof VisualGrounding !== "undefined" && VisualGrounding.proposeGroundedCandidates)
             ? VisualGrounding.proposeGroundedCandidates(session.marks, session.parsedTask, session.ocrRegions || [])
             : [];
@@ -2229,7 +2236,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
   if (msg.type === "SCAN") {
-    phaseScan(msg.task)
+    phaseScan(msg.task, msg.tabId)
       .then(r => sendResponse({ ok: true, result: r }))
       .catch(e => sendResponse({ ok: false, error: e.message }));
     return true;
@@ -2396,7 +2403,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === "FILL_SINGLE_FIELD") {
     (async () => {
       try {
-        const tab = await getTargetTab();
+        const tab = await getTargetTab(msg.tabId);
         if (!tab) { sendResponse({ ok: false, error: "No active tab" }); return; }
         if (msg.saveToVault && msg.key && msg.value) {
           const vault = await getVault();
@@ -2421,7 +2428,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === "STORE_PAGE_TO_VAULT") {
     (async () => {
       try {
-        const tab = await getTargetTab();
+        const tab = await getTargetTab(msg.tabId);
         if (!tab) { sendResponse({ ok: false, error: "No active tab" }); return; }
         await ensureContent(tab.id);
         const result = await msgTab(tab.id, { type: "READ_VAULT_FIELDS" });
@@ -2448,7 +2455,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === "FILL_FROM_VAULT") {
     (async () => {
       try {
-        const tab = await getTargetTab();
+        const tab = await getTargetTab(msg.tabId);
         if (!tab) { sendResponse({ ok: false, error: "No active tab" }); return; }
         const vault = await getVault();
         if (!vault || !Object.keys(vault).length) { sendResponse({ ok: false, error: "Vault is empty." }); return; }

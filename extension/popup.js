@@ -880,23 +880,29 @@ const VAULT_STORE_RE = /\b(store|save|remember|capture|extract|read).{0,30}(vaul
 // Fill-from-vault: must mention "vault" or "stored/saved values" explicitly.
 const VAULT_FILL_RE  = /\b(fill|populate|autofill|use|apply).{0,30}(vault|stored values?|saved values?|from vault)\b|\bfill.{0,20}from\s+(the\s+)?vault\b/i;
 
-scanBtn.addEventListener("click", () => {
-  resetPipeline();
-  setProtection("running", "Reading the screen locally");
-  setPipelineStage("observe");
+scanBtn.addEventListener("click", async () => {
   const task = taskEl.value.trim();
   if (!task) {
-    showStatus("statusMsg", "warn", "Describe what the agent should do first.");
+    showStatus("statusMsg", "error", "Please describe what the agent should do.");
     taskEl.focus();
     return;
   }
+
+  // Resolve current active tab in this side panel window
+  const tabs = await new Promise(r => chrome.tabs.query({ active: true, currentWindow: true }, r));
+  const currentTab = (tabs && tabs[0]) ? tabs[0] : null;
+  const tabId = currentTab?.id || null;
+
+  resetPipeline();
+  setProtection("running", "Reading the screen locally");
+  setPipelineStage("observe");
 
   const isVaultStore = VAULT_STORE_RE.test(task);
   const isVaultFill = VAULT_FILL_RE.test(task);
 
   if (isVaultStore) {
     busy(scanBtn, "Storing to vault…");
-    chrome.runtime.sendMessage({ type: "STORE_PAGE_TO_VAULT" }, (res) => {
+    chrome.runtime.sendMessage({ type: "STORE_PAGE_TO_VAULT", tabId }, (res) => {
       scanBtn.disabled = false;
       scanBtn.innerHTML = SCAN_LABEL;
       if (!res || !res.ok) {
@@ -907,7 +913,7 @@ scanBtn.addEventListener("click", () => {
       showStatus("statusMsg", "success", `Stored ${n} value${n === 1 ? "" : "s"} from this page into vault.`);
       loadVault();
       // Background scan to update preview without blocking UI
-      chrome.runtime.sendMessage({ type: "SCAN", task }, (scanRes) => {
+      chrome.runtime.sendMessage({ type: "SCAN", task, tabId }, (scanRes) => {
         if (scanRes && scanRes.ok && scanRes.result) {
           renderScan(scanRes.result, false);
         }
@@ -932,7 +938,7 @@ scanBtn.addEventListener("click", () => {
     const match = PAGE_MAP.find(p => p.re.test(task));
     const targetPage = match ? match.page : null;
     busy(scanBtn, "Filling from vault…");
-    chrome.runtime.sendMessage({ type: "FILL_FROM_VAULT", targetPage }, (res) => {
+    chrome.runtime.sendMessage({ type: "FILL_FROM_VAULT", targetPage, tabId }, (res) => {
       scanBtn.disabled = false;
       scanBtn.innerHTML = SCAN_LABEL;
       if (!res || !res.ok) {
@@ -979,7 +985,7 @@ scanBtn.addEventListener("click", () => {
     showStatus("statusMsg", "warn", "Scan is taking longer than expected. Check if the active tab is loading, or click 'Run agent' again.");
   }, 35000);
 
-  chrome.runtime.sendMessage({ type: "SCAN", task }, (res) => {
+  chrome.runtime.sendMessage({ type: "SCAN", task, tabId }, (res) => {
     clearTimeout(scanWatchdog);
     scanBtn.disabled = false;
     scanBtn.innerHTML = SCAN_LABEL;

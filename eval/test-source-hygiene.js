@@ -43,6 +43,22 @@ for (const dir of DIRS) {
 
     const text = fs.readFileSync(file, 'utf8');
     checked++;
+    if (path.extname(name) === '.js') {
+      try {
+        const vm = require('vm');
+        // Handle ES modules (e.g., vision-worker.js)
+        if (text.includes('import ') || text.includes('export ')) {
+          require('child_process').execFileSync('node', ['--check', file]);
+        } else {
+          new vm.Script(text, { filename: file });
+        }
+      } catch (syntaxErr) {
+        bad++;
+        const rel = path.relative(ROOT, file);
+        console.log(`  FAIL ${rel} SyntaxError: ${syntaxErr.message}`);
+      }
+    }
+
     if (!FORBIDDEN.test(text)) continue;
 
     bad++;
@@ -58,5 +74,5 @@ for (const dir of DIRS) {
   }
 }
 
-console.log(`\n${checked} source file(s) checked, ${bad} with embedded control characters\n`);
+console.log(`\n${checked} source file(s) checked, ${bad} with errors or embedded control characters\n`);
 process.exit(bad ? 1 : 0);

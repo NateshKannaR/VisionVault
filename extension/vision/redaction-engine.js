@@ -52,17 +52,17 @@
         const rw = box.w * sx;
         const rh = box.h * sy;
 
-        // Line-height adaptive boundary dilation: swallows glyph descenders (g, y, j, p, q) and card edges
+        // Line-height adaptive boundary dilation: swallows glyph descenders (g, y, j, p, q) without merging adjacent lines
         const isAadhaarField = (r.label === "aadhaar_card_pii" || r.label === "aadhaar" || r.label === "vid" || (r.reason && r.reason.includes("aadhaar")));
         const isSensitiveId = isAadhaarField || (r.label === "pan" || r.label === "passport" || r.label === "card" || r.label === "credit_card");
         const isPassword = (r.label === "password" || (r.reason && r.reason.includes("password")));
 
         const padX = isSensitiveId
-          ? Math.max(16, Math.min(48, Math.round(Math.max(rw, 24) * 0.18)))
-          : Math.max(8, Math.min(24, Math.round(Math.max(rw, 16) * 0.10)));
+          ? Math.max(6, Math.min(14, Math.round(Math.max(rw, 24) * 0.08)))
+          : Math.max(3, Math.min(8, Math.round(Math.max(rw, 16) * 0.05)));
         const padY = isSensitiveId
-          ? Math.max(10, Math.min(28, Math.round(Math.max(rh, 12) * 0.38)))
-          : Math.max(7, Math.min(20, Math.round(Math.max(rh, 8) * 0.28)));
+          ? Math.max(3, Math.min(6, Math.round(Math.max(rh, 12) * 0.12)))
+          : Math.max(2, Math.min(4, Math.round(Math.max(rh, 8) * 0.08)));
 
         const x0 = clamp(Math.round(rx) - padX, 0, bitmap.width - 1);
         const y0 = clamp(Math.round(ry) - padY, 0, bitmap.height - 1);
@@ -143,9 +143,15 @@
             }
           }
         } else {
-          // Fail-closed 100% black ink blot
-          ctx.fillStyle = "#000000";
-          ctx.fillRect(x0, y0, w0, h0);
+          // Fail-closed 100% black ink blot with clean rounded corners
+          ctx.fillStyle = "#020617";
+          if (typeof ctx.roundRect === "function") {
+            ctx.beginPath();
+            ctx.roundRect(x0, y0, w0, h0, Math.min(3, Math.min(w0, h0) / 4));
+            ctx.fill();
+          } else {
+            ctx.fillRect(x0, y0, w0, h0);
+          }
         }
       }
 

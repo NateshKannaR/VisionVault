@@ -593,6 +593,16 @@ function findContextLabelledPII() {
       return;
     }
 
+    // NEVER treat sidebar navigation items, header titles, tabs, or buttons as PII label-value pairs!
+    if (el.closest("nav, .sidebar, .topbar, .topbar-title, .topbar-actions, [role='navigation'], [role='tablist'], .nav-item, .nav-link, button, .btn, .switch-link")) {
+      return;
+    }
+
+    // Avoid treating complex containers or wide blocks as individual values
+    if (el.children && el.children.length > 2) return;
+    const r = el.getBoundingClientRect();
+    if (r.height > 80 || r.width > 450) return;
+
     const prev = el.previousElementSibling || (el.parentElement && el.parentElement.previousElementSibling);
     if (!prev) return;
     const label = (prev.innerText || prev.textContent || "").trim();
@@ -668,18 +678,84 @@ function isCircular(el, rect) {
   }
 }
 
+function findPiiRangesInTextNode(node, text) {
+  const boxes = [];
+  const tests = [
+    { re: EMAIL_RE, label: "email" },
+    { re: PHONE_RE, label: "phone" },
+    { re: CARD_RE, label: "card" },
+    { re: SSN_RE, label: "ssn" },
+    { re: AADHAAR_RE, label: "aadhaar" },
+    { re: PAN_RE, label: "pan" },
+    { re: PASSPORT_RE, label: "passport" },
+    { re: DL_RE, label: "driving_license" },
+    { re: ACCOUNT_RE, label: "bank_account" },
+    { re: IFSC_RE, label: "ifsc" },
+    { re: UPI_RE, label: "upi" },
+    { re: VID_RE, label: "vid" },
+  ];
+
+  try {
+    const range = document.createRange();
+    for (const { re, label } of tests) {
+      const flags = (re.flags && re.flags.includes("i") ? "i" : "") + "g";
+      const globalRe = new RegExp(re.source, flags);
+      let m;
+      while ((m = globalRe.exec(text)) !== null) {
+        if (!m[0] || m[0].length < 3) continue;
+        const start = m.index;
+        const end = m.index + m[0].length;
+        try {
+          range.setStart(node, start);
+          range.setEnd(node, end);
+          const rects = range.getClientRects();
+          for (let i = 0; i < rects.length; i++) {
+            const r = rects[i];
+            if (r.width > 2 && r.height > 2) {
+              boxes.push({
+                x: Math.round(r.left),
+                y: Math.round(r.top),
+                w: Math.round(r.width),
+                h: Math.round(r.height),
+                label
+              });
+            }
+          }
+        } catch (_) {}
+      }
+    }
+  } catch (_) {}
+  return boxes;
+}
+
 // ── Phase 1: scan for PII regions ────────────────────────────────────────────
 function scanForPII() {
   const regions = [];
   const seen = new Set();
   let nodeCount = 0;
 
+  function addBoxRegion(box, el, type, reason, label = null, extra = null) {
+    if (!box || box.w < 2 || box.h < 2) return;
+    if (el && type === "text") sensitiveTextEls.add(el);
+    const key = `${box.x},${box.y},${box.w},${box.h}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+
+    const stableId = el ? (deterministicId(el, "pii") + "_" + box.x + "_" + box.y) : ("pii_" + box.x + "_" + box.y);
+    regions.push({
+      id: stableId,
+      ...box,
+      box,
+      type,
+      sensitive: true,
+      reason,
+      label,
+      ...(extra || {})
+    });
+  }
+
   function addRegion(el, type, reason, label = null, extra = null) {
     if (!el) return;
-    // Remember WHICH element was judged sensitive, not just the rectangle. The rectangle is
-    // enough to paint over the pixels; it is not enough to stop the same text being sent as
-    // an element label in the marks array, which is a second, unredacted channel to the same
-    // server. See suppressLabelsInside.
     if (type === "text") sensitiveTextEls.add(el);
     const r = rectOf(el);
     if (r.w < 2 || r.h < 2) return;
@@ -731,7 +807,17 @@ function scanForPII() {
           const text = node.nodeValue || "";
           if (text.trim().length < 4) continue;
           if (testPII(text)) {
-            addRegion(node.parentElement, "text", "pii_text_match", "regex_pii");
+            const rangeBoxes = findPiiRangesInTextNode(node, text);
+            if (rangeBoxes.length > 0) {
+              for (const rBox of rangeBoxes) {
+                addBoxRegion(rBox, node.parentElement, "text", "pii_text_match", rBox.label || "regex_pii");
+              }
+            } else {
+              const r = rectOf(node.parentElement);
+              if (r && r.h <= 90) {
+                addRegion(node.parentElement, "text", "pii_text_match", "regex_pii");
+              }
+            }
           }
         }
       } catch (_) {}

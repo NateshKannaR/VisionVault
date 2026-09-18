@@ -494,14 +494,15 @@
         // ascenders, descenders and antialiased edges visible — the evaluation measured only
         // ~82% of a text region actually covered. Scaling the pad with the region's height
         // closes that gap without smothering neighbouring elements.
-        // Boundary dilation: Generous padding ensures numbers, names, and glyph edges are 100% swallowed
+        // Boundary dilation: swallows glyph descenders without merging adjacent lines
         const isAadhaarField = (r.label === "aadhaar_card_pii" || r.label === "aadhaar" || r.label === "vid" || (r.reason && r.reason.includes("aadhaar")));
-        const padX = isAadhaarField
-          ? Math.max(16, Math.min(48, Math.round(Math.max(rw, 24) * 0.18)))
-          : Math.max(8, Math.min(24, Math.round(Math.max(rw, 16) * 0.08)));
-        const padY = isAadhaarField
-          ? Math.max(8, Math.min(24, Math.round(Math.max(rh, 12) * 0.35)))
-          : Math.max(6, Math.min(18, Math.round(Math.max(rh, 8) * 0.25)));
+        const isSensitiveId = isAadhaarField || (r.label === "pan" || r.label === "passport" || r.label === "card" || r.label === "credit_card");
+        const padX = isSensitiveId
+          ? Math.max(6, Math.min(14, Math.round(Math.max(rw, 24) * 0.08)))
+          : Math.max(3, Math.min(8, Math.round(Math.max(rw, 16) * 0.05)));
+        const padY = isSensitiveId
+          ? Math.max(3, Math.min(6, Math.round(Math.max(rh, 12) * 0.12)))
+          : Math.max(2, Math.min(4, Math.round(Math.max(rh, 8) * 0.08)));
         const x0 = clamp(Math.round(rx) - padX, 0, bitmap.width - 1);
         const y0 = clamp(Math.round(ry) - padY, 0, bitmap.height - 1);
         const w0 = Math.max(1, Math.min(bitmap.width - x0, Math.round(rw) + padX * 2));
@@ -555,8 +556,14 @@
             }
           }
         } else {
-          ctx.fillStyle = "#000000";
-          ctx.fillRect(x0, y0, w0, h0);
+          ctx.fillStyle = "#020617";
+          if (typeof ctx.roundRect === "function") {
+            ctx.beginPath();
+            ctx.roundRect(x0, y0, w0, h0, Math.min(3, Math.min(w0, h0) / 4));
+            ctx.fill();
+          } else {
+            ctx.fillRect(x0, y0, w0, h0);
+          }
         }
       }
 

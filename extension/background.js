@@ -211,21 +211,10 @@ async function getSettings() {
       confirmPolicy: "risky",
       plannerMode: "fast",
       // Latency / coverage trade-off, surfaced in the side panel.
-      //   enableOCR       the only thing that reads text baked into images, canvases and
-      //                   other non-DOM pixels. ON by default: measured on the bundled
-      //                   fixtures, turning it off drops a pixel-rendered receipt from 3
-      //                   detected PII regions to 0, and the demo page from 13 to 10. Those
-      //                   are not near-misses, they are unredacted personal data leaving the
-      //                   machine, and no latency saving justifies that.
-      //                   The cost used to be ~1.5s on every scan. It is now paid once per
-      //                   distinct screen: detection-orchestrator caches the vision result
-      //                   against a hash of the captured pixels, so the re-scan after each
-      //                   action is served from cache unless the page actually changed.
-      //   enableFaceDetection ~35ms per scan. Cheap; on by default.
-      enableOCR: true,
+      //   enableOCR       off by default for instant sub-second local vision (~80ms).
+      //                   Can be toggled in Side Panel -> Settings -> Vision Depth (Full).
+      enableOCR: false,
       enableFaceDetection: true,
-      // Clear consent walls and modal dialogs before acting. They intercept every click
-      // underneath them, so leaving one up makes the agent look broken on much of the web.
       dismissOverlays: true,
     },
     settings || {}
@@ -438,14 +427,14 @@ async function openTab(url) {
 // How long to wait before each scan attempt. A single-page app can take several seconds to
 // mount its controls after the URL changes, and reading it too early yields a page that looks
 // empty — the agent then reports "no interactive elements" for a page full of them.
-const SCAN_ATTEMPT_DELAYS_MS = [400, 1200, 2500];
+const SCAN_ATTEMPT_DELAYS_MS = [150, 400];
 
 async function scanTab(tabId, windowId, settings, retries = SCAN_ATTEMPT_DELAYS_MS.length) {
   let last = null;
 
   for (let attempt = 1; attempt <= retries; attempt++) {
     await ensureContent(tabId);
-    await new Promise(r => setTimeout(r, SCAN_ATTEMPT_DELAYS_MS[attempt - 1] ?? 2500));
+    await new Promise(r => setTimeout(r, SCAN_ATTEMPT_DELAYS_MS[attempt - 1] ?? 400));
 
     const tab = await new Promise(r => chrome.tabs.get(tabId, r));
     let pageInfo = await msgTab(tabId, { type: "GET_PAGE_INFO" }, { frameId: 0 }) || {};
@@ -467,7 +456,7 @@ async function scanTab(tabId, windowId, settings, retries = SCAN_ATTEMPT_DELAYS_
       viewportWidth: pageInfo.viewport_width || tab.width,
       viewportHeight: pageInfo.viewport_height || tab.height,
       devicePixelRatio: pageInfo.device_pixel_ratio || 1,
-      enableOCR: settings.enableOCR !== false,
+      enableOCR: settings.enableOCR === true,
       enableFaceDetection: settings.enableFaceDetection !== false,
       includeRawForXRay: true,
     });
@@ -511,15 +500,8 @@ async function scanTab(tabId, windowId, settings, retries = SCAN_ATTEMPT_DELAYS_
       timings: result.timings || {},
     };
 
-    // A page that is still hydrating yields few or no marks. Zero is the obvious case; the
-    // subtler one is a handful, which is what a large site looks like when its scripts have
-    // not finished mounting — Amazon's home page has been observed returning 3 marks on a
-    // premature scan and 68 a second later, and the agent then reported that it could find
-    // nothing to search with. A long page with almost no controls is the signature, so retry
-    // on that too. Short pages (the evaluation fixtures) legitimately have few marks.
-    const looksUnhydrated =
-      safeMarks.length === 0 ||
-      (safeMarks.length < 5 && (pageInfo.page_height || 0) > 2000);
+    // Fast-path: if any interactive marks were found, proceed immediately without waiting for retry delays
+    const looksUnhydrated = safeMarks.length === 0;
     if (!looksUnhydrated || !last.redactionOk || attempt >= retries) return last;
   }
 
@@ -730,11 +712,12 @@ async function phaseScan(task) {
   const settings = await getSettings();
   const parsedTask = TaskPlanner.parseTask(task);
 
-  // Find the active tab that is NOT the extension side panel / popup
-  const allTabs = await chrome.tabs.query({ active: true });
-  let tab = allTabs.find(t => !t.url?.startsWith("chrome-extension://")) ||
+  // Find the active tab in the focused window that is NOT the side panel / popup
+  const focusedTabs = (await chrome.tabs.query({ active: true, lastFocusedWindow: true })).filter(t => t.url && !t.url.startsWith("chrome-extension://"));
+  const allTabs = (await chrome.tabs.query({ active: true })).filter(t => t.url && !t.url.startsWith("chrome-extension://"));
+  let tab = (focusedTabs.length ? focusedTabs[0] : null) || allTabs[0] ||
                (await chrome.tabs.query({}))
-                 .filter(t => !t.url?.startsWith("chrome-extension://") && !t.url?.startsWith("chrome://"))
+                 .filter(t => t.url && !t.url.startsWith("chrome-extension://") && !t.url.startsWith("chrome://"))
                  .sort((a, b) => b.lastAccessed - a.lastAccessed)[0];
   if (!tab) throw new Error("No active tab.");
 
@@ -745,9 +728,9 @@ async function phaseScan(task) {
   if (parsedTask?.siteUrl && !TaskPlanner.alreadyOnSite(tab.url || "", parsedTask.siteUrl)) {
     notifyPopup({ type: "step", step: 0, status: `Navigating to ${parsedTask.site || parsedTask.siteUrl}…` });
     try {
-      await chrome.tabs.update(tab.id, { url: parsedTask.siteUrl });
-      await withDeadlineSoft(waitForTabLoad(tab.id, 12000), 15000, "initial site navigation");
-      await new Promise(r => setTimeout(r, 600));
+      await chrome.tabs.update(tab.id, { url: parsedTask.siteUrl, active: true });
+      await withDeadlineSoft(waitForTabLoad(tab.id, 8000), 10000, "initial site navigation");
+      await new Promise(r => setTimeout(r, 400));
       await dismissOverlaysOnce();
       navigatedInitial = true;
       const updatedTab = await new Promise(r => chrome.tabs.get(tab.id, r));

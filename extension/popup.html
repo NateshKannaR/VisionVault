@@ -73,15 +73,9 @@
       <span class="brand-name">VisionVault</span>
       <span class="brand-sub">Private browsing agent</span>
     </div>
-  <div style="display: flex; gap: 6px; align-items: center;">
-    <div class="engine-pill" id="engineBadgeContainer" title="Local Inference Hardware Acceleration">
-      <span class="engine-dot" id="engineDot"></span>
-      <span id="engineBadge">⚡ WASM SIMD</span>
-    </div>
-    <div class="server-pill" id="backendBadgeContainer" title="Planning backend">
-      <span class="status-dot" id="serverDot"></span>
-      <span id="backendBadge">checking</span>
-    </div>
+  <div class="server-pill" id="backendBadgeContainer" title="Planning backend">
+    <span class="status-dot" id="serverDot"></span>
+    <span id="backendBadge">checking</span>
   </div>
 </header>
 
@@ -801,6 +795,13 @@
         </button>
       </div>
       <p class="diag-body" id="serverInfo">Checking…</p>
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 10px; padding-top: 8px; border-top: 1px solid rgba(255, 255, 255, 0.08);">
+        <span style="font-size: 11px; color: var(--text-muted);">Inference Acceleration</span>
+        <div class="engine-pill" id="engineBadgeContainer" title="Local Inference Hardware Acceleration">
+          <span class="engine-dot" id="engineDot"></span>
+          <span id="engineBadge">⚡ WASM SIMD</span>
+        </div>
+      </div>
     </div>
   </section>
 

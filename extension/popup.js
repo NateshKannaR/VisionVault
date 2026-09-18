@@ -987,16 +987,24 @@ scanBtn.addEventListener("click", () => {
   liveStepRow = null;
   actionCount = 0;
   renderedLogCount = 0;
-  hideStatus("statusMsg");
+  const scanWatchdog = setTimeout(() => {
+    scanBtn.disabled = false;
+    scanBtn.innerHTML = SCAN_LABEL;
+    scanSkeleton.hidden = true;
+    idleState.hidden = false;
+    showStatus("statusMsg", "warn", "Scan is taking longer than expected. Check if the active tab is loading, or click 'Run agent' again.");
+  }, 35000);
 
   chrome.runtime.sendMessage({ type: "SCAN", task }, (res) => {
+    clearTimeout(scanWatchdog);
     scanBtn.disabled = false;
     scanBtn.innerHTML = SCAN_LABEL;
     scanSkeleton.hidden = true;
 
-    if (!res || !res.ok) {
+    if (chrome.runtime.lastError || !res || !res.ok) {
       idleState.hidden = false;
-      showStatus("statusMsg", "error", esc(res?.error || "Scan failed. Open a normal web page and try again."));
+      const err = chrome.runtime.lastError?.message || res?.error || "Scan failed. Open a normal web page and try again.";
+      showStatus("statusMsg", "error", esc(err));
       return;
     }
 
@@ -1844,6 +1852,9 @@ chrome.runtime.onMessage.addListener((msg) => {
   }
 
   if (d.type === "step") {
+    if (scanSkeleton && !scanSkeleton.hidden && d.status) {
+      busy(scanBtn, d.status);
+    }
     setLiveStep(`Step ${esc(d.step)} — ${esc(d.status)}`, d.planner);
     const stage = pipelineFromStatus(d.status);
     if (stage) setPipelineStage(stage);

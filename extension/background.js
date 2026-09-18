@@ -728,13 +728,34 @@ function restrictedPageReason(url) {
 async function phaseScan(task) {
   const t0 = performance.now();
   const settings = await getSettings();
+  const parsedTask = TaskPlanner.parseTask(task);
+
   // Find the active tab that is NOT the extension side panel / popup
   const allTabs = await chrome.tabs.query({ active: true });
-  const tab = allTabs.find(t => !t.url?.startsWith("chrome-extension://")) ||
+  let tab = allTabs.find(t => !t.url?.startsWith("chrome-extension://")) ||
                (await chrome.tabs.query({}))
                  .filter(t => !t.url?.startsWith("chrome-extension://") && !t.url?.startsWith("chrome://"))
                  .sort((a, b) => b.lastAccessed - a.lastAccessed)[0];
   if (!tab) throw new Error("No active tab.");
+
+  let navigatedInitial = false;
+
+  // If the user's task explicitly asks to navigate to a site (e.g. "open amazon and search for earphones")
+  // and the current tab is not already on that site, navigate immediately to the target URL before scanning.
+  if (parsedTask?.siteUrl && !TaskPlanner.alreadyOnSite(tab.url || "", parsedTask.siteUrl)) {
+    notifyPopup({ type: "step", step: 0, status: `Navigating to ${parsedTask.site || parsedTask.siteUrl}…` });
+    try {
+      await chrome.tabs.update(tab.id, { url: parsedTask.siteUrl });
+      await withDeadlineSoft(waitForTabLoad(tab.id, 12000), 15000, "initial site navigation");
+      await new Promise(r => setTimeout(r, 600));
+      await dismissOverlaysOnce();
+      navigatedInitial = true;
+      const updatedTab = await new Promise(r => chrome.tabs.get(tab.id, r));
+      if (updatedTab && updatedTab.url) tab = updatedTab;
+    } catch (navErr) {
+      console.warn("[agent] Initial navigation notice:", navErr);
+    }
+  }
 
   // Chrome refuses to inject content scripts into its own pages and the Web Store. Without
   // this the scan quietly finds nothing and reports "no interactive elements", which reads
@@ -742,6 +763,7 @@ async function phaseScan(task) {
   const blocked = restrictedPageReason(tab.url || "");
   if (blocked) throw new Error(blocked);
 
+  notifyPopup({ type: "step", step: 0, status: "Reading screen locally…" });
   const scan = await scanTab(tab.id, tab.windowId, settings);
 
   // FAIL CLOSED: abort the whole request rather than showing/sending anything unredacted.
@@ -760,7 +782,6 @@ async function phaseScan(task) {
   // Any tab recorded during an earlier run belongs to that run.
   _openedTabIds.length = 0;
 
-  const parsedTask = TaskPlanner.parseTask(task);
   const checklist = (typeof TaskChecklist !== "undefined" && TaskChecklist.generateTaskChecklist)
     ? TaskChecklist.generateTaskChecklist(task, parsedTask)
     : [];
@@ -772,7 +793,7 @@ async function phaseScan(task) {
     // What the instruction has actually achieved so far. The planner reads this to decide
     // whether anything remains to be done, which is what makes the loop terminate.
     progress: {
-      navigated: false, searched: false, opened: [], scrolled: false,
+      navigated: navigatedInitial, searched: false, opened: [], scrolled: false,
       queryLanded: false, querySubmitted: false, filledAny: false,
       searchOpenAttempts: 0, siteSearchUrlTried: false, fillScrolls: 0,
       bookingStep: 0, fromTyped: false, toTyped: false, bookingCompleted: false,

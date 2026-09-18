@@ -894,79 +894,63 @@ scanBtn.addEventListener("click", () => {
   const isVaultStore = VAULT_STORE_RE.test(task);
   const isVaultFill = VAULT_FILL_RE.test(task);
 
-  if (isVaultStore || isVaultFill) {
-    busy(scanBtn, isVaultStore ? "Scanning & Reading…" : "Scanning & Filling…");
-    idleState.hidden = true;
-    scanSkeleton.hidden = false;
-    runBtn.hidden = true;
-    previewWrap.hidden = true;
-    statsGrid.hidden = true;
-    if ($("scoreCard")) $("scoreCard").hidden = true;
-    timingWrap.hidden = true;
-    confirmWrap.hidden = true;
-    inputPromptWrap.hidden = true;
-    hideStatus("statusMsg");
-
-    chrome.runtime.sendMessage({ type: "SCAN", task }, (scanRes) => {
-      scanSkeleton.hidden = true;
-      if (scanRes && scanRes.ok && scanRes.result) {
-        renderScan(scanRes.result, true);
-      }
-
-      if (isVaultStore) {
-        busy(scanBtn, "Storing to vault…");
-        chrome.runtime.sendMessage({ type: "STORE_PAGE_TO_VAULT" }, (res) => {
-          scanBtn.disabled = false;
-          scanBtn.innerHTML = SCAN_LABEL;
-          if (!res || !res.ok) {
-            showStatus("statusMsg", "error", esc(res?.error || "No data-vault-key fields found on this page."));
-            return;
-          }
-          const n = Object.keys(res.stored || {}).length;
-          showStatus("statusMsg", "success", `Stored ${n} value${n === 1 ? "" : "s"} from this page into vault. Screen masked & recorded.`);
-          loadVault();
-        });
+  if (isVaultStore) {
+    busy(scanBtn, "Storing to vault…");
+    chrome.runtime.sendMessage({ type: "STORE_PAGE_TO_VAULT" }, (res) => {
+      scanBtn.disabled = false;
+      scanBtn.innerHTML = SCAN_LABEL;
+      if (!res || !res.ok) {
+        showStatus("statusMsg", "error", esc(res?.error || "No vault fields found on this page."));
         return;
       }
+      const n = res.count || Object.keys(res.stored || {}).length;
+      showStatus("statusMsg", "success", `Stored ${n} value${n === 1 ? "" : "s"} from this page into vault.`);
+      loadVault();
+      // Background scan to update preview without blocking UI
+      chrome.runtime.sendMessage({ type: "SCAN", task }, (scanRes) => {
+        if (scanRes && scanRes.ok && scanRes.result) {
+          renderScan(scanRes.result, false);
+        }
+      });
+    });
+    return;
+  }
 
-      if (isVaultFill) {
-        const PAGE_MAP = [
-          { re: /form\s*1|personal|hr/i,            page: "form-hr" },
-          { re: /form\s*2|payroll|banking|salary/i,     page: "form-payroll" },
-          { re: /form\s*3|asset|it|system/i,         page: "form-it" },
-          { re: /form\s*4|housing|quarter/i,        page: "form-housing" },
-          { re: /form\s*5|medical|health|depend/i,     page: "form-medical" },
-          { re: /mission\s*reg/i,                    page: "form1" },
-          { re: /frequen/i,                          page: "form2" },
-          { re: /ground\s*station/i,                 page: "form3" },
-          { re: /security|clearance/i,               page: "form4" },
-          { re: /operator|credential/i,              page: "form5" },
-        ];
-        const match = PAGE_MAP.find(p => p.re.test(task));
-        const targetPage = match ? match.page : null;
-        busy(scanBtn, "Filling from vault…");
-        chrome.runtime.sendMessage({ type: "FILL_FROM_VAULT", targetPage }, (res) => {
-          scanBtn.disabled = false;
-          scanBtn.innerHTML = SCAN_LABEL;
-          if (!res || !res.ok) {
-            showStatus("statusMsg", "error", esc(res?.error || "Vault is empty — navigate to the dashboard first."));
-            return;
-          }
-          const n = res.filled || 0;
-          const missing = res.missing || [];
-          if (missing.length) {
-            showStatus("statusMsg", "info", `Filled ${n} field${n===1?"":"s"} from vault. Asking about ${missing.length} missing field${missing.length===1?"":"s"}…`);
-            promptMissingFields(missing, 0);
-          } else {
-            showStatus("statusMsg", "success", `Filled ${n} field${n===1?"":"s"} from vault.`);
-            chrome.runtime.sendMessage({ type: "SCAN", task }, (postScan) => {
-              if (postScan && postScan.ok && postScan.result) {
-                renderScan(postScan.result, false);
-              }
-            });
+  if (isVaultFill) {
+    const PAGE_MAP = [
+      { re: /form\s*1|personal|hr/i,            page: "form-hr" },
+      { re: /form\s*2|payroll|banking|salary/i,     page: "form-payroll" },
+      { re: /form\s*3|asset|it|system/i,         page: "form-it" },
+      { re: /form\s*4|housing|quarter/i,        page: "form-housing" },
+      { re: /form\s*5|medical|health|depend/i,     page: "form-medical" },
+      { re: /mission\s*reg/i,                    page: "form1" },
+      { re: /frequen/i,                          page: "form2" },
+      { re: /ground\s*station/i,                 page: "form3" },
+      { re: /security|clearance/i,               page: "form4" },
+      { re: /operator|credential/i,              page: "form5" },
+    ];
+    const match = PAGE_MAP.find(p => p.re.test(task));
+    const targetPage = match ? match.page : null;
+    busy(scanBtn, "Filling from vault…");
+    chrome.runtime.sendMessage({ type: "FILL_FROM_VAULT", targetPage }, (res) => {
+      scanBtn.disabled = false;
+      scanBtn.innerHTML = SCAN_LABEL;
+      if (!res || !res.ok) {
+        showStatus("statusMsg", "error", esc(res?.error || "Vault is empty — navigate to the dashboard first."));
+        return;
+      }
+      const n = res.filled || 0;
+      const missing = res.missing || [];
+      if (missing.length) {
+        showStatus("statusMsg", "info", `Filled ${n} field${n===1?"":"s"} from vault. Asking about ${missing.length} missing field${missing.length===1?"":"s"}…`);
+        promptMissingFields(missing, 0);
+      } else {
+        showStatus("statusMsg", "success", `Filled ${n} field${n===1?"":"s"} from vault.`);
+        chrome.runtime.sendMessage({ type: "SCAN", task }, (postScan) => {
+          if (postScan && postScan.ok && postScan.result) {
+            renderScan(postScan.result, false);
           }
         });
-        return;
       }
     });
     return;

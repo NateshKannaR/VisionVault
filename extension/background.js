@@ -706,6 +706,15 @@ function restrictedPageReason(url) {
   return "";
 }
 
+async function getTargetTab() {
+  const focusedTabs = (await chrome.tabs.query({ active: true, lastFocusedWindow: true })).filter(t => t.url && !t.url.startsWith("chrome-extension://"));
+  const allTabs = (await chrome.tabs.query({ active: true })).filter(t => t.url && !t.url.startsWith("chrome-extension://"));
+  return (focusedTabs.length ? focusedTabs[0] : null) || allTabs[0] ||
+         (await chrome.tabs.query({}))
+           .filter(t => t.url && !t.url.startsWith("chrome-extension://") && !t.url.startsWith("chrome://"))
+           .sort((a, b) => b.lastAccessed - a.lastAccessed)[0] || null;
+}
+
 // ── PHASE 1: Initial scan (just preview, nothing sent) ────────────────────────
 async function phaseScan(task) {
   const t0 = performance.now();
@@ -713,12 +722,7 @@ async function phaseScan(task) {
   const parsedTask = TaskPlanner.parseTask(task);
 
   // Find the active tab in the focused window that is NOT the side panel / popup
-  const focusedTabs = (await chrome.tabs.query({ active: true, lastFocusedWindow: true })).filter(t => t.url && !t.url.startsWith("chrome-extension://"));
-  const allTabs = (await chrome.tabs.query({ active: true })).filter(t => t.url && !t.url.startsWith("chrome-extension://"));
-  let tab = (focusedTabs.length ? focusedTabs[0] : null) || allTabs[0] ||
-               (await chrome.tabs.query({}))
-                 .filter(t => t.url && !t.url.startsWith("chrome-extension://") && !t.url.startsWith("chrome://"))
-                 .sort((a, b) => b.lastAccessed - a.lastAccessed)[0];
+  let tab = await getTargetTab();
   if (!tab) throw new Error("No active tab.");
 
   let navigatedInitial = false;
@@ -2392,9 +2396,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === "FILL_SINGLE_FIELD") {
     (async () => {
       try {
-        const allTabs = await chrome.tabs.query({ active: true });
-        const tab = allTabs.find(t => !t.url?.startsWith("chrome-extension://")) ||
-                    (await chrome.tabs.query({})).filter(t => !t.url?.startsWith("chrome-extension://") && !t.url?.startsWith("chrome://")).sort((a,b) => b.lastAccessed - a.lastAccessed)[0];
+        const tab = await getTargetTab();
         if (!tab) { sendResponse({ ok: false, error: "No active tab" }); return; }
         if (msg.saveToVault && msg.key && msg.value) {
           const vault = await getVault();
@@ -2419,9 +2421,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === "STORE_PAGE_TO_VAULT") {
     (async () => {
       try {
-        const allTabs = await chrome.tabs.query({ active: true });
-        const tab = allTabs.find(t => !t.url?.startsWith("chrome-extension://")) ||
-                    (await chrome.tabs.query({})).filter(t => !t.url?.startsWith("chrome-extension://") && !t.url?.startsWith("chrome://")).sort((a,b) => b.lastAccessed - a.lastAccessed)[0];
+        const tab = await getTargetTab();
         if (!tab) { sendResponse({ ok: false, error: "No active tab" }); return; }
         await ensureContent(tab.id);
         const result = await msgTab(tab.id, { type: "READ_VAULT_FIELDS" });
@@ -2448,9 +2448,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === "FILL_FROM_VAULT") {
     (async () => {
       try {
-        const allTabs = await chrome.tabs.query({ active: true });
-        const tab = allTabs.find(t => !t.url?.startsWith("chrome-extension://")) ||
-                    (await chrome.tabs.query({})).filter(t => !t.url?.startsWith("chrome-extension://") && !t.url?.startsWith("chrome://")).sort((a,b) => b.lastAccessed - a.lastAccessed)[0];
+        const tab = await getTargetTab();
         if (!tab) { sendResponse({ ok: false, error: "No active tab" }); return; }
         const vault = await getVault();
         if (!vault || !Object.keys(vault).length) { sendResponse({ ok: false, error: "Vault is empty." }); return; }

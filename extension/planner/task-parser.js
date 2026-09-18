@@ -194,6 +194,18 @@
         result.recipient = rec[1].trim();
         result.message = "hi";
       }
+    } else {
+      const m5 = text.match(/\b(?:send|post|type|message|msg)\s+['"]?([^'"]+?)['"]?(?:\s+(?:on|via|in)\s+(?:whatsapp|slack|telegram|teams)|$)/i);
+      if (m5 && (result.site === "whatsapp" || /whatsapp|slack|telegram/i.test(text))) {
+        result.wantsMessage = true;
+        result.message = m5[1].replace(/\s+(?:message|msg)$/i, "").trim();
+        result.recipient = null;
+      }
+    }
+
+    if (result.wantsMessage) {
+      result.query = null;
+      result.wantsSearch = false;
     }
 
     const cartKeywords = /\b(add\s+to\s+cart|add\s+to\s+basket|buy\s+now|add\s+it\s+to\s+cart|put\s+(?:it\s+)?in\s+(?:the\s+)?cart)\b/i;

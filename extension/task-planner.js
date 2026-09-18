@@ -234,6 +234,18 @@
         result.recipient = rec[1].trim();
         result.message = "hi";
       }
+    } else {
+      const m5 = text.match(/\b(?:send|post|type|message|msg)\s+['"]?([^'"]+?)['"]?(?:\s+(?:on|via|in)\s+(?:whatsapp|slack|telegram|teams)|$)/i);
+      if (m5 && (result.site === "whatsapp" || /whatsapp|slack|telegram/i.test(text))) {
+        result.wantsMessage = true;
+        result.message = m5[1].replace(/\s+(?:message|msg)$/i, "").trim();
+        result.recipient = null;
+      }
+    }
+
+    if (result.wantsMessage) {
+      result.query = null;
+      result.wantsSearch = false;
     }
 
     // E-commerce & Shopping task detection:
@@ -752,11 +764,21 @@
         return { action: "click", mark_id: sendBtn.id, reasoning: "Click Send to send the message" };
       }
 
+      // Message typing box (Type a message / Chat input)
+      const isMsgBox = (m) => {
+        const l = (m.label || "").toLowerCase();
+        if (/search|find|filter/i.test(l)) return false;
+        return /type a message|type a msg|\bmessage\b|chat input|write a message/i.test(l) ||
+               (m.role === "editable" && !/search/i.test(l));
+      };
+      const msgBox = first(isMsgBox);
+
       if (progress.messageTyped) {
-        return { action: "press_key", mark_id: progress.lastTypedMarkId || 1, key: "Enter", reasoning: "Press Enter to send the message" };
+        const targetId = (msgBox && msgBox.id) || progress.lastTypedMarkId || (available.find(m => m.role === "editable")?.id) || 1;
+        return { action: "press_key", mark_id: targetId, key: "Enter", value: "Enter", reasoning: "Press Enter to send the message" };
       }
 
-      // 3. Open or Search for Recipient Contact first (if not yet opened)
+      // 3. Open or Search for Recipient Contact first (if specified and not yet opened)
       const pageTitle = (state.pageInfo?.title || "").toLowerCase();
       const isContactActive = parsed.recipient && (pageTitle.includes(parsed.recipient.toLowerCase()) || available.some(m => (m.label || "").toLowerCase() === parsed.recipient.toLowerCase() && m.role === "heading"));
 
@@ -777,15 +799,9 @@
         }
       }
 
-      // 4. Message typing box (Type a message / Chat input)
-      const isMsgBox = (m) => {
-        const l = (m.label || "").toLowerCase();
-        if (/search|find|filter/i.test(l)) return false;
-        return /type a message|type a msg|\bmessage\b|chat input|write a message/i.test(l) ||
-               (m.role === "editable" && !/search/i.test(l));
-      };
-      const msgBox = first(isMsgBox);
+      // 4. Type message into composer
       if (msgBox && parsed.message && !progress.messageTyped) {
+        progress.lastTypedMarkId = msgBox.id;
         return { action: "type", mark_id: msgBox.id, value: parsed.message, reasoning: `Type "${parsed.message}" into message box` };
       }
 

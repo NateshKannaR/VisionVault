@@ -875,7 +875,7 @@ async function phaseScan(task, preferredTabId = null) {
 const RUN_BUDGET_MS = 600000;  // 10 minutes for complex booking flows
 const STEP_BUDGET_MS = 60000;  // 60s per step (booking pages can be slow)
 const MAX_STEPS = 60;          // enough for a full booking flow
-const MAX_CONSECUTIVE_FAILURES = 4;
+const MAX_CONSECUTIVE_FAILURES = 6;
 
 /** Rejects if `promise` has not settled within `ms`. Used to bound every awaited stage. */
 function withDeadline(promise, ms, label) {
@@ -1107,6 +1107,9 @@ async function recoverAfterFailedAction(error, failed) {
   if (!/not found|no longer visible|navigated before/i.test(String(error || ""))) return null;
   notifyPopup({ type: "step", step: session.stepCount, status: "The page moved under the plan — re-reading it." });
   await rescanCurrentTab(false, "recovery");
+  if (session.marks && session.marks.length > 0 && (session.consecutiveFailures || 0) > 1) {
+    session.consecutiveFailures = Math.max(1, session.consecutiveFailures - 1);
+  }
 
   // Re-scanning alone is not recovery. Mark ids encode geometry, so on a page that reflows
   // every scan the planner proposes a fresh id, it goes stale again before it executes, and
@@ -1687,6 +1690,7 @@ async function phaseRun() {
         guard.record("type", resp.mark_id, value, typedOk);
         if (typedOk) {
           session.filledIds.push(resp.mark_id);
+          session.progress.lastTypedMarkId = resp.mark_id;
           if (fieldKey) session.progress.filledAny = true;
           const valLower = String(value || "").toLowerCase();
           if (session.parsedTask?.from && valLower.includes(session.parsedTask.from.toLowerCase())) {
@@ -1736,6 +1740,9 @@ async function phaseRun() {
         const keyOk = !!exec?.ok || (exec?.noReply && navigated);
         noteResult(session, keyOk);
         guard.record("press_key", resp.mark_id, resp.value, keyOk);
+        if (keyOk && session.progress.messageTyped) {
+          session.progress.messageSent = true;
+        }
         session.actionLog.push({ action: "press_key", value: resp.value, mark_id: resp.mark_id, serverMs, ok: keyOk });
         await rescanCurrentTab(navigated);
         if (session.parsedTask?.query && !session.progress.queryLanded) {

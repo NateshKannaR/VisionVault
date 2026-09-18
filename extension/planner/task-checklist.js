@@ -102,6 +102,22 @@
       });
     }
 
+    // Step 4b: Messaging steps
+    if (p.wantsMessage) {
+      if (p.recipient) {
+        items.push({
+          id: "open_contact",
+          label: `Open chat with ${p.recipient}`,
+          status: "pending",
+        });
+      }
+      items.push({
+        id: "send_message",
+        label: `Send message "${p.message || "hi"}"`,
+        status: "pending",
+      });
+    }
+
     // Step 5: Verification & Completion
     items.push({
       id: "verify_complete",
@@ -179,6 +195,14 @@
       }
 
       if (item.id === "add_to_cart" && prog.cartAdded) {
+        item.status = "done";
+      }
+
+      if (item.id === "open_contact" && (prog.contactOpened || prog.contactSearched)) {
+        item.status = "done";
+      }
+
+      if (item.id === "send_message" && (prog.messageSent || (prog.messageTyped && action && (action.action === "press_key" || action.action === "click")))) {
         item.status = "done";
       }
 

@@ -54,7 +54,8 @@
 
         // Line-height adaptive boundary dilation: swallows glyph descenders (g, y, j, p, q) without merging adjacent lines
         const isAadhaarField = (r.label === "aadhaar_card_pii" || r.label === "aadhaar" || r.label === "vid" || (r.reason && r.reason.includes("aadhaar")));
-        const isSensitiveId = isAadhaarField || (r.label === "pan" || r.label === "passport" || r.label === "card" || r.label === "credit_card");
+        const isVehicleField = (r.label === "vehicle_rc_pii" || r.label === "vehicle_reg" || r.label === "chassis_number" || (r.reason && r.reason.includes("vehicle")));
+        const isSensitiveId = isAadhaarField || isVehicleField || (r.label === "pan" || r.label === "passport" || r.label === "card" || r.label === "credit_card");
         const isPassword = (r.label === "password" || (r.reason && r.reason.includes("password")));
 
         const padX = isSensitiveId
@@ -131,6 +132,9 @@
             if (isAadhaarField) tokenText = "[AADHAAR: REDACTED]";
             else if (r.label === "card" || r.label === "credit_card") tokenText = "[CARD: REDACTED]";
             else if (r.label === "pan") tokenText = "[PAN: REDACTED]";
+            else if (r.label === "vehicle_reg") tokenText = "[VEHICLE: REDACTED]";
+            else if (r.label === "chassis_number") tokenText = "[CHASSIS: REDACTED]";
+            else if (isVehicleField) tokenText = "[RC: REDACTED]";
             else if (r.label === "email") tokenText = "[EMAIL: REDACTED]";
             else if (r.label === "phone") tokenText = "[PHONE: REDACTED]";
 

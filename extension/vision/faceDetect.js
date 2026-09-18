@@ -280,6 +280,15 @@
     for (let i = 0; i < decodedBoxes.length; i++) {
       const faceScore = scoresData[i * 2 + 1];
       if (faceScore >= scoreThreshold) {
+        const b = decodedBoxes[i];
+        const bw = b[2] - b[0];
+        const bh = b[3] - b[1];
+        // Human faces have an aspect ratio close to 1:1 (typically 0.45 to 1.8).
+        // Discard extreme aspect ratios (e.g. horizontal dividers, margins, table edges).
+        if (bw > 0 && bh > 0) {
+          const ratio = bw / bh;
+          if (ratio < 0.35 || ratio > 2.2) continue;
+        }
         candidates.push({
           box: decodedBoxes[i],
           score: faceScore
@@ -302,6 +311,8 @@
       const rawW = (b[2] - b[0]) * targetW;
       const rawH = (b[3] - b[1]) * targetH;
 
+      if (rawW < 12 || rawH < 12) return null;
+
       const padX = rawW * 0.12;
       const padTop = rawH * 0.15;
       const padBottom = rawH * 0.35;
@@ -322,7 +333,7 @@
         confidence: Math.round(item.score * 100) / 100,
         source: "vision_face"
       };
-    });
+    }).filter(Boolean);
 
     // Adaptive multi-scale patch inference for small avatar regions (zooms 2x into candidate thumbnails)
     if (Array.isArray(options.avatarPatches) && options.avatarPatches.length > 0 && typeof OffscreenCanvas !== "undefined") {

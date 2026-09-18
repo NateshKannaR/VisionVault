@@ -97,8 +97,11 @@
   // Name patterns on identity cards (e.g. "SAMARTH SHARMA", "JOHN DOE")
   const ID_NAME_RE  = /\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3}|[A-Z]{3,}(?:\s+[A-Z]{2,}){1,3})\b/g;
 
+  // 17-character Vehicle Identification Number (VIN) / Chassis Number
+  const CHASSIS_VIN_RE = /\b[A-HJ-NPR-Z0-9]{17}\b/g;
+
   // Values that are sensitive because of the words printed next to them, not their shape.
-  const LABELLED_VALUE_RE = /\b(billed to|bill to|invoice to|sold to|customer|client|account holder|card ?holder|patient|employee|member|full name|name|username|user|operator on duty|operator|duty|mission id|mission|officer|supervisor|pilot|commander|technician|personnel|satellite name|satellite|orbit type|orbit|launch date|launch|orbital inclination|inclination|apogee|perigee|tle line 1|tle line 2|tle1|tle2|tle|ground station freq|ground station|freq|frequency|encryption key ref|encryption key|enc key ref|enc key|encryption|org|organisation|organization|company|address|street|zip|pin|pincode|postal code|recipient|addressed to|deliver to|ship to)\s*[:\-]\s*([^\r\n]{2,80})/gi;
+  const LABELLED_VALUE_RE = /\b(billed to|bill to|invoice to|sold to|customer|client|account holder|card ?holder|patient|employee|member|full name|owner name|owner|name|username|user|son\/wife\/daughter of|s\/o|w\/o|d\/o|operator on duty|operator|duty|mission id|mission|officer|supervisor|pilot|commander|technician|personnel|satellite name|satellite|orbit type|orbit|launch date|launch|orbital inclination|inclination|apogee|perigee|tle line 1|tle line 2|tle1|tle2|tle|ground station freq|ground station|freq|frequency|encryption key ref|encryption key|enc key ref|enc key|encryption|org|organisation|organization|company|address|street|zip|pin|pincode|postal code|recipient|addressed to|deliver to|ship to|chassis number|engine\/motor number|engine number|regn\.?\s*number|date of regn|regn\.?\s*validity)\s*[:\-]?\s*([^\r\n]{2,80})/gi;
   const EMPLOYEE_ID_RE    = /\b(?:ISRO|NASA|ESA|DRDO|BARC|EMP|STAFF|ID)[-\s]?\d{4,8}\b/gi;
   const ROLE_NAME_RE      = /\b(?:HR|Admin|Lead|Director|Officer|Manager|Employee|Staff)\s*[—–-]\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\b/gi;
 
@@ -124,6 +127,7 @@
     { label: "dob",        regex: DOB_RE },
     { label: "gender",     regex: GENDER_RE },
     { label: "driving_licence", regex: DL_RE },
+    { label: "chassis_number", regex: CHASSIS_VIN_RE },
     { label: "vehicle_reg", regex: VEHICLE_RE },
     { label: "bank_account", regex: ACCOUNT_RE, valueGroup: 1 },
     { label: "passport",   regex: PASSPORT_RE },
@@ -356,21 +360,6 @@
         ctx.drawImage(bitmap, minX, minY, roiW, roiH, 0, 0, targetCropW, targetCropH);
       }
     }
-
-    // Adaptive contrast & binarization preprocessing:
-    // Enhances contrast (1.8x) and binarizes light/dark boundaries for crisp character recognition
-    try {
-      const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const d = imgData.data;
-      for (let i = 0; i < d.length; i += 4) {
-        const gray = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
-        const val = gray > 180 ? 255 : (gray < 70 ? 0 : Math.round((gray - 70) * 2.2));
-        d[i] = val;
-        d[i + 1] = val;
-        d[i + 2] = val;
-      }
-      ctx.putImageData(imgData, 0, 0);
-    } catch (e) {}
 
     const tOcrStart = performance.now();
     let ocrData = null;
@@ -619,6 +608,78 @@
             type: "text",
             reason: "aadhaar_card_word",
             label: "aadhaar_card_pii",
+            text: wt,
+            confidence: 0.95,
+            source: "vision_ocr"
+          });
+        }
+      }
+    }
+
+    // 5. Vehicle Registration Certificate (RC Card) & Smart Card Layout Guard
+    // When an RC card or Vehicle Registration Certificate is detected, redact all cardholder
+    // and vehicle identifiers (Reg No, Chassis/VIN, Engine No, Owner Name, Address, Dates, Relative)
+    const isVehicleRcCard = /vehicle registration|registration certificate|government of \w+|chassis number|engine\/motor|regn\.?\s*number|motor vehicles department/i.test(fullText) ||
+                            piiRegions.some(r => r.label === "vehicle_reg" || r.label === "chassis_number");
+
+    if (isVehicleRcCard) {
+      console.log("[vision] Vehicle RC card layout detected. Enforcing complete vehicle & owner PII coverage.");
+      const rcHeaderRe = /^(indian union vehicle registration certificate|issued by government of|government of [a-z\s]+|registration certificate|form 23|motor vehicles department|transport department|union of india)[\s,.:/-]*$/i;
+
+      for (const line of lines) {
+        const lt = (line.text || "").trim();
+        if (!lt) continue;
+        if (rcHeaderRe.test(lt)) continue;
+
+        const box = line.bbox;
+        if (box) {
+          const rx = Math.max(0, Math.round(box.x0 * toVpX));
+          const ry = Math.max(0, Math.round(box.y0 * toVpY));
+          const rw = Math.max(16, Math.round((box.x1 - box.x0) * toVpX));
+          const rh = Math.max(12, Math.round((box.y1 - box.y0) * toVpY));
+
+          const dup = piiRegions.some(r => Math.abs(r.x - rx) < 15 && Math.abs(r.y - ry) < 15);
+          if (!dup) {
+            piiRegions.push({
+              x: rx,
+              y: ry,
+              w: rw,
+              h: rh,
+              type: "text",
+              reason: "vehicle_rc_field",
+              label: "vehicle_rc_pii",
+              text: lt,
+              confidence: 0.95,
+              source: "vision_ocr"
+            });
+          }
+        }
+      }
+
+      // Word-level coverage for standalone identifiers (TN21BV5085, RAJA, ELUMALAI, THATTAR, 631502, etc.)
+      const nonPiiWords = /^(indian|union|vehicle|registration|certificate|issued|by|government|of|tamil|nadu|bharat|stage|vi|fuel|petrol|diesel|c|te|norms|emission)$/i;
+      for (const word of words) {
+        const wt = (word.text || "").trim();
+        if (!wt || wt.length < 2) continue;
+        if (nonPiiWords.test(wt)) continue;
+        const bbox = word.bbox;
+        if (!bbox) continue;
+
+        const rx = Math.max(0, Math.round(bbox.x0 * toVpX));
+        const ry = Math.max(0, Math.round(bbox.y0 * toVpY));
+        const rw = Math.max(14, Math.round((bbox.x1 - bbox.x0) * toVpX));
+        const rh = Math.max(12, Math.round((bbox.y1 - bbox.y0) * toVpY));
+
+        const dup = piiRegions.some(r => Math.abs(r.x - rx) < 10 && Math.abs(r.y - ry) < 10);
+        if (!dup) {
+          piiRegions.push({
+            x: rx,
+            y: ry,
+            w: rw,
+            h: rh,
+            type: "text",
+            reason: "vehicle_rc_word",
+            label: "vehicle_rc_pii",
             text: wt,
             confidence: 0.95,
             source: "vision_ocr"

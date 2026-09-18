@@ -623,40 +623,10 @@
 
     if (isVehicleRcCard) {
       console.log("[vision] Vehicle RC card layout detected. Enforcing complete vehicle & owner PII coverage.");
-      const rcHeaderRe = /^(indian union vehicle registration certificate|issued by government of|government of [a-z\s]+|registration certificate|form 23|motor vehicles department|transport department|union of india)[\s,.:/-]*$/i;
+      const nonPiiWords = /^(indian|union|vehicle|registration|certificate|issued|by|government|of|tamil|nadu|fuel|petrol|diesel|c|te|norms|emission|bharat|stage|vi)$/i;
 
-      for (const line of lines) {
-        const lt = (line.text || "").trim();
-        if (!lt) continue;
-        if (rcHeaderRe.test(lt)) continue;
-
-        const box = line.bbox;
-        if (box) {
-          const rx = Math.max(0, Math.round(box.x0 * toVpX));
-          const ry = Math.max(0, Math.round(box.y0 * toVpY));
-          const rw = Math.max(16, Math.round((box.x1 - box.x0) * toVpX));
-          const rh = Math.max(12, Math.round((box.y1 - box.y0) * toVpY));
-
-          const dup = piiRegions.some(r => Math.abs(r.x - rx) < 15 && Math.abs(r.y - ry) < 15);
-          if (!dup) {
-            piiRegions.push({
-              x: rx,
-              y: ry,
-              w: rw,
-              h: rh,
-              type: "text",
-              reason: "vehicle_rc_field",
-              label: "vehicle_rc_pii",
-              text: lt,
-              confidence: 0.95,
-              source: "vision_ocr"
-            });
-          }
-        }
-      }
-
-      // Word-level coverage for standalone identifiers (TN21BV5085, RAJA, ELUMALAI, THATTAR, 631502, etc.)
-      const nonPiiWords = /^(indian|union|vehicle|registration|certificate|issued|by|government|of|tamil|nadu|bharat|stage|vi|fuel|petrol|diesel|c|te|norms|emission)$/i;
+      // Pure word-level bounding boxes so vertical/slanted documents get precise individual boxes
+      // without merging unrelated columns into giant horizontal bars.
       for (const word of words) {
         const wt = (word.text || "").trim();
         if (!wt || wt.length < 2) continue;
@@ -666,11 +636,21 @@
 
         const rx = Math.max(0, Math.round(bbox.x0 * toVpX));
         const ry = Math.max(0, Math.round(bbox.y0 * toVpY));
-        const rw = Math.max(14, Math.round((bbox.x1 - bbox.x0) * toVpX));
+        const rw = Math.max(12, Math.round((bbox.x1 - bbox.x0) * toVpX));
         const rh = Math.max(12, Math.round((bbox.y1 - bbox.y0) * toVpY));
 
-        const dup = piiRegions.some(r => Math.abs(r.x - rx) < 10 && Math.abs(r.y - ry) < 10);
-        if (!dup) {
+        // Use IoU overlap check instead of naive Y-distance so words sharing Y coordinate are NOT skipped!
+        const isDuplicate = piiRegions.some(ex => {
+          const ix = Math.max(ex.x, rx);
+          const iy = Math.max(ex.y, ry);
+          const iw = Math.max(0, Math.min(ex.x + ex.w, rx + rw) - ix);
+          const ih = Math.max(0, Math.min(ex.y + ex.h, ry + rh) - iy);
+          const inter = iw * ih;
+          const union = ex.w * ex.h + rw * rh - inter;
+          return union > 0 && (inter / union) > 0.5;
+        });
+
+        if (!isDuplicate) {
           piiRegions.push({
             x: rx,
             y: ry,

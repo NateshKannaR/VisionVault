@@ -85,6 +85,10 @@ const VID_RE      = /\b\d{4}[\s-]{0,2}\d{4}[\s-]{0,2}\d{4}[\s-]{0,2}\d{4}\b/g;
 const DL_RE       = /\b[A-Z]{2}[-\s]?\d{2}[-\s]?\d{4}[-\s]?\d{7}\b|\b[A-Z]{2}[-\s]?\d{2}[-\s]?\d{11}\b/g;
 const VEHICLE_RE  = /\b[A-Z]{2}[\s-]?\d{1,2}[\s-]?[A-Z]{1,3}[\s-]?\d{4}\b/g;
 const ACCOUNT_RE  = /\b(?:a\/c|acc(?:oun)?t(?:\s*(?:no|number|#))?|bank\s*a\/?c)\s*[:.#-]?\s*(\d{9,18})\b/gi;
+const EMPLOYEE_ID_RE = /\b(?:ISRO|NASA|ESA|DRDO|BARC|EMP|STAFF|ID)[-\s]?\d{4,8}\b/gi;
+const ROLE_NAME_RE   = /\b(?:HR|Admin|Lead|Director|Officer|Manager|Employee|Staff)\s*[—–-]\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\b/g;
+const NAME_WITH_ID_RE = /\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\s*[—–-]\s*(?:ISRO|EMP|ID)?[-\s]?\d+/g;
+const LABELED_VALUE_INLINE_RE = /(?:^|[|\n\r;])\s*([a-zA-Z0-9\s._\-#]+?)\s*[:=–—]\s*([^|\n\r<]{2,120})/g;
 
 // Devanagari, Tamil, Bengali and the other Indic digit blocks, mapped one code point to one
 // so match offsets are unaffected. Without this an Aadhaar printed as 2345 6789 0123 in
@@ -123,7 +127,7 @@ function normalizeDigits(text) {
 // ── PII Label Keywords ───────────────────────────────────────────────────────
 const PII_LABEL_KEYWORDS = [
   // identity & personnel
-  "name", "surname", "first name", "last name", "full name", "username", "user id",
+  "name", "surname", "first name", "last name", "full name", "username", "user id", "user",
   "aadhaar", "ssn", "social security", "national id", "voter", "passport", "license",
   "licence", "pan", "tax id", "nino", "date of birth", "dob", "birth", "age", "gender",
   "operator", "operator on duty", "duty", "mission", "mission id", "officer", "supervisor",
@@ -131,20 +135,21 @@ const PII_LABEL_KEYWORDS = [
   "employee", "staff", "applicant", "candidate", "member",
   // credentials & security
   "password", "passwd", "passcode", "pin", "otp", "secret", "api key", "token", "key",
-  "encryption key", "encryption key ref", "encryption", "auth token", "private key",
+  "encryption key", "encryption key ref", "enc key ref", "enc key", "encryption", "auth token", "private key",
   "clearance", "restricted", "confidential", "classified", "internal", "data classification",
   // orbital, aerospace & telemetry
-  "satellite", "satellite name", "launch date", "apogee", "perigee", "inclination",
-  "orbital inclination", "orbit type", "orbit", "tle", "tle line 1", "tle line 2",
-  "frequency", "ground station", "ground station freq", "telemetry", "payload",
+  "satellite", "satellite name", "launch", "launch date", "apogee", "perigee", "inclination",
+  "orbital inclination", "orbit type", "orbit", "tle", "tle1", "tle2", "tle line 1", "tle line 2",
+  "frequency", "freq", "ground station", "ground station freq", "telemetry", "payload",
   // contact
   "email", "e-mail", "phone", "mobile", "telephone", "contact", "address", "street",
-  "postcode", "post code", "zip", "postal", "city", "country",
+  "postcode", "post code", "zip", "postal", "postal code", "pincode", "city", "country", "state",
+  "org", "organization", "organisation", "company",
   // financial
   "card", "credit card", "debit card", "cvv", "cvc", "expiry", "account number", "account no",
-  "routing", "ifsc", "iban", "swift", "upi", "salary", "income", "bank",
+  "routing", "ifsc", "iban", "swift", "upi", "salary", "income", "annual income", "bank",
   // health / misc sensitive
-  "insurance", "policy number", "medical", "diagnosis", "blood group", "orbital"
+  "insurance", "policy number", "medical", "diagnosis", "blood group", "marital status", "father name", "orbital"
 ];
 
 /**
@@ -468,15 +473,6 @@ function deterministicMarkId(el, usedIds) {
   return id;
 }
 
-function testPII(text) {
-  const tests = [EMAIL_RE, PHONE_RE, CARD_RE, SSN_RE, VID_RE, AADHAAR_RE, PAN_RE, DL_RE,
-                 VEHICLE_RE, ACCOUNT_RE, PASSPORT_RE, IFSC_RE, UPI_RE];
-  const probe = normalizeDigits(text);
-  const result = tests.some(re => { re.lastIndex = 0; return re.test(probe); });
-  tests.forEach(re => { re.lastIndex = 0; });
-  return result;
-}
-
 // Keyword matching must respect word boundaries. Plain substring matching fires on innocent
 // words that happen to contain a short keyword — "pin" inside "shipping", "age" inside
 // "message", "pan" inside "company" — and each false hit blacks out a control the planner
@@ -499,6 +495,37 @@ function matchesPiiKeyword(text) {
   const t = normalizeForKeywordMatch(text);
   if (!t) return false;
   return PII_LABEL_PATTERNS.some(re => re.test(t));
+}
+
+function testPII(text) {
+  const tests = [EMAIL_RE, PHONE_RE, CARD_RE, SSN_RE, VID_RE, AADHAAR_RE, PAN_RE, DL_RE,
+                 VEHICLE_RE, ACCOUNT_RE, PASSPORT_RE, IFSC_RE, UPI_RE, EMPLOYEE_ID_RE];
+  const probe = normalizeDigits(text);
+  let result = tests.some(re => { re.lastIndex = 0; return re.test(probe); });
+  tests.forEach(re => { re.lastIndex = 0; });
+  if (result) return true;
+
+  // Check labeled values (e.g. "Name: ...", "Operator: ...", "Address: ...", "Orbit: ...", "Satellite: ...")
+  LABELED_VALUE_INLINE_RE.lastIndex = 0;
+  let lm;
+  while ((lm = LABELED_VALUE_INLINE_RE.exec(text)) !== null) {
+    if (matchesPiiKeyword(lm[1].trim())) {
+      LABELED_VALUE_INLINE_RE.lastIndex = 0;
+      return true;
+    }
+  }
+  LABELED_VALUE_INLINE_RE.lastIndex = 0;
+
+  // Check employee names in role patterns ("HR — Priya Menon", "Rajesh Kumar — ISRO-10234")
+  ROLE_NAME_RE.lastIndex = 0;
+  if (ROLE_NAME_RE.test(text)) { ROLE_NAME_RE.lastIndex = 0; return true; }
+  ROLE_NAME_RE.lastIndex = 0;
+
+  NAME_WITH_ID_RE.lastIndex = 0;
+  if (NAME_WITH_ID_RE.test(text)) { NAME_WITH_ID_RE.lastIndex = 0; return true; }
+  NAME_WITH_ID_RE.lastIndex = 0;
+
+  return false;
 }
 
 /**
@@ -693,10 +720,13 @@ function findPiiRangesInTextNode(node, text) {
     { re: IFSC_RE, label: "ifsc" },
     { re: UPI_RE, label: "upi" },
     { re: VID_RE, label: "vid" },
+    { re: EMPLOYEE_ID_RE, label: "employee_id" },
   ];
 
   try {
     const range = document.createRange();
+
+    // 1. Standard pattern regexes
     for (const { re, label } of tests) {
       const flags = (re.flags && re.flags.includes("i") ? "i" : "") + "g";
       const globalRe = new RegExp(re.source, flags);
@@ -722,6 +752,101 @@ function findPiiRangesInTextNode(node, text) {
             }
           }
         } catch (_) {}
+      }
+    }
+
+    // 2. Inline labeled key-value pairs (e.g. "Name: R. Sharma | Username: rsharma_mcc", "Orbit: ...", "Address: ...")
+    LABELED_VALUE_INLINE_RE.lastIndex = 0;
+    let lm;
+    while ((lm = LABELED_VALUE_INLINE_RE.exec(text)) !== null) {
+      const rawLabel = (lm[1] || "").trim();
+      const rawVal = (lm[2] || "").trim();
+      if (!rawLabel || !rawVal || rawVal.length < 2) continue;
+      if (matchesPiiKeyword(rawLabel)) {
+        const valOffset = lm[0].indexOf(lm[2]);
+        if (valOffset !== -1) {
+          const start = lm.index + valOffset;
+          const end = start + rawVal.length;
+          try {
+            range.setStart(node, start);
+            range.setEnd(node, end);
+            const rects = range.getClientRects();
+            for (let i = 0; i < rects.length; i++) {
+              const r = rects[i];
+              if (r.width > 2 && r.height > 2) {
+                boxes.push({
+                  x: Math.round(r.left),
+                  y: Math.round(r.top),
+                  w: Math.round(r.width),
+                  h: Math.round(r.height),
+                  label: rawLabel.toLowerCase().slice(0, 30)
+                });
+              }
+            }
+          } catch (_) {}
+        }
+      }
+    }
+
+    // 3. Person names following roles ("HR — Priya Menon")
+    ROLE_NAME_RE.lastIndex = 0;
+    let rm;
+    while ((rm = ROLE_NAME_RE.exec(text)) !== null) {
+      const name = (rm[1] || "").trim();
+      if (name.length >= 3) {
+        const valOffset = rm[0].lastIndexOf(rm[1]);
+        if (valOffset !== -1) {
+          const start = rm.index + valOffset;
+          const end = start + name.length;
+          try {
+            range.setStart(node, start);
+            range.setEnd(node, end);
+            const rects = range.getClientRects();
+            for (let i = 0; i < rects.length; i++) {
+              const r = rects[i];
+              if (r.width > 2 && r.height > 2) {
+                boxes.push({
+                  x: Math.round(r.left),
+                  y: Math.round(r.top),
+                  w: Math.round(r.width),
+                  h: Math.round(r.height),
+                  label: "name"
+                });
+              }
+            }
+          } catch (_) {}
+        }
+      }
+    }
+
+    // 4. Person names preceding employee IDs ("Rajesh Kumar — ISRO-10234")
+    NAME_WITH_ID_RE.lastIndex = 0;
+    let nm;
+    while ((nm = NAME_WITH_ID_RE.exec(text)) !== null) {
+      const name = (nm[1] || "").trim();
+      if (name.length >= 3) {
+        const valOffset = nm[0].indexOf(nm[1]);
+        if (valOffset !== -1) {
+          const start = nm.index + valOffset;
+          const end = start + name.length;
+          try {
+            range.setStart(node, start);
+            range.setEnd(node, end);
+            const rects = range.getClientRects();
+            for (let i = 0; i < rects.length; i++) {
+              const r = rects[i];
+              if (r.width > 2 && r.height > 2) {
+                boxes.push({
+                  x: Math.round(r.left),
+                  y: Math.round(r.top),
+                  w: Math.round(r.width),
+                  h: Math.round(r.height),
+                  label: "name"
+                });
+              }
+            }
+          } catch (_) {}
+        }
       }
     }
   } catch (_) {}

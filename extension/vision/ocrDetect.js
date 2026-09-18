@@ -98,7 +98,9 @@
   const ID_NAME_RE  = /\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3}|[A-Z]{3,}(?:\s+[A-Z]{2,}){1,3})\b/g;
 
   // Values that are sensitive because of the words printed next to them, not their shape.
-  const LABELLED_VALUE_RE = /\b(billed to|bill to|invoice to|sold to|customer|client|account holder|card ?holder|patient|employee|member|full name|name|operator on duty|operator|duty|mission id|mission|officer|supervisor|pilot|commander|technician|personnel|satellite name|satellite|orbit type|launch date|orbital inclination|apogee|perigee|tle line 1|tle line 2|tle|ground station freq|ground station|encryption key ref|encryption key|encryption|recipient|addressed to|deliver to|ship to)\s*[:\-]\s*([^\r\n]{2,60})/gi;
+  const LABELLED_VALUE_RE = /\b(billed to|bill to|invoice to|sold to|customer|client|account holder|card ?holder|patient|employee|member|full name|name|username|user|operator on duty|operator|duty|mission id|mission|officer|supervisor|pilot|commander|technician|personnel|satellite name|satellite|orbit type|orbit|launch date|launch|orbital inclination|inclination|apogee|perigee|tle line 1|tle line 2|tle1|tle2|tle|ground station freq|ground station|freq|frequency|encryption key ref|encryption key|enc key ref|enc key|encryption|org|organisation|organization|company|address|street|zip|pin|pincode|postal code|recipient|addressed to|deliver to|ship to)\s*[:\-]\s*([^\r\n]{2,80})/gi;
+  const EMPLOYEE_ID_RE    = /\b(?:ISRO|NASA|ESA|DRDO|BARC|EMP|STAFF|ID)[-\s]?\d{4,8}\b/gi;
+  const ROLE_NAME_RE      = /\b(?:HR|Admin|Lead|Director|Officer|Manager|Employee|Staff)\s*[—–-]\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\b/gi;
 
   // Secrets, API Keys, Tokens & Postal Codes
   const OPENAI_KEY_RE = /sk-[a-zA-Z0-9]{20,}/g;
@@ -128,6 +130,8 @@
     { label: "ifsc",       regex: IFSC_RE },
     { label: "upi",        regex: UPI_RE },
     { label: "phone",      regex: PHONE_RE },
+    { label: "employee_id", regex: EMPLOYEE_ID_RE },
+    { label: "name",       regex: ROLE_NAME_RE, valueGroup: 1 },
     { label: "labelled_value", regex: LABELLED_VALUE_RE, valueGroup: 2 }
   ];
 

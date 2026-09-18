@@ -801,6 +801,7 @@ function inferRole(el) {
   if (role === "checkbox" || role === "switch") return "checkbox";
   if (role === "radio") return "radio";
   if (role === "tab" || (el.classList && (el.classList.contains("tab") || el.classList.contains("nav-item")))) return "clickable";
+  if (role === "listitem" || role === "row" || role === "gridcell" || el.getAttribute("data-tab") != null) return "clickable";
   if (role === "textbox" || role === "searchbox") return "editable";
   if (el.getAttribute("contenteditable") === "true") return "editable";
   if (aria.includes("message") || placeholder.includes("message")) return "editable";
@@ -814,7 +815,7 @@ function tagInteractiveElements() {
   const seen = new WeakSet();
 
   const candidates = querySelectorAllDeep(
-    'a, button, input:not([type="hidden"]):not([type="file"]), textarea, select, label[for], [role="button"], [role="link"], [role="searchbox"], [role="textbox"], [role="combobox"], [role="checkbox"], [role="radio"], [role="switch"], [role="tab"], [role="menuitem"], [role="option"], [contenteditable="true"], [tabindex="0"], [aria-haspopup="listbox"], [aria-haspopup="true"], .nav-link, .nav-item, [data-page], [onclick], .btn, [id*="search" i], [name*="search" i], [name*="keywords" i], [class*="searchCity" i], [class*="searchToCity" i]'
+    'a, button, input:not([type="hidden"]):not([type="file"]), textarea, select, label[for], [role="button"], [role="link"], [role="searchbox"], [role="textbox"], [role="combobox"], [role="checkbox"], [role="radio"], [role="switch"], [role="tab"], [role="menuitem"], [role="option"], [role="listitem"], [role="row"], [role="gridcell"], [contenteditable="true"], [tabindex="0"], [aria-haspopup="listbox"], [aria-haspopup="true"], .nav-link, .nav-item, [data-page], [data-tab], [onclick], .btn, [id*="search" i], [name*="search" i], [name*="keywords" i], [class*="searchCity" i], [class*="searchToCity" i], [data-testid*="cell" i], [data-testid*="chat" i], [data-testid*="conversation" i]'
   );
 
   candidates.forEach((el) => {
@@ -902,8 +903,20 @@ function scanPage() {
     // Order matters: scanForPII populates sensitiveTextEls, and tagInteractiveElements reads
     // it to decide which labels may leave the device.
     sensitiveTextEls = new Set();
-    const piiRegions = scanForPII();
-    const marks = tagInteractiveElements();
+    let piiRegions = [];
+    try {
+      piiRegions = scanForPII();
+    } catch (err) {
+      console.warn("[vagent] scanForPII non-fatal:", err);
+    }
+
+    let marks = [];
+    try {
+      marks = tagInteractiveElements();
+    } catch (err) {
+      console.warn("[vagent] tagInteractiveElements non-fatal:", err);
+    }
+
     return {
       piiRegions,
       marks,

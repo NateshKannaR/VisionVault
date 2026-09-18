@@ -220,15 +220,18 @@
       }
     }
 
-    // Fallback: single top-frame message (e.g. scripting API blocked on this page).
-    if (!injectionResults || injectionResults.length === 0) {
+    // Fallback: single top-frame message (e.g. scripting API blocked or returned 0 marks).
+    const hasAnyMarks = injectionResults && injectionResults.some(e => e && e.result && e.result.marks && e.result.marks.length > 0);
+    if (!injectionResults || injectionResults.length === 0 || !hasAnyMarks) {
       const single = await msgTab(tabId, { type: "SCAN_PAGE" }, { frameId: 0 });
-      if (!single) return empty;
-      return {
-        piiRegions: (single.piiRegions || []).map(r => ({ ...r, frameId: 0 })),
-        marks: (single.marks || []).map(m => ({ ...m, frameId: 0 })),
-        frameStats: { total: 1, merged: 1, skipped: 0 }
-      };
+      if (single && (single.marks?.length || !hasAnyMarks)) {
+        return {
+          piiRegions: (single.piiRegions || []).map(r => ({ ...r, frameId: 0 })),
+          marks: (single.marks || []).map(m => ({ ...m, frameId: 0 })),
+          frameStats: { total: 1, merged: 1, skipped: 0 }
+        };
+      }
+      if (!injectionResults || injectionResults.length === 0) return empty;
     }
 
     const piiRegions = [];

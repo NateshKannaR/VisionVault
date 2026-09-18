@@ -224,13 +224,20 @@ async function getSettings() {
 // ── Tab helpers ───────────────────────────────────────────────────────────────
 async function ensureContent(tabId) {
   try {
-    // allFrames: content.js + action-executor.js must exist in every frame we may scan or act on.
+    // allFrames: ensure all content scripts exist in every frame we may scan or act on.
     await chrome.scripting.executeScript({
       target: { tabId, allFrames: true },
-      files: ["action-executor.js", "content.js"],
+      files: [
+        "prompt-scrubber.js",
+        "pdf-scrubber.js",
+        "cursor-overlay.js",
+        "obstacle-detector.js",
+        "action-executor.js",
+        "content.js"
+      ],
     });
   } catch (_) {}
-  await new Promise(r => setTimeout(r, 250));
+  await new Promise(r => setTimeout(r, 200));
 }
 
 function msgTab(tabId, msg, options) {
@@ -427,7 +434,8 @@ async function openTab(url) {
 // How long to wait before each scan attempt. A single-page app can take several seconds to
 // mount its controls after the URL changes, and reading it too early yields a page that looks
 // empty — the agent then reports "no interactive elements" for a page full of them.
-const SCAN_ATTEMPT_DELAYS_MS = [150, 400];
+// If marks are found on attempt 1, it completes immediately (<150ms) without waiting.
+const SCAN_ATTEMPT_DELAYS_MS = [150, 600, 1400];
 
 async function scanTab(tabId, windowId, settings, retries = SCAN_ATTEMPT_DELAYS_MS.length) {
   let last = null;
@@ -740,6 +748,7 @@ async function phaseScan(task, preferredTabId = null) {
     try {
       await chrome.tabs.update(tab.id, { url: parsedTask.siteUrl, active: true });
       await withDeadlineSoft(waitForTabLoad(tab.id, 8000), 10000, "initial site navigation");
+      await withDeadlineSoft(waitForContent(tab.id, 6000), 8000, "initial site hydration");
       await new Promise(r => setTimeout(r, 400));
       await dismissOverlaysOnce();
       navigatedInitial = true;
@@ -1228,9 +1237,15 @@ async function phaseRun() {
       notifyPopup({ type: "step", step: session.stepCount, status: "Reading the page..." });
 
       if (!session.marks || session.marks.length === 0) {
+        notifyPopup({ type: "step", step: session.stepCount, status: "Waiting for page elements to mount…" });
+        await withDeadlineSoft(waitForContent(session.tabId, 5000), 6000, "content mount wait");
         await rescanCurrentTab(false);
         if (!session.marks || session.marks.length === 0) {
-          return finish({ error: "No interactive elements detected on this page." });
+          await new Promise(r => setTimeout(r, 800));
+          await rescanCurrentTab(false);
+          if (!session.marks || session.marks.length === 0) {
+            return finish({ error: "No interactive elements detected on this page. If the page is still loading, wait a moment and click 'Run agent' again." });
+          }
         }
       }
 

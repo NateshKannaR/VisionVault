@@ -227,6 +227,11 @@
       result.wantsMessage = true;
       result.recipient = m4[1].trim();
       result.message = m4[2].trim();
+    } else if (text.match(/\b(?:whatsapp|message|text|dm)\s+([a-zA-Z0-9_]+)\s+['"]?([^'"]+?)['"]?(?:\s+(?:on|via|in)\s+(?:whatsapp|slack|telegram|teams)|$)/i)) {
+      const mDirect = text.match(/\b(?:whatsapp|message|text|dm)\s+([a-zA-Z0-9_]+)\s+['"]?([^'"]+?)['"]?(?:\s+(?:on|via|in)\s+(?:whatsapp|slack|telegram|teams)|$)/i);
+      result.wantsMessage = true;
+      result.recipient = mDirect[1].trim();
+      result.message = mDirect[2].trim();
     } else if (/\b(send|message|msg|text|chat)\b/i.test(text) && /\bto\s+([a-zA-Z0-9_\s]+)/i.test(text)) {
       const rec = text.match(/\bto\s+([a-zA-Z0-9_\s]+?)(?:\s+(?:on|via|in)\s+(?:whatsapp|slack|telegram|teams)|$)/i);
       if (rec) {
@@ -752,7 +757,7 @@
       const isRealSendBtn = (m) => {
         const l = (m.label || "").trim().toLowerCase();
         if (/\b(document|photo|video|contact|location|file|media|audio|voice|call)\b/i.test(l)) return false;
-        return /^\s*send(\s+message)?\s*$/i.test(l) || (l === "send" && (m.role === "button" || m.role === "clickable"));
+        return /\bsend\b/i.test(l) || l.includes("compose-btn-send") || (l === "send" && (m.role === "button" || m.role === "clickable"));
       };
       const sendBtn = first(isRealSendBtn);
 
@@ -760,7 +765,7 @@
         return { action: "done", reasoning: "WhatsApp message sent successfully" };
       }
 
-      if (sendBtn) {
+      if (sendBtn && (progress.messageTyped || !parsed.recipient || !available.some(m => isSearchBox(m)))) {
         return { action: "click", mark_id: sendBtn.id, reasoning: "Click Send to send the message" };
       }
 
@@ -774,6 +779,9 @@
       const msgBox = first(isMsgBox);
 
       if (progress.messageTyped) {
+        if (sendBtn) {
+          return { action: "click", mark_id: sendBtn.id, reasoning: "Click Send to send the message" };
+        }
         const targetId = (msgBox && msgBox.id) || progress.lastTypedMarkId || (available.find(m => m.role === "editable")?.id) || 1;
         return { action: "press_key", mark_id: targetId, key: "Enter", value: "Enter", reasoning: "Press Enter to send the message" };
       }

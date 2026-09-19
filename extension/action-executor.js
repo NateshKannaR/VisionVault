@@ -876,6 +876,11 @@
       await delay(30);
 
       for (const char of val) {
+        try {
+          targetEl.dispatchEvent(new InputEvent("beforeinput", {
+            bubbles: true, cancelable: true, inputType: "insertText", data: char
+          }));
+        } catch (_) {}
         document.execCommand("insertText", false, char);
         await humanDelay();
       }
@@ -883,6 +888,7 @@
       targetEl.dispatchEvent(new InputEvent("input", {
         bubbles: true, cancelable: true, inputType: "insertText", data: val,
       }));
+      targetEl.dispatchEvent(new Event("change", { bubbles: true }));
       scheduleCursorFade(2000);
       return true;
     }
@@ -1117,11 +1123,41 @@
         case "press_key": {
           const keyVal = value || "Enter";
           el.focus();
+
+          // 1. Hardware OS-level keystroke via Chrome DevTools Protocol (CDP)
+          let cdpSuccess = false;
+          try {
+            if (typeof chrome !== "undefined" && chrome?.runtime?.sendMessage) {
+              const cdpRes = await chrome.runtime.sendMessage({
+                type: "CDP_KEY",
+                key: keyVal,
+              });
+              if (cdpRes && cdpRes.ok && cdpRes.nativeCdp) {
+                cdpSuccess = true;
+              }
+            }
+          } catch (_) {}
+
+          // 2. Synthetic keyboard event dispatch
           dispatchKey(el, keyVal);
-          if ((keyVal === "Enter" || keyVal === "Return") && !el.isContentEditable) {
-            await submitOwningForm(el);
+
+          // 3. Fallback form submission or Chat Send button click
+          if (keyVal === "Enter" || keyVal === "Return") {
+            if (!el.isContentEditable) {
+              await submitOwningForm(el);
+            } else {
+              // WhatsApp Web, Slack, ChatGPT, etc. Send button discovery
+              const container = el.closest("footer, form, div") || document;
+              const chatSendBtn = container.querySelector(
+                'button[aria-label*="send" i], button[data-tab="11"], [data-testid*="send" i], [data-icon="send"]'
+              ) || document.querySelector('footer button[aria-label*="send" i], footer [data-icon="send"], [data-testid="compose-btn-send"], button[aria-label="Send"]');
+              if (chatSendBtn) {
+                const clickTarget = chatSendBtn.closest("button") || chatSendBtn;
+                await realisticClick(clickTarget, "Send Message");
+              }
+            }
           }
-          return { ok: true };
+          return { ok: true, cdp: cdpSuccess };
         }
 
         case "select":

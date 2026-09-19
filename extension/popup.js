@@ -1615,20 +1615,54 @@ function setMicLive(live) {
   if (note) note.hidden = !live;
 }
 
-function stopDictation() {
-  if (recognition && recognising) {
-    try { recognition.stop(); } catch (_) {}
+async function startDictation() {
+  if (recognising) {
+    stopDictation();
+    return;
   }
-  setMicLive(false);
+
+  dictationBase = (taskEl.value || "").trim();
+
+  // 1. Try In-Page dictation on active web tab (avoids Chrome extension speech restrictions)
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tab && tab.id && tab.url && (tab.url.startsWith("http://") || tab.url.startsWith("https://"))) {
+      setMicLive(true);
+      showStatus("statusMsg", "info", "Listening on page… Speak your command.");
+      chrome.tabs.sendMessage(tab.id, { type: "START_IN_PAGE_VOICE" }, (res) => {
+        if (chrome.runtime.lastError || (res && !res.ok)) {
+          console.warn("[dictation] In-page voice fallback to popup:", chrome.runtime.lastError?.message);
+          startLocalDictation();
+        }
+      });
+      return;
+    }
+  } catch (_) {}
+
+  // 2. Fallback to local popup dictation
+  startLocalDictation();
 }
 
-function startDictation() {
-  if (!Recognizer || recognising) return;
+function stopDictation() {
+  setMicLive(false);
+  if (recognition) {
+    try { recognition.stop(); } catch (_) {}
+    recognition = null;
+  }
+  chrome.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
+    if (tab?.id) chrome.tabs.sendMessage(tab.id, { type: "STOP_IN_PAGE_VOICE" }).catch(() => {});
+  }).catch(() => {});
+}
+
+function startLocalDictation() {
+  if (!Recognizer) {
+    showStatus("statusMsg", "warn", "Web Speech API is not supported in this browser.");
+    setMicLive(false);
+    return;
+  }
 
   recognition = new Recognizer();
   recognition.lang = navigator.language || "en-IN";
-  // Interim results make the box fill as the user speaks, which is what tells them it is
-  // working; without it the panel looks frozen for the length of the sentence.
   recognition.interimResults = true;
   recognition.continuous = false;
   recognition.maxAlternatives = 1;
@@ -1641,8 +1675,6 @@ function startDictation() {
     let text = "";
     for (let i = 0; i < event.results.length; i++) text += event.results[i][0].transcript;
     const joined = (dictationBase ? dictationBase + " " : "") + text.trim();
-    // maxlength on the textarea does not apply to programmatic writes, so the cap is applied
-    // here or a long dictation would silently exceed what the task field accepts.
     taskEl.value = joined.slice(0, 240);
     const c = $("charCount");
     if (c) c.textContent = taskEl.value.length;
@@ -1666,7 +1698,7 @@ function startDictation() {
         err === "no-speech"
           ? "Didn't catch anything — try again."
           : err === "network"
-            ? "Speech recognition needs a network connection."
+            ? "Speech recognition needs a network connection or active web page."
             : `Dictation stopped (${err}).`;
       showStatus("statusMsg", err === "no-speech" ? "info" : "warn", esc(message));
     }
@@ -1691,16 +1723,48 @@ function startDictation() {
   }
 }
 
-// The button only appears where it can actually do something. A browser with no recogniser
-// gets the typed field it already had, rather than a control that fails when pressed.
-if (Recognizer && $("micBtn")) {
+// Global voice listener for in-page results
+chrome.runtime.onMessage.addListener((msg) => {
+  if (msg.type === "VOICE_RESULT") {
+    if (taskEl && msg.transcript) {
+      const joined = (dictationBase ? dictationBase + " " : "") + msg.transcript.trim();
+      taskEl.value = joined.slice(0, 240);
+      const c = $("charCount");
+      if (c) c.textContent = taskEl.value.length;
+    }
+    if (msg.isFinal) {
+      setMicLive(false);
+      showStatus("statusMsg", "info", "Voice command recognized.");
+      if (taskEl && taskEl.value.trim().length > 0 && typeof autoAgentMode === "function" && autoAgentMode()) {
+        showStatus("statusMsg", "info", "Voice command recognized. Launching agent...");
+        setTimeout(() => {
+          if ($("scanBtn")) $("scanBtn").click();
+        }, 600);
+      }
+    }
+  } else if (msg.type === "VOICE_ERROR") {
+    setMicLive(false);
+    const err = msg.error;
+    if (err === "not-allowed") {
+      showStatus("statusMsg", "warn", "Microphone access blocked on this tab. Please allow microphone in Chrome.");
+    } else if (err === "no-speech") {
+      showStatus("statusMsg", "info", "Didn't catch anything — try again.");
+    } else {
+      showStatus("statusMsg", "warn", `Voice dictation stopped (${err}).`);
+    }
+  } else if (msg.type === "VOICE_END") {
+    setMicLive(false);
+  }
+});
+
+// The button only appears where it can actually do something.
+if ($("micBtn")) {
   $("micBtn").hidden = false;
   $("micBtn").addEventListener("click", () => (recognising ? stopDictation() : startDictation()));
 }
 
 document.addEventListener("keydown", (e) => {
   if ((e.ctrlKey || e.metaKey) && (e.key === "m" || e.key === "M")) {
-    if (!Recognizer) return;
     e.preventDefault();
     recognising ? stopDictation() : startDictation();
   }

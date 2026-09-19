@@ -2233,6 +2233,51 @@ async function cdpDispatchClick(tabId, x, y) {
   }
 }
 
+async function cdpDispatchKey(tabId, key) {
+  try {
+    const attached = await ensureDebuggerAttached(tabId);
+    if (!attached) return { ok: false, error: "Debugger attach not available" };
+
+    const target = { tabId };
+    const isEnter = key === "Enter" || key === "Return";
+
+    if (isEnter) {
+      await chrome.debugger.sendCommand(target, "Input.dispatchKeyEvent", {
+        type: "rawKeyDown",
+        windowsVirtualKeyCode: 13,
+        nativeVirtualKeyCode: 13,
+        key: "Enter",
+        code: "Enter",
+        unmodifiedText: "\r",
+        text: "\r"
+      });
+      await new Promise((r) => setTimeout(r, 45));
+      await chrome.debugger.sendCommand(target, "Input.dispatchKeyEvent", {
+        type: "keyUp",
+        windowsVirtualKeyCode: 13,
+        nativeVirtualKeyCode: 13,
+        key: "Enter",
+        code: "Enter",
+        unmodifiedText: "\r",
+        text: "\r"
+      });
+    } else {
+      await chrome.debugger.sendCommand(target, "Input.dispatchKeyEvent", {
+        type: "keyDown",
+        key: String(key)
+      });
+      await chrome.debugger.sendCommand(target, "Input.dispatchKeyEvent", {
+        type: "keyUp",
+        key: String(key)
+      });
+    }
+    return { ok: true, nativeCdp: true };
+  } catch (e) {
+    console.warn("[CDP] Hardware keypress failed, falling back to DOM key:", e);
+    return { ok: false, error: e.message };
+  }
+}
+
 try {
   chrome.debugger.onDetach.addListener((source) => {
     if (source?.tabId) _attachedDebuggers.delete(source.tabId);
@@ -2248,6 +2293,17 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       return true;
     }
     cdpDispatchClick(tabId, msg.x, msg.y)
+      .then(r => sendResponse(r))
+      .catch(e => sendResponse({ ok: false, error: e.message }));
+    return true;
+  }
+  if (msg.type === "CDP_KEY") {
+    const tabId = sender?.tab?.id || session?.tabId;
+    if (!tabId) {
+      sendResponse({ ok: false, error: "No active tab for CDP key" });
+      return true;
+    }
+    cdpDispatchKey(tabId, msg.key || "Enter")
       .then(r => sendResponse(r))
       .catch(e => sendResponse({ ok: false, error: e.message }));
     return true;

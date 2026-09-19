@@ -334,22 +334,24 @@ function safeLabel(el) {
         associatedLabel(),
         el.getAttribute("data-vault-key"),
         el.getAttribute("aria-label"),
+        el.getAttribute("data-testid"),
         el.getAttribute("placeholder"),
         el.getAttribute("title"),
+        dataIcon(),
         el.getAttribute("name"),
         el.getAttribute("id"),
-        dataIcon(),
       ]
     : [
         el.innerText,
         el.getAttribute("data-page"),
         el.getAttribute("data-vault-key"),
         el.getAttribute("aria-label"),
+        el.getAttribute("data-testid"),
+        dataIcon(),
         el.getAttribute("title"),
         el.getAttribute("placeholder"),
         el.getAttribute("name"),
         el.getAttribute("id"),
-        dataIcon(),
       ];
 
   const PROMPT_INJECTION_RE = /\b(?:system:|assistant:|human:|user:|ignore\s+(?:all\s+)?previous\s+instructions?|disregard\s+(?:all\s+)?prior\s+instructions?|developer\s+mode|jailbreak|<\|im_start\|>|<\|im_end\|>|<\|system\|>|\[\/?inst\]|admin\s+override)\b/i;
@@ -1235,6 +1237,153 @@ function checkFieldValue(targetId, expectedValue) {
   return { ok: true };
 }
 
+// ── In-Page Voice Dictation HUD ──────────────────────────────────────────────
+let inPageRecognition = null;
+let voiceHudEl = null;
+
+function showVoiceHud(text) {
+  if (voiceHudEl) voiceHudEl.remove();
+  voiceHudEl = document.createElement("div");
+  voiceHudEl.className = "vv-voice-hud";
+  voiceHudEl.id = "vv-voice-hud-root";
+
+  const micIcon = document.createElement("div");
+  micIcon.className = "vv-voice-mic-icon";
+  micIcon.innerHTML = `
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
+      <path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v3M8 22h8"/>
+    </svg>
+  `;
+
+  const transcript = document.createElement("div");
+  transcript.className = "vv-voice-transcript";
+  transcript.id = "vv-voice-transcript-text";
+  transcript.textContent = text || "Listening…";
+
+  const cancelBtn = document.createElement("button");
+  cancelBtn.className = "vv-voice-close";
+  cancelBtn.id = "vv-voice-cancel-btn";
+  cancelBtn.title = "Stop listening";
+  cancelBtn.textContent = "✕";
+  cancelBtn.addEventListener("click", () => stopInPageVoiceDictation());
+
+  voiceHudEl.appendChild(micIcon);
+  voiceHudEl.appendChild(transcript);
+  voiceHudEl.appendChild(cancelBtn);
+  document.body.appendChild(voiceHudEl);
+}
+
+function updateVoiceHud(text) {
+  const el = document.getElementById("vv-voice-transcript-text");
+  if (el) {
+    el.textContent = text || "Listening…";
+    el.classList.add("live");
+  }
+}
+
+function hideVoiceHud(msg = "", isError = false) {
+  if (!voiceHudEl) return;
+  if (msg) {
+    const el = document.getElementById("vv-voice-transcript-text");
+    if (el) {
+      el.textContent = msg;
+      if (isError) el.style.color = "#f87171";
+    }
+    setTimeout(() => {
+      if (voiceHudEl) {
+        voiceHudEl.remove();
+        voiceHudEl = null;
+      }
+    }, 1500);
+  } else {
+    voiceHudEl.remove();
+    voiceHudEl = null;
+  }
+}
+
+function stopInPageVoiceDictation() {
+  if (inPageRecognition) {
+    try { inPageRecognition.stop(); } catch (_) {}
+    inPageRecognition = null;
+  }
+  hideVoiceHud();
+  try {
+    chrome.runtime.sendMessage({ type: "VOICE_END" });
+  } catch (_) {}
+}
+
+function startInPageVoiceDictation() {
+  const Recognizer = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!Recognizer) {
+    try {
+      chrome.runtime.sendMessage({
+        type: "VOICE_ERROR",
+        error: "Web Speech API is not supported in this browser tab."
+      });
+    } catch (_) {}
+    return { ok: false, error: "not supported" };
+  }
+
+  stopInPageVoiceDictation();
+
+  try {
+    const rec = new Recognizer();
+    rec.lang = navigator.language || "en-IN";
+    rec.interimResults = true;
+    rec.continuous = false;
+    rec.maxAlternatives = 1;
+
+    showVoiceHud("Listening… Speak your command");
+
+    rec.onresult = (event) => {
+      let transcript = "";
+      for (let i = 0; i < event.results.length; i++) {
+        transcript += event.results[i][0].transcript;
+      }
+      transcript = transcript.trim();
+      updateVoiceHud(transcript);
+      const isFinal = event.results[event.results.length - 1].isFinal;
+      try {
+        chrome.runtime.sendMessage({
+          type: "VOICE_RESULT",
+          transcript,
+          isFinal
+        });
+      } catch (_) {}
+      if (isFinal) {
+        setTimeout(() => hideVoiceHud(), 800);
+      }
+    };
+
+    rec.onerror = (event) => {
+      const err = event.error || "unknown";
+      hideVoiceHud(err === "no-speech" ? "Didn't catch that" : `Mic error: ${err}`, true);
+      try {
+        chrome.runtime.sendMessage({ type: "VOICE_ERROR", error: err });
+      } catch (_) {}
+    };
+
+    rec.onend = () => {
+      inPageRecognition = null;
+      hideVoiceHud();
+      try {
+        chrome.runtime.sendMessage({ type: "VOICE_END" });
+      } catch (_) {}
+    };
+
+    rec.start();
+    inPageRecognition = rec;
+    return { ok: true };
+  } catch (err) {
+    hideVoiceHud(`Could not start mic: ${err.message}`, true);
+    try {
+      chrome.runtime.sendMessage({ type: "VOICE_ERROR", error: err.message });
+    } catch (_) {}
+    return { ok: false, error: err.message };
+  }
+}
+
 // ── Message Listeners ─────────────────────────────────────────────────────────
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === "SCAN_PAGE") {
@@ -1383,6 +1532,18 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     } catch (err) {
       sendResponse({ ok: false, error: err.message || String(err) });
     }
+    return true;
+  }
+
+  if (msg.type === "START_IN_PAGE_VOICE") {
+    const res = startInPageVoiceDictation();
+    sendResponse(res);
+    return true;
+  }
+
+  if (msg.type === "STOP_IN_PAGE_VOICE") {
+    stopInPageVoiceDictation();
+    sendResponse({ ok: true });
     return true;
   }
 

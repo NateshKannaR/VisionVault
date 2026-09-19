@@ -14,10 +14,10 @@ async function requestAccess() {
     // Stop all audio tracks immediately once permission is verified
     stream.getTracks().forEach((track) => track.stop());
 
-    statusEl.textContent = "✓ Microphone access granted! Closing tab…";
+    statusEl.textContent = "✓ Microphone access granted! VisionVault is ready for voice commands.";
     statusEl.className = "success";
     if (allowBtn) {
-      allowBtn.textContent = "✓ Access Granted";
+      allowBtn.textContent = "✓ Access Granted — Ready!";
       allowBtn.style.background = "#10b981";
     }
 
@@ -27,7 +27,7 @@ async function requestAccess() {
 
     setTimeout(() => {
       window.close();
-    }, 1200);
+    }, 2500);
   } catch (err) {
     console.warn("Microphone request error:", err);
     if (allowBtn) {

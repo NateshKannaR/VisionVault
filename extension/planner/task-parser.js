@@ -187,6 +187,11 @@
       result.wantsMessage = true;
       result.recipient = m4[1].trim();
       result.message = m4[2].trim();
+    } else if (text.match(/\b(?:whatsapp|message|text|dm)\s+([a-zA-Z0-9_]+)\s+['"]?([^'"]+?)['"]?(?:\s+(?:on|via|in)\s+(?:whatsapp|slack|telegram|teams)|$)/i)) {
+      const mDirect = text.match(/\b(?:whatsapp|message|text|dm)\s+([a-zA-Z0-9_]+)\s+['"]?([^'"]+?)['"]?(?:\s+(?:on|via|in)\s+(?:whatsapp|slack|telegram|teams)|$)/i);
+      result.wantsMessage = true;
+      result.recipient = mDirect[1].trim();
+      result.message = mDirect[2].trim();
     } else if (/\b(send|message|msg|text|chat)\b/i.test(text) && /\bto\s+([a-zA-Z0-9_\s]+)/i.test(text)) {
       const rec = text.match(/\bto\s+([a-zA-Z0-9_\s]+?)(?:\s+(?:on|via|in)\s+(?:whatsapp|slack|telegram|teams)|$)/i);
       if (rec) {

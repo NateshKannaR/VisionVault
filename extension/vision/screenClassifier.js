@@ -48,15 +48,17 @@
       const label = (m.label || "").toLowerCase();
       const tag = (m.tag || "").toLowerCase();
 
-      if (role === "input" || tag === "input" || tag === "textarea") {
+      const isInput = role.startsWith("input:") || role === "textarea" || role === "editable" || role === "combobox" || tag === "input" || tag === "textarea";
+      const isButton = role === "button" || role === "input:submit" || role === "input:button" || tag === "button";
+      if (isInput) {
         inputCount++;
-        if (label.includes("password") || (m.type === "password")) {
+        if (role === "input:password" || label.includes("password")) {
           passwordCount++;
         }
-        if (label.includes("search") || label.includes("find") || label.includes("query")) {
+        if (role === "input:search" || label.includes("search") || label.includes("find") || label.includes("query")) {
           searchCount++;
         }
-      } else if (role === "button" || tag === "button") {
+      } else if (isButton) {
         buttonCount++;
         if (label.includes("cart") || label.includes("buy") || label.includes("checkout") || label.includes("pay")) {
           cartCount++;

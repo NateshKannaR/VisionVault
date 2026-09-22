@@ -74,7 +74,8 @@
   }
 
   const EMAIL_RE    = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
-  const PHONE_RE    = /(\+?\d[\d\s\-().]{7,}\d)/g;
+  // Negative lookbehind for currency/price context to avoid matching prices as phone numbers
+  const PHONE_RE    = /(?<![\d.₹$€£¥,])(\+?\d[\d\s\-().]{7,}\d)(?![\d%])/g;
   const CARD_RE     = /\b(?:\d{4}[- ]?){3}\d{4}\b/g;
   const SSN_RE      = /\b\d{3}[-\s]?\d{2}[-\s]?\d{4}\b/g;
   // Separators are whatever the site chose, plus the wider gaps OCR tends to read out of printed cards.
@@ -111,19 +112,21 @@
   const GITHUB_PAT_RE = /ghp_[a-zA-Z0-9]{36}/g;
   const JWT_RE        = /eyJ[a-zA-Z0-9_-]{10,}\.eyJ[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9_-]{10,}/g;
   const PINCODE_RE    = /\b[1-9][0-9]{5}\b/g;
+  // GSTIN: 2-digit state code + PAN + 1 entity digit + Z + 1 check digit
+  const GSTIN_RE      = /\b\d{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}\b/g;
 
   const PII_PATTERNS = [
     { label: "openai_key", regex: OPENAI_KEY_RE },
     { label: "aws_key",    regex: AWS_KEY_RE },
     { label: "github_pat", regex: GITHUB_PAT_RE },
     { label: "jwt_token",  regex: JWT_RE },
-    { label: "pincode",    regex: PINCODE_RE },
     { label: "email",      regex: EMAIL_RE },
     { label: "card",       regex: CARD_RE },
     { label: "ssn",        regex: SSN_RE },
     { label: "vid",        regex: VID_RE },
     { label: "aadhaar",    regex: AADHAAR_RE },
     { label: "pan",        regex: PAN_RE },
+    { label: "gstin",      regex: GSTIN_RE },
     { label: "dob",        regex: DOB_RE },
     { label: "gender",     regex: GENDER_RE },
     { label: "driving_licence", regex: DL_RE },

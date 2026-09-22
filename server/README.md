@@ -45,37 +45,43 @@ on `done`.
 
 ## Planning chain
 
-Tried in order; each tier only if the previous is absent or fails:
+The actual runtime chain is a strict fallback order:
 
-1. **Google Gemini** — used when `GEMINI_API_KEY` is set.
-2. **Groq** — used when `GROQ_API_KEY` is set.
-3. **Deterministic rule-based planner** — always available, no network, no key.
+1. **Google Gemini** — active when `GEMINI_API_KEY` is configured.
+2. **Groq** — used next when available.
+3. **Ollama** — optional local VLM route when `OLLAMA_HOST` is active.
+4. **Deterministic rule-based planner** — always available, no network, no key.
 
-There is no OpenAI tier and no Ollama tier. They are not implemented and not called; if you see
-them mentioned anywhere, that documentation is stale.
+This is intentionally resilient: a quota issue, key issue, or unreachable hosted service does not
+break the loop. The local extension always keeps the real personal data on-device and only sends
+symbolic targets and a redacted view upstream.
 
 `GET /health` reports the live chain:
 
 ```json
-{"status":"ok","backend":"gemini","chain":["gemini","groq","mock"]}
+{"status":"ok","backend":"gemini","chain":["gemini","groq","ollama","mock"]}
 ```
 
-Both hosted tiers are open-weight-friendly substitutes for a self-hosted VLM — the request shape
-is an ordinary chat-completion with one image, so pointing tier 2 at a local vLLM or Ollama
-deployment is a change of base URL, not of architecture.
+The server is intentionally model-agnostic. Hosted providers can be swapped in or out without
+changing the client-side contract, and the request layout remains compatible with local or remote
+open-weight VLMs.
 
 ## Running
 
 ```bash
+cd server
 pip install -r requirements.txt
-cp .env.example .env     # add a key, or leave both blank to use the rule-based planner
-python main.py           # http://127.0.0.1:8000
+cp .env.example .env  # optional, only if you want to add API keys
+python main.py         # http://127.0.0.1:8000
 ```
+
+Common environment variables:
 
 | Variable | Meaning |
 | :--- | :--- |
 | `GEMINI_API_KEY` / `GEMINI_MODEL` | tier 1 |
 | `GROQ_API_KEY` / `GROQ_MODEL` | tier 2 |
+| `OLLAMA_HOST` / `OLLAMA_MODEL` | optional local tier |
 | `PORT` | listen port, default 8000 |
 
 ## Testing it
@@ -84,10 +90,9 @@ python main.py           # http://127.0.0.1:8000
 python eval/test-server-contract.py
 ```
 
-Exercises this endpoint over real HTTP against whichever backend is configured, and checks the
-half of the privacy contract the server is responsible for: replies are well-formed, target only
-supplied mark ids, never contain an invented personal value, terminate with `done`, and tolerate
-a request that carries no image (the client's fail-closed path sends none).
+This exercises the HTTP endpoint and checks the server-side portion of the privacy contract:
+well-formed responses, valid mark ids, no invented personal values, graceful missing-image
+handling, and clean termination semantics.
 
 It does **not** test detection or redaction — those are client-side and are measured by
 `node eval/run-full-eval.js` against a live Chrome session.

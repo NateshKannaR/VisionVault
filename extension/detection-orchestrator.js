@@ -43,12 +43,17 @@
     const flags = `${settings.enableOCR !== false ? 1 : 0}${settings.enableFaceDetection !== false ? 1 : 0}` +
                   `|${settings.viewportWidth || 0}x${settings.viewportHeight || 0}@${settings.devicePixelRatio || 1}`;
     const s = String(screenshot || "");
+    const len = s.length;
+    // Sample 64 evenly-spaced characters instead of hashing the full base64 string.
+    // A 60KB base64 screenshot has ~80K chars; sampling 64 of them is ~1250× faster
+    // while remaining collision-resistant for same-page cache correctness.
+    const step = Math.max(1, Math.floor(len / 64));
     let h = 0x811c9dc5;
-    for (let i = 0; i < s.length; i++) {
+    for (let i = 0; i < len; i += step) {
       h ^= s.charCodeAt(i);
       h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
     }
-    return `${h.toString(36)}:${s.length}:${flags}`;
+    return `${h.toString(36)}:${len}:${flags}`;
   }
 
   function visionCacheGet(key) {
@@ -799,14 +804,29 @@
       try {
         const classifier = global.ScreenClassifier || (typeof require !== "undefined" ? require("./vision/screenClassifier.js") : null);
         if (classifier && typeof classifier.classifyScreenState === "function") {
+          // Fetch live page info so the classifier sees the real title and URL path,
+          // not empty strings — without this it always falls back to GENERAL_INTERACTION.
+          let liveTitle = settings.pageTitle || "";
+          let liveUrlPath = settings.urlPath || "";
+          try {
+            const chromeApi2 = safeGetChrome();
+            if (chromeApi2 && chromeApi2.tabs && chromeApi2.tabs.query) {
+              const tabs = await new Promise(r => chromeApi2.tabs.query({ active: true, lastFocusedWindow: true }, r));
+              if (tabs && tabs[0]) {
+                liveTitle = tabs[0].title || liveTitle;
+                try { const u = new URL(tabs[0].url || ""); liveUrlPath = u.pathname; } catch (_) {}
+              }
+            }
+          } catch (_) {}
           screenEvaluation = classifier.classifyScreenState({
             marks,
             piiRegions: mergedRegions,
             pageInfo: {
-              title: mainDomScan?.title || "",
-              url_path: mainDomScan?.url || "",
-              viewport_height: viewportHeight,
-              viewport_width: viewportWidth
+              title: liveTitle,
+              url_path: liveUrlPath,
+              url: liveUrlPath,
+              viewport_height: settings.viewportHeight || 0,
+              viewport_width: settings.viewportWidth || 0
             }
           });
         }

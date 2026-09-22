@@ -442,7 +442,9 @@ async function scanTab(tabId, windowId, settings, retries = SCAN_ATTEMPT_DELAYS_
 
   for (let attempt = 1; attempt <= retries; attempt++) {
     await ensureContent(tabId);
-    await new Promise(r => setTimeout(r, SCAN_ATTEMPT_DELAYS_MS[attempt - 1] ?? 400));
+    if (attempt > 1) {
+      await new Promise(r => setTimeout(r, SCAN_ATTEMPT_DELAYS_MS[attempt - 1] ?? 400));
+    }
 
     const tab = await new Promise(r => chrome.tabs.get(tabId, r));
     let pageInfo = await msgTab(tabId, { type: "GET_PAGE_INFO" }, { frameId: 0 }) || {};
@@ -506,6 +508,7 @@ async function scanTab(tabId, windowId, settings, retries = SCAN_ATTEMPT_DELAYS_
       tab,
       regions: result.regions || [],
       timings: result.timings || {},
+      screenEvaluation: result.screenEvaluation || null,
     };
 
     // Fast-path: if any interactive marks were found, proceed immediately without waiting for retry delays
@@ -556,7 +559,8 @@ async function callServer(payload, serverUrl) {
       checklist: payload.checklist || session?.checklist || [],
       grounded_candidates: payload.grounded_candidates || [],
       step: payload.step || 1,
-      page_info: payload.page_info || {}
+      page_info: payload.page_info || {},
+      screen_evaluation: payload.screen_evaluation || null
     };
 
     const streamUrl = targetUrl.replace(/\/api\/agent\/step\/?$/, "/api/agent/step/stream");
@@ -792,6 +796,7 @@ async function phaseScan(task, preferredTabId = null) {
     task,
     parsedTask,
     checklist,
+    screenEvaluation: null,
     // What the instruction has actually achieved so far. The planner reads this to decide
     // whether anything remains to be done, which is what makes the loop terminate.
     progress: {
@@ -861,6 +866,7 @@ async function phaseScan(task, preferredTabId = null) {
     marksDetected: scan.safeMarks.length,
     timings: timingBreakdown,
     timings_ms: timingBreakdown,
+    screenEvaluation: scan.screenEvaluation || null,
   };
 }
 
@@ -1379,6 +1385,7 @@ async function phaseRun() {
             checklist: session.checklist || [],
             grounded_candidates: groundedCandidates,
             page_info: session.pageInfo || {},
+            screen_evaluation: session.screenEvaluation || null,
             step: session.stepCount,
           }, session.serverUrl);
         } catch (e) {
@@ -1993,6 +2000,7 @@ async function rescanCurrentTab(resetFilled = false, reason = "agent") {
     session.redactionOk = true;
     session.marks = scan.safeMarks;
     session.markFrames = scan.markFrames;
+    if (scan.screenEvaluation) session.screenEvaluation = scan.screenEvaluation;
     if (resetFilled) {
       session.filledIds = [];
       session.consecutiveFailures = 0;

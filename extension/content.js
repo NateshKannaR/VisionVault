@@ -68,7 +68,7 @@ const PII_INPUT_SELECTORS = [
 
 // ── PII Text Regexes ─────────────────────────────────────────────────────────
 const EMAIL_RE    = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
-const PHONE_RE    = /(\+?\d[\d\s\-().]{7,}\d)/g;
+const PHONE_RE    = /(?<![\d.₹$€£¥,])(?:\+?\d[\d\s\-().]{7,}\d)(?![\d%])/g;
 const CARD_RE     = /\b(?:\d{4}[- ]?){3}\d{4}\b/g;
 const SSN_RE      = /\b\d{3}[-\s]?\d{2}[-\s]?\d{4}\b/g;
 // Kept in step with the same identifiers in vision/ocrDetect.js. The two detectors read
@@ -82,6 +82,8 @@ const PASSPORT_RE = /\b[A-Z][0-9]{7}\b/g;
 const IFSC_RE     = /\b[A-Z]{4}0[A-Z0-9]{6}\b/g;
 const UPI_RE      = /\b[a-zA-Z0-9.\-_]{2,40}@(okhdfcbank|okaxis|oksbi|okicici|paytm|ybl|ibl|axl|upi)\b/gi;
 const VID_RE      = /\b\d{4}[\s-]{0,2}\d{4}[\s-]{0,2}\d{4}[\s-]{0,2}\d{4}\b/g;
+// GSTIN: 2-digit state code + PAN + 1 entity digit + Z + 1 check digit
+const GSTIN_RE    = /\b\d{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}\b/g;
 const DL_RE       = /\b[A-Z]{2}[-\s]?\d{2}[-\s]?\d{4}[-\s]?\d{7}\b|\b[A-Z]{2}[-\s]?\d{2}[-\s]?\d{11}\b/g;
 const VEHICLE_RE  = /\b[A-Z]{2}[\s-]?\d{1,2}[\s-]?[A-Z]{1,3}[\s-]?\d{4}\b/g;
 const ACCOUNT_RE  = /\b(?:a\/c|acc(?:oun)?t(?:\s*(?:no|number|#))?|bank\s*a\/?c)\s*[:.#-]?\s*(\d{9,18})\b/gi;
@@ -149,7 +151,9 @@ const PII_LABEL_KEYWORDS = [
   "card", "credit card", "debit card", "cvv", "cvc", "expiry", "account number", "account no",
   "routing", "ifsc", "iban", "swift", "upi", "salary", "income", "annual income", "bank",
   // health / misc sensitive
-  "insurance", "policy number", "medical", "diagnosis", "blood group", "marital status", "father name", "orbital"
+  "insurance", "policy number", "medical", "diagnosis", "blood group", "marital status", "father name", "orbital",
+  // tax identifiers
+  "gstin", "gst", "tin", "vat", "tax number", "registration number", "cin", "llpin"
 ];
 
 /**
@@ -501,7 +505,7 @@ function matchesPiiKeyword(text) {
 
 function testPII(text) {
   const tests = [EMAIL_RE, PHONE_RE, CARD_RE, SSN_RE, VID_RE, AADHAAR_RE, PAN_RE, DL_RE,
-                 VEHICLE_RE, ACCOUNT_RE, PASSPORT_RE, IFSC_RE, UPI_RE, EMPLOYEE_ID_RE];
+                 VEHICLE_RE, ACCOUNT_RE, PASSPORT_RE, IFSC_RE, UPI_RE, EMPLOYEE_ID_RE, GSTIN_RE];
   const probe = normalizeDigits(text);
   let result = tests.some(re => { re.lastIndex = 0; return re.test(probe); });
   tests.forEach(re => { re.lastIndex = 0; });
@@ -723,6 +727,7 @@ function findPiiRangesInTextNode(node, text) {
     { re: UPI_RE, label: "upi" },
     { re: VID_RE, label: "vid" },
     { re: EMPLOYEE_ID_RE, label: "employee_id" },
+    { re: GSTIN_RE, label: "gstin" },
   ];
 
   try {

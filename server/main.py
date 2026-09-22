@@ -178,6 +178,7 @@ class AgentStepRequest(BaseModel):
     page_info: Optional[PageInfo] = None
     task_hints: Optional[TaskHints] = None
     progress: Optional[Progress] = None
+    screen_evaluation: Optional[Dict[str, Any]] = None
 
 BOOKING_RE = re.compile(
     r"\b(book|flight|hotel|train|bus|cab|ticket|reserve|makemytrip|goibibo|irctc|redbus|cleartrip)\b",
@@ -623,8 +624,12 @@ def plan_with_gemini(req: AgentStepRequest) -> Optional[StepResponse]:
         img_b64 = img_b64.split(",", 1)[1]
 
     marks_summary = marks_for_prompt(req, with_boxes=bool(img_b64))
+    screen_ctx = ""
+    if req.screen_evaluation and req.screen_evaluation.get("category"):
+        sc = req.screen_evaluation
+        screen_ctx = f"SCREEN CONTEXT: {sc.get('category')} (confidence {sc.get('confidence', 0):.0%}), strategy={sc.get('recommendedStrategy')}, complexity={sc.get('visualComplexity')}\n"
 
-    prompt_text = f"""You are VisionVault: a visual AI browser agent designed for privacy-preserving web automation.
+    prompt_text = f"""You are VisionVault: a visual AI browser agent designed for privacy-preserving web automation.{screen_ctx}
 REDACTION SCHEME AWARENESS:
 - You receive a sanitized, on-device blacked-out/mosaic screenshot where all sensitive credentials, faces, cards, and PII have been scrubbed by the client's local computer vision & OCR models.
 - You are fully aware of this client-side redaction scheme: blacked-out zones represent protected sensitive elements.
@@ -706,7 +711,7 @@ Respond in STRICT JSON ONLY:
                 data=json.dumps(payload).encode("utf-8"),
                 headers={"Content-Type": "application/json"}
             )
-            with urllib.request.urlopen(req_post, timeout=5) as resp:
+            with urllib.request.urlopen(req_post, timeout=25) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
                 candidate = data.get("candidates", [{}])[0]
                 content = candidate.get("content", {}).get("parts", [{}])[0].get("text", "")

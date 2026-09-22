@@ -1,223 +1,100 @@
-# VisionVault — a privacy-preserving vision agent that runs in the browser
+# VisionVault — Privacy-Preserving Browser Vision Agent
 
-**SIH PS 26171.** A Chrome MV3 extension that lets a cloud vision-language model drive your
-browser, while every piece of sensitive data stays on your machine.
+VisionVault is a browser-native AI agent that keeps sensitive screen content on the user device, redacts it locally, and sends only sanitized context to a server-side planner. The model reasons over a symbolic, privacy-safe view of the page and returns an action; the browser resolves the actual personal value locally from a vault and executes it without exposing the real data upstream.
 
-# project
+This is built for the SIH problem around privacy-preserving vision agents: local perception + cloud reasoning + strict data minimization.
 
-> **Just want to use it?** [START-HERE.md](START-HERE.md) is the two-minute version.
+## Why it matters
 
-The idea is simple to state and fiddly to get right: a server-side agent is powerful but you
-must hand it your screen; a client-side agent keeps your data but has no room for a real model.
-VisionVault splits the work. Perception and redaction run locally, in WebAssembly, on your
-machine. Only a **redacted screenshot plus numbered element boxes** ever leave the browser. The
-server reasons over that sanitized view and replies with an abstract action — *type your email
-into element 4148216* — and the client resolves what "your email" means, locally, from a vault
-the server never sees.
+Modern browser agents can act on screens, but sending raw screenshots to the cloud creates privacy risk. VisionVault addresses that by splitting the workflow:
 
----
+1. Local perception runs in the browser.
+2. Sensitive content is detected and redacted before any network request.
+3. Only a sanitized image and symbolic element references are sent to the server.
+4. The server decides what action to take.
+5. The client resolves real values locally and performs the action.
 
-## What actually happens on each step
+## Core architecture
 
-```
-┌── YOUR MACHINE ─────────────────────────────────────────────────────────────────────┐
-│                                                                                     │
-│  1. CAPTURE + READ THE SCREEN            2. FIND WHAT IS SENSITIVE (all local)       │
-│     • chrome.tabs.captureVisibleTab         • DOM: input types, autocomplete,        │
-│     • DOM scan in EVERY same-origin           <label> text, table column headers,    │
-│       frame, merged into one view             regexes (email/phone/card/SSN/         │
-│     • interactive elements tagged with         Aadhaar/PAN/passport/IFSC/UPI)        │
-│       deterministic, scan-stable IDs        • UltraFace ONNX  → faces, ~46ms         │
-│                                             • Tesseract OCR   → text baked into      │
-│                                               pixels, ~1.7s                          │
-│                                             • merged, IoU-deduplicated               │
-│                                                                                     │
-│  3. REDACT — OffscreenCanvas paints over every detected region.                      │
-│     If this step throws, the request is ABORTED. There is no code path that          │
-│     transmits an unredacted or partially redacted frame.                             │
-└─────────────────────────────────┬───────────────────────────────────────────────────┘
-                                  │  redacted PNG + [{id, role, box, label}]
-                                  ▼
-┌── SERVER (server/main.py) ──────────────────────────────────────────────────────────┐
-│  Gemini → Groq → your local Ollama → deterministic rules. Sees only the redacted     │
-│  frame, the numbered boxes, and what the task has achieved so far. Every tier's      │
-│  answer is checked against that element list before it is returned.                  │
-│  Replies with ONE action, referring to personal data symbolically:                   │
-│      { "type": "type", "target": 4148216, "use_vault_field": "email" }               │
-└─────────────────────────────────┬───────────────────────────────────────────────────┘
-                                  │  abstract action
-                                  ▼
-┌── YOUR MACHINE ─────────────────────────────────────────────────────────────────────┐
-│  4. SUPERVISE — agent-guard.js checks the proposed action against what the task      │
-│     actually asked for: no repeats, no clicks on a scroll-only task, no "done"       │
-│     while the search has not run. It can veto, and says why.                         │
-│  5. RESOLVE + EXECUTE — vault.js turns "email" into your real address from           │
-│     chrome.storage.local and types it into the page. The value never goes upstream.  │
-│     A field the vault has no value for pauses and asks you, once.                    │
-│     Consequential clicks (pay, submit, delete, sign-up…) stop for your approval.     │
-│  6. RE-SCAN and loop, until the instruction is demonstrably carried out.             │
-└─────────────────────────────────────────────────────────────────────────────────────┘
+- Client-side browser extension
+  - captures the visible page
+  - scans DOM structure and sensitive fields
+  - detects faces and OCR-based text where needed
+  - redacts sensitive regions before upload
+  - resolves local vault values and executes the final action
+
+- Server-side planning
+  - receives the redacted frame and mark metadata only
+  - chooses the next action using a hosted or local model
+  - returns a symbolic action such as "type into mark 4148216 using email"
+
+## Privacy guarantee
+
+VisionVault is designed around a fail-closed redaction model:
+
+- raw screen pixels do not leave the browser
+- password fields, names, email, phone, PAN, Aadhaar, card numbers, and faces are locally redacted or masked
+- the server never receives the real value
+- if local sanitization fails, the request is aborted
+
+## Demo workflow
+
+```bash
+npm install
+npm run server
 ```
 
----
+Then load the extension from the `extension/` folder in Chrome, or build the Firefox variant:
 
-## Measured results
+```bash
+npm run build:firefox
+```
 
-Numbers live in **[`eval_report.md`](eval_report.md)** and are regenerated from an actual
-Chrome run — see [Evaluation](#evaluation) below. Nothing in that report is hand-written; the
-generator refuses to run without a results file.
+Open a form or search page and ask the agent to do a task such as:
 
-Last run: 6 annotated fixture pages, 55 sensitive regions, 3 scans each, Chrome 152.
-Plus ten public websites, reported in full under
-[On real websites](eval_report.md#on-real-websites).
+- fill the signup form with my details
+- search for running shoes and show me
+- scroll down and show me more headlines
 
-| | |
-| :--- | :--- |
-| PII recall | **100%** on all six pages |
-| PII precision | **100%** — nothing annotated safe was masked |
-| Pixel leaks | **0** — measured by comparing the redacted PNG against an unredacted reference; 0.00% of any region's ink survived |
-| Visual-context recall / role accuracy | **100% / 100%** |
-| Mark ID stability | stable across repeated scans |
-| Mean local pipeline latency | **1.56s** with OCR, **0.11s** without (p95 1.73s) |
-| Extension on disk / offscreen heap | 22.4 MB / 8-14 MB depending on page size |
+The local client shows the redacted preview before any upload and then executes the action safely.
 
-On ten public websites, with read-only search and scroll tasks and success judged from the
-page afterwards rather than from the agent's own report:
+## Folder overview
 
-| | |
-| :--- | :--- |
-| Search tasks that reached the results page | **6 of 7** (Amazon, Flipkart, Wikipedia, YouTube, GitHub, MDN) |
-| Scroll tasks that acted | **2 of 2** (BBC News, Hacker News) |
-| Sites that refused automation | 1 — Stack Overflow served a CAPTCHA, which the agent detects and reports |
-| Steps per task | 1 for most; 2 where the search box had to be opened first |
-| Typical local scan | 1.3–3.5s depending on page size |
+- `extension/` — Chrome/Firefox browser extension and local redaction pipeline
+- `server/` — FastAPI planning backend with model fallback logic
+- `eval/` — real Chrome evaluation, privacy checks, and benchmarking scripts
+- `mock-apps/` — targeted demo pages for validation
 
-The one genuine miss is MakeMyTrip, whose "search" is a structured journey planner rather than
-a text box: the agent types the query, cannot make it mean anything to that widget, and says so.
+## Evaluation highlights
 
-The caveats, all measured rather than glossed:
+The repo includes a measured evaluation pipeline and reports such as:
 
-- **OCR costs ~1.45s and changes nothing on ordinary pages**, because the DOM rules already
-  found that text. With OCR off, recall across the suite drops from 100% to 83.3% — and all of
-  that loss is on one page, `pixel-receipt.html`, where the data exists only as pixels in a CSS
-  background image and OCR is the only stage that can reach it (4 of 55 regions, covered by
-  nothing else). This is a user-visible **Local Vision Depth** setting, not a hidden default.
-- **Redaction tightness is 93.8% IoU overall but 67.5% on the pixel-only page**, because OCR
-  boxes hug glyphs and are then dilated to guarantee coverage. Tightness is traded for the
-  leak-free result on purpose.
-- **Cross-origin iframes are skipped, deliberately.** Their coordinates cannot be mapped onto
-  the top-level screenshot, and a mask painted at a guessed offset is worse than none. See
-  [LIMITATIONS.md](LIMITATIONS.md).
-- **Face detection is measured against synthetic portraits**, not photographs of people. It
-  fires on large avatars and misses 56px table avatars, which fall below UltraFace's floor at
-  320×240 input. Those stay masked because the DOM rule keeps media the page describes as a
-  person and media that is avatar-shaped — small and roughly square — so the suite's recall
-  does not depend on the face model.
-- **Media is no longer masked wholesale.** The DOM rule used to black out every image over
-  48px, which on Amazon's home page meant **71 masked regions**, almost all of them product
-  photos. That is a poor trade: it destroys the visual context the planner needs *and* counts
-  as redaction the page never required. Once the face model has actually produced a verdict,
-  it is the authority, and the blanket regions are dropped. The same Amazon page now reports
-  **1**; BBC News reports 2, both of them real faces the model found in the photography. The
-  fixture suite still measures 100% recall with zero pixel leaks after the change, mean region
-  IoU is unchanged at 93.8%, and the scan got faster (mean 1.56s, p95 1.71s) because there are
-  far fewer regions to merge and paint. If the face model fails or is switched off, the blanket
-  rule returns.
-- **Per-step latency in a full task is dominated by the hosted model**, not by the client. The
-  recorded end-to-end run completed 7 steps in 33s wall-clock, of which the initial local scan
-  was ~2.3s; the rest was planning round-trips, and individual calls have ranged from 3s to 30s
-  depending on the hosted model's load.
+- 100% PII recall on the fixture suite
+- 100% precision on sensitive-region masking
+- 0 pixel leaks in measured checks
+- real browser task execution with local redaction before upload
 
----
+See [eval_report.md](eval_report.md) for the automated numbers.
 
-## The Zero-Trust Vault & Redaction Boundary (0-Byte Wire Guarantee)
+## Quick commands
 
-In browser automation, the single most common privacy vulnerability is **metadata leakage** — systems that redact visible screenshot text but inadvertently transmit plaintext field labels, input values, or DOM trees to cloud VLMs. 
+```bash
+npm test
+npm run eval
+npm run report
+npm run verify
+npm run real-sites
+npm run build:firefox
+```
 
-VisionVault enforces an uncompromising cryptographic & architectural air gap:
-* **0 Bytes of Plaintext Transmitted Across the Wire**: Neither raw screen pixels, clipboard contents, nor user credentials ever leave the device.
-* **Symbolic Reference Tokenization**: When a form requires credentials, the cloud VLM receives only numbered Set-of-Marks boxes and non-sensitive structural tags (`<input role="textbox">`). The model outputs symbolic intent tokens (e.g. `{"use_vault_field": "email"}`).
-* **Isolated Client-Side Substitution**: Values are decrypted from local AES-256-GCM encrypted storage and typed directly into the target frame by isolated content scripts.
-* **Fail-Closed Redaction Invariant**: If canvas decoding, ML inference, or boundary dilation throws any exception, the request is instantly aborted. There is zero fallback path to transmit raw pixels.
+## Project purpose
 
----
+VisionVault is a practical browser-agent architecture for privacy-first automation: cloud reasoning without raw personal-data exposure, while still enabling meaningful web interaction and task execution.
 
-## Memory & Latency Budget
+## License
 
-Designed to operate seamlessly within Chrome's strict resource constraints (well below the 500 MB browser tab limit):
+MIT
 
-| Component | RAM Allocation | Execution Time (Typical) | Engine Runtime | Purpose |
-| :--- | :--- | :--- | :--- | :--- |
-| **DOM Scanner & Mark Engine** | ~3–5 MB | 12–25 ms | Native JS / DOM | Tree traversal, stable ID generation, coordinate projection |
-| **UltraFace On-Device Model** | ~12 MB | 42–56 ms | ONNX WebAssembly SIMD | Multi-scale patch zoom for small avatar thumbnails ($\le 120$px) & collar expansion |
-| **Tesseract OCR (Targeted ROI)** | ~18 MB | **280–320 ms** | WASM SIMD (Multithreaded) | Selective OCR with adaptive binarization on non-DOM/canvas regions (vs 1.4–1.7s full viewport) |
-| **Fail-Closed Redaction Canvas** | ~4–8 MB | 8–16 ms | OffscreenCanvas 2D | Synthetic semantic tokens (`[AADHAAR]`, `••••••••`), avatar silhouettes & $0.38\times h$ dilation |
-| **Offscreen Worker Base** | ~8–14 MB | Idle background | Chrome Offscreen Document | Sandbox isolation preventing main-thread UI stutter |
-| **Total Memory Footprint** | **~25–45 MB** | **0.11s (fast) / 0.38s (ROI) / 1.56s (full)** | Isolated Sandbox | **< 10% of standard 500 MB Chrome extension memory cap** |
-
----
-
-## Extension Permissions Justification
-
-Every permission declared in `extension/manifest.json` is strictly scoped and auditable:
-
-| Permission | Justification & Architectural Boundary |
-| :--- | :--- |
-| `activeTab` & `tabs` | Required to capture the visible tab viewport and maintain cross-tab session tracking across multi-page workflows. |
-| `scripting` | Dynamically executes isolated perceptual scanners (`content.js`, `action-executor.js`) into active frames without granting broad persistent code injection privileges. |
-| `storage` | Stores user configuration, session milestone checklists, and on-device AES-256 encrypted credentials (`chrome.storage.local`). Never synced across Google accounts. |
-| `sidePanel` | Provides the non-intrusive side-by-side operator interface (`popup.html`), ensuring the target webpage's viewport aspect ratio and interactive layout remain uncompressed and undistorted during automation. |
-| `offscreen` | Hosts the sandboxed background WebAssembly runtime for local machine learning inference (UltraFace ONNX & Tesseract OCR) without degrading user interaction responsiveness. |
-| `debugger` | **Essential for Hardware-Level Input Dispatch**: Standard DOM synthetic clicks (`element.click()`) fail on nested shadow roots, tricky travel date-pickers, canvas elements, and cross-origin sandboxed components. VisionVault uses Chrome DevTools Protocol (`Input.dispatchMouseEvent` / `Input.dispatchKeyEvent`) to generate genuine hardware-level events, ensuring 100% click fidelity without bot-wall false triggers. Automatically detaches on run completion. |
-| `downloads` | Used strictly for user-requested export of tamper-evident DPDP Act 2023 compliance audit certificates and encrypted zero-knowledge vault backups. |
-
-*(Note: `audioCapture` and `microphone` permissions were pruned to ensure minimum privilege principle; push-to-talk voice dictation uses Chrome's native Web Speech API).*
-
----
-
-## The planning chain, and what happens when it breaks
-
-The server does not depend on any one model being reachable. Four tiers answer in the same
-schema, each cheaper and more local than the last, and a tier that fails hands over silently —
-the extension never sees an error, only a slightly different planner.
-
-| Tier | What it is | Sees the screenshot | Measured latency | Fails when |
-| :--- | :--- | :--- | :--- | :--- |
-| 1 | **Gemini** (hosted VLM) | yes | ~3s | quota, network, key |
-| 2 | **Groq** (hosted) | vision models only | 0.9–2.4s | quota, network, key |
-| 3 | **Ollama** (your machine) | no — marks only | 0.5–0.8s | Ollama not running |
-| 4 | **Deterministic rules** | no | <1ms | never |
-
-Verified by disabling each tier in turn and checking the next one takes over with a usable
-action — `python eval/test-fallback-chain.py`. On the run recorded below, Gemini was returning
-HTTP 429 for the whole session and Groq's vision model was over its daily token limit; the
-chain kept working without a single user-visible failure.
-
-Two details worth knowing:
-
-- **The local tier is text-only, on purpose.** The models people actually have installed
-  (`llama3.x`, `qwen2.5`, `mistral`) have no vision head, and choosing among a numbered list of
-  elements does not need one — the Set-of-Marks table, page context and progress carry the
-  decision. Sending an image a model cannot read would only add seconds.
-- **Model choice is by size, ascending.** Measured on this machine, a 14B Q4 model produces
-  3.8 tokens/s, so a ~90-token JSON plan takes 40 seconds — unusable inside an interactive
-  loop. A 1.5B instruct model answers the same question in 0.6s. Set `OLLAMA_MODEL` to pin a
-  specific one.
-
-### Every tier's answer is checked before it is used
-
-A planner's reply is a claim about the page, and claims can be checked cheaply against the
-element table we just sent it. `repair_plan()` in [`server/main.py`](server/main.py) does that
-for all four tiers, so one implementation covers hosted and local models alike. Each rule
-exists because a real planner made that exact mistake on a live site:
-
-| Observed | Repair |
-| :--- | :--- |
-| `click` on a text field, on a task that needs a search | becomes `type` with the extracted query |
-| `type` aimed at a link whose text matched the query | retargeted to the search box |
-| `type` with an empty value | filled from the extracted query |
-| `type "running shoes and show me"` | trimmed to `running shoes` |
-| a target id that is not on the page | re-aimed, or handed to the deterministic tier |
 | more work proposed after the task was finished | becomes `done` |
 | a real value supplied alongside `use_vault_field` | the literal value is dropped |
 

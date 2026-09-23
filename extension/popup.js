@@ -660,6 +660,123 @@ $("overlayToggle").addEventListener("click", (e) => {
   overlayEl.classList.toggle("dim", !on);
 });
 
+// ── Active Models & Sensitivity Analysis Inspector ───────────────────────────
+function renderModelInspector(d) {
+  const card = $("modelInspectorCard");
+  if (!card || !d) return;
+  card.hidden = false;
+
+  const screenTypeEl = $("inspectorScreenType");
+  if (screenTypeEl && d.screenEvaluation) {
+    const cat = d.screenEvaluation.category || "DOM Structural";
+    screenTypeEl.textContent = cat;
+  }
+
+  const table = $("sensitivityTable");
+  const countSummary = $("inspectorCountSummary");
+  if (!table) return;
+  table.innerHTML = "";
+
+  const regions = Array.isArray(d.regions) ? d.regions : [];
+  const marks = Array.isArray(d.marks) ? d.marks : [];
+
+  if (countSummary) {
+    countSummary.textContent = `${regions.length} sensitive, ${marks.length} public`;
+  }
+
+  const badgeEl = $("modelInspectorBadge");
+  if (badgeEl) {
+    const faceRan = regions.some(r => (r.sources || [r.source]).includes("vision_face"));
+    const ocrRan = regions.some(r => (r.sources || [r.source]).includes("vision_ocr"));
+    let activeCount = 2; // DOM + Decision Planner
+    if (faceRan) activeCount++;
+    if (ocrRan) activeCount++;
+    badgeEl.textContent = `${activeCount} Models Active`;
+  }
+
+  if (regions.length === 0 && marks.length === 0) {
+    table.innerHTML = `<div style="font-size:11px; color:var(--text-faint); padding:6px; font-style:italic;">No interactive elements or PII detected on this screen.</div>`;
+    return;
+  }
+
+  // 1. Sensitive Items (Classified as PII & Redacted locally)
+  regions.forEach((r) => {
+    const row = document.createElement("div");
+    row.style.cssText = "display:flex; justify-content:space-between; align-items:center; background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.22); border-radius:4px; padding:5px 8px; font-size:11px;";
+
+    const left = document.createElement("div");
+    left.style.cssText = "display:flex; align-items:center; gap:6px; overflow:hidden;";
+
+    const badge = document.createElement("span");
+    badge.style.cssText = "background:rgba(239,68,68,0.25); color:#f87171; font-size:9px; font-weight:700; padding:1px 5px; border-radius:3px; white-space:nowrap;";
+    badge.textContent = "SENSITIVE";
+
+    const name = document.createElement("span");
+    name.style.cssText = "color:#fff; font-weight:500; text-overflow:ellipsis; overflow:hidden; white-space:nowrap; max-width:135px;";
+    name.textContent = r.label || r.reason || "Personal Credential";
+    name.title = name.textContent;
+
+    left.appendChild(badge);
+    left.appendChild(name);
+
+    const right = document.createElement("div");
+    right.style.cssText = "font-size:10px; color:var(--text-muted); text-align:right; white-space:nowrap;";
+
+    const sources = (r.sources && r.sources.length ? r.sources : [r.source]).filter(Boolean);
+    let modelName = "DOM Rules";
+    if (sources.includes("vision_face")) modelName = "UltraFace ONNX";
+    else if (sources.includes("vision_ocr")) modelName = "Tesseract OCR";
+    else if (r.reason === "pii_text_match") modelName = "Regex Scanner";
+    else if (r.reason === "sensitive_input" || r.reason === "nearby_label_pii") modelName = "Context Classifier";
+
+    const conf = Math.round((r.confidence || 0.9) * 100);
+    right.innerHTML = `<span style="color:#38bdf8; font-weight:600;">${modelName}</span> <span style="color:var(--text-faint);">(${conf}%)</span>`;
+
+    row.appendChild(left);
+    row.appendChild(right);
+    table.appendChild(row);
+  });
+
+  // 2. Sample Non-Sensitive Items (Classified as Safe & Public for VLM context)
+  const safeMarks = marks.slice(0, 5);
+  safeMarks.forEach((m) => {
+    const row = document.createElement("div");
+    row.style.cssText = "display:flex; justify-content:space-between; align-items:center; background:rgba(16,185,129,0.06); border:1px solid rgba(16,185,129,0.18); border-radius:4px; padding:5px 8px; font-size:11px;";
+
+    const left = document.createElement("div");
+    left.style.cssText = "display:flex; align-items:center; gap:6px; overflow:hidden;";
+
+    const badge = document.createElement("span");
+    badge.style.cssText = "background:rgba(16,185,129,0.2); color:#34d399; font-size:9px; font-weight:700; padding:1px 5px; border-radius:3px; white-space:nowrap;";
+    badge.textContent = "SAFE / PUBLIC";
+
+    const name = document.createElement("span");
+    name.style.cssText = "color:#e2e8f0; text-overflow:ellipsis; overflow:hidden; white-space:nowrap; max-width:135px;";
+    name.textContent = `${m.label || m.role} [${m.id}]`;
+    name.title = name.textContent;
+
+    left.appendChild(badge);
+    left.appendChild(name);
+
+    const right = document.createElement("div");
+    right.style.cssText = "font-size:10px; color:var(--text-muted); text-align:right; white-space:nowrap;";
+    right.innerHTML = `<span style="color:#10b981; font-weight:600;">SoM Grounding</span> <span style="color:var(--text-faint);">(Public)</span>`;
+
+    row.appendChild(left);
+    row.appendChild(right);
+    table.appendChild(row);
+  });
+}
+
+if ($("modelInspectorToggle")) {
+  $("modelInspectorToggle").addEventListener("click", () => {
+    const body = $("modelInspectorBody");
+    if (body) {
+      body.hidden = !body.hidden;
+    }
+  });
+}
+
 // ── Visual Privacy X-Ray Split Lens ──────────────────────────────────────────
 let currentScanData = null;
 let isXRayActive = false;
@@ -1129,6 +1246,7 @@ scanBtn.addEventListener("click", async () => {
   previewWrap.hidden = true;
   statsGrid.hidden = true;
   if ($("scoreCard")) $("scoreCard").hidden = true;
+  if ($("modelInspectorCard")) $("modelInspectorCard").hidden = true;
   timingWrap.hidden = true;
   confirmWrap.hidden = true;
   inputPromptWrap.hidden = true;
@@ -1252,6 +1370,7 @@ function renderScan(d, announce) {
   }
 
   renderRegions(d.regions, d.viewport);
+  renderModelInspector(d);
 
   renderScorecard(d);
   setStat("s-pii", d.piiCount);

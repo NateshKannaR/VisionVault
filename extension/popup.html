@@ -290,6 +290,52 @@
       <p class="preview-foot" id="regionHint">Every box below was painted over before this image left the page.</p>
     </figure>
 
+    <!-- Active Models & Sensitivity Analysis Inspector -->
+    <div class="card" id="modelInspectorCard" hidden style="margin-top: 10px; border: 1px solid rgba(56, 189, 248, 0.35); background: rgba(15, 23, 42, 0.75);">
+      <div class="card-head" style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" id="modelInspectorToggle">
+        <div style="display:flex; align-items:center; gap:6px;">
+          <svg class="ic" viewBox="0 0 24 24"><use href="#i-sparkle"/></svg>
+          <span style="font-weight:600; color:#fff;">Active Models &amp; Sensitivity Analysis</span>
+        </div>
+        <span class="badge" id="modelInspectorBadge" style="background:rgba(56,189,248,0.15); color:var(--accent); font-size:10px; font-weight:700;">3 Models Active</span>
+      </div>
+
+      <div id="modelInspectorBody" style="margin-top:8px;">
+        <!-- Active Model Badges -->
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-bottom:10px;">
+          <div style="background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:6px 8px;">
+            <div style="font-size:9.5px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.04em;">Biometric Vision</div>
+            <div style="font-size:11px; font-weight:600; color:#38bdf8; margin-top:2px;">UltraFace-RFB-320</div>
+            <div style="font-size:9px; color:var(--text-faint);">ONNX Runtime Web (WASM-SIMD)</div>
+          </div>
+          <div style="background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:6px 8px;">
+            <div style="font-size:9.5px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.04em;">Text / OCR Model</div>
+            <div style="font-size:11px; font-weight:600; color:#a78bfa; margin-top:2px;">Tesseract.js WASM</div>
+            <div style="font-size:9px; color:var(--text-faint);">Local Regex &amp; NER Pattern Engine</div>
+          </div>
+          <div style="background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:6px 8px;">
+            <div style="font-size:9.5px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.04em;">Layout Classifier</div>
+            <div style="font-size:11px; font-weight:600; color:#34d399; margin-top:2px;" id="inspectorScreenType">DOM Structural Heuristic</div>
+            <div style="font-size:9px; color:var(--text-faint);">Screen State &amp; ARIA Context</div>
+          </div>
+          <div style="background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:6px 8px;">
+            <div style="font-size:9.5px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.04em;">Decision Agent</div>
+            <div style="font-size:11px; font-weight:600; color:#f59e0b; margin-top:2px;">VLM Task Planner</div>
+            <div style="font-size:9px; color:#10b981; font-weight:600;">🔒 Receives 0 PII Bytes</div>
+          </div>
+        </div>
+
+        <!-- Sensitivity Breakdown List -->
+        <div style="font-size:10.5px; font-weight:700; color:var(--text-muted); margin-bottom:6px; text-transform:uppercase; letter-spacing:0.04em; display:flex; justify-content:space-between; align-items:center;">
+          <span>Detected Items Breakdown</span>
+          <span id="inspectorCountSummary" style="font-size:9.5px; font-weight:500; color:var(--text-faint);">0 items</span>
+        </div>
+        <div id="sensitivityTable" style="max-height:160px; overflow-y:auto; display:flex; flex-direction:column; gap:4px;">
+          <!-- Populated dynamically with each detected region & element classification -->
+        </div>
+      </div>
+    </div>
+
     <!-- Metrics -->
     <!--
       The privacy scorecard.

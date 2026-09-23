@@ -750,6 +750,23 @@ is(isroFormStep2.action, 'type', 'isro form step 2 types into email');
 is(isroFormStep2.mark_id, 2, 'targets email field mark');
 is(isroFormStep2.use_vault_field, 'email', 'uses vault field email');
 
+const isroFormStepPhone = planNextAction({
+  task: isroFormTask,
+  parsed: isroFormParsed,
+  pageInfo: { url: 'https://www.isro.gov.in/ISROAPP/fFBF' },
+  marks: [
+    { id: 1, role: 'input:text', label: 'Enter Your Name Here' },
+    { id: 2, role: 'input:text', label: 'Enter Your Email Address Here' },
+    { id: 4, role: 'input:tel', label: 'Enter Your Mobile Number Here' },
+    { id: 3, role: 'input:text', label: 'Feedback Message' }
+  ],
+  filledIds: [1, 2],
+  progress: { navigated: true }
+});
+is(isroFormStepPhone.action, 'type', 'isro form step types into mobile number');
+is(isroFormStepPhone.mark_id, 4, 'targets mobile field mark');
+is(isroFormStepPhone.use_vault_field, 'phone', 'uses vault field phone');
+
 // Scenario 3: Image Redaction Demo (Leadership gallery face detection)
 const isroFaceTask = 'open isro leadership page and redact faces';
 const isroFaceParsed = TaskPlanner.parseTask(isroFaceTask);

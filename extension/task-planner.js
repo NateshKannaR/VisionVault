@@ -1679,6 +1679,11 @@
         return { action: "type", mark_id: emailInput.id, use_vault_field: "email", reasoning: "Fill Email from local Vault (PII protected)" };
       }
 
+      const phoneInput = available.find(m => FILLABLE_ROLES.has(m.role) && (/phone|mobile|contact/i.test(m.label || "") || m.role === "input:tel" || m.vaultKey === "phone"));
+      if (phoneInput) {
+        return { action: "type", mark_id: phoneInput.id, use_vault_field: "phone", reasoning: "Fill Phone from local Vault (PII protected)" };
+      }
+
       const msgInput = available.find(m => FILLABLE_ROLES.has(m.role) && (/message|feedback|query/i.test(m.label || "") || m.role === "textarea" || m.vaultKey === "about"));
       if (msgInput) {
         return { action: "type", mark_id: msgInput.id, use_vault_field: "about", reasoning: "Fill Feedback Message from local Vault" };

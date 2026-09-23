@@ -34,6 +34,9 @@
     <g id="i-server"><rect x="3.5" y="4.5" width="17" height="6.4" rx="2"/><rect x="3.5" y="13.1" width="17" height="6.4" rx="2"/><path d="M7.2 7.7v.02M7.2 16.3v.02"/></g>
     <g id="i-sliders"><path d="M4 7h16M4 12h16M4 17h16"/><circle cx="9" cy="7" r="2.1"/><circle cx="15.5" cy="12" r="2.1"/><circle cx="8" cy="17" r="2.1"/></g>
     <g id="i-refresh"><path d="M20.2 12a8.2 8.2 0 1 1-2.4-5.8"/><path d="M20.4 4v4.8h-4.8"/></g>
+    <g id="i-trash"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6"/></g>
+    <g id="i-plus"><path d="M12 5v14M5 12h14"/></g>
+    <g id="i-x"><path d="M18 6L6 18M6 6l12 12"/></g>
     <g id="i-type"><path d="M4.5 7.5v-2h15v2M12 5.5v13M9 18.5h6"/></g>
     <g id="i-cursor"><path d="M5.5 3.5l4.8 15.5 2.5-6.3 6.2-2.4z"/></g>
     <g id="i-globe"><circle cx="12" cy="12" r="7.6"/><path d="M4.4 12h15.2M12 4.4c2.4 2.6 2.4 12.6 0 15.2-2.4-2.6-2.4-12.6 0-15.2z"/></g>
@@ -623,10 +626,69 @@
 
       <div class="field"><label class="field-label" for="v-about">Role / Notes</label><textarea id="v-about" rows="2" placeholder="Mission Controller notes"></textarea></div>
 
-      <button class="btn btn-primary btn-block" id="saveVault">
+      <div class="settings-group-title" style="margin-top:16px;display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:0.04em;">🔑 Custom &amp; Additional Vault Fields</span>
+        <span id="customFieldsCount" style="font-size:10px;color:var(--text-muted);font-weight:600;background:var(--surface-2);padding:1px 6px;border-radius:4px;border:1px solid var(--border);">0 fields</span>
+      </div>
+      <div id="vaultCustomFieldsList" class="vault-custom-list" style="margin-top:6px;">
+        <!-- Dynamically populated rows with key name, value input, and delete button -->
+      </div>
+
+      <!-- Add New Vault Field Card -->
+      <div class="card" style="margin-top:10px;padding:10px;background:var(--surface);border:1px dashed var(--border-light);border-radius:var(--r);">
+        <div style="font-size:11.5px;font-weight:600;color:var(--text-bright);margin-bottom:6px;display:flex;align-items:center;gap:6px;">
+          <svg class="ic" viewBox="0 0 24 24"><use href="#i-plus"/></svg>
+          <span>Add New Vault Field</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px;">
+          <div>
+            <label class="field-label" for="newVaultKey">Field Identifier / Key</label>
+            <input class="input" id="newVaultKey" type="text" placeholder="e.g. pan, aadhaar, dob" list="vaultKeySuggestions" />
+            <datalist id="vaultKeySuggestions">
+              <option value="pan">PAN Card Number</option>
+              <option value="aadhaar">Aadhaar Number</option>
+              <option value="dob">Date of Birth</option>
+              <option value="passport">Passport Number</option>
+              <option value="father_name">Father's Name</option>
+              <option value="mother_name">Mother's Name</option>
+              <option value="emp_id">Employee ID</option>
+              <option value="occupation">Occupation</option>
+              <option value="annual_income">Annual Income</option>
+              <option value="marital_status">Marital Status</option>
+              <option value="gender">Gender</option>
+              <option value="qualification">Qualification / Degree</option>
+              <option value="account_number">Bank Account Number</option>
+              <option value="ifsc">IFSC Code</option>
+              <option value="upi">UPI ID</option>
+              <option value="clearance_level">Security Clearance</option>
+            </datalist>
+          </div>
+          <div>
+            <label class="field-label" for="newVaultValue">Secret Value</label>
+            <input class="input" id="newVaultValue" type="text" placeholder="Enter sensitive value" />
+          </div>
+        </div>
+        <button class="btn btn-secondary btn-sm btn-block" id="addVaultFieldBtn" type="button">
+          <svg class="ic" viewBox="0 0 24 24"><use href="#i-plus"/></svg>
+          <span>Store New Field to Encrypted Vault</span>
+        </button>
+      </div>
+
+      <button class="btn btn-primary btn-block" id="saveVault" style="margin-top:12px;">
         <svg class="ic" viewBox="0 0 24 24"><use href="#i-check"/></svg>
         <span>Save vault</span>
       </button>
+
+      <div style="display: flex; gap: 8px; margin-top: 6px;">
+        <button class="btn btn-ghost btn-sm" id="resetVaultBtn" type="button" style="flex: 1; font-size: 11px;">
+          <svg class="ic" viewBox="0 0 24 24"><use href="#i-refresh"/></svg>
+          <span>Reset to Defaults</span>
+        </button>
+        <button class="btn btn-ghost btn-sm" id="clearVaultBtn" type="button" style="flex: 1; font-size: 11px; color: #f87171;">
+          <svg class="ic" viewBox="0 0 24 24"><use href="#i-trash"/></svg>
+          <span>Clear All Fields</span>
+        </button>
+      </div>
 
       <div style="display: flex; gap: 8px; margin-top: 8px;">
         <button class="btn btn-secondary btn-sm" id="exportVaultBackupBtn" type="button" style="flex: 1;">

@@ -163,9 +163,40 @@ async function runTests() {
   assert.strictEqual(status.encrypted, true);
   assert.strictEqual(status.cipher, "AES-GCM-256");
   assert.strictEqual(status.iterations, 100000);
-  console.log("✔ getVaultEncryptionStatus(): returned valid cryptographic metadata");
+  // 12. Dynamic Vault Upgrades: setVaultField()
+  await vm.setVaultField("pan", "ABCDE1234F");
+  await vm.setVaultField("security_clearance", "LEVEL-5-COSMIC");
+  const stored1 = await vm.getVault();
+  assert.strictEqual(stored1.pan, "ABCDE1234F", "Newly added field 'pan' must be in vault");
+  assert.strictEqual(stored1.security_clearance, "LEVEL-5-COSMIC", "Newly added field 'security_clearance' must be in vault");
+  assert.strictEqual(await vm.resolveVaultField("pan"), "ABCDE1234F", "Custom field 'pan' must resolve");
+  assert.strictEqual(await vm.resolveVaultField("security_clearance"), "LEVEL-5-COSMIC", "Custom field 'security_clearance' must resolve");
+  console.log("✔ setVaultField(): dynamically stored new custom credentials into encrypted vault");
 
-  console.log("\nAll Vault Lock & AES Encryption tests passed successfully (11/11)!");
+  // 13. Dynamic Vault Deletion: deleteVaultField()
+  const deletedPan = await vm.deleteVaultField("pan");
+  assert.strictEqual(deletedPan, true, "deleteVaultField should return true for existing field");
+  const stored2 = await vm.getVault();
+  assert.strictEqual(stored2.pan, undefined, "Deleted field 'pan' must no longer exist in vault");
+  assert.strictEqual(stored2.security_clearance, "LEVEL-5-COSMIC", "Non-deleted fields must remain intact");
+  assert.strictEqual(await vm.resolveVaultField("pan"), "", "Deleted field should resolve to empty string");
+  console.log("✔ deleteVaultField(): successfully deleted specific credential from encrypted vault");
+
+  // 14. Vault Reset: resetVaultToDefault()
+  await vm.resetVaultToDefault();
+  const defaultVault = await vm.getVault();
+  assert.strictEqual(defaultVault.satellite_name, "INSAT-4B", "Reset vault must contain default satellite_name");
+  assert.strictEqual(defaultVault.operator, "R. Sharma", "Reset vault must contain default operator");
+  assert.strictEqual(defaultVault.security_clearance, undefined, "Custom fields must be cleared on reset");
+  console.log("✔ resetVaultToDefault(): restored vault to default space mission profile");
+
+  // 15. Vault Clear: clearVault()
+  await vm.clearVault();
+  const emptyVault = await vm.getVault();
+  assert.deepStrictEqual(emptyVault, {}, "Cleared vault must be an empty object");
+  console.log("✔ clearVault(): cleared all credentials from encrypted vault");
+
+  console.log("\nAll Vault Lock, AES Encryption & Dynamic Field tests passed successfully (15/15)!");
 }
 
 runTests().catch((err) => {

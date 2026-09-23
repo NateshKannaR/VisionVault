@@ -459,6 +459,58 @@
   }
 
   /**
+   * Stores or updates a specific key-value pair in the vault, encrypting it immediately.
+   */
+  async function setVaultField(key, value, optionalPin) {
+    if (!key) return false;
+    const cleanKey = String(key).trim().toLowerCase().replace(/[\s-]+/g, "_");
+    const vault = await getVault(optionalPin);
+    vault[cleanKey] = String(value !== undefined && value !== null ? value : "").trim();
+    await saveVault(vault, optionalPin);
+    return true;
+  }
+
+  /**
+   * Deletes a specific key from the vault and re-encrypts the updated vault.
+   */
+  async function deleteVaultField(key, optionalPin) {
+    if (!key) return false;
+    const vault = await getVault(optionalPin);
+    const cleanKey = String(key).trim();
+    const normalizedKey = cleanKey.toLowerCase().replace(/[\s-]+/g, "_");
+    let found = false;
+    if (Object.prototype.hasOwnProperty.call(vault, cleanKey)) {
+      delete vault[cleanKey];
+      found = true;
+    }
+    if (Object.prototype.hasOwnProperty.call(vault, normalizedKey)) {
+      delete vault[normalizedKey];
+      found = true;
+    }
+    if (found) {
+      await saveVault(vault, optionalPin);
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Resets the vault to the default mission profile.
+   */
+  async function resetVaultToDefault(optionalPin) {
+    await saveVault({ ...DEFAULT_MISSION_VAULT }, optionalPin);
+    return true;
+  }
+
+  /**
+   * Wipes all entries from the vault.
+   */
+  async function clearVault(optionalPin) {
+    await saveVault({}, optionalPin);
+    return true;
+  }
+
+  /**
    * Resolves a vault field type to the user's stored real value.
    */
   async function resolveVaultField(fieldType) {
@@ -609,6 +661,10 @@
     getVault,
     saveVault,
     resolveVaultField,
+    setVaultField,
+    deleteVaultField,
+    resetVaultToDefault,
+    clearVault,
     generateSalt,
     hashPin,
     hasVaultPin,
@@ -629,6 +685,10 @@
   global.getVault = getVault;
   global.saveVault = saveVault;
   global.resolveVaultField = resolveVaultField;
+  global.setVaultField = setVaultField;
+  global.deleteVaultField = deleteVaultField;
+  global.resetVaultToDefault = resetVaultToDefault;
+  global.clearVault = clearVault;
   global.hasVaultPin = hasVaultPin;
   global.verifyVaultPin = verifyVaultPin;
   global.unlockVaultWithPin = unlockVaultWithPin;

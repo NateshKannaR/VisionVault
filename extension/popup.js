@@ -174,6 +174,66 @@ async function loadVault() {
     v = vault || {};
   }
   VAULT_KEYS.forEach((k) => { const el = $("v-" + k); if (el) el.value = v[k] || ""; });
+
+  // Render dynamic custom vault fields
+  const customList = $("vaultCustomFieldsList");
+  if (customList) {
+    customList.innerHTML = "";
+    const standardKeysSet = new Set(VAULT_KEYS);
+    const customKeys = Object.keys(v).filter(
+      (k) => !standardKeysSet.has(k) && !k.startsWith("_") && k !== "updatedAt"
+    );
+    const countEl = $("customFieldsCount");
+    if (countEl) countEl.textContent = `${customKeys.length} field${customKeys.length === 1 ? "" : "s"}`;
+
+    if (customKeys.length === 0) {
+      customList.innerHTML = `<div style="font-size:11px;color:var(--text-faint);padding:6px 2px;font-style:italic;">No custom fields stored yet. Add new fields below.</div>`;
+    } else {
+      customKeys.forEach((key) => {
+        const val = v[key] || "";
+        const row = document.createElement("div");
+        row.className = "vault-entry-row";
+        row.dataset.key = key;
+
+        const badge = document.createElement("span");
+        badge.className = "vault-entry-badge";
+        badge.title = key;
+        badge.textContent = key;
+
+        const input = document.createElement("input");
+        input.className = "input vault-custom-input";
+        input.type = "text";
+        input.dataset.key = key;
+        input.value = val;
+        input.placeholder = "Enter value";
+
+        const delBtn = document.createElement("button");
+        delBtn.className = "btn btn-ghost btn-icon vault-del-field-btn";
+        delBtn.type = "button";
+        delBtn.title = `Delete ${key} from vault`;
+        delBtn.innerHTML = `<svg class="ic" viewBox="0 0 24 24"><use href="#i-trash"/></svg>`;
+        delBtn.addEventListener("click", async () => {
+          if (confirm(`Delete "${key}" from your encrypted vault?`)) {
+            if (typeof deleteVaultField === "function") {
+              await deleteVaultField(key);
+            } else {
+              delete v[key];
+              if (typeof saveVault === "function") await saveVault(v);
+              else await chrome.storage.local.set({ vault: v });
+            }
+            await loadVault();
+            showStatus("vaultStatus", "info", `Deleted "${key}" from vault.`);
+            setTimeout(() => hideStatus("vaultStatus"), 2500);
+          }
+        });
+
+        row.appendChild(badge);
+        row.appendChild(input);
+        row.appendChild(delBtn);
+        customList.appendChild(row);
+      });
+    }
+  }
 }
 
 function lockVaultNow() {
@@ -182,6 +242,8 @@ function lockVaultNow() {
     lockVault();
   }
   VAULT_KEYS.forEach((k) => { const el = $("v-" + k); if (el) el.value = ""; });
+  const customList = $("vaultCustomFieldsList");
+  if (customList) customList.innerHTML = "";
   hideStatus("vaultStatus");
   updateVaultUI();
 }
@@ -336,6 +398,12 @@ updateVaultUI();
 $("saveVault").addEventListener("click", async () => {
   const vault = {};
   VAULT_KEYS.forEach((k) => { const el = $("v-" + k); if (el) vault[k] = el.value.trim(); });
+  // Include custom dynamically added fields
+  document.querySelectorAll(".vault-custom-input").forEach((input) => {
+    const k = input.dataset.key;
+    if (k) vault[k] = input.value.trim();
+  });
+
   try {
     if (typeof saveVault === "function") {
       await saveVault(vault);
@@ -349,6 +417,98 @@ $("saveVault").addEventListener("click", async () => {
     showStatus("vaultStatus", "error", err.message || "Failed to save vault");
   }
 });
+
+// Add new custom field to vault
+if ($("addVaultFieldBtn")) {
+  $("addVaultFieldBtn").addEventListener("click", async () => {
+    const keyInput = $("newVaultKey");
+    const valInput = $("newVaultValue");
+    if (!keyInput || !valInput) return;
+    const rawKey = keyInput.value.trim();
+    const val = valInput.value.trim();
+
+    if (!rawKey) {
+      showStatus("vaultStatus", "error", "Please specify a field identifier/key");
+      keyInput.focus();
+      return;
+    }
+
+    const cleanKey = rawKey.toLowerCase().replace(/[\s-]+/g, "_");
+
+    if (VAULT_KEYS.includes(cleanKey)) {
+      const el = $("v-" + cleanKey);
+      if (el) {
+        el.value = val;
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        el.focus();
+      }
+    }
+
+    try {
+      if (typeof setVaultField === "function") {
+        await setVaultField(cleanKey, val);
+      } else {
+        let v = typeof getVault === "function" ? await getVault() : {};
+        v[cleanKey] = val;
+        if (typeof saveVault === "function") await saveVault(v);
+        else await chrome.storage.local.set({ vault: v });
+      }
+      keyInput.value = "";
+      valInput.value = "";
+      await loadVault();
+      showStatus("vaultStatus", "success", `Stored "${cleanKey}" securely in AES-GCM-256 encrypted vault.`);
+      setTimeout(() => hideStatus("vaultStatus"), 3000);
+    } catch (err) {
+      showStatus("vaultStatus", "error", "Failed to store field: " + err.message);
+    }
+  });
+
+  $("newVaultValue")?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") $("addVaultFieldBtn").click();
+  });
+}
+
+// Reset vault to default ISRO profile
+if ($("resetVaultBtn")) {
+  $("resetVaultBtn").addEventListener("click", async () => {
+    if (confirm("Reset vault to default ISRO mission profile? This will restore standard mission attributes.")) {
+      try {
+        if (typeof resetVaultToDefault === "function") {
+          await resetVaultToDefault();
+        } else if (typeof DEFAULT_MISSION_VAULT !== "undefined") {
+          if (typeof saveVault === "function") await saveVault({ ...DEFAULT_MISSION_VAULT });
+          else await chrome.storage.local.set({ vault: { ...DEFAULT_MISSION_VAULT } });
+        }
+        await loadVault();
+        showStatus("vaultStatus", "info", "Vault reset to default mission profile.");
+        setTimeout(() => hideStatus("vaultStatus"), 3000);
+      } catch (err) {
+        showStatus("vaultStatus", "error", "Reset failed: " + err.message);
+      }
+    }
+  });
+}
+
+// Clear all vault credentials
+if ($("clearVaultBtn")) {
+  $("clearVaultBtn").addEventListener("click", async () => {
+    if (confirm("Are you sure you want to clear all vault fields? All stored personal and mission data will be deleted.")) {
+      try {
+        if (typeof clearVault === "function") {
+          await clearVault();
+        } else {
+          if (typeof saveVault === "function") await saveVault({});
+          else await chrome.storage.local.set({ vault: {} });
+        }
+        await loadVault();
+        showStatus("vaultStatus", "info", "All vault credentials deleted.");
+        setTimeout(() => hideStatus("vaultStatus"), 3000);
+      } catch (err) {
+        showStatus("vaultStatus", "error", "Clear failed: " + err.message);
+      }
+    }
+  });
+}
 
 $("togglePassword").addEventListener("click", (e) => {
   const field = $("v-password");

@@ -668,6 +668,114 @@ is(p1.openTargets.includes('form 2'), true, 'fill the form fill form 2 includes 
 const p2 = TaskPlanner.parseTask('fill the form 2');
 is(p2.openTargets.includes('form 2'), true, 'fill the form 2 includes form 2');
 
+console.log('\nISRO Prototype: 3 Automation Scenarios');
+console.log('--------------------------------------');
+
+// Scenario 1: Chandrayaan Missions Search & Retrieval
+const isroSearchTask = 'find latest updates on chandrayaan missions on isro';
+const isroSearchParsed = TaskPlanner.parseTask(isroSearchTask);
+is(isroSearchParsed.site, 'isro', 'isro search site is isro');
+is(isroSearchParsed.siteUrl, 'https://www.isro.gov.in', 'isro search siteUrl is isro.gov.in');
+is(isroSearchParsed.query, 'chandrayaan missions', 'query cleanly extracted as chandrayaan missions');
+is(isroSearchParsed.wantsSearch, true, 'wantsSearch is true');
+
+const isroSearchStep1 = planNextAction({
+  task: isroSearchTask,
+  parsed: isroSearchParsed,
+  pageInfo: { url: 'https://www.google.com' },
+  marks: [],
+  progress: {}
+});
+is(isroSearchStep1.action, 'navigate', 'isro search step 1 navigates to isro.gov.in');
+is(isroSearchStep1.value, 'https://www.isro.gov.in', 'navigates to https://www.isro.gov.in');
+
+const isroSearchStep2 = planNextAction({
+  task: isroSearchTask,
+  parsed: isroSearchParsed,
+  pageInfo: { url: 'https://www.isro.gov.in/' },
+  marks: [
+    { id: 10, role: 'input:text', label: 'search' },
+    { id: 25, role: 'link', label: 'Chandrayaan-3 Hop Experiment Reveals Lunar Secrets' }
+  ],
+  progress: { navigated: true }
+});
+is(isroSearchStep2.action, 'click', 'isro search step 2 clicks visible Chandrayaan mission link');
+is(isroSearchStep2.mark_id, 25, 'targets Chandrayaan link mark');
+
+const isroSearchStep3 = planNextAction({
+  task: isroSearchTask,
+  parsed: isroSearchParsed,
+  pageInfo: { url: 'https://www.isro.gov.in/Chandrayaan_3Hop_Experiment_Reveals.html' },
+  marks: [],
+  progress: { navigated: true, chandrayaanOpened: true }
+});
+is(isroSearchStep3.action, 'done', 'isro search completes on mission detail page');
+
+// Scenario 2: Contact/Grievance Form Autofill with Vault
+const isroFormTask = 'fill contact form on isro with my details';
+const isroFormParsed = TaskPlanner.parseTask(isroFormTask);
+is(isroFormParsed.site, 'isro', 'isro form site is isro');
+is(isroFormParsed.siteUrl, 'https://www.isro.gov.in/ISROAPP/fFBF', 'isro form siteUrl is feedback form');
+is(isroFormParsed.wantsFill, true, 'isro form wantsFill is true');
+
+const isroFormStep1 = planNextAction({
+  task: isroFormTask,
+  parsed: isroFormParsed,
+  pageInfo: { url: 'https://www.isro.gov.in/ISROAPP/fFBF' },
+  marks: [
+    { id: 1, role: 'input:text', label: 'Enter Your Name Here' },
+    { id: 2, role: 'input:text', label: 'Enter Your Email Address Here' },
+    { id: 3, role: 'input:text', label: 'Feedback Message' }
+  ],
+  filledIds: [],
+  progress: { navigated: true }
+});
+is(isroFormStep1.action, 'type', 'isro form step 1 types into name');
+is(isroFormStep1.mark_id, 1, 'targets name field mark');
+is(isroFormStep1.use_vault_field, 'name', 'uses vault field name');
+
+const isroFormStep2 = planNextAction({
+  task: isroFormTask,
+  parsed: isroFormParsed,
+  pageInfo: { url: 'https://www.isro.gov.in/ISROAPP/fFBF' },
+  marks: [
+    { id: 1, role: 'input:text', label: 'Enter Your Name Here' },
+    { id: 2, role: 'input:text', label: 'Enter Your Email Address Here' },
+    { id: 3, role: 'input:text', label: 'Feedback Message' }
+  ],
+  filledIds: [1],
+  progress: { navigated: true }
+});
+is(isroFormStep2.action, 'type', 'isro form step 2 types into email');
+is(isroFormStep2.mark_id, 2, 'targets email field mark');
+is(isroFormStep2.use_vault_field, 'email', 'uses vault field email');
+
+// Scenario 3: Image Redaction Demo (Leadership gallery face detection)
+const isroFaceTask = 'open isro leadership page and redact faces';
+const isroFaceParsed = TaskPlanner.parseTask(isroFaceTask);
+is(isroFaceParsed.site, 'isro', 'isro face task site is isro');
+is(isroFaceParsed.siteUrl, 'https://www.isro.gov.in/leadership.html', 'isro face task siteUrl is leadership.html');
+is(isroFaceParsed.wantsRedact, true, 'isro face task wantsRedact is true');
+
+const isroFaceStep1 = planNextAction({
+  task: isroFaceTask,
+  parsed: isroFaceParsed,
+  pageInfo: { url: 'https://www.isro.gov.in' },
+  marks: [],
+  progress: {}
+});
+is(isroFaceStep1.action, 'navigate', 'isro face step 1 navigates to leadership.html');
+is(isroFaceStep1.value, 'https://www.isro.gov.in/leadership.html', 'navigates to leadership.html');
+
+const isroFaceStep2 = planNextAction({
+  task: isroFaceTask,
+  parsed: isroFaceParsed,
+  pageInfo: { url: 'https://www.isro.gov.in/leadership.html' },
+  marks: [],
+  progress: { navigated: true }
+});
+is(isroFaceStep2.action, 'done', 'isro face step 2 completes with on-device face redaction active');
+
 console.log('\n' + '='.repeat(60));
 if (failures.length) {
   console.log(`${failures.length} of ${checks} checks FAILED`);

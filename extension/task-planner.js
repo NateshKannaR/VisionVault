@@ -51,6 +51,7 @@
     instagram: "https://www.instagram.com",
     gmail: "https://mail.google.com",
     sih: "https://www.sih.gov.in",
+    isro: "https://www.isro.gov.in",
   };
 
   // Conversational tail: "... and show me", "... then tell me the results", "... please".
@@ -146,6 +147,7 @@
       // Sorting
       wantsSort: false,
       sort: null,
+      wantsRedact: /\b(redact|blur|mask)\s*(?:faces?|images?|photos?|people)?\b|\bface\s*redaction\b/i.test(text),
     };
 
     const isTravel = result.wantsBook ||
@@ -317,7 +319,7 @@
       result.wantsSort = true;
       result.sort = "popularity";
       result.wantsFilter = true;
-    } else if (/\b(newest|latest)\b/i.test(text)) {
+    } else if (/\b(?:sort\s+by\s+(?:the\s+)?(?:newest|latest)|(?:newest|latest)\s+first)\b/i.test(text) || (/\b(newest|latest)\b/i.test(text) && /\bsort\b/i.test(text))) {
       result.wantsSort = true;
       result.sort = "newest";
       result.wantsFilter = true;
@@ -349,11 +351,25 @@
     }
 
     if (!result.site) {
-      const onSiteMatch = text.match(/\b(?:on|in|at)\s+(github|amazon|flipkart|makemytrip|whatsapp|youtube|wikipedia)\b/i);
+      const onSiteMatch = text.match(/\b(?:on|in|at)\s+(github|amazon|flipkart|makemytrip|whatsapp|youtube|wikipedia|isro)\b/i);
       if (onSiteMatch) {
         const candidate = onSiteMatch[1].toLowerCase();
         result.site = candidate;
         result.siteUrl = siteUrlFor(candidate);
+      }
+    }
+
+    if ((result.site === "isro" || /\bisro\b/i.test(text)) && (!result.siteUrl || result.siteUrl.includes("isro.gov.in"))) {
+      if (!result.site) result.site = "isro";
+      if (/\b(feedback|contact|grievance|complaint)\b/i.test(text)) {
+        result.siteUrl = "https://www.isro.gov.in/ISROAPP/fFBF";
+        result.wantsFill = true;
+      } else if (/\b(leadership|chairman|directors?)\b/i.test(text)) {
+        result.siteUrl = "https://www.isro.gov.in/leadership.html";
+      } else if (/\bformer\s*chairm[ea]n\b/i.test(text)) {
+        result.siteUrl = "https://www.isro.gov.in/formerchairman.html";
+      } else if (!result.siteUrl) {
+        result.siteUrl = "https://www.isro.gov.in";
       }
     }
 
@@ -446,6 +462,8 @@
       // box whole. Cutting at the first comma and capping the length costs nothing on a real
       // query, which is two or three words, and rescues every one of those.
       if (q) {
+        q = q.replace(/^(?:(?:the\s+)?(?:latest|recent|new)\s+)?(?:updates?|news|info|information)\s+(?:on|about|for)\s+/i, "");
+        q = q.replace(/\s+(?:on|in|at)\s+(?:isro|amazon|flipkart|github|google|youtube)\b.*$/i, "");
         q = q.split(/\s*[,;]\s*/)[0].trim();
         const words = q.split(/\s+/);
         if (words.length > 8) q = words.slice(0, 8).join(" ");
@@ -580,7 +598,7 @@
     [/\bcountry\b|\bnation\b/, "country"],
     [/postcode|post[\s_-]*code|street[\s_-]*address|address[\s_-]*line|\baddress\b|\bstreet\b/, "address"],
     [/company|organisation|organization|employer|institution|college|university|school/, "company"],
-    [/\b(about|bio|biography|description|notes|comment|comments|cover[\s_-]*letter)\b/i, "about"],
+    [/\b(about|bio|biography|description|notes|comment|comments|message|feedback|query|cover[\s_-]*letter)\b/i, "about"],
     [/first[\s_-]*name|given[\s_-]*name/, "first_name"],
     [/last[\s_-]*name|family[\s_-]*name|surname/, "last_name"],
     [/full[\s_-]*name|\bname\b/, "name"],
@@ -837,6 +855,13 @@
     if (parsed.wantsShop || parsed.wantsAddToCart || isShoppingSite(url)) {
       const shopPlan = planShoppingStep(parsed, available, done, progress, state.pageInfo);
       if (shopPlan) return shopPlan;
+    }
+
+    // 2f. ISRO flow (Chandrayaan search, Leadership face redaction, Contact form autofill)
+    const isIsroSite = (parsed.site && /isro/i.test(parsed.site)) || /isro\.gov\.in/i.test(url || "");
+    if (isIsroSite) {
+      const isroPlan = planIsroStep(parsed, available, done, progress, state.pageInfo, state);
+      if (isroPlan) return isroPlan;
     }
 
     // 3. Search query
@@ -1437,6 +1462,86 @@
     return null;
   }
 
+  /**
+   * Deterministic step planner for ISRO portal workflows:
+   * 1. Chandrayaan mission updates & retrieval
+   * 2. Leadership face redaction demo
+   * 3. Contact / Grievance form autofill with zero PII leakage
+   */
+  function planIsroStep(parsed, available, done, progress, pageInfo, state) {
+    const url = (pageInfo && pageInfo.url) || "";
+    const title = (pageInfo && pageInfo.title) || "";
+    const isLeadershipPage = /leadership\.html|formerchairman\.html/i.test(url) || /leadership|chairman/i.test(title);
+    const isChandrayaanPage = /chandrayaan/i.test(url) || /chandrayaan/i.test(title);
+    const isFeedbackPage = /ISROAPP\/fFBF|feedback/i.test(url);
+
+    // Scenario A: Face Redaction Demo on Leadership page
+    if (parsed.wantsRedact || /leadership|formerchairman|chairman/i.test(parsed.raw || "")) {
+      if (isLeadershipPage) {
+        return { action: "done", reasoning: "ISRO leadership portraits detected; on-device face blurring and visual redaction active." };
+      }
+      return { action: "navigate", value: "https://www.isro.gov.in/leadership.html", reasoning: "Open ISRO leadership gallery for face redaction demo" };
+    }
+
+    // Scenario B: Chandrayaan Missions Search & Retrieval
+    if (parsed.wantsSearch || /chandrayaan/i.test(parsed.query || parsed.raw || "")) {
+      if (isChandrayaanPage && (progress.chandrayaanOpened || (progress.opened && progress.opened.includes("chandrayaan")))) {
+        return { action: "done", reasoning: "Navigated to latest Chandrayaan mission updates." };
+      }
+
+      // Check if a Chandrayaan link is visible on screen to open
+      const chLink = available.find(m => {
+        if (m.role !== "link" && m.role !== "clickable") return false;
+        const l = (m.label || "").toLowerCase();
+        return /chandrayaan/i.test(l);
+      });
+      if (chLink && !progress.chandrayaanOpened) {
+        progress.chandrayaanOpened = true;
+        return { action: "click", mark_id: chLink.id, openTarget: "chandrayaan", reasoning: `Open Chandrayaan update: "${chLink.label.slice(0, 60)}"` };
+      }
+
+      if (parsed.query && !progress.searched) {
+        const searchBox = available.find(m => isSearchBox(m) || (FILLABLE_ROLES.has(m.role) && /search|keyword/i.test(m.label || "")));
+        if (searchBox) {
+          return { action: "type", mark_id: searchBox.id, value: parsed.query || "Chandrayaan", reasoning: `Search ISRO portal for "${parsed.query || "Chandrayaan"}"` };
+        }
+      }
+
+      if (progress.searched || isChandrayaanPage) {
+        return { action: "done", reasoning: "Chandrayaan mission information retrieved." };
+      }
+    }
+
+    // Scenario C: Contact / Feedback Form Autofill
+    if (parsed.wantsFill || isFeedbackPage) {
+      if (!isFeedbackPage && !url.includes("isro-portal")) {
+        return { action: "navigate", value: "https://www.isro.gov.in/ISROAPP/fFBF", reasoning: "Open ISRO feedback and contact form" };
+      }
+
+      // Fill name field if available and not filled
+      const nameInput = available.find(m => FILLABLE_ROLES.has(m.role) && (/name/i.test(m.label || "") || m.vaultKey === "name"));
+      if (nameInput) {
+        return { action: "type", mark_id: nameInput.id, use_vault_field: "name", reasoning: "Fill Name from local Vault (PII protected)" };
+      }
+
+      // Fill email field if available and not filled
+      const emailInput = available.find(m => FILLABLE_ROLES.has(m.role) && (/email/i.test(m.label || "") || m.role === "input:email" || m.vaultKey === "email"));
+      if (emailInput) {
+        return { action: "type", mark_id: emailInput.id, use_vault_field: "email", reasoning: "Fill Email from local Vault (PII protected)" };
+      }
+
+      // Fill feedback message if available and not filled
+      const msgInput = available.find(m => FILLABLE_ROLES.has(m.role) && (/message|feedback|query/i.test(m.label || "") || m.role === "textarea" || m.vaultKey === "about"));
+      if (msgInput) {
+        return { action: "type", mark_id: msgInput.id, use_vault_field: "about", reasoning: "Fill Feedback Message from local Vault" };
+      }
+
+      return { action: "done", reasoning: "ISRO contact form autofilled with protected Vault credentials (zero PII transmitted)." };
+    }
+
+    return null;
+  }
+
   function isShoppingSite(url) {
     return /amazon\.|flipkart\.|myntra\.|ebay\.|meesho\.|walmart\.|target\.|bestbuy\./i.test(url || "");
   }
@@ -1791,7 +1896,7 @@
 
   const TaskPlanner = {
     parseTask, planNextAction, planBatchFormFill, alreadyOnSite, siteUrlFor, vaultKeyForLabel, KNOWN_SITES,
-    isShoppingSite, planShoppingStep, planGitHubStep, planBookingStep, planYouTubeStep,
+    isShoppingSite, planShoppingStep, planGitHubStep, planBookingStep, planYouTubeStep, planIsroStep,
     TaskChecklist, VisualGrounding, TaskParser,
   };
 

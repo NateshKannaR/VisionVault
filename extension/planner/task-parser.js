@@ -33,6 +33,7 @@
     instagram: "https://www.instagram.com",
     gmail: "https://mail.google.com",
     sih: "https://www.sih.gov.in",
+    isro: "https://www.isro.gov.in",
   };
 
   const TAIL_RE = /\s*(?:,|\band\b|\bthen\b)?\s*(?:please\s+)?(?:can\s+you\s+)?(?:show|display|tell|give|list|find|see)\s+(?:me|us|it)?\s*(?:the\s+)?(?:results?|details?|options?|list|prices?|it|best(?:\s+among\s+them)?)?\s*[.!]?\s*$/i;
@@ -115,6 +116,7 @@
       // Sorting
       wantsSort: false,
       sort: null,
+      wantsRedact: /\b(redact|blur|mask)\s*(?:faces?|images?|photos?|people)?\b|\bface\s*redaction\b/i.test(text),
     };
 
     const isTravel = result.wantsBook ||
@@ -268,7 +270,7 @@
       result.wantsSort = true;
       result.sort = "popularity";
       result.wantsFilter = true;
-    } else if (/\b(newest|latest)\b/i.test(text)) {
+    } else if (/\b(?:sort\s+by\s+(?:the\s+)?(?:newest|latest)|(?:newest|latest)\s+first)\b/i.test(text) || (/\b(newest|latest)\b/i.test(text) && /\bsort\b/i.test(text))) {
       result.wantsSort = true;
       result.sort = "newest";
       result.wantsFilter = true;
@@ -299,11 +301,25 @@
     }
 
     if (!result.site) {
-      const onSiteMatch = text.match(/\b(?:on|in|at)\s+(github|amazon|flipkart|makemytrip|whatsapp|youtube|wikipedia)\b/i);
+      const onSiteMatch = text.match(/\b(?:on|in|at)\s+(github|amazon|flipkart|makemytrip|whatsapp|youtube|wikipedia|isro)\b/i);
       if (onSiteMatch) {
         const candidate = onSiteMatch[1].toLowerCase();
         result.site = candidate;
         result.siteUrl = siteUrlFor(candidate);
+      }
+    }
+
+    if ((result.site === "isro" || /\bisro\b/i.test(text)) && (!result.siteUrl || result.siteUrl.includes("isro.gov.in"))) {
+      if (!result.site) result.site = "isro";
+      if (/\b(feedback|contact|grievance|complaint)\b/i.test(text)) {
+        result.siteUrl = "https://www.isro.gov.in/ISROAPP/fFBF";
+        result.wantsFill = true;
+      } else if (/\b(leadership|chairman|directors?)\b/i.test(text)) {
+        result.siteUrl = "https://www.isro.gov.in/leadership.html";
+      } else if (/\bformer\s*chairm[ea]n\b/i.test(text)) {
+        result.siteUrl = "https://www.isro.gov.in/formerchairman.html";
+      } else if (!result.siteUrl) {
+        result.siteUrl = "https://www.isro.gov.in";
       }
     }
 
@@ -381,6 +397,8 @@
         if (stripped.length >= 2) q = stripped;
       }
       if (q) {
+        q = q.replace(/^(?:(?:the\s+)?(?:latest|recent|new)\s+)?(?:updates?|news|info|information)\s+(?:on|about|for)\s+/i, "");
+        q = q.replace(/\s+(?:on|in|at)\s+(?:isro|amazon|flipkart|github|google|youtube)\b.*$/i, "");
         q = q.split(/\s*[,;]\s*/)[0].trim();
         const words = q.split(/\s+/);
         if (words.length > 8) q = words.slice(0, 8).join(" ");
@@ -503,7 +521,7 @@
     [/\bcountry\b|\bnation\b/, "country"],
     [/postcode|post[\s_-]*code|street[\s_-]*address|address[\s_-]*line|\baddress\b|\bstreet\b/, "address"],
     [/company|organisation|organization|employer|institution|college|university|school/, "company"],
-    [/\b(about|bio|biography|description|notes|comment|comments|cover[\s_-]*letter)\b/i, "about"],
+    [/\b(about|bio|biography|description|notes|comment|comments|message|feedback|query|cover[\s_-]*letter)\b/i, "about"],
     [/first[\s_-]*name|given[\s_-]*name/, "first_name"],
     [/last[\s_-]*name|family[\s_-]*name|surname/, "last_name"],
     [/full[\s_-]*name|\bname\b/, "name"],

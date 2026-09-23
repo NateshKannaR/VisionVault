@@ -742,10 +742,11 @@ function isAvatarElement(el, r) {
     el.src
   ].filter(Boolean).join(" ").toLowerCase();
 
-  if (/avatar|profile|user[-_ ]?(?:pic|photo|image)|selfie|headshot|portrait|whatsapp\.net/i.test(test)) {
+  // Strictly target avatars, profile pictures, and biometric photos
+  if (/\b(?:avatar|profile[-_ ]?(?:pic|photo|image|thumb)?|selfie|headshot|portrait)\b|whatsapp\.net/i.test(test)) {
     return true;
   }
-  if (r && r.w >= 20 && r.w <= 140 && isCircular(el, r)) {
+  if (r && r.w >= 20 && r.w <= 96 && isCircular(el, r)) {
     return true;
   }
   return false;
@@ -986,9 +987,12 @@ function scanForPII() {
                 addBoxRegion(rBox, node.parentElement, "text", "pii_text_match", rBox.label || "regex_pii");
               }
             } else {
-              const r = rectOf(node.parentElement);
-              if (r && r.h <= 90 && !isSafeAppChrome(node.parentElement.innerText || "")) {
-                addRegion(node.parentElement, "text", "pii_text_match", "regex_pii");
+              const pText = (node.parentElement?.innerText || "").trim();
+              if (pText.length <= 40 && !isSafeAppChrome(pText)) {
+                const r = rectOf(node.parentElement);
+                if (r && r.h <= 50) {
+                  addRegion(node.parentElement, "text", "pii_text_match", "regex_pii");
+                }
               }
             }
           }
@@ -1007,35 +1011,6 @@ function scanForPII() {
       } catch (_) {}
     }
     walkTextNodes(document.body);
-  }
-
-  // 3b. Messaging & Social Media Platforms (WhatsApp Web, Telegram, Slack, etc.)
-  // Contact names, user phone numbers, and chat message previews are high-sensitivity PII.
-  const isMessagingPlatform = /web\.whatsapp\.com|telegram\.org|slack\.com|messenger\.com/i.test(window.location.hostname);
-  if (isMessagingPlatform) {
-    // A. Contact names in conversation & chat list
-    querySelectorAllDeep(
-      "[data-testid='cell-frame-title'] span, " +
-      "[data-testid='chat-cell'] span[title], " +
-      "[data-testid='conversation-header'] span[title], " +
-      "[data-testid='conversation-header'] [dir='auto'], " +
-      "div[role='listitem'] [dir='auto']"
-    ).forEach(el => {
-      const txt = (el.innerText || el.textContent || "").trim();
-      if (!txt || txt.length < 2 || isSafeAppChrome(txt)) return;
-      if (/^(yesterday|today|\d{1,2}:\d{2}\s*(?:am|pm)?)$/i.test(txt)) return;
-      addRegion(el, "text", "messaging_contact_pii", txt.slice(0, 40));
-    });
-
-    // B. Chat message preview snippets
-    querySelectorAllDeep(
-      "[data-testid='last-msg-status'] span, " +
-      "[data-testid='cell-frame-container'] span[title*=': ']"
-    ).forEach(el => {
-      const txt = (el.innerText || el.textContent || "").trim();
-      if (!txt || txt.length < 3 || isSafeAppChrome(txt)) return;
-      addRegion(el, "text", "messaging_chat_snippet", "chat_message");
-    });
   }
 
   // 4. Media that could hold a face or an identity document.

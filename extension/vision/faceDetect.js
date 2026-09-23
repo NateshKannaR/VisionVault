@@ -10,7 +10,7 @@
 (function (global) {
   const MODEL_INPUT_WIDTH = 320;
   const MODEL_INPUT_HEIGHT = 240;
-  const CONFIDENCE_THRESHOLD = 0.52; // High-recall threshold for avatars & small profile thumbnails
+  const CONFIDENCE_THRESHOLD = 0.45; // Enhanced high-recall threshold for avatars & small profile thumbnails
   const IOU_THRESHOLD = 0.3;
   const CENTER_VARIANCE = 0.1;
   const SIZE_VARIANCE = 0.2;

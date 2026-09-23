@@ -503,7 +503,22 @@ function matchesPiiKeyword(text) {
   return PII_LABEL_PATTERNS.some(re => re.test(t));
 }
 
+const SAFE_APP_CHROME_WORDS = new Set([
+  "whatsapp", "search", "search or start a new chat", "all", "unread", "favourites", "groups",
+  "communities", "status", "channels", "chats", "calls", "settings", "profile", "ask meta ai",
+  "send document", "add contact", "new chat", "menu", "attach", "type a message", "online",
+  "voice and video calling is now available", "go to calls"
+]);
+
+function isSafeAppChrome(text) {
+  if (!text) return false;
+  const clean = String(text).trim().toLowerCase();
+  if (SAFE_APP_CHROME_WORDS.has(clean)) return true;
+  return false;
+}
+
 function testPII(text) {
+  if (!text || isSafeAppChrome(text)) return false;
   const tests = [EMAIL_RE, PHONE_RE, CARD_RE, SSN_RE, VID_RE, AADHAAR_RE, PAN_RE, DL_RE,
                  VEHICLE_RE, ACCOUNT_RE, PASSPORT_RE, IFSC_RE, UPI_RE, EMPLOYEE_ID_RE, GSTIN_RE];
   const probe = normalizeDigits(text);
@@ -544,8 +559,12 @@ function isSearchLike(el) {
   const type = (el.getAttribute && el.getAttribute("type") || "").toLowerCase();
   const role = (el.getAttribute && el.getAttribute("role") || "").toLowerCase();
   if (type === "search" || role === "searchbox") return true;
+  const dataTab = el.getAttribute && el.getAttribute("data-tab");
+  if (dataTab === "3" && (el.contentEditable === "true" || el.getAttribute("contenteditable") === "true")) return true;
+  const testId = (el.getAttribute && el.getAttribute("data-testid") || "").toLowerCase();
+  if (testId.includes("search") || testId.includes("chat-list-search")) return true;
   const ident = normalizeForKeywordMatch(
-    [el.getAttribute("name"), el.getAttribute("id"), el.getAttribute("aria-label")].filter(Boolean).join(" ")
+    [el.getAttribute("name"), el.getAttribute("id"), el.getAttribute("aria-label"), el.getAttribute("placeholder")].filter(Boolean).join(" ")
   );
   return /\b(search|query|filter|keywords?|lookup|find)\b/.test(ident);
 }
@@ -691,24 +710,45 @@ function frameOffsetInTopViewport() {
   return { x: Math.round(offX), y: Math.round(offY), isTop: false };
 }
 
-/**
- * Is this element rendered as a circle or near-circle?
- *
- * A profile picture is round on nearly every site that has one; a product thumbnail is not.
- * Used to decide which small images stay masked when the face model has already had its say.
- */
 function isCircular(el, rect) {
   try {
-    const radius = getComputedStyle(el).borderRadius || "";
-    const first = radius.split(/\s|\//)[0] || "";
-    const shorter = Math.min(rect.w || 0, rect.h || 0);
-    if (!shorter) return false;
-    if (first.endsWith("%")) return parseFloat(first) >= 40;
-    if (first.endsWith("px")) return parseFloat(first) >= shorter * 0.4;
+    const candidates = [el, el.parentElement, el.parentElement ? el.parentElement.parentElement : null].filter(Boolean);
+    for (const node of candidates) {
+      const style = getComputedStyle(node);
+      const radius = style.borderRadius || "";
+      const first = radius.split(/\s|\//)[0] || "";
+      const shorter = Math.min(rect.w || 0, rect.h || 0);
+      if (first.endsWith("%") && parseFloat(first) >= 40) return true;
+      if (first.endsWith("px") && shorter > 0 && parseFloat(first) >= shorter * 0.4) return true;
+      if (style.clipPath && (style.clipPath.includes("circle") || style.clipPath.includes("ellipse"))) return true;
+    }
     return false;
   } catch (_) {
     return false;
   }
+}
+
+function isAvatarElement(el, r) {
+  if (!el) return false;
+  const test = [
+    el.getAttribute("alt"),
+    el.getAttribute("aria-label"),
+    el.getAttribute("title"),
+    typeof el.className === "string" ? el.className : "",
+    el.getAttribute("data-testid"),
+    el.parentElement?.getAttribute("data-testid"),
+    typeof el.parentElement?.className === "string" ? el.parentElement.className : "",
+    el.parentElement?.getAttribute("aria-label"),
+    el.src
+  ].filter(Boolean).join(" ").toLowerCase();
+
+  if (/avatar|profile|user[-_ ]?(?:pic|photo|image)|selfie|headshot|portrait|whatsapp\.net/i.test(test)) {
+    return true;
+  }
+  if (r && r.w >= 20 && r.w <= 140 && isCircular(el, r)) {
+    return true;
+  }
+  return false;
 }
 
 function findPiiRangesInTextNode(node, text) {
@@ -938,6 +978,7 @@ function scanForPII() {
           if (nodeCount > MAX_DOM_NODES) return;
           const text = node.nodeValue || "";
           if (text.trim().length < 4) continue;
+          if (isSafeAppChrome(text)) continue;
           if (testPII(text)) {
             const rangeBoxes = findPiiRangesInTextNode(node, text);
             if (rangeBoxes.length > 0) {
@@ -946,7 +987,7 @@ function scanForPII() {
               }
             } else {
               const r = rectOf(node.parentElement);
-              if (r && r.h <= 90) {
+              if (r && r.h <= 90 && !isSafeAppChrome(node.parentElement.innerText || "")) {
                 addRegion(node.parentElement, "text", "pii_text_match", "regex_pii");
               }
             }
@@ -968,6 +1009,35 @@ function scanForPII() {
     walkTextNodes(document.body);
   }
 
+  // 3b. Messaging & Social Media Platforms (WhatsApp Web, Telegram, Slack, etc.)
+  // Contact names, user phone numbers, and chat message previews are high-sensitivity PII.
+  const isMessagingPlatform = /web\.whatsapp\.com|telegram\.org|slack\.com|messenger\.com/i.test(window.location.hostname);
+  if (isMessagingPlatform) {
+    // A. Contact names in conversation & chat list
+    querySelectorAllDeep(
+      "[data-testid='cell-frame-title'] span, " +
+      "[data-testid='chat-cell'] span[title], " +
+      "[data-testid='conversation-header'] span[title], " +
+      "[data-testid='conversation-header'] [dir='auto'], " +
+      "div[role='listitem'] [dir='auto']"
+    ).forEach(el => {
+      const txt = (el.innerText || el.textContent || "").trim();
+      if (!txt || txt.length < 2 || isSafeAppChrome(txt)) return;
+      if (/^(yesterday|today|\d{1,2}:\d{2}\s*(?:am|pm)?)$/i.test(txt)) return;
+      addRegion(el, "text", "messaging_contact_pii", txt.slice(0, 40));
+    });
+
+    // B. Chat message preview snippets
+    querySelectorAllDeep(
+      "[data-testid='last-msg-status'] span, " +
+      "[data-testid='cell-frame-container'] span[title*=': ']"
+    ).forEach(el => {
+      const txt = (el.innerText || el.textContent || "").trim();
+      if (!txt || txt.length < 3 || isSafeAppChrome(txt)) return;
+      addRegion(el, "text", "messaging_chat_snippet", "chat_message");
+    });
+  }
+
   // 4. Media that could hold a face or an identity document.
   //
   //    This is the fail-closed default for when no face model is available. When one HAS run,
@@ -977,18 +1047,16 @@ function scanForPII() {
   //
   //    The markup hints travel with the region so that filter can keep anything the page
   //    itself describes as a person, whatever the model concluded.
-  document.querySelectorAll("img, video, canvas").forEach(el => {
+  document.querySelectorAll("img, video, canvas, [role='img']").forEach(el => {
     if (el.offsetParent === null) return;
     const r = rectOf(el);
-    if (r.w >= 48 && r.h >= 48) {
-      addRegion(el, "media", "possible_face_or_media", "media", {
+    if (r.w >= 22 && r.h >= 22) {
+      const isAvatar = isAvatarElement(el, r);
+      addRegion(el, "media", isAvatar ? "profile_avatar" : "possible_face_or_media", isAvatar ? "profile_avatar" : "media", {
         alt: (el.getAttribute("alt") || "").slice(0, 80),
         className: (typeof el.className === "string" ? el.className : "").slice(0, 80),
         src: (el.getAttribute("src") || "").slice(0, 120),
-        // Circular is the strongest available signal for "this is a person". Product
-        // thumbnails, logos and category tiles are square or rectangular; profile pictures are
-        // round almost everywhere. Computed here because only the page can see the style.
-        circular: isCircular(el, r),
+        circular: isAvatar || isCircular(el, r),
       });
     }
   });

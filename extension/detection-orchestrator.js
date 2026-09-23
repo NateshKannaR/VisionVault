@@ -339,6 +339,7 @@
     if (!faceModelRan) return regions;
     return (regions || []).filter((r) => {
       if (r.reason !== "possible_face_or_media") return true;
+      if (r.reason === "profile_avatar" || r.label === "profile_avatar" || r.reason === "avatar_face_pii") return true;
       const hint = `${r.label || ""} ${r.alt || ""} ${r.className || ""} ${r.src || ""}`;
       if (PERSON_MEDIA_RE.test(hint)) return true;
       return isAvatarShaped(r);
@@ -358,11 +359,11 @@
   function isAvatarShaped(region) {
     const w = region.w || 0;
     const h = region.h || 0;
-    if (w < 24 || h < 24) return false;
+    if (w < 18 || h < 18) return false;
     const shorter = Math.min(w, h);
     if (shorter > 140) return false;
     const ratio = w / h;
-    if (ratio < 0.7 || ratio > 1.4) return false;
+    if (ratio < 0.65 || ratio > 1.5) return false;
     // Small and square is not enough on its own: a shopping home page is full of small square
     // product thumbnails, and masking them all put Amazon back to 65 masked regions. Round is
     // what distinguishes a profile picture from a product tile.

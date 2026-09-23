@@ -92,6 +92,30 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);}
 .audit-stat{background:rgba(0,180,216,.06);border:1px solid var(--border);border-radius:8px;padding:12px;text-align:center;}
 .audit-stat-num{font-size:20px;font-weight:700;color:var(--accent);}
 .audit-stat-lbl{font-size:10px;color:var(--muted);margin-top:4px;text-transform:uppercase;letter-spacing:.5px;}
+
+/* ── SIH Demo Banner & Inspector ── */
+.demo-banner{display:flex;align-items:center;justify-content:space-between;gap:12px;background:linear-gradient(90deg,#0a1b33,#061324);border-bottom:1px solid rgba(0,180,216,.3);padding:9px 24px;position:relative;z-index:90;}
+.demo-banner-content{display:flex;align-items:center;gap:12px;}
+.demo-badge{padding:3px 9px;border-radius:12px;background:rgba(0,180,216,.2);border:1px solid var(--accent);color:var(--accent);font-size:10px;font-weight:700;letter-spacing:.8px;}
+.demo-text{font-size:12px;color:var(--text);}
+.demo-text strong{color:var(--accent2);}
+.demo-pill-btn{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;background:rgba(6,214,160,.12);border:1px solid rgba(6,214,160,.4);border-radius:18px;color:var(--green);font-size:11.5px;font-weight:700;cursor:pointer;transition:all .15s;}
+.demo-pill-btn:hover{background:rgba(6,214,160,.22);transform:scale(1.02);}
+
+/* ── Inspector Modal ── */
+.modal-backdrop{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.75);backdrop-filter:blur(4px);z-index:9999;align-items:center;justify-content:center;padding:20px;}
+.modal-backdrop.open{display:flex;}
+.modal-window{background:var(--card);border:1px solid var(--accent);border-radius:12px;max-width:760px;width:100%;box-shadow:0 20px 40px rgba(0,0,0,.8);overflow:hidden;}
+.modal-head{display:flex;justify-content:space-between;align-items:center;padding:14px 20px;border-bottom:1px solid var(--border);background:var(--sidebar);}
+.modal-title{font-size:14px;font-weight:700;color:var(--accent);display:flex;align-items:center;gap:8px;}
+.modal-close{background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;padding:0 4px;line-height:1;}
+.modal-body{padding:20px;}
+.split-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.split-box{background:rgba(0,0,0,.35);border:1px solid var(--border);border-radius:8px;padding:14px;}
+.split-title{font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:6px;}
+.split-title.danger{color:var(--red);}
+.split-title.safe{color:var(--green);}
+.code-block{font-family:'Courier New',monospace;font-size:11px;line-height:1.6;background:#050b14;border:1px solid var(--border);border-radius:6px;padding:10px;color:var(--accent2);overflow-x:auto;}
 </style>
 </head>
 <body>
@@ -104,6 +128,66 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);}
     <div class="topbar-sub">Master Control Facility — Hassan, Karnataka &nbsp;|&nbsp; SIH PS 26171</div>
   </div>
   <div class="status-pill"><div class="sdot"></div><span>NOMINAL</span></div>
+</div>
+
+<!-- SIH Hackathon Showcase Banner -->
+<div class="demo-banner">
+  <div class="demo-banner-content">
+    <div class="demo-badge">SIH PS 26171 SHOWCASE</div>
+    <div class="demo-text">
+      <strong>Zero-Data-Leakage Architecture:</strong> Visual perception &amp; PII redaction run 100% on-device before reasoning.
+    </div>
+  </div>
+  <div class="demo-actions">
+    <button class="demo-pill-btn" onclick="openNetworkInspector()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+      Inspect Network Privacy (0 Bytes PII Sent)
+    </button>
+  </div>
+</div>
+
+<!-- Modal: Network Privacy Inspector -->
+<div class="modal-backdrop" id="networkModal">
+  <div class="modal-window">
+    <div class="modal-head">
+      <div class="modal-title">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+        VisionVault On-Device Network Isolation Proof
+      </div>
+      <button class="modal-close" onclick="closeNetworkInspector()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="split-grid">
+        <div class="split-box">
+          <div class="split-title danger">⚠️ What Is On User Screen (Raw Data)</div>
+          <div class="code-block" style="color:#f87171;">
+{
+  "satellite": "INSAT-4B",
+  "kms_encryption_key": "ISRO-KMS-EK-2026-04871",
+  "operator_name": "R. Sharma",
+  "operator_email": "r.sharma@isro.gov.in",
+  "operator_phone": "+91 80 2217 2296",
+  "mcf_pin": "573201"
+}
+          </div>
+          <p style="font-size:11px; color:var(--muted); margin-top:8px;">Standard AI agents send these raw unencrypted strings to cloud servers.</p>
+        </div>
+        <div class="split-box">
+          <div class="split-title safe">🔒 What Remote Server Receives (VisionVault)</div>
+          <div class="code-block" style="color:#34d399;">
+{
+  "image": "data:image/png;base64,[PII_MASKED]",
+  "action": "type",
+  "mark_id": 12,
+  "use_vault_field": "encryption_key_ref",
+  "leaked_bytes": 0
+}
+          </div>
+          <p style="font-size:11px; color:var(--green); margin-top:8px;">✓ 100% on-device resolution. Actual secret key inserted locally from encrypted Vault.</p>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <div class="layout">
@@ -524,6 +608,20 @@ function runComplianceAudit() {
     <div>[0.104s] AUDIT PASSED: 0 bytes of sensitive data or credentials transmitted off-device!</div>
   `;
 }
+
+function openNetworkInspector() {
+  const m = document.getElementById('networkModal');
+  if (m) m.classList.add('open');
+}
+
+function closeNetworkInspector() {
+  const m = document.getElementById('networkModal');
+  if (m) m.classList.remove('open');
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeNetworkInspector();
+});
 </script>
 </body>
 </html>

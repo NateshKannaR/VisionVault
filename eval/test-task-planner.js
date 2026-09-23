@@ -937,6 +937,39 @@ const auditStep2 = planNextAction({
 });
 is(auditStep2.action, 'done', 'audit step 2 completes compliance check');
 
+// 6. SIH Flagship Demo: Security Clearance Zero-PII Fill
+const demoTask = 'open security clearance and autofill with vault credentials';
+const demoParsed = TaskPlanner.parseTask(demoTask);
+is(demoParsed.wantsFill, true, 'flagship demo wantsFill is true');
+is(demoParsed.openTargets.includes('security clearance'), true, 'openTargets includes security clearance');
+
+const demoStep1 = planNextAction({
+  task: demoTask,
+  parsed: demoParsed,
+  pageInfo: { url: 'http://127.0.0.1:8080/mock-apps/isro-portal.html' },
+  marks: [
+    { id: 1, role: 'clickable', label: 'Dashboard' },
+    { id: 2, role: 'clickable', label: 'Security Clearance' }
+  ],
+  progress: {}
+});
+is(demoStep1.action, 'click', 'flagship demo step 1 clicks Security Clearance nav tab');
+is(demoStep1.mark_id, 2, 'targets Security Clearance mark');
+
+const demoStep2 = planNextAction({
+  task: demoTask,
+  parsed: demoParsed,
+  pageInfo: { url: 'http://127.0.0.1:8080/mock-apps/isro-portal.html' },
+  marks: [
+    { id: 10, role: 'input:text', label: 'Satellite Name', vaultKey: 'satellite_name' },
+    { id: 11, role: 'input:text', label: 'Encryption Key Reference', vaultKey: 'encryption_key_ref' }
+  ],
+  progress: { opened: ['security clearance'] }
+});
+is(demoStep2.action, 'type', 'flagship demo step 2 types satellite name');
+is(demoStep2.mark_id, 10, 'targets satellite name input');
+is(demoStep2.use_vault_field, 'satellite_name', 'uses vault field satellite_name');
+
 console.log('\n' + '='.repeat(60));
 if (failures.length) {
   console.log(`${failures.length} of ${checks} checks FAILED`);

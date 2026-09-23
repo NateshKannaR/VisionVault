@@ -776,6 +776,167 @@ const isroFaceStep2 = planNextAction({
 });
 is(isroFaceStep2.action, 'done', 'isro face step 2 completes with on-device face redaction active');
 
+// SIH Advanced ISRO Automations
+// 1. Gaganyaan Mission Tracker
+const gaganyaanTask = 'find latest test milestones for gaganyaan crew module on isro';
+const gaganyaanParsed = TaskPlanner.parseTask(gaganyaanTask);
+is(gaganyaanParsed.site, 'isro', 'gaganyaan task site is isro');
+is(gaganyaanParsed.mission, 'gaganyaan', 'gaganyaan mission identified');
+is(gaganyaanParsed.siteUrl, 'https://www.isro.gov.in', 'gaganyaan siteUrl is isro.gov.in');
+
+const gaganyaanStep1 = planNextAction({
+  task: gaganyaanTask,
+  parsed: gaganyaanParsed,
+  pageInfo: { url: 'https://www.isro.gov.in/' },
+  marks: [
+    { id: 10, role: 'link', label: 'Gaganyaan Crew Module IMAT Parachute Drop Test' }
+  ],
+  progress: {}
+});
+is(gaganyaanStep1.action, 'click', 'gaganyaan step 1 clicks Gaganyaan milestone link');
+is(gaganyaanStep1.mark_id, 10, 'targets Gaganyaan milestone mark');
+
+const gaganyaanStep2 = planNextAction({
+  task: gaganyaanTask,
+  parsed: gaganyaanParsed,
+  pageInfo: { url: 'https://www.isro.gov.in/gaganyaan.html' },
+  marks: [],
+  progress: { missionOpened: true }
+});
+is(gaganyaanStep2.action, 'done', 'gaganyaan completes on mission page');
+
+// 2. Aditya-L1 Solar Mission Tracker
+const adityaTask = 'check aditya l1 solar mission updates on isro';
+const adityaParsed = TaskPlanner.parseTask(adityaTask);
+is(adityaParsed.site, 'isro', 'aditya task site is isro');
+is(adityaParsed.mission, 'aditya-l1', 'aditya mission identified');
+
+const adityaStep1 = planNextAction({
+  task: adityaTask,
+  parsed: adityaParsed,
+  pageInfo: { url: 'https://www.isro.gov.in/' },
+  marks: [
+    { id: 15, role: 'link', label: 'Aditya-L1 Solar Flare & Coronal Observation status' }
+  ],
+  progress: {}
+});
+is(adityaStep1.action, 'click', 'aditya step 1 clicks Aditya-L1 link');
+is(adityaStep1.mark_id, 15, 'targets Aditya-L1 mark');
+
+// 3. Space Hardware Tender & Procurement Monitor
+const tendersTask = 'check latest active tenders for electronics on isro';
+const tendersParsed = TaskPlanner.parseTask(tendersTask);
+is(tendersParsed.site, 'isro', 'tenders task site is isro');
+is(tendersParsed.wantsTenders, true, 'wantsTenders is true');
+is(tendersParsed.siteUrl, 'https://www.isro.gov.in/Tenders.html', 'tenders siteUrl is Tenders.html');
+
+const tendersStep1 = planNextAction({
+  task: tendersTask,
+  parsed: tendersParsed,
+  pageInfo: { url: 'https://www.isro.gov.in' },
+  marks: [],
+  progress: {}
+});
+is(tendersStep1.action, 'navigate', 'tenders step 1 navigates to Tenders.html');
+is(tendersStep1.value, 'https://www.isro.gov.in/Tenders.html', 'navigates to Tenders.html');
+
+const tendersStep2 = planNextAction({
+  task: tendersTask,
+  parsed: tendersParsed,
+  pageInfo: { url: 'https://www.isro.gov.in/Tenders.html' },
+  marks: [
+    { id: 31, role: 'link', label: 'RFP for Spacecraft Cryogenic Stage Actuator Electronics' }
+  ],
+  progress: { navigated: true }
+});
+is(tendersStep2.action, 'click', 'tenders step 2 clicks RFP mark');
+is(tendersStep2.mark_id, 31, 'targets RFP mark');
+
+const tendersStep3 = planNextAction({
+  task: tendersTask,
+  parsed: tendersParsed,
+  pageInfo: { url: 'https://www.isro.gov.in/Tenders.html' },
+  marks: [],
+  progress: { navigated: true, tenderOpened: true }
+});
+is(tendersStep3.action, 'done', 'tenders completes with active RFPs extracted');
+
+// 4. ICRB Scientist / Engineer Recruitment Assistant
+const careersTask = 'check latest scientist recruitment notifications on isro careers';
+const careersParsed = TaskPlanner.parseTask(careersTask);
+is(careersParsed.site, 'isro', 'careers task site is isro');
+is(careersParsed.wantsCareers, true, 'wantsCareers is true');
+is(careersParsed.siteUrl, 'https://www.isro.gov.in/Careers.html', 'careers siteUrl is Careers.html');
+
+const careersStep1 = planNextAction({
+  task: careersTask,
+  parsed: careersParsed,
+  pageInfo: { url: 'https://www.isro.gov.in' },
+  marks: [],
+  progress: {}
+});
+is(careersStep1.action, 'navigate', 'careers step 1 navigates to Careers.html');
+is(careersStep1.value, 'https://www.isro.gov.in/Careers.html', 'navigates to Careers.html');
+
+const careersStep2 = planNextAction({
+  task: careersTask,
+  parsed: careersParsed,
+  pageInfo: { url: 'https://www.isro.gov.in/Careers.html' },
+  marks: [
+    { id: 42, role: 'link', label: 'Advt No. ICRB:02:2024 Recruitment for Scientist/Engineer SC' }
+  ],
+  progress: { navigated: true }
+});
+is(careersStep2.action, 'click', 'careers step 2 clicks ICRB announcement link');
+is(careersStep2.mark_id, 42, 'targets ICRB mark');
+
+// 4b. ICRB Application Form Autofill with local Vault
+const careersFillTask = 'fill isro scientist recruitment application with my details';
+const careersFillParsed = TaskPlanner.parseTask(careersFillTask);
+is(careersFillParsed.wantsCareers, true, 'careers fill wantsCareers is true');
+is(careersFillParsed.wantsFill, true, 'careers fill wantsFill is true');
+
+const careersFillStep1 = planNextAction({
+  task: careersFillTask,
+  parsed: careersFillParsed,
+  pageInfo: { url: 'https://www.isro.gov.in/Careers.html' },
+  marks: [
+    { id: 50, role: 'input:text', label: 'Candidate Full Name', vaultKey: 'name' },
+    { id: 51, role: 'input:email', label: 'Email ID', vaultKey: 'email' },
+    { id: 52, role: 'input:tel', label: 'Mobile Number', vaultKey: 'phone' }
+  ],
+  progress: { navigated: true }
+});
+is(careersFillStep1.action, 'type', 'careers fill types candidate name');
+is(careersFillStep1.mark_id, 50, 'targets candidate name mark');
+is(careersFillStep1.use_vault_field, 'name', 'uses vault field name');
+
+// 5. On-Device Privacy & Data Leakage Security Auditor
+const auditTask = 'audit isro press page for exposed contact numbers and unredacted faces';
+const auditParsed = TaskPlanner.parseTask(auditTask);
+is(auditParsed.site, 'isro', 'audit task site is isro');
+is(auditParsed.wantsAudit, true, 'audit task wantsAudit is true');
+is(auditParsed.siteUrl, 'https://www.isro.gov.in/Press.html', 'audit task siteUrl is Press.html');
+
+const auditStep1 = planNextAction({
+  task: auditTask,
+  parsed: auditParsed,
+  pageInfo: { url: 'https://www.isro.gov.in' },
+  marks: [],
+  progress: {}
+});
+is(auditStep1.action, 'navigate', 'audit step 1 navigates to Press.html');
+is(auditStep1.value, 'https://www.isro.gov.in/Press.html', 'navigates to Press.html');
+
+const auditStep2 = planNextAction({
+  task: auditTask,
+  parsed: auditParsed,
+  pageInfo: { url: 'https://www.isro.gov.in/Press.html' },
+  marks: [],
+  progress: { navigated: true }
+});
+is(auditStep2.action, 'done', 'audit step 2 completes compliance check');
+
 console.log('\n' + '='.repeat(60));
 if (failures.length) {
   console.log(`${failures.length} of ${checks} checks FAILED`);

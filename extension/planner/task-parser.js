@@ -117,6 +117,10 @@
       wantsSort: false,
       sort: null,
       wantsRedact: /\b(redact|blur|mask)\s*(?:faces?|images?|photos?|people)?\b|\bface\s*redaction\b/i.test(text),
+      wantsTenders: /\b(tenders?|procurement|rfps?|bids?|bidding|e-?procurement)\b/i.test(text),
+      wantsCareers: /\b(careers?|recruitment|icrb|vacanc(?:y|ies)|jobs?|scientist|engineer\s*recruitment)\b/i.test(text),
+      wantsAudit: /\b(audit|compliance|data\s*leak|leakage|privacy\s*check|security\s*check)\b/i.test(text),
+      mission: null,
     };
 
     const isTravel = result.wantsBook ||
@@ -311,9 +315,23 @@
 
     if ((result.site === "isro" || /\bisro\b/i.test(text)) && (!result.siteUrl || result.siteUrl.includes("isro.gov.in"))) {
       if (!result.site) result.site = "isro";
-      if (/\b(feedback|contact|grievance|complaint)\b/i.test(text)) {
+      if (result.wantsAudit) {
+        if (/\bpress\b/i.test(text)) {
+          result.siteUrl = "https://www.isro.gov.in/Press.html";
+        } else if (/\bleadership\b/i.test(text)) {
+          result.siteUrl = "https://www.isro.gov.in/leadership.html";
+        } else if (!result.siteUrl) {
+          result.siteUrl = "https://www.isro.gov.in";
+        }
+      } else if (/\b(feedback|grievance|complaint)\b/i.test(text) || (/\bcontact\b/i.test(text) && /\b(form|fill|us|page)\b/i.test(text))) {
         result.siteUrl = "https://www.isro.gov.in/ISROAPP/fFBF";
         result.wantsFill = true;
+      } else if (/\b(tenders?|procurement|rfps?|bids?|bidding|e-?procurement)\b/i.test(text)) {
+        result.siteUrl = "https://www.isro.gov.in/Tenders.html";
+        result.wantsTenders = true;
+      } else if (/\b(careers?|recruitment|icrb|vacanc(?:y|ies)|jobs?|scientist|engineer)\b/i.test(text)) {
+        result.siteUrl = "https://www.isro.gov.in/Careers.html";
+        result.wantsCareers = true;
       } else if (/\b(leadership|chairman|directors?)\b/i.test(text)) {
         result.siteUrl = "https://www.isro.gov.in/leadership.html";
       } else if (/\bformer\s*chairm[ea]n\b/i.test(text)) {
@@ -321,6 +339,17 @@
       } else if (!result.siteUrl) {
         result.siteUrl = "https://www.isro.gov.in";
       }
+    }
+
+    if (/\bgaganyaan\b/i.test(text)) {
+      result.mission = "gaganyaan";
+      if (!result.query && !result.wantsTenders && !result.wantsCareers && !result.wantsAudit) result.query = "gaganyaan";
+    } else if (/\baditya(?:[\s_-]*l1)?\b/i.test(text)) {
+      result.mission = "aditya-l1";
+      if (!result.query && !result.wantsTenders && !result.wantsCareers && !result.wantsAudit) result.query = "aditya l1";
+    } else if (/\bchandrayaan(?:[\s_-]*[123])?\b/i.test(text)) {
+      result.mission = "chandrayaan";
+      if (!result.query && !result.wantsTenders && !result.wantsCareers && !result.wantsAudit) result.query = "chandrayaan";
     }
 
     const wantsNewRepo = /\b(?:create|make|add|new|init|initialize)\s+(?:a\s+)?(?:new\s+)?repo(?:sitory)?\b/i.test(text) ||
@@ -397,7 +426,7 @@
         if (stripped.length >= 2) q = stripped;
       }
       if (q) {
-        q = q.replace(/^(?:(?:the\s+)?(?:latest|recent|new)\s+)?(?:updates?|news|info|information)\s+(?:on|about|for)\s+/i, "");
+        q = q.replace(/^(?:(?:the\s+)?(?:latest|recent|new)\s+)?(?:updates?|news|info|information|test\s*milestones?|milestones?|announcements?)\s+(?:on|about|for)\s+/i, "");
         q = q.replace(/\s+(?:on|in|at)\s+(?:isro|amazon|flipkart|github|google|youtube)\b.*$/i, "");
         q = q.split(/\s*[,;]\s*/)[0].trim();
         const words = q.split(/\s+/);

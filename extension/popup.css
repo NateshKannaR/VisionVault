@@ -508,22 +508,6 @@ textarea#task::placeholder {
   border-color: var(--border-light);
 }
 
-.quick-chip.flagship-demo-chip {
-  background: linear-gradient(135deg, rgba(0, 180, 216, 0.22), rgba(72, 202, 228, 0.12));
-  border: 1px solid rgba(0, 180, 216, 0.6);
-  color: #e0f2fe;
-  font-weight: 600;
-  box-shadow: 0 0 10px rgba(0, 180, 216, 0.2);
-}
-
-.quick-chip.flagship-demo-chip:hover {
-  background: linear-gradient(135deg, rgba(0, 180, 216, 0.35), rgba(72, 202, 228, 0.22));
-  border-color: #00b4d8;
-  color: #fff;
-  box-shadow: 0 0 14px rgba(0, 180, 216, 0.35);
-  transform: translateY(-1px);
-}
-
 .kbd-hint {
   font-size: 10.5px;
   color: var(--text-faint);

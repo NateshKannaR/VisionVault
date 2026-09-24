@@ -898,18 +898,58 @@ textarea { resize: vertical; min-height: 65px; font-size: 14px; line-height: 1.5
   font-family: 'JetBrains Mono', monospace;
 }
 
-/* Redaction Demonstration Lens Switcher */
-.redaction-lens-box {
-  background: rgba(13, 24, 45, 0.95);
-  border: 1.5px solid var(--accent);
-  border-radius: 14px;
-  padding: 16px 20px;
+/* Playbook Hero & Redaction Lens */
+.playbook-hero {
+  background: linear-gradient(135deg, rgba(8, 22, 46, 0.95), rgba(4, 12, 28, 0.95));
+  border: 1px solid rgba(0, 229, 255, 0.28);
+  border-radius: 16px;
+  padding: 22px 26px;
   margin-bottom: 22px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  box-shadow: 0 0 24px rgba(0, 229, 255, 0.15);
+  flex-wrap: wrap;
+  gap: 18px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4), 0 0 24px rgba(0, 229, 255, 0.08);
+}
+.playbook-hero-left {
+  flex: 1;
+  min-width: 300px;
+}
+.playbook-hero-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.hero-pill-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(0, 229, 255, 0.12);
+  border: 1px solid rgba(0, 229, 255, 0.35);
+  color: var(--accent);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 3px 10px;
+  border-radius: 20px;
+  letter-spacing: 0.8px;
+  margin-bottom: 8px;
+}
+.playbook-hero-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 24px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: -0.5px;
+  margin-bottom: 6px;
+}
+.playbook-hero-sub {
+  font-size: 13.5px;
+  color: var(--muted);
+  line-height: 1.5;
+  max-width: 680px;
 }
 .lens-btn-group { display: flex; gap: 8px; }
 .lens-btn {
@@ -929,6 +969,23 @@ textarea { resize: vertical; min-height: 65px; font-size: 14px; line-height: 1.5
   color: #03121c;
   border-color: var(--accent);
   box-shadow: 0 0 12px rgba(0, 229, 255, 0.35);
+}
+.prompt-tag {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--accent);
+  background: rgba(0, 229, 255, 0.12);
+  border: 1px solid rgba(0, 229, 255, 0.3);
+  padding: 2px 7px;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+.prompt-box.featured {
+  border-color: rgba(0, 229, 255, 0.45);
+  background: rgba(0, 229, 255, 0.06);
+  box-shadow: 0 0 14px rgba(0, 229, 255, 0.1);
 }
 
 body.mode-redacted input:not([readonly]),
@@ -1263,63 +1320,48 @@ body.mode-redacted .datablock {
     <div class="page active" id="page-overview">
       <div class="inner">
         
-        <!-- Live Redaction Presentation Lens Switcher -->
-        <div class="redaction-lens-box">
-          <div>
-            <div style="font-family:'Space Grotesk',sans-serif; font-weight:800; font-size:15px; color:#fff; display:flex; align-items:center; gap:8px;">
-              <i class="fa-solid fa-eye-slash" style="color:var(--accent)"></i> VisionVault Presentation Lens
-            </div>
-            <div style="font-size:12.5px; color:var(--muted); margin-top:2px;">
-              Toggle views to clearly demonstrate to evaluators how edge masking prevents PII from reaching cloud vision models.
-            </div>
-          </div>
-          <div class="lens-btn-group">
-            <button class="lens-btn active" id="lens-normal" onclick="setRedactionLens('normal')"><i class="fa-solid fa-desktop"></i> Human View</button>
-            <button class="lens-btn" id="lens-redacted" onclick="setRedactionLens('redacted')"><i class="fa-solid fa-shield-halved"></i> What Cloud LLM Sees (Redacted)</button>
-          </div>
+        <!-- Synchronous Scientist Metadata (Preserved for Extension Context & Logic) -->
+        <div id="active-scientist-meta" style="display:none;" aria-hidden="true">
+          <img id="ov-badge-img" src="images/emp-natesh.jpeg" class="badge-avatar-img" alt="Badge" />
+          <span id="ov-name" class="badge-pii-val">Natesh Kanna R</span>
+          <span id="ov-empid" class="badge-pii-val">ISRO-10101</span>
+          <span id="ov-dept">Flight Software & Spacecraft Control</span>
+          <span id="ov-org">Master Control Facility (MCF)</span>
+          <span id="ov-email" class="badge-pii-val">natesh.kanna@isro.gov.in</span>
+          <span id="ov-sat-name">Chandrayaan-3 Propulsion</span>
+          <span id="ov-orbit-type">Lunar Polar Orbit • 100 km</span>
+          <span id="ov-freq">● 8.400 GHz LOCKED</span>
         </div>
 
-        <div class="page-badge" style="background:rgba(0,229,255,.14);border:1px solid rgba(0,229,255,.35);color:var(--accent);">EVALUATION &amp; LIVE AGENT PLAYBOOK</div>
-        <div class="page-title">How to Execute the VisionVault Demo</div>
-        <div class="page-sub">Step-by-step workflow to execute autonomous zero-leak vision automation using the Chrome extension sidepanel, or run the live in-browser interactive pipeline simulator below.</div>
-
-        <!-- Active Operator Context Strip -->
-        <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; background:rgba(8,16,32,0.85); border:1px solid var(--border); border-radius:12px; padding:12px 18px; margin: 18px 0 24px;">
-          <div style="display:flex; align-items:center; gap:12px;">
-            <div class="badge-avatar-frame" style="width:44px; height:44px; border-radius:50%; overflow:hidden; border:2px solid var(--accent); flex-shrink:0;">
-              <img id="ov-badge-img" src="images/emp-natesh.jpeg" class="badge-avatar-img" alt="Officer Photo" style="width:100%; height:100%; object-fit:cover;"/>
-            </div>
-            <div>
-              <div style="font-size:14px; font-weight:800; color:#fff; display:flex; align-items:center; gap:8px;">
-                <span id="ov-name" class="badge-pii-val">Natesh Kanna R</span>
-                <span style="font-size:11px; font-family:'JetBrains Mono',monospace; color:var(--accent); background:rgba(0,229,255,0.12); padding:1px 6px; border-radius:4px;" id="ov-empid" class="badge-pii-val">ISRO-10101</span>
-              </div>
-              <div style="font-size:12px; color:var(--muted); margin-top:2px;">
-                <span id="ov-dept">Flight Software &amp; Spacecraft Control</span> • <span id="ov-org">Master Control Facility (MCF)</span>
-                <span id="ov-email" class="badge-pii-val" style="display:none;">natesh.kanna@isro.gov.in</span>
-                <span id="ov-sat-name" style="display:none;">Chandrayaan-3 Propulsion</span>
-                <span id="ov-orbit-type" style="display:none;">Lunar Polar Orbit • 100 km</span>
-                <span id="ov-freq" style="display:none;">● 8.400 GHz LOCKED</span>
-              </div>
-            </div>
+        <!-- Ultra-Modern Hero Header -->
+        <div class="playbook-hero">
+          <div class="playbook-hero-left">
+            <div class="hero-pill-badge"><i class="fa-solid fa-satellite"></i> LIVE EVALUATION PLAYBOOK</div>
+            <div class="playbook-hero-title">How to Execute the VisionVault Demo</div>
+            <div class="playbook-hero-sub">Step-by-step workflow to execute autonomous zero-leak vision automation using the Chrome extension sidepanel, or run the live in-browser interactive pipeline simulator below.</div>
           </div>
-          <div style="display:flex; align-items:center; gap:10px;">
-            <span style="font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--green); font-weight:700;"><i class="fa-solid fa-signal"></i> 8.400 GHz Deep Space Locked</span>
-            <button class="topbar-action" style="padding:6px 12px; font-size:12px;" onclick="navigateToPage('messages')"><i class="fa-solid fa-comments"></i> Open Secure Comms</button>
+          <div class="playbook-hero-right">
+            <div class="lens-btn-group" title="Presentation View Filter">
+              <button class="lens-btn active" id="lens-normal" onclick="setRedactionLens('normal')"><i class="fa-solid fa-desktop"></i> Human View</button>
+              <button class="lens-btn" id="lens-redacted" onclick="setRedactionLens('redacted')"><i class="fa-solid fa-shield-halved"></i> Cloud LLM (Masked)</button>
+            </div>
+            <button class="topbar-action active" style="padding:8px 16px; font-size:12.5px;" onclick="navigateToPage('messages')">
+              <i class="fa-solid fa-comments"></i> Open Comms <i class="fa-solid fa-arrow-right" style="margin-left:4px;"></i>
+            </button>
           </div>
         </div>
 
         <!-- 4-Step Modern Execution Guide Grid -->
-        <div class="guide-grid" style="margin-bottom: 28px;">
+        <div class="guide-grid" style="margin-bottom: 24px;">
           
           <!-- Step 1 -->
           <div class="guide-card">
             <span class="guide-step-tag">STEP 01</span>
             <div class="guide-title"><i class="fa-solid fa-puzzle-piece" style="color:var(--accent)"></i> Load Extension</div>
             <div class="guide-desc">
-              Open <code>chrome://extensions</code> in Chrome, enable <strong>Developer mode</strong> (top-right), click <strong>Load unpacked</strong>, and select the project's <code>extension/</code> folder.
+              Open <code>chrome://extensions</code> in Chrome, toggle <strong>Developer mode</strong> (top-right), click <strong>Load unpacked</strong>, and select the project's <code>extension/</code> folder.
             </div>
-            <div style="margin-top:auto; padding-top:8px;">
+            <div style="margin-top:auto; padding-top:6px;">
               <div style="font-size:11.5px; font-family:'JetBrains Mono',monospace; color:var(--accent2); background:rgba(56,189,248,0.1); border-radius:6px; padding:6px 10px;">
                 <i class="fa-solid fa-check"></i> Manifest V3 • Side Panel Ready
               </div>
@@ -1329,13 +1371,13 @@ body.mode-redacted .datablock {
           <!-- Step 2 -->
           <div class="guide-card">
             <span class="guide-step-tag">STEP 02</span>
-            <div class="guide-title"><i class="fa-solid fa-satellite-dish" style="color:var(--accent)"></i> Open Comms Channel</div>
+            <div class="guide-title"><i class="fa-solid fa-user-astronaut" style="color:var(--accent)"></i> Pick Scientist &amp; Mission</div>
             <div class="guide-desc">
-              Switch to the <strong>Secure Comms Channel</strong> tab. Here, HR transmits raw, AES-256-GCM encrypted mission payloads with employee PII, Aadhaar, salary, TLE, and system credentials.
+              Switch to <strong>Secure Comms Channel</strong>. Click any scientist (e.g. <em>Kavita Krishnan</em> or <em>Rajesh Kumar</em>) to receive their AES-256 encrypted mission telemetry card.
             </div>
-            <div style="margin-top:auto; padding-top:8px;">
+            <div style="margin-top:auto; padding-top:6px;">
               <button class="topbar-action" style="width:100%; justify-content:center; padding:8px 12px; font-size:12px;" onclick="navigateToPage('messages')">
-                <i class="fa-solid fa-arrow-up-right-from-square"></i> Jump to Comms Channel
+                <i class="fa-solid fa-satellite-dish"></i> Open Secure Comms Channel
               </button>
             </div>
           </div>
@@ -1345,26 +1387,29 @@ body.mode-redacted .datablock {
             <span class="guide-step-tag">STEP 03</span>
             <div class="guide-title"><i class="fa-solid fa-terminal" style="color:var(--accent)"></i> Extension Prompts for Sidepanel</div>
             <div class="guide-desc">
-              Click the VisionVault extension puzzle icon to open the <strong>Side Panel</strong>. Paste one of the calibrated autonomous instructions into the agent chat:
+              Open the VisionVault Side Panel and paste any of these calibrated prompts into the agent chat box:
             </div>
             
-            <div style="display:flex; flex-direction:column; gap:8px; margin-top:10px;">
+            <div style="display:flex; flex-direction:column; gap:8px; margin-top:8px;">
+              <!-- Featured Prompt: Store values to vault -->
+              <div class="prompt-box featured">
+                <span class="prompt-tag">VAULT STORE</span>
+                <span id="prompt-p0" style="flex:1; font-weight:700; color:#fff;">store these values to the vault</span>
+                <button class="prompt-copy-btn" onclick="copyPromptText(this, 'prompt-p0')"><i class="fa-regular fa-copy"></i> Copy Prompt</button>
+              </div>
+
               <!-- Main 5-DB prompt -->
               <div class="prompt-box">
+                <span class="prompt-tag" style="color:var(--green); border-color:rgba(16,185,129,0.4); background:rgba(16,185,129,0.12);">5-DB AUTOPILOT</span>
                 <span id="prompt-p1" style="flex:1;">Read the encrypted mission transmission in Secure Comms Channel, securely store all fields in the local vault, and autonomously populate and submit all 5 ISRO databases (HR, Payroll, Mission Systems, Staff Housing, and Health).</span>
                 <button class="prompt-copy-btn" onclick="copyPromptText(this, 'prompt-p1')"><i class="fa-regular fa-copy"></i> Copy Prompt</button>
               </div>
 
               <!-- DB 1 prompt -->
               <div class="prompt-box">
+                <span class="prompt-tag" style="color:var(--yellow); border-color:rgba(245,158,11,0.4); background:rgba(245,158,11,0.12);">SINGLE DB</span>
                 <span id="prompt-p2" style="flex:1;">Autonomously populate Database 1 HR Personnel details from vault and submit.</span>
                 <button class="prompt-copy-btn" onclick="copyPromptText(this, 'prompt-p2')"><i class="fa-regular fa-copy"></i> Copy Prompt</button>
-              </div>
-
-              <!-- DB 2 prompt -->
-              <div class="prompt-box">
-                <span id="prompt-p3" style="flex:1;">Autonomously populate Database 2 Mission Payroll &amp; Banking records from vault.</span>
-                <button class="prompt-copy-btn" onclick="copyPromptText(this, 'prompt-p3')"><i class="fa-regular fa-copy"></i> Copy Prompt</button>
               </div>
             </div>
           </div>
@@ -1376,7 +1421,7 @@ body.mode-redacted .datablock {
             <div class="guide-desc">
               Observe real-time on-screen redaction bounding boxes and local vault tokenization. Raw Aadhaar numbers, PAN cards, bank accounts, and biometric photos are NEVER sent to third-party cloud LLMs.
             </div>
-            <div style="margin-top:auto; padding-top:8px;">
+            <div style="margin-top:auto; padding-top:6px;">
               <button class="topbar-action" style="width:100%; justify-content:center; padding:8px 12px; font-size:12px; border-color:rgba(16,185,129,0.4); color:var(--green);" onclick="setRedactionLens('redacted')">
                 <i class="fa-solid fa-eye-slash"></i> Inspect Redaction Lens
               </button>
@@ -1386,7 +1431,7 @@ body.mode-redacted .datablock {
         </div>
 
         <!-- In-Browser System Simulator Card -->
-        <div class="sim-card">
+        <div class="sim-card" id="sim-lab-section">
           <div class="sim-header">
             <div>
               <div style="display:flex; align-items:center; gap:8px;">
@@ -1474,12 +1519,12 @@ Click 'Run Full Autonomous Simulation' or step through each stage.</div>
           <p style="font-size:13.5px; color:var(--muted); margin-bottom:16px; line-height:1.6;">
             Once automation completes, inspect the live decrypted records in each of the 5 mission database endpoints below:
           </p>
-          <div class="grid2">
-            <button class="topbar-action" style="justify-content:flex-start;padding:12px 16px;font-size:13.5px;" onclick="navigateToPage('form-hr')"><i class="fa-solid fa-user-check" style="color:var(--accent);font-size:16px;"></i> Database 1 — HR Personnel Details</button>
-            <button class="topbar-action" style="justify-content:flex-start;padding:12px 16px;font-size:13.5px;" onclick="navigateToPage('form-payroll')"><i class="fa-solid fa-money-check-dollar" style="color:var(--green);font-size:16px;"></i> Database 2 — Mission Payroll &amp; Banking</button>
-            <button class="topbar-action" style="justify-content:flex-start;padding:12px 16px;font-size:13.5px;" onclick="navigateToPage('form-it')"><i class="fa-solid fa-microchip" style="color:var(--yellow);font-size:16px;"></i> Database 3 — Mission Systems &amp; IT Access</button>
-            <button class="topbar-action" style="justify-content:flex-start;padding:12px 16px;font-size:13.5px;" onclick="navigateToPage('form-housing')"><i class="fa-solid fa-building-user" style="color:var(--violet);font-size:16px;"></i> Database 4 — Staff Quarters &amp; Logistics</button>
-            <button class="topbar-action" style="justify-content:flex-start;padding:12px 16px;font-size:13.5px;" onclick="navigateToPage('form-medical')"><i class="fa-solid fa-heart-pulse" style="color:#f43f5e;font-size:16px;"></i> Database 5 — Health, Vitals &amp; Emergency</button>
+          <div class="grid2" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(210px, 1fr)); gap:10px;">
+            <button class="topbar-action" style="justify-content:flex-start;padding:12px 14px;font-size:13px;" onclick="navigateToPage('form-hr')"><i class="fa-solid fa-user-check" style="color:var(--accent);font-size:15px;"></i> Database 1 — HR</button>
+            <button class="topbar-action" style="justify-content:flex-start;padding:12px 14px;font-size:13px;" onclick="navigateToPage('form-payroll')"><i class="fa-solid fa-money-check-dollar" style="color:var(--green);font-size:15px;"></i> Database 2 — Payroll</button>
+            <button class="topbar-action" style="justify-content:flex-start;padding:12px 14px;font-size:13px;" onclick="navigateToPage('form-it')"><i class="fa-solid fa-microchip" style="color:var(--yellow);font-size:15px;"></i> Database 3 — Systems</button>
+            <button class="topbar-action" style="justify-content:flex-start;padding:12px 14px;font-size:13px;" onclick="navigateToPage('form-housing')"><i class="fa-solid fa-building-user" style="color:var(--violet);font-size:15px;"></i> Database 4 — Housing</button>
+            <button class="topbar-action" style="justify-content:flex-start;padding:12px 14px;font-size:13px;" onclick="navigateToPage('form-medical')"><i class="fa-solid fa-heart-pulse" style="color:#f43f5e;font-size:15px;"></i> Database 5 — Medical</button>
           </div>
         </div>
 

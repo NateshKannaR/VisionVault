@@ -1,0 +1,9 @@
+{
+  "name": "isro-mission-portal-prototype",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Local prototype backend for the ISRO mission and employee portals",
+  "scripts": {
+    "start": "node server.js"
+  }
+}

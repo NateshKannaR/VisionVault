@@ -384,6 +384,7 @@
         const b = normalizeBox(r);
         if (!b || b.w <= 0 || b.h <= 0) continue;
         const src = r.source || defSrc;
+        const isCirc = Boolean(r.circular || r.isCircle || (r.label && /avatar/i.test(r.label)));
         all.push({
           x: b.x,
           y: b.y,
@@ -395,6 +396,7 @@
           confidence: Number(r.confidence ?? 0.85),
           source: src,
           sources: Array.isArray(r.sources) ? [...r.sources] : [src],
+          circular: isCirc,
           text: r.text || ""
         });
       }
@@ -407,19 +409,43 @@
     const merged = [];
     for (const item of all) {
       const matchIdx = merged.findIndex(m => {
-        const isNear = Math.abs(m.x - item.x) <= 4 && Math.abs(m.y - item.y) <= 4 && Math.abs(m.w - item.w) <= 6 && Math.abs(m.h - item.h) <= 6;
-        return isNear || computeIoU(m, item) >= (options.iouThreshold || 0.5);
+        const isNear = Math.abs(m.x - item.x) <= 6 && Math.abs(m.y - item.y) <= 6 && Math.abs(m.w - item.w) <= 8 && Math.abs(m.h - item.h) <= 8;
+        const iou = computeIoU(m, item);
+        const isAvatarM = Boolean(m.circular || m.reason === "profile_avatar" || (m.label && /avatar/i.test(m.label)));
+        const isAvatarItem = Boolean(item.circular || item.reason === "profile_avatar" || (item.label && /avatar/i.test(item.label)));
+        const itemCx = item.x + item.w / 2;
+        const itemCy = item.y + item.h / 2;
+        const mCx = m.x + m.w / 2;
+        const mCy = m.y + m.h / 2;
+        const isAvatarFaceOverlap = (isAvatarM || isAvatarItem) && (
+          iou > 0.10 ||
+          (itemCx >= m.x - 4 && itemCx <= m.x + m.w + 4 && itemCy >= m.y - 4 && itemCy <= m.y + m.h + 4) ||
+          (mCx >= item.x - 4 && mCx <= item.x + item.w + 4 && mCy >= item.y - 4 && mCy <= item.y + item.h + 4)
+        );
+        return isNear || iou >= (options.iouThreshold || 0.5) || isAvatarFaceOverlap;
       });
 
       if (matchIdx === -1) {
         merged.push({ ...item });
       } else {
         const existing = merged[matchIdx];
-        const nextX = Math.min(existing.x, item.x);
-        const nextY = Math.min(existing.y, item.y);
-        const nextW = Math.max(existing.x + existing.w, item.x + item.w) - nextX;
-        const nextH = Math.max(existing.y + existing.h, item.y + item.h) - nextY;
+        let nextX = Math.min(existing.x, item.x);
+        let nextY = Math.min(existing.y, item.y);
+        let nextW = Math.max(existing.x + existing.w, item.x + item.w) - nextX;
+        let nextH = Math.max(existing.y + existing.h, item.y + item.h) - nextY;
+
+        // If one is a circular avatar, retain the exact avatar's neat square bounds rather than dilating
+        const isAvatarExisting = Boolean(existing.circular || existing.reason === "profile_avatar" || (existing.label && /avatar/i.test(existing.label)));
+        const isAvatarItem = Boolean(item.circular || item.reason === "profile_avatar" || (item.label && /avatar/i.test(item.label)));
+        if (isAvatarExisting || isAvatarItem) {
+          const avatar = isAvatarExisting ? existing : item;
+          nextX = avatar.x;
+          nextY = avatar.y;
+          nextW = avatar.w;
+          nextH = avatar.h;
+        }
         const combSources = Array.from(new Set([...(existing.sources || [existing.source]), ...(item.sources || [item.source])]));
+        const isCirc = Boolean(existing.circular || item.circular || isAvatarExisting || isAvatarItem || ((existing.label || item.label) && /avatar/i.test(existing.label || item.label)));
 
         merged[matchIdx] = {
           x: nextX,
@@ -432,6 +458,7 @@
           confidence: Math.max(existing.confidence, item.confidence),
           source: combSources.join(","),
           sources: combSources,
+          circular: isCirc,
           text: item.text || existing.text || ""
         };
       }
@@ -445,6 +472,7 @@
       type: r.type || "pii",
       reason: r.reason || "pii_detection",
       ...(r.label ? { label: r.label } : {}),
+      ...(r.circular ? { circular: true, isCircle: true } : {}),
       confidence: Number(r.confidence || 0.85),
       source: r.source,
       sources: r.sources || [r.source],
@@ -496,6 +524,9 @@
         const rw = box.w * sx;
         const rh = box.h * sy;
 
+        // Discard regions completely outside the current screenshot canvas
+        if (rx + rw <= 0 || rx >= bitmap.width || ry + rh <= 0 || ry >= bitmap.height) continue;
+
         // Boundary dilation. OCR reports boxes that hug the glyphs, so a fixed 3px pad left
         // ascenders, descenders and antialiased edges visible — the evaluation measured only
         // ~82% of a text region actually covered. Scaling the pad with the region's height
@@ -515,14 +546,36 @@
         const h0 = Math.max(1, Math.min(bitmap.height - y0, Math.round(rh) + padY * 2));
 
 
-        const isFaceOrMedia = (r.type === "face" || r.type === "media" || r.reason === "face_detection" || r.reason === "face_detection_patch" || r.reason === "possible_face_or_media" || (r.label && /avatar|face|profile/i.test(r.label)));
-        const isCircle = Boolean(r.circular || (isFaceOrMedia && Math.abs(w0 - h0) <= 12 && Math.max(w0, h0) <= 120));
+        const isFaceOrMedia = (
+          r.type === "face" ||
+          r.type === "media" ||
+          r.reason === "face_detection" ||
+          r.reason === "face_detection_patch" ||
+          r.reason === "possible_face_or_media" ||
+          r.reason === "profile_avatar" ||
+          (r.label && /avatar|face|profile/i.test(r.label))
+        );
+        const isCircle = Boolean(
+          r.circular ||
+          r.isCircle ||
+          (r.reason === "profile_avatar") ||
+          (r.label && /avatar/i.test(r.label)) ||
+          ((r.type === "face" || r.type === "media") && Math.abs(rw - rh) <= 8 && Math.max(rw, rh) <= 120 && (r.reason === "profile_avatar" || (r.label && /avatar/i.test(r.label))))
+        );
+        let circleRadius = Math.min(w0, h0) / 2;
+        let cx = x0 + w0 / 2;
+        let cy = y0 + h0 / 2;
+        if (isCircle) {
+          circleRadius = (Math.max(rw, rh) / 2) + 2.0;
+          cx = rx + rw / 2;
+          cy = ry + rh / 2;
+        }
 
         if ((mode || "black") === "blur") {
           if (isCircle) {
             ctx.save();
             ctx.beginPath();
-            ctx.arc(x0 + w0 / 2, y0 + h0 / 2, Math.min(w0, h0) / 2, 0, Math.PI * 2);
+            ctx.arc(cx, cy, circleRadius, 0, Math.PI * 2);
             ctx.clip();
           }
           const step = Math.max(8, Math.min(20, Math.round(Math.min(w0, h0) / 4)));
@@ -543,13 +596,11 @@
             ctx.save();
             if (isCircle) {
               ctx.beginPath();
-              ctx.arc(x0 + w0 / 2, y0 + h0 / 2, Math.min(w0, h0) / 2, 0, Math.PI * 2);
+              ctx.arc(cx, cy, circleRadius, 0, Math.PI * 2);
               ctx.clip();
             }
             ctx.fillStyle = "#1e293b";
             ctx.fillRect(x0, y0, w0, h0);
-            const cx = x0 + w0 / 2;
-            const cy = y0 + h0 / 2;
             const radius = Math.min(w0, h0) * 0.22;
             ctx.fillStyle = "#64748b";
             ctx.beginPath();
@@ -577,7 +628,7 @@
           ctx.fillStyle = "#020617";
           if (isCircle) {
             ctx.beginPath();
-            ctx.arc(x0 + w0 / 2, y0 + h0 / 2, Math.min(w0, h0) / 2, 0, Math.PI * 2);
+            ctx.arc(cx, cy, circleRadius, 0, Math.PI * 2);
             ctx.fill();
           } else if (typeof ctx.roundRect === "function") {
             ctx.beginPath();

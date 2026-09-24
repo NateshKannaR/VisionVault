@@ -44,6 +44,7 @@
         const b = normalizeBox(r);
         if (!b || b.w <= 0 || b.h <= 0) continue;
         const src = r.source || defSrc;
+        const isCirc = Boolean(r.circular || r.isCircle || (r.label && /avatar/i.test(r.label)));
         all.push({
           x: b.x,
           y: b.y,
@@ -55,6 +56,7 @@
           confidence: Number(r.confidence ?? 0.85),
           source: src,
           sources: Array.isArray(r.sources) ? [...r.sources] : [src],
+          circular: isCirc,
           text: r.text || ""
         });
       }
@@ -67,19 +69,43 @@
     const merged = [];
     for (const item of all) {
       const matchIdx = merged.findIndex(m => {
-        const isNear = Math.abs(m.x - item.x) <= 4 && Math.abs(m.y - item.y) <= 4 && Math.abs(m.w - item.w) <= 6 && Math.abs(m.h - item.h) <= 6;
-        return isNear || computeIoU(m, item) >= (options.iouThreshold || 0.5);
+        const isNear = Math.abs(m.x - item.x) <= 6 && Math.abs(m.y - item.y) <= 6 && Math.abs(m.w - item.w) <= 8 && Math.abs(m.h - item.h) <= 8;
+        const iou = computeIoU(m, item);
+        const isAvatarM = Boolean(m.circular || m.reason === "profile_avatar" || (m.label && /avatar/i.test(m.label)));
+        const isAvatarItem = Boolean(item.circular || item.reason === "profile_avatar" || (item.label && /avatar/i.test(item.label)));
+        const itemCx = item.x + item.w / 2;
+        const itemCy = item.y + item.h / 2;
+        const mCx = m.x + m.w / 2;
+        const mCy = m.y + m.h / 2;
+        const isAvatarFaceOverlap = (isAvatarM || isAvatarItem) && (
+          iou > 0.10 ||
+          (itemCx >= m.x - 4 && itemCx <= m.x + m.w + 4 && itemCy >= m.y - 4 && itemCy <= m.y + m.h + 4) ||
+          (mCx >= item.x - 4 && mCx <= item.x + item.w + 4 && mCy >= item.y - 4 && mCy <= item.y + item.h + 4)
+        );
+        return isNear || iou >= (options.iouThreshold || 0.5) || isAvatarFaceOverlap;
       });
 
       if (matchIdx === -1) {
         merged.push({ ...item });
       } else {
         const existing = merged[matchIdx];
-        const nextX = Math.min(existing.x, item.x);
-        const nextY = Math.min(existing.y, item.y);
-        const nextW = Math.max(existing.x + existing.w, item.x + item.w) - nextX;
-        const nextH = Math.max(existing.y + existing.h, item.y + item.h) - nextY;
+        let nextX = Math.min(existing.x, item.x);
+        let nextY = Math.min(existing.y, item.y);
+        let nextW = Math.max(existing.x + existing.w, item.x + item.w) - nextX;
+        let nextH = Math.max(existing.y + existing.h, item.y + item.h) - nextY;
+
+        // If one is a circular avatar, retain the exact avatar's neat square bounds rather than dilating
+        const isAvatarExisting = Boolean(existing.circular || existing.reason === "profile_avatar" || (existing.label && /avatar/i.test(existing.label)));
+        const isAvatarItem = Boolean(item.circular || item.reason === "profile_avatar" || (item.label && /avatar/i.test(item.label)));
+        if (isAvatarExisting || isAvatarItem) {
+          const avatar = isAvatarExisting ? existing : item;
+          nextX = avatar.x;
+          nextY = avatar.y;
+          nextW = avatar.w;
+          nextH = avatar.h;
+        }
         const combSources = Array.from(new Set([...(existing.sources || [existing.source]), ...(item.sources || [item.source])]));
+        const isCirc = Boolean(existing.circular || item.circular || isAvatarExisting || isAvatarItem || ((existing.label || item.label) && /avatar/i.test(existing.label || item.label)));
 
         merged[matchIdx] = {
           x: nextX,
@@ -92,6 +118,7 @@
           confidence: Math.max(existing.confidence, item.confidence),
           source: combSources.join(","),
           sources: combSources,
+          circular: isCirc,
           text: item.text || existing.text || ""
         };
       }
@@ -108,6 +135,7 @@
       confidence: r.confidence,
       source: r.source,
       sources: r.sources || [r.source],
+      ...(r.circular ? { circular: true, isCircle: true } : {}),
       ...(r.text ? { text: r.text } : {})
     }));
   }

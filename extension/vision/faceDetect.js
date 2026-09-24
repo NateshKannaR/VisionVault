@@ -10,7 +10,7 @@
 (function (global) {
   const MODEL_INPUT_WIDTH = 320;
   const MODEL_INPUT_HEIGHT = 240;
-  const CONFIDENCE_THRESHOLD = 0.45; // Enhanced high-recall threshold for avatars & small profile thumbnails
+  const CONFIDENCE_THRESHOLD = 0.65; // High-precision threshold preventing false face detections on UI icons
   const IOU_THRESHOLD = 0.3;
   const CENTER_VARIANCE = 0.1;
   const SIZE_VARIANCE = 0.2;
@@ -313,9 +313,9 @@
 
       if (rawW < 12 || rawH < 12) return null;
 
-      const padX = rawW * 0.12;
-      const padTop = rawH * 0.15;
-      const padBottom = rawH * 0.35;
+      const padX = rawW * 0.15;
+      const padTop = rawH * 0.25;
+      const padBottom = rawH * 0.18;
 
       const x = Math.max(0, Math.round(rawX - padX));
       const y = Math.max(0, Math.round(rawY - padTop));

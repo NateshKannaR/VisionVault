@@ -654,14 +654,14 @@ function findContextLabelledPII() {
     }
 
     // NEVER treat sidebar navigation items, header titles, tabs, buttons, or messaging chat items as PII label-value pairs!
-    if (el.closest("nav, .sidebar, .topbar, .topbar-title, .topbar-actions, [role='navigation'], [role='tablist'], .nav-item, .nav-link, button, .btn, .switch-link, [role='listitem'], [data-testid*='chat'], [data-testid*='conversation'], [data-testid*='msg'], .message-in, .message-out, [role='feed']")) {
+    if (el.closest("nav, .sidebar, .topbar, .topbar-branding, .topbar-sub, .topbar-title, .topbar-actions, [role='navigation'], [role='tablist'], .nav-item, .nav-link, button, .btn, .switch-link, [role='listitem'], [data-testid*='chat'], [data-testid*='conversation'], [data-testid*='msg'], .message-in, .message-out, [role='feed']")) {
       return;
     }
 
-    // Avoid treating complex containers or wide blocks as individual values
+    // Avoid treating complex containers or excessively large blocks as individual values
     if (el.children && el.children.length > 2) return;
     const r = el.getBoundingClientRect();
-    if (r.height > 80 || r.width > 450) return;
+    if (r.height > 120 || r.width > 950) return;
 
     const prev = el.previousElementSibling || (el.parentElement && el.parentElement.previousElementSibling);
     if (!prev) return;
@@ -751,14 +751,15 @@ function isAvatarElement(el, r) {
     el.parentElement?.getAttribute("data-testid"),
     typeof el.parentElement?.className === "string" ? el.parentElement.className : "",
     el.parentElement?.getAttribute("aria-label"),
+    el.closest(".avatar, .roster-avatar, .emp-sidebar-avatar, .badge-avatar-frame, [class*='avatar'], [class*='profile'], [class*='contact']")?.className,
     el.src
   ].filter(Boolean).join(" ").toLowerCase();
 
-  // Strictly target avatars, profile pictures, and biometric photos
-  if (/\b(?:avatar|profile[-_ ]?(?:pic|photo|image|thumb)?|selfie|headshot|portrait)\b|whatsapp\.net/i.test(test)) {
+  // Strictly target avatars, profile pictures, employee badges, and biometric photos
+  if (/\b(?:avatar|profile[-_ ]?(?:pic|photo|image|thumb)?|selfie|headshot|portrait|roster|badge[-_]?avatar|emp[-_]?sidebar|scientist|officer|face|contact)\b|emp[-_]|whatsapp\.net/i.test(test)) {
     return true;
   }
-  if (r && r.w >= 20 && r.w <= 96 && isCircular(el, r)) {
+  if (r && r.w >= 18 && r.w <= 160 && isCircular(el, r)) {
     return true;
   }
   return false;
@@ -793,6 +794,10 @@ function findPiiRangesInTextNode(node, text) {
       let m;
       while ((m = globalRe.exec(text)) !== null) {
         if (!m[0] || m[0].length < 3) continue;
+        const val = m[0];
+        // Guard against false positive matches on decimals, dates, or telemetry strings
+        if (label === "phone" && (val.includes(".") || /[a-zA-Z]/.test(val) || val.replace(/\D/g, "").length < 9)) continue;
+        if (label === "card" && (val.includes(".") || /[a-zA-Z]/.test(val) || val.replace(/\D/g, "").length < 13)) continue;
         const start = m.index;
         const end = m.index + m[0].length;
         try {
@@ -944,6 +949,8 @@ function scanForPII() {
     if (type === "text") sensitiveTextEls.add(el);
     const r = rectOf(el);
     if (r.w < 2 || r.h < 2) return;
+    // Skip elements completely outside the current viewport
+    if (r.x + r.w <= 0 || r.x >= window.innerWidth || r.y + r.h <= 0 || r.y >= window.innerHeight) return;
     const key = `${r.x},${r.y},${r.w},${r.h}`;
     if (seen.has(key)) return;
     seen.add(key);
@@ -975,6 +982,12 @@ function scanForPII() {
     }
   });
 
+  // 1b. Explicit PII telemetry and value elements (e.g. [data-pii], .db-val, .tle-val, .badge-pii-val)
+  querySelectorAllDeep("[data-pii], .db-val, .tle-val, .badge-pii-val").forEach(el => {
+    const label = el.getAttribute("data-pii") || el.className || "pii_value";
+    addRegion(el, "text", "context_labelled_pii", label);
+  });
+
   // 2b. Values that are sensitive because of the column/term they sit under
   findContextLabelledPII().forEach(({ el, label }) => {
     addRegion(el, "text", "context_labelled_pii", label.slice(0, 30));
@@ -989,6 +1002,8 @@ function scanForPII() {
         while ((node = walker.nextNode())) {
           nodeCount++;
           if (nodeCount > MAX_DOM_NODES) return;
+          // Skip text nodes already contained in an explicitly redacted PII container or topbar chrome
+          if (node.parentElement?.closest("[data-pii], .db-val, .tle-val, .badge-pii-val, .topbar-branding, .topbar-sub")) continue;
           const text = node.nodeValue || "";
           if (text.trim().length < 4) continue;
           if (isSafeAppChrome(text)) continue;
@@ -1034,16 +1049,25 @@ function scanForPII() {
   //
   //    The markup hints travel with the region so that filter can keep anything the page
   //    itself describes as a person, whatever the model concluded.
-  document.querySelectorAll("img, video, canvas, [role='img']").forEach(el => {
-    if (el.offsetParent === null) return;
-    const r = rectOf(el);
-    if (r.w >= 22 && r.h >= 22) {
-      const isAvatar = isAvatarElement(el, r);
-      addRegion(el, "media", isAvatar ? "profile_avatar" : "possible_face_or_media", isAvatar ? "profile_avatar" : "media", {
-        alt: (el.getAttribute("alt") || "").slice(0, 80),
-        className: (typeof el.className === "string" ? el.className : "").slice(0, 80),
-        src: (el.getAttribute("src") || "").slice(0, 120),
-        circular: isAvatar || isCircular(el, r),
+  // 4. Media & Avatar Frames that hold a face, profile portrait, or identity document.
+  const mediaElements = new Set([
+    ...document.querySelectorAll("img, video, canvas, [role='img']"),
+    ...document.querySelectorAll(".avatar, .badge-avatar-frame, .badge-avatar-img, [class*='avatar'], .emp-sidebar-avatar, .roster-avatar")
+  ]);
+
+  mediaElements.forEach(el => {
+    const avatarParent = el.closest(".avatar, .badge-avatar-frame");
+    const targetEl = avatarParent || el;
+    if (targetEl.offsetParent === null && window.getComputedStyle(targetEl).position !== "fixed") return;
+    const r = rectOf(targetEl);
+    if (r.w >= 18 && r.h >= 18 && r.x + r.w > 0 && r.x < window.innerWidth && r.y + r.h > 0 && r.y < window.innerHeight) {
+      const isAvatar = isAvatarElement(targetEl, r) || isAvatarElement(el, r);
+      const isCirc = isAvatar || isCircular(targetEl, r) || isCircular(el, r);
+      addRegion(targetEl, "media", isAvatar ? "profile_avatar" : "possible_face_or_media", isAvatar ? "profile_avatar" : "media", {
+        alt: (el.getAttribute("alt") || targetEl.getAttribute("alt") || "").slice(0, 80),
+        className: (typeof targetEl.className === "string" ? targetEl.className : "").slice(0, 80),
+        src: (el.getAttribute("src") || targetEl.getAttribute("src") || "").slice(0, 120),
+        circular: isCirc,
       });
     }
   });
@@ -1609,78 +1633,65 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
   if (msg.type === "READ_VAULT_FIELDS") {
     const fields = {};
+    const TELEMETRY_KEYS = new Set([
+      "satellite_name", "mission_id", "orbit_type", "orbital_inclination",
+      "apogee", "perigee", "ground_station_freq", "encryption_key_ref",
+      "tle_line_1", "tle_line_2", "launch_date"
+    ]);
 
-    // 1. Inputs/controls or elements with explicit data-vault-key
-    document.querySelectorAll("[data-vault-key]").forEach(el => {
-      const key = el.getAttribute("data-vault-key");
-      const val = (el.value || el.innerText || el.textContent || "").trim();
-      if (key && val && val !== "Loading…") fields[key] = val;
-    });
-
-    // 2. Scan localStorage for any stored vault object (e.g. isro_vault_*, vault, mission_vault)
-    try {
-      for (let i = 0; i < localStorage.length; i++) {
-        const lsKey = localStorage.key(i);
-        if (/vault/i.test(lsKey)) {
-          const raw = localStorage.getItem(lsKey);
-          if (raw) {
-            const parsed = JSON.parse(raw);
-            if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-              for (const [k, v] of Object.entries(parsed)) {
-                if (v && typeof v === "string" && !fields[k]) {
-                  fields[k] = v.trim();
-                }
-              }
-            }
-          }
-        }
-      }
-    } catch (_) {}
-
-    // 3. Scan window.vaultData or document variables if present
-    try {
-      if (typeof window.vaultData === "object" && window.vaultData !== null) {
-        for (const [k, v] of Object.entries(window.vaultData)) {
-          if (v && typeof v === "string" && !fields[k]) {
-            fields[k] = v.trim();
-          }
-        }
-      }
-    } catch (_) {}
-
-    // 4. Structured Key-Value block parser on the page (messages, datablocks, pre, code, chat bubbles)
     const KEY_ALIASES = {
       "satellite": "satellite_name",
       "satellite name": "satellite_name",
+      "satellite_name": "satellite_name",
       "mission id": "mission_id",
       "mission": "mission_id",
+      "mission_id": "mission_id",
       "operator": "operator",
       "operator on duty": "operator",
       "launch": "launch_date",
       "launch date": "launch_date",
+      "launch_date": "launch_date",
       "orbit": "orbit_type",
       "orbit type": "orbit_type",
+      "orbit_type": "orbit_type",
       "inclination": "orbital_inclination",
       "orbital inclination": "orbital_inclination",
+      "orbital_inclination": "orbital_inclination",
       "apogee": "apogee",
       "perigee": "perigee",
       "freq": "ground_station_freq",
       "frequency": "ground_station_freq",
+      "downlink": "ground_station_freq",
+      "downlink freq": "ground_station_freq",
+      "downlink frequency": "ground_station_freq",
+      "downlink_freq": "ground_station_freq",
       "ground station freq": "ground_station_freq",
       "ground station frequency": "ground_station_freq",
+      "ground_station_freq": "ground_station_freq",
       "enc key ref": "encryption_key_ref",
       "encryption key ref": "encryption_key_ref",
       "encryption key": "encryption_key_ref",
+      "encryption_key_ref": "encryption_key_ref",
       "tle1": "tle_line_1",
       "tle 1": "tle_line_1",
+      "tle-1": "tle_line_1",
+      "tle_1": "tle_line_1",
       "tle line 1": "tle_line_1",
+      "tle_line_1": "tle_line_1",
       "tle2": "tle_line_2",
       "tle 2": "tle_line_2",
+      "tle-2": "tle_line_2",
+      "tle_2": "tle_line_2",
       "tle line 2": "tle_line_2",
+      "tle_line_2": "tle_line_2",
       "name": "name",
       "full name": "name",
       "username": "username",
       "user name": "username",
+      "empid": "username",
+      "emp id": "username",
+      "emp_id": "username",
+      "employee id": "username",
       "email": "email",
       "email address": "email",
       "phone": "phone",
@@ -1698,18 +1709,63 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       "designation": "about",
       "role": "about",
       "about": "about",
+      "desc": "about",
+      "description": "about",
+      "dept": "about",
+      "department": "about",
       "occupation": "occupation",
       "annual income": "annual_income",
       "income": "annual_income",
       "salary": "annual_income"
     };
 
-    const textContainers = document.querySelectorAll(".datablock, .bubble, pre, code, .msg-row, .card, .chat-col, [role='main'], main, body");
-    for (const container of textContainers) {
+    // 0. Explicit JSON payload from verified datablocks (e.g. data-vault-payload in chat or page)
+    const payloadEls = document.querySelectorAll("[data-vault-payload]");
+    payloadEls.forEach(payloadEl => {
+      try {
+        const raw = payloadEl.getAttribute("data-vault-payload");
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && typeof parsed === "object") {
+            for (const [k, v] of Object.entries(parsed)) {
+              const cleanKey = k.toLowerCase().trim().replace(/[-_]/g, " ");
+              const mappedKey = KEY_ALIASES[cleanKey] || KEY_ALIASES[k.toLowerCase().trim()] || k;
+              if (v && typeof v === "string" && v.trim()) fields[mappedKey] = v.trim();
+            }
+          }
+        }
+      } catch (_) {}
+    });
+
+    // 0b. Extract from ISRO Overview & Badge Elements if present
+    const ovMappings = [
+      ["#ov-name", "name"],
+      ["#ov-empid", "username"],
+      ["#ov-email", "email"],
+      ["#ov-org", "company"],
+      ["#ov-sat-name", "satellite_name"],
+      ["#ov-orbit-type", "orbit_type"],
+      ["#ov-freq", "ground_station_freq"],
+      ["#ov-dept", "about"]
+    ];
+    for (const [sel, key] of ovMappings) {
+      if (!fields[key]) {
+        const el = document.querySelector(sel);
+        if (el) {
+          let val = (el.innerText || el.textContent || "").trim();
+          if (key === "ground_station_freq") val = val.replace(/^[●\s]+/, "").replace(/\s*LOCKED\s*$/i, "").trim();
+          if (val && val !== "Loading…" && !val.includes("───")) fields[key] = val;
+        }
+      }
+    }
+
+    // 1. Structured Key-Value block parser on the page (e.g. .datablock in decrypted chat messages)
+    // Verified datablocks represent authentic ground truth directly from Mission Control / HR
+    const structuredContainers = document.querySelectorAll(".datablock, [data-vault-source='verified'], pre, code, .bubble, .msg-row");
+    for (const container of structuredContainers) {
       const text = container.innerText || container.textContent || "";
       if (!text || text.length < 5) continue;
 
-      // Match patterns like "Key: Value | Key2: Value" or "Key: Value\n"
       const lines = text.split(/[\r\n|]+/);
       for (const line of lines) {
         const match = line.match(/^\s*([A-Za-z0-9\s_-]+)\s*[:=]\s*(.+?)\s*$/);
@@ -1717,22 +1773,115 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           const rawKey = match[1].toLowerCase().trim();
           const rawVal = match[2].trim();
           const mappedKey = KEY_ALIASES[rawKey] || rawKey.replace(/[^a-z0-9]+/g, "_");
-          if (mappedKey && rawVal && rawVal !== "Loading…" && !fields[mappedKey]) {
-            fields[mappedKey] = rawVal;
+          if (mappedKey && rawVal && rawVal !== "Loading…" && !rawVal.includes("───")) {
+            if (!fields[mappedKey] || fields[mappedKey].length < rawVal.length) {
+              fields[mappedKey] = rawVal;
+            }
           }
         }
       }
     }
 
+    // 2. Scan window.vaultData or document variables if present
+    try {
+      if (typeof window.vaultData === "object" && window.vaultData !== null) {
+        for (const [k, v] of Object.entries(window.vaultData)) {
+          if (v && typeof v === "string" && v.trim()) {
+            fields[k] = v.trim();
+          }
+        }
+      }
+    } catch (_) {}
+
+    // 3. Scan localStorage for any stored plaintext vault object or chat messages
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const lsKey = localStorage.key(i);
+        if (/vault.*plain|plain.*vault/i.test(lsKey) || lsKey === "isro_vault_plain") {
+          const raw = localStorage.getItem(lsKey);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+              for (const [k, v] of Object.entries(parsed)) {
+                if (v && typeof v === "string" && v.trim()) {
+                  fields[k] = v.trim();
+                }
+              }
+            }
+          }
+        } else if (lsKey.startsWith("isro_chat_hr_")) {
+          const raw = localStorage.getItem(lsKey);
+          if (raw) {
+            try {
+              const msgs = JSON.parse(raw);
+              if (Array.isArray(msgs)) {
+                for (const m of msgs) {
+                  if (m.text) {
+                    try {
+                      const obj = JSON.parse(m.text);
+                      if (obj.type === "VAULT_MISSION" && obj.vault) {
+                        for (const [vk, vv] of Object.entries(obj.vault)) {
+                          if (vv && typeof vv === "string" && vv.trim()) fields[vk] = vv.trim();
+                        }
+                      }
+                    } catch (_) {}
+                  }
+                }
+              }
+            } catch (_) {}
+          }
+        }
+      }
+    } catch (_) {}
+
+    // 4. Inputs/controls or elements with explicit data-vault-key
+    // Guard against Chrome Autofill dumping the user's name across all text inputs!
+    document.querySelectorAll("[data-vault-key]").forEach(el => {
+      const key = el.getAttribute("data-vault-key");
+      const val = (el.value || el.innerText || el.textContent || "").trim();
+      if (!key || !val || val === "Loading…") return;
+
+      // Telemetry fields should NEVER be set to a person's name or autofill value if structured telemetry exists
+      if (TELEMETRY_KEYS.has(key)) {
+        if (fields[key]) {
+          // Already have verified structured telemetry value; do not overwrite with unverified input
+          return;
+        }
+        // If the value in this telemetry input is identical to the employee/user name, reject it!
+        if (fields.name && val.toLowerCase() === fields.name.toLowerCase()) {
+          return;
+        }
+        // If it's a person's name format (e.g. contains "Natesh" or identical to user profile), reject
+        if (/natesh/i.test(val)) {
+          return;
+        }
+      }
+
+      // If not yet set or not protected telemetry, assign
+      if (!fields[key]) {
+        fields[key] = val;
+      }
+    });
+
     // 5. Specific regex extraction for TLE lines if present in text
     const fullBodyText = document.body ? (document.body.innerText || "") : "";
-    if (!fields.tle_line_1) {
+    if (!fields.tle_line_1 || /natesh/i.test(fields.tle_line_1)) {
       const tle1Match = fullBodyText.match(/\b(1\s+\d{5}[A-Z]\s+[^\r\n]{30,60})/);
       if (tle1Match) fields.tle_line_1 = tle1Match[1].trim();
     }
-    if (!fields.tle_line_2) {
+    if (!fields.tle_line_2 || /natesh/i.test(fields.tle_line_2)) {
       const tle2Match = fullBodyText.match(/\b(2\s+\d{5}\s+[^\r\n]{30,60})/);
       if (tle2Match) fields.tle_line_2 = tle2Match[1].trim();
+    }
+
+    // 6. Final safety check: if telemetry fields are polluted by the user's name, clean them!
+    const userName = fields.name || "";
+    if (userName) {
+      for (const tKey of TELEMETRY_KEYS) {
+        if (fields[tKey] && fields[tKey].toLowerCase() === userName.toLowerCase()) {
+          delete fields[tKey];
+        }
+      }
     }
 
     sendResponse({ fields, count: Object.keys(fields).length });
@@ -1782,8 +1931,22 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     }
 
     const activePage = document.querySelector(".page.active");
-    const container = activePage || document;
-    const allFields = Array.from(container.querySelectorAll("input[data-vault-key], textarea[data-vault-key], select[data-vault-key]"));
+    let container = activePage || document;
+    let allFields = Array.from(container.querySelectorAll("input[data-vault-key], textarea[data-vault-key], select[data-vault-key]"));
+
+    if (!allFields.length) {
+      // If currently on messages page or container has no fields, check if there's a form-hr page
+      const formPage = document.getElementById("page-form-hr") || document.querySelector(".page[id*='form']");
+      if (formPage) {
+        document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
+        document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
+        formPage.classList.add("active");
+        const hrNav = document.querySelector(".nav-item[data-page='form-hr']");
+        if (hrNav) hrNav.classList.add("active");
+        container = formPage;
+        allFields = Array.from(container.querySelectorAll("input[data-vault-key], textarea[data-vault-key], select[data-vault-key]"));
+      }
+    }
 
     if (!allFields.length) {
       sendResponse({ ok: false, error: "No fillable fields on this page. Navigate to a form first." });

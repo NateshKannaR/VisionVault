@@ -1,0 +1,1456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>VisionVault • Privacy-Preserving Browser Vision Agent | Local ViT + Redaction</title>
+<meta name="description" content="A vision agent that sees your screen without ever leaking it. On-device ViT screen understanding, dynamic PII redaction, and sanitized server reasoning."/>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"/>
+
+<style>
+:root {
+  --bg-main: #060911;
+  --bg-surface: #0c1220;
+  --bg-surface-elevated: #111a2e;
+  --bg-glass: rgba(12, 18, 32, 0.85);
+  --border-subtle: rgba(255, 255, 255, 0.1);
+  --border-glow: rgba(56, 189, 248, 0.3);
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
+  --text-faint: #64748b;
+  --accent-cyan: #00e5ff;
+  --accent-cyan-dim: #38bdf8;
+  --accent-emerald: #10b981;
+  --accent-violet: #818cf8;
+  --accent-amber: #f59e0b;
+  --accent-rose: #f43f5e;
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --font-display: 'Space Grotesk', sans-serif;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; font-family: var(--font-sans); color: var(--text-main); background: var(--bg-main); font-size: 16px; }
+body {
+  min-height: 100vh;
+  overflow-x: hidden;
+  background-image: 
+    radial-gradient(circle at 50% 0%, rgba(56, 189, 248, 0.16) 0%, transparent 60%),
+    radial-gradient(circle at 85% 35%, rgba(129, 140, 248, 0.1) 0%, transparent 45%),
+    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 48px 48px, 48px 48px;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: var(--bg-main); }
+::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.2); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--accent-cyan); }
+
+/* Navigation */
+nav {
+  position: sticky;
+  top: 0;
+  width: 100%;
+  height: 68px;
+  z-index: 100;
+  background: var(--bg-glass);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 2.5rem;
+}
+.nav-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+  color: #fff;
+  font-weight: 800;
+  font-size: 1.25rem;
+  letter-spacing: -0.02em;
+  font-family: var(--font-display);
+}
+.brand-badge {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(0, 229, 255, 0.25), rgba(129, 140, 248, 0.25));
+  border: 1.5px solid rgba(0, 229, 255, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent-cyan);
+  font-size: 16px;
+}
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+}
+.nav-link {
+  color: var(--text-muted);
+  text-decoration: none;
+  font-size: 0.95rem;
+  font-weight: 600;
+  transition: color 0.2s;
+}
+.nav-link:hover { color: var(--accent-cyan); }
+.nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0.65rem 1.35rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  border-radius: 10px;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+  font-family: var(--font-display);
+}
+.btn-primary {
+  background: #ffffff;
+  color: #060911;
+  box-shadow: 0 0 24px rgba(255, 255, 255, 0.25);
+}
+.btn-primary:hover {
+  background: #f1f5f9;
+  transform: translateY(-2px);
+  box-shadow: 0 0 30px rgba(0, 229, 255, 0.5);
+}
+.btn-secondary {
+  background: var(--bg-surface-elevated);
+  color: var(--text-main);
+  border: 1px solid var(--border-subtle);
+}
+.btn-secondary:hover {
+  background: #17233d;
+  border-color: rgba(255, 255, 255, 0.3);
+  transform: translateY(-2px);
+}
+.btn-glow {
+  background: linear-gradient(135deg, rgba(0, 229, 255, 0.18), rgba(129, 140, 248, 0.18));
+  color: var(--accent-cyan);
+  border: 1.5px solid rgba(0, 229, 255, 0.45);
+}
+.btn-glow:hover {
+  background: linear-gradient(135deg, rgba(0, 229, 255, 0.3), rgba(129, 140, 248, 0.3));
+  border-color: var(--accent-cyan);
+  box-shadow: 0 0 20px rgba(0, 229, 255, 0.35);
+  transform: translateY(-2px);
+}
+.btn-sm {
+  padding: 0.45rem 1rem;
+  font-size: 0.85rem;
+}
+
+/* Containers */
+.container {
+  max-width: 80rem;
+  margin: 0 auto;
+  padding: 0 2rem;
+}
+
+/* Badges */
+.pill-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0.45rem 1.1rem;
+  background: rgba(0, 229, 255, 0.1);
+  border: 1.5px solid rgba(0, 229, 255, 0.35);
+  border-radius: 9999px;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--accent-cyan);
+  margin-bottom: 1.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.pill-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent-cyan);
+  box-shadow: 0 0 10px var(--accent-cyan);
+  animation: pulseDot 2s infinite ease-in-out;
+}
+@keyframes pulseDot { 0%, 100% { opacity: 0.6; transform: scale(0.9); } 50% { opacity: 1; transform: scale(1.15); } }
+
+/* Section Header */
+.section-header {
+  text-align: center;
+  max-width: 52rem;
+  margin: 0 auto 3.5rem auto;
+}
+.section-tag {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: var(--accent-cyan);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 0.85rem;
+  font-weight: 800;
+}
+.section-title {
+  font-family: var(--font-display);
+  font-size: 2.5rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.2;
+  margin-bottom: 1.1rem;
+  color: #fff;
+}
+.section-desc {
+  font-size: 1.15rem;
+  color: var(--text-muted);
+  line-height: 1.65;
+}
+
+/* Hero Section */
+.hero {
+  padding: 6.5rem 0 5rem 0;
+  text-align: center;
+  position: relative;
+}
+.hero h1 {
+  font-family: var(--font-display);
+  font-size: clamp(2.5rem, 5.5vw, 4.4rem);
+  font-weight: 900;
+  line-height: 1.1;
+  letter-spacing: -0.04em;
+  max-width: 62rem;
+  margin: 0 auto 1.5rem auto;
+  background: linear-gradient(180deg, #ffffff 50%, #94a3b8 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.hero p {
+  font-size: clamp(1.1rem, 2vw, 1.3rem);
+  color: var(--text-muted);
+  max-width: 48rem;
+  margin: 0 auto 2.5rem auto;
+  line-height: 1.7;
+}
+.hero-cta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+  margin-bottom: 3.5rem;
+}
+.hero-specs {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3rem;
+  flex-wrap: wrap;
+  padding-top: 2.5rem;
+  border-top: 1px solid var(--border-subtle);
+  max-width: 60rem;
+  margin: 0 auto;
+}
+.spec-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+.spec-val {
+  font-family: var(--font-mono);
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: #fff;
+}
+.spec-lbl {
+  font-size: 0.85rem;
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+}
+
+/* Flowchart Visual Box */
+.workflow-visual-box {
+  margin: 3.5rem auto 1rem;
+  background: var(--bg-surface);
+  border: 1.5px solid var(--border-glow);
+  border-radius: 20px;
+  padding: 2rem 2.5rem;
+  max-width: 70rem;
+  box-shadow: 0 0 50px rgba(0, 229, 255, 0.08);
+}
+.workflow-steps {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 1rem;
+  position: relative;
+}
+@media(max-width: 900px) {
+  .workflow-steps { grid-template-columns: 1fr; }
+}
+.wf-step {
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  padding: 1.25rem;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.wf-step.active-step {
+  border-color: var(--accent-cyan);
+  background: rgba(0, 229, 255, 0.08);
+}
+.wf-step-num {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: var(--accent-cyan);
+}
+.wf-step-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #fff;
+}
+.wf-step-desc {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+/* Problem vs Solution Split */
+.problem-solution { padding: 5rem 0; }
+.split-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+}
+.split-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 18px;
+  padding: 2.5rem;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+}
+.split-card.bad {
+  border-color: rgba(244, 63, 94, 0.3);
+  background: linear-gradient(180deg, rgba(244, 63, 94, 0.06) 0%, var(--bg-surface) 100%);
+}
+.split-card.good {
+  border-color: rgba(0, 229, 255, 0.4);
+  background: linear-gradient(180deg, rgba(0, 229, 255, 0.07) 0%, var(--bg-surface) 100%);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+}
+.card-header-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  margin-bottom: 1.25rem;
+}
+.bad .card-header-badge { color: var(--accent-rose); }
+.good .card-header-badge { color: var(--accent-cyan); }
+.split-card h3 {
+  font-size: 1.6rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin-bottom: 1rem;
+  font-family: var(--font-display);
+}
+.split-card p {
+  color: var(--text-muted);
+  line-height: 1.65;
+  margin-bottom: 1.75rem;
+  font-size: 1.05rem;
+}
+.evidence-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.evidence-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  font-size: 0.95rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+.evidence-item i {
+  margin-top: 3px;
+  font-size: 1.05rem;
+}
+.bad .evidence-item i { color: var(--accent-rose); }
+.good .evidence-item i { color: var(--accent-emerald); }
+
+/* The Eight-Stage Agent Loop */
+.loop-section { padding: 5rem 0; }
+.stages-wrapper {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 18px;
+  padding: 2.5rem;
+}
+.stages-legend {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 2rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid var(--border-subtle);
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+.legend-group {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+.legend-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+.legend-box {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+}
+.box-local { background: var(--accent-emerald); }
+.box-wire { background: var(--accent-rose); }
+.box-server { background: var(--accent-violet); }
+
+.stages-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+}
+@media (max-width: 992px) {
+  .stages-grid { grid-template-columns: repeat(2, 1fr); }
+  .split-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 600px) {
+  .stages-grid { grid-template-columns: 1fr; }
+}
+.stage-card {
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  padding: 1.35rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.stage-card:hover, .stage-card.active {
+  border-color: var(--accent-cyan);
+  background: #141f36;
+  transform: translateY(-2px);
+  box-shadow: 0 0 20px rgba(0, 229, 255, 0.15);
+}
+.stage-num {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: var(--accent-cyan);
+  margin-bottom: 0.6rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.stage-zone-badge {
+  font-size: 0.7rem;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-weight: 700;
+}
+.zone-local { background: rgba(16, 185, 129, 0.15); color: var(--accent-emerald); }
+.zone-wire { background: rgba(244, 63, 94, 0.15); color: var(--accent-rose); }
+.zone-server { background: rgba(129, 140, 248, 0.15); color: var(--accent-violet); }
+.stage-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin-bottom: 0.45rem;
+  color: #fff;
+  font-family: var(--font-display);
+}
+.stage-sub {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  color: var(--text-faint);
+  line-height: 1.45;
+}
+
+/* Stage Detail Box */
+.stage-detail-box {
+  margin-top: 2rem;
+  background: var(--bg-surface-elevated);
+  border: 1.5px solid var(--border-glow);
+  border-radius: 14px;
+  padding: 1.75rem;
+  display: flex;
+  gap: 1.5rem;
+  align-items: flex-start;
+}
+.detail-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: rgba(0, 229, 255, 0.15);
+  border: 1.5px solid rgba(0, 229, 255, 0.35);
+  display: grid;
+  place-items: center;
+  color: var(--accent-cyan);
+  font-size: 20px;
+  flex-shrink: 0;
+}
+.detail-content h4 {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 0.4rem;
+}
+.detail-content p {
+  font-size: 1rem;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+/* Interactive Simulator */
+.demo-section { padding: 5rem 0; }
+.simulator-layout {
+  display: grid;
+  grid-template-columns: 360px 1fr;
+  gap: 2rem;
+}
+@media(max-width: 900px) {
+  .simulator-layout { grid-template-columns: 1fr; }
+}
+.controls-panel {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 16px;
+  padding: 1.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+.controls-panel h3 {
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #fff;
+}
+.filter-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+.filter-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.filter-item:hover { border-color: var(--accent-cyan); }
+.filter-info { display: flex; flex-direction: column; gap: 2px; }
+.filter-title { font-size: 0.92rem; font-weight: 700; color: #fff; }
+.filter-desc { font-size: 0.78rem; font-family: var(--font-mono); color: var(--text-faint); }
+
+/* Switch Toggle */
+.switch { position: relative; width: 44px; height: 24px; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.slider {
+  position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+  background-color: rgba(255, 255, 255, 0.1);
+  transition: .3s; border-radius: 24px; border: 1px solid var(--border-subtle);
+}
+.slider:before {
+  position: absolute; content: ""; height: 16px; width: 16px; left: 3px; bottom: 3px;
+  background-color: white; transition: .3s; border-radius: 50%;
+}
+input:checked + .slider { background-color: var(--accent-cyan); }
+input:checked + .slider:before { transform: translateX(20px); background-color: #03121c; }
+
+.simulated-frame {
+  background: var(--bg-surface);
+  border: 1.5px solid var(--border-glow);
+  border-radius: 16px;
+  padding: 1.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+.frame-top-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-subtle);
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+.frame-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+@media(max-width: 600px) { .frame-body { grid-template-columns: 1fr; } }
+.frame-card {
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+.frame-label {
+  font-size: 0.78rem;
+  font-family: var(--font-mono);
+  color: var(--text-faint);
+  text-transform: uppercase;
+  margin-bottom: 6px;
+  font-weight: 700;
+}
+.frame-value {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #fff;
+  word-break: break-all;
+}
+.redacted-token {
+  color: var(--accent-cyan) !important;
+  background: rgba(0, 229, 255, 0.12);
+  padding: 2px 8px;
+  border-radius: 6px;
+  display: inline-block;
+  font-family: var(--font-mono);
+  border: 1px solid rgba(0, 229, 255, 0.3);
+}
+.redacted-mask {
+  background: #000 !important;
+  color: transparent !important;
+  user-select: none;
+  border-radius: 4px;
+}
+.redacted-blur {
+  filter: blur(8px);
+  user-select: none;
+}
+
+/* Call to Action Footer Banner */
+.cta-banner {
+  padding: 6rem 0;
+  text-align: center;
+}
+.cta-box {
+  background: linear-gradient(180deg, var(--bg-surface) 0%, #080d19 100%);
+  border: 1.5px solid var(--border-glow);
+  border-radius: 24px;
+  padding: 4rem 2rem;
+  max-width: 62rem;
+  margin: 0 auto;
+  box-shadow: 0 0 60px rgba(0, 229, 255, 0.1);
+}
+.cta-box h2 {
+  font-family: var(--font-display);
+  font-size: clamp(2.2rem, 3.8vw, 3rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  margin-bottom: 1.2rem;
+  color: #fff;
+}
+.cta-box p {
+  font-size: 1.25rem;
+  color: var(--text-muted);
+  max-width: 40rem;
+  margin: 0 auto 2.5rem auto;
+  line-height: 1.65;
+}
+.cta-buttons {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+}
+
+/* Video Showcase Section */
+.video-showcase-section {
+  padding: 5rem 0 3rem 0;
+}
+.video-mockup {
+  background: var(--bg-surface);
+  border: 1.5px solid rgba(0, 229, 255, 0.35);
+  border-radius: 16px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6), 0 0 30px rgba(0, 229, 255, 0.15);
+  overflow: hidden;
+  position: relative;
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+.video-mockup:hover {
+  border-color: var(--accent-cyan);
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.7), 0 0 40px rgba(0, 229, 255, 0.25);
+}
+.video-mockup-header {
+  background: #090f1d;
+  padding: 12px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border-subtle);
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+}
+.video-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.window-dots {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.window-dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+}
+.window-dot.close { background: #ef4444; }
+.window-dot.min { background: #f59e0b; }
+.window-dot.max { background: #10b981; }
+.video-filename {
+  color: var(--text-main);
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.video-badge {
+  background: rgba(0, 229, 255, 0.15);
+  color: var(--accent-cyan);
+  border: 1px solid rgba(0, 229, 255, 0.4);
+  padding: 3px 10px;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+}
+.video-wrapper {
+  position: relative;
+  width: 100%;
+  background: #020617;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.video-wrapper video {
+  width: 100%;
+  max-height: 720px;
+  display: block;
+  background: #000;
+  outline: none;
+}
+.video-chapters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin-top: 1.5rem;
+}
+.chapter-card {
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-decoration: none;
+}
+.chapter-card:hover {
+  border-color: var(--accent-cyan);
+  background: rgba(0, 229, 255, 0.08);
+  transform: translateY(-2px);
+}
+.chapter-time {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: var(--accent-cyan);
+  background: rgba(0, 229, 255, 0.15);
+  padding: 2px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+.chapter-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1.3;
+}
+.chapter-desc {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+/* Video Modal Lightbox */
+.video-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(2, 6, 23, 0.88);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  z-index: 1000;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+}
+.video-modal-backdrop.active {
+  display: flex;
+}
+.video-modal-content {
+  width: 100%;
+  max-width: 65rem;
+  background: var(--bg-surface);
+  border: 1.5px solid var(--accent-cyan);
+  border-radius: 16px;
+  box-shadow: 0 0 50px rgba(0, 229, 255, 0.3);
+  overflow: hidden;
+  position: relative;
+}
+.video-modal-close {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  transition: all 0.2s;
+}
+.video-modal-close:hover {
+  background: var(--accent-rose);
+  border-color: var(--accent-rose);
+}
+
+/* Footer */
+footer {
+  border-top: 1px solid var(--border-subtle);
+  padding: 2.5rem 2rem;
+  font-size: 0.9rem;
+  color: var(--text-faint);
+}
+.footer-inner {
+  max-width: 80rem;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+}
+.footer-links {
+  display: flex;
+  align-items: center;
+  gap: 1.75rem;
+}
+.footer-links a {
+  color: var(--text-muted);
+  text-decoration: none;
+  font-weight: 600;
+  transition: color 0.2s;
+}
+.footer-links a:hover { color: #fff; }
+</style>
+</head>
+<body>
+
+<!-- Navigation Bar -->
+<nav>
+  <a href="index.html" class="nav-brand">
+    <div class="brand-badge">
+      <i class="fa-solid fa-shield-halved"></i>
+    </div>
+    <span>VisionVault</span>
+  </a>
+  <div class="nav-links">
+    <a href="#video-demo" class="nav-link" style="color:var(--accent-cyan); font-weight:700;">
+      <i class="fa-solid fa-circle-play"></i> Video Demo
+    </a>
+    <a href="#loop" class="nav-link">8-Stage Loop</a>
+    <a href="#demo" class="nav-link">Live Redaction Lab</a>
+    <a href="#specs" class="nav-link">Specifications</a>
+  </div>
+  <div class="nav-actions">
+    <a href="employee-portal.html" class="btn btn-primary btn-sm">
+      <i class="fa-solid fa-arrow-up-right-from-square"></i> Open Demo
+    </a>
+  </div>
+</nav>
+
+<!-- Hero Section -->
+<header class="hero container">
+  <div class="pill-badge">
+    <span class="pill-dot"></span>
+    Local ViT Vision · Dynamic Canvas Redaction · Zero-Knowledge Agent Automation
+  </div>
+  <h1>A vision agent that sees your screen without ever leaking it.</h1>
+  <p>
+    Browser-resident ViT inference reads the live screen state. Faces, passwords, PII, and sensitive telemetry keys are destroyed locally in device RAM. Only an anonymized, schema-tagged context reaches the cloud reasoning model.
+  </p>
+  <div class="hero-cta">
+    <a href="#video-demo" class="btn btn-glow" id="btn-hero-video">
+      <i class="fa-solid fa-circle-play"></i> Watch Prototype Demo (1080p)
+    </a>
+    <a href="visionvault-extension.zip" download class="btn btn-secondary" id="btn-download-ext">
+      <i class="fa-solid fa-download"></i> Extension (.zip)
+    </a>
+  </div>
+
+  <div class="hero-specs" id="specs">
+    <div class="spec-item">
+      <span class="spec-val" style="color:var(--accent-emerald);">0 Bytes</span>
+      <span class="spec-lbl">Raw PII Cloud Egress</span>
+    </div>
+    <div class="spec-item">
+      <span class="spec-val">&lt; 38 ms</span>
+      <span class="spec-lbl">Client ViT Latency</span>
+    </div>
+    <div class="spec-item">
+      <span class="spec-val">WebGPU + WASM</span>
+      <span class="spec-lbl">On-Device Inference</span>
+    </div>
+    <div class="spec-item">
+      <span class="spec-val" style="color:var(--accent-cyan);">5 / 5 Databases</span>
+      <span class="spec-lbl">ISRO Automated Sync</span>
+    </div>
+  </div>
+</header>
+
+<!-- Video Prototype Showcase Section -->
+<section class="video-showcase-section container" id="video-demo">
+  <div class="section-header">
+    <div class="section-tag"><i class="fa-solid fa-play" style="font-size:10px; margin-right:4px;"></i> Official Walkthrough Video</div>
+    <h2 class="section-title">VisionVault in Action: Full End-to-End Walkthrough</h2>
+    <p class="section-desc">Watch how VisionVault detects on-screen credentials in real time, redacts PII before transmission, and automates multi-database forms without cloud pixel leakage.</p>
+  </div>
+
+  <div class="video-mockup">
+    <div class="video-mockup-header">
+      <div class="video-header-left">
+        <div class="window-dots">
+          <span class="window-dot close"></span>
+          <span class="window-dot min"></span>
+          <span class="window-dot max"></span>
+        </div>
+        <div class="video-filename">
+          <i class="fa-solid fa-film" style="color:var(--accent-cyan);"></i> ProtoType VisionVault.mp4
+        </div>
+      </div>
+      <div style="display:flex; align-items:center; gap:10px;">
+        <span class="video-badge"><i class="fa-solid fa-circle" style="font-size:7px; color:var(--accent-emerald); margin-right:4px;"></i> 1080P HD • ZERO-LEAK DEMO</span>
+        <button class="btn btn-secondary btn-sm" onclick="toggleVideoFullscreen()" title="Fullscreen mode" style="padding:4px 8px; font-size:11px;">
+          <i class="fa-solid fa-expand"></i>
+        </button>
+      </div>
+    </div>
+    
+    <div class="video-wrapper">
+      <video id="demoVideoPlayer" controls playsinline preload="metadata" poster="images/demo-video-cover.jpg">
+        <source src="images/ProtoType VisionVault.mp4" type="video/mp4">
+        Your browser does not support the video tag.
+      </video>
+    </div>
+  </div>
+
+  <!-- Interactive Chapter Jump Navigation -->
+  <div class="video-chapters">
+    <div class="chapter-card" onclick="seekDemoVideo(0)">
+      <span class="chapter-time">00:00</span>
+      <div>
+        <div class="chapter-title"><i class="fa-solid fa-lock" style="color:var(--accent-cyan)"></i> Encrypted Comms Reception</div>
+        <div class="chapter-desc">Mission transmission received &amp; decrypted locally with AES-256-GCM.</div>
+      </div>
+    </div>
+    <div class="chapter-card" onclick="seekDemoVideo(12)">
+      <span class="chapter-time">00:12</span>
+      <div>
+        <div class="chapter-title"><i class="fa-solid fa-user-shield" style="color:var(--accent-emerald)"></i> ViT Face &amp; PII Redaction</div>
+        <div class="chapter-desc">Real-time offscreen canvas masks faces, emails, and credentials.</div>
+      </div>
+    </div>
+    <div class="chapter-card" onclick="seekDemoVideo(25)">
+      <span class="chapter-time">00:25</span>
+      <div>
+        <div class="chapter-title"><i class="fa-solid fa-vault" style="color:var(--accent-amber)"></i> Secure Vault Ingestion</div>
+        <div class="chapter-desc">Telemetry vectors &amp; parameters encrypted at rest with PBKDF2.</div>
+      </div>
+    </div>
+    <div class="chapter-card" onclick="seekDemoVideo(40)">
+      <span class="chapter-time">00:40</span>
+      <div>
+        <div class="chapter-title"><i class="fa-solid fa-database" style="color:var(--accent-violet)"></i> 5-Database Form Automation</div>
+        <div class="chapter-desc">Autonomous DOM dispatch across Payroll, Systems &amp; Quarters.</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-top:2rem; text-align:center; display:flex; justify-content:center; gap:1rem; flex-wrap:wrap;">
+    <a href="employee-portal.html" class="btn btn-primary">
+      <i class="fa-solid fa-play"></i> Try Interactive Demo →
+    </a>
+  </div>
+</section>
+
+<!-- Problem vs Solution Comparison -->
+<section class="problem-solution container">
+  <div class="section-header">
+    <div class="section-tag">Zero-Trust Security Analysis</div>
+    <h2 class="section-title">Why standard vision agents fail enterprise compliance</h2>
+    <p class="section-desc">Traditional AI vision agents upload raw unredacted screenshots to cloud endpoints. VisionVault enforces privacy in browser hardware.</p>
+  </div>
+  <div class="split-grid">
+    <!-- Unsafe Cloud Agent -->
+    <div class="split-card bad">
+      <div class="card-header-badge">
+        <i class="fa-solid fa-triangle-exclamation"></i> Vulnerable Cloud Model (OpenAI / Anthropic Direct)
+      </div>
+      <h3>Unredacted Pixel Exfiltration</h3>
+      <p>Full raw screenshots — bank accounts, employee files, Aadhaar cards, secret KMS encryption keys — are uploaded directly to remote LLM servers.</p>
+      <ul class="evidence-list">
+        <li class="evidence-item">
+          <i class="fa-solid fa-xmark"></i>
+          <span>Full uncompressed screenshots sent over the public internet to external APIs.</span>
+        </li>
+        <li class="evidence-item">
+          <i class="fa-solid fa-xmark"></i>
+          <span>Credentials, biometrics and classified telemetry permanently stored in server logs.</span>
+        </li>
+        <li class="evidence-item">
+          <i class="fa-solid fa-xmark"></i>
+          <span>Heavy network latency (&gt;3.5MB uncompressed image payloads per step).</span>
+        </li>
+      </ul>
+    </div>
+
+    <!-- VisionVault Zero-Trust Model -->
+    <div class="split-card good">
+      <div class="card-header-badge">
+        <i class="fa-solid fa-shield-check"></i> The VisionVault Architecture
+      </div>
+      <h3>On-Device Perception &amp; Sanitization</h3>
+      <p>A lightweight quantized ViT on the client handles perception and redaction; reasoning stays on the server but only ever receives structure — layout, roles, and schema tokens.</p>
+      <ul class="evidence-list">
+        <li class="evidence-item">
+          <i class="fa-solid fa-check"></i>
+          <span>Sensitive text, faces, passwords and keys are destroyed locally in browser RAM.</span>
+        </li>
+        <li class="evidence-item">
+          <i class="fa-solid fa-check"></i>
+          <span>Server receives only tokenized placeholders (e.g. «PERSON_1», «SECRET_1»).</span>
+        </li>
+        <li class="evidence-item">
+          <i class="fa-solid fa-check"></i>
+          <span>True Zero-Trust assurance: the server structurally cannot leak what it never saw.</span>
+        </li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- The Eight-Stage Agent Loop -->
+<section class="loop-section container" id="loop">
+  <div class="section-header">
+    <div class="section-tag">Execution Pipeline</div>
+    <h2 class="section-title">The Eight-Stage Autonomous Agent Loop</h2>
+    <p class="section-desc">Click any stage to inspect the execution boundaries. Stages 1–4 and 8 never leave the client; only stage 5 crosses the network wire.</p>
+  </div>
+
+  <div class="stages-wrapper">
+    <div class="stages-legend">
+      <div class="legend-group">
+        <div class="legend-pill">
+          <div class="legend-box box-local"></div>
+          <span>Client Boundary (Zero Network Egress)</span>
+        </div>
+        <div class="legend-pill">
+          <div class="legend-box box-wire"></div>
+          <span>Wire Boundary (Sanitized Schema)</span>
+        </div>
+        <div class="legend-pill">
+          <div class="legend-box box-server"></div>
+          <span>Server Model (Constrained Reasoning)</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="stages-grid" id="stagesGrid">
+      <div class="stage-card active" data-stage="1" onclick="selectStage(1)">
+        <div class="stage-num"><span>01 / 08</span><span class="stage-zone-badge zone-local">LOCAL</span></div>
+        <div class="stage-title">Screen Capture</div>
+        <div class="stage-sub">Tab pixels + DOM tree</div>
+      </div>
+      <div class="stage-card" data-stage="2" onclick="selectStage(2)">
+        <div class="stage-num"><span>02 / 08</span><span class="stage-zone-badge zone-local">LOCAL</span></div>
+        <div class="stage-title">On-Device ViT</div>
+        <div class="stage-sub">WebGPU inference (~35ms)</div>
+      </div>
+      <div class="stage-card" data-stage="3" onclick="selectStage(3)">
+        <div class="stage-num"><span>03 / 08</span><span class="stage-zone-badge zone-local">LOCAL</span></div>
+        <div class="stage-title">Hybrid Detection</div>
+        <div class="stage-sub">Vision ∪ DOM ∪ Regex</div>
+      </div>
+      <div class="stage-card" data-stage="4" onclick="selectStage(4)">
+        <div class="stage-num"><span>04 / 08</span><span class="stage-zone-badge zone-local">LOCAL</span></div>
+        <div class="stage-title">Canvas Redact</div>
+        <div class="stage-sub">Destructive pixel mask</div>
+      </div>
+      <div class="stage-card" data-stage="5" onclick="selectStage(5)">
+        <div class="stage-num"><span>05 / 08</span><span class="stage-zone-badge zone-wire">WIRE</span></div>
+        <div class="stage-title">Sanitized Payload</div>
+        <div class="stage-sub">Tokens cross network</div>
+      </div>
+      <div class="stage-card" data-stage="6" onclick="selectStage(6)">
+        <div class="stage-num"><span>06 / 08</span><span class="stage-zone-badge zone-server">SERVER</span></div>
+        <div class="stage-title">VLM Reasoning</div>
+        <div class="stage-sub">Plans abstract steps</div>
+      </div>
+      <div class="stage-card" data-stage="7" onclick="selectStage(7)">
+        <div class="stage-num"><span>07 / 08</span><span class="stage-zone-badge zone-wire">WIRE</span></div>
+        <div class="stage-title">Action Response</div>
+        <div class="stage-sub">Constrained action JSON</div>
+      </div>
+      <div class="stage-card" data-stage="8" onclick="selectStage(8)">
+        <div class="stage-num"><span>08 / 08</span><span class="stage-zone-badge zone-local">LOCAL</span></div>
+        <div class="stage-title">DOM Autofill</div>
+        <div class="stage-sub">Native browser events</div>
+      </div>
+    </div>
+
+    <!-- Dynamic Stage Detail Box -->
+    <div class="stage-detail-box">
+      <div class="detail-icon" id="detailIcon"><i class="fa-solid fa-camera"></i></div>
+      <div class="detail-content">
+        <h4 id="detailTitle">Stage 1: Screen Capture &amp; DOM Parsing</h4>
+        <p id="detailDesc">The extension grabs a frame of the active tab and pairs it with the live DOM accessibility tree so every visual region has a semantic label and bounding coordinates.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Live Interactive Redaction Lab -->
+<section class="demo-section container" id="demo">
+  <div class="section-header">
+    <div class="section-tag">Interactive Sandbox</div>
+    <h2 class="section-title">Live Vision Redaction Lab</h2>
+    <p class="section-desc">Toggle filters below to see how raw screen data is transformed before leaving the browser.</p>
+  </div>
+
+  <div class="simulator-layout">
+    <div class="controls-panel">
+      <h3>Active Redaction Filters</h3>
+      <div class="filter-list">
+        <label class="filter-item">
+          <div class="filter-info">
+            <span class="filter-title">Full Names &amp; Operator</span>
+            <span class="filter-desc">ViT entity box → «PERSON_1»</span>
+          </div>
+          <div class="switch">
+            <input type="checkbox" id="toggle-name" checked onchange="updateSimulatedFrame()">
+            <span class="slider"></span>
+          </div>
+        </label>
+
+        <label class="filter-item">
+          <div class="filter-info">
+            <span class="filter-title">Official Email &amp; Chat</span>
+            <span class="filter-desc">input[type=email] → «EMAIL_1»</span>
+          </div>
+          <div class="switch">
+            <input type="checkbox" id="toggle-email" checked onchange="updateSimulatedFrame()">
+            <span class="slider"></span>
+          </div>
+        </label>
+
+        <label class="filter-item">
+          <div class="filter-info">
+            <span class="filter-title">Phone &amp; Contact Numbers</span>
+            <span class="filter-desc">checksum regex → «PHONE_1»</span>
+          </div>
+          <div class="switch">
+            <input type="checkbox" id="toggle-phone" checked onchange="updateSimulatedFrame()">
+            <span class="slider"></span>
+          </div>
+        </label>
+
+        <label class="filter-item">
+          <div class="filter-info">
+            <span class="filter-title">KMS Encryption Keys</span>
+            <span class="filter-desc">secret token → Black Box Mask</span>
+          </div>
+          <div class="switch">
+            <input type="checkbox" id="toggle-key" checked onchange="updateSimulatedFrame()">
+            <span class="slider"></span>
+          </div>
+        </label>
+
+        <label class="filter-item">
+          <div class="filter-info">
+            <span class="filter-title">Biometric Face Avatar</span>
+            <span class="filter-desc">Local ViT face box → Gaussian blur</span>
+          </div>
+          <div class="switch">
+            <input type="checkbox" id="toggle-face" checked onchange="updateSimulatedFrame()">
+            <span class="slider"></span>
+          </div>
+        </label>
+      </div>
+    </div>
+
+    <div class="simulated-frame">
+      <div class="frame-top-bar">
+        <span><i class="fa-solid fa-eye-slash" style="color:var(--accent-cyan);"></i> SIMULATED WIRE PAYLOAD (CLOUD SERVER PERSPECTIVE)</span>
+        <span id="frameStatusText" style="color:var(--accent-emerald);">● 5 MASKS APPLIED</span>
+      </div>
+
+      <div class="frame-body">
+        <div class="frame-card">
+          <div class="frame-label">Operator Identity</div>
+          <div class="frame-value redacted-token" id="sim-name">«PERSON_1»</div>
+        </div>
+
+        <div class="frame-card">
+          <div class="frame-label">Official Email</div>
+          <div class="frame-value redacted-token" id="sim-email">«EMAIL_1»</div>
+        </div>
+
+        <div class="frame-card">
+          <div class="frame-label">Phone &amp; SMS Token</div>
+          <div class="frame-value redacted-token" id="sim-phone">«PHONE_1»</div>
+        </div>
+
+        <div class="frame-card">
+          <div class="frame-label">KMS Secret Key Reference</div>
+          <div class="frame-value redacted-mask" id="sim-key">ISRO-KMS-EK-2026-04871</div>
+        </div>
+
+        <div class="frame-card">
+          <div class="frame-label">Mission Ground Station (Public)</div>
+          <div class="frame-value" style="color:var(--accent-cyan);">14.250 GHz (Ku-Band)</div>
+        </div>
+
+        <div class="frame-card">
+          <div class="frame-label">Operator Face / Badge Photo</div>
+          <div class="frame-value redacted-blur" id="sim-face" style="display:flex; align-items:center; gap:8px;">
+            <i class="fa-solid fa-user-astronaut"></i> [BIOMETRIC AVATAR]
+          </div>
+        </div>
+      </div>
+
+      <div style="font-size:0.85rem; color:var(--text-faint); margin-top:0.5rem; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+        <span>Non-sensitive technical identifiers remain intact for agent spatial reasoning.</span>
+        <a href="employee-portal.html" class="btn btn-secondary btn-sm">Open Interactive Demo →</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer>
+  <div class="footer-inner">
+    <div>
+      <strong>VisionVault</strong> • Privacy-Preserving Browser Vision Agent
+    </div>
+    <div class="footer-links">
+      <a href="employee-portal.html">Employee Portal</a>
+      <a href="hr-portal.html">HR Command</a>
+      <a href="login.html">Login</a>
+      <a href="visionvault-extension.zip" download>Extension (.zip)</a>
+      <a href="https://github.com/NateshKannaR/VisionVault" target="_blank">GitHub</a>
+    </div>
+  </div>
+</footer>
+
+<script>
+const STAGE_DETAILS = {
+  1: {
+    icon: "fa-camera",
+    title: "Stage 1: Screen Capture & DOM Parsing",
+    desc: "The extension grabs a frame of the active tab and pairs it with the live DOM/accessibility tree so every visual region has a semantic label and bounding coordinates."
+  },
+  2: {
+    icon: "fa-microchip",
+    title: "Stage 2: On-Device ViT Inference (WebGPU / WASM)",
+    desc: "A lightweight quantized Vision Transformer runs locally via ONNX Runtime Web. It extracts visual regions of interest (avatars, signatures, badges) in ~35ms."
+  },
+  3: {
+    icon: "fa-crosshairs",
+    title: "Stage 3: Hybrid Detection (Vision ∪ DOM ∪ Regex)",
+    desc: "Multi-layered detection combines computer vision bounding boxes with HTML input selectors and regex patterns (Aadhaar, PAN, emails, KMS keys) for 100% recall."
+  },
+  4: {
+    icon: "fa-eraser",
+    title: "Stage 4: Offscreen Canvas Redaction",
+    desc: "Sensitive pixels are black-boxed or blurred on an offscreen HTML5 canvas buffer before serialization. Sensitive values are swapped for schema tokens."
+  },
+  5: {
+    icon: "fa-network-wired",
+    title: "Stage 5: Wire Boundary Transmission",
+    desc: "Only the sanitized, redacted image and schema-tagged layout cross the network. Real names, credentials, and passwords NEVER leave the user's device."
+  },
+  6: {
+    icon: "fa-brain",
+    title: "Stage 6: Sanitized Server Reasoning",
+    desc: "An open-weights VLM (Qwen2-VL or Llava) analyzes the layout and plans the next action using abstract tokens («PERSON_1», «SECRET_1») without seeing private data."
+  },
+  7: {
+    icon: "fa-code",
+    title: "Stage 7: Constrained JSON Action Response",
+    desc: "The model returns structured action instructions like {\"type\":\"click\",\"selector\":\"#btn-submit\"}, strictly validated against an allowable action grammar."
+  },
+  8: {
+    icon: "fa-arrow-rotate-left",
+    title: "Stage 8: Client Desanitization & DOM Execution",
+    desc: "The extension receives the action, verifies its boundaries, restores local tokens if typing is required, and dispatches native browser events into the target DOM element."
+  }
+};
+
+function selectStage(num) {
+  document.querySelectorAll(".stage-card").forEach(el => el.classList.remove("active"));
+  const card = document.querySelector(`.stage-card[data-stage="${num}"]`);
+  if (card) card.classList.add("active");
+
+  const detail = STAGE_DETAILS[num];
+  if (detail) {
+    document.getElementById("detailIcon").innerHTML = `<i class="fa-solid ${detail.icon}"></i>`;
+    document.getElementById("detailTitle").textContent = detail.title;
+    document.getElementById("detailDesc").textContent = detail.desc;
+  }
+}
+
+function updateSimulatedFrame() {
+  const nameActive = document.getElementById("toggle-name").checked;
+  const emailActive = document.getElementById("toggle-email").checked;
+  const phoneActive = document.getElementById("toggle-phone").checked;
+  const keyActive = document.getElementById("toggle-key").checked;
+  const faceActive = document.getElementById("toggle-face").checked;
+
+  const simName = document.getElementById("sim-name");
+  const simEmail = document.getElementById("sim-email");
+  const simPhone = document.getElementById("sim-phone");
+  const simKey = document.getElementById("sim-key");
+  const simFace = document.getElementById("sim-face");
+
+  if (nameActive) {
+    simName.textContent = "«PERSON_1»";
+    simName.className = "frame-value redacted-token";
+  } else {
+    simName.textContent = "Rajesh Kumar";
+    simName.className = "frame-value";
+  }
+
+  if (emailActive) {
+    simEmail.textContent = "«EMAIL_1»";
+    simEmail.className = "frame-value redacted-token";
+  } else {
+    simEmail.textContent = "r.sharma@isro.gov.in";
+    simEmail.className = "frame-value";
+  }
+
+  if (phoneActive) {
+    simPhone.textContent = "«PHONE_1»";
+    simPhone.className = "frame-value redacted-token";
+  } else {
+    simPhone.textContent = "+91 80 2217 2296";
+    simPhone.className = "frame-value";
+  }
+
+  if (keyActive) {
+    simKey.textContent = "ISRO-KMS-EK-2026-04871";
+    simKey.className = "frame-value redacted-mask";
+  } else {
+    simKey.textContent = "ISRO-KMS-EK-2026-04871";
+    simKey.className = "frame-value";
+  }
+
+  if (faceActive) {
+    simFace.className = "frame-value redacted-blur";
+  } else {
+    simFace.className = "frame-value";
+  }
+
+  let count = [nameActive, emailActive, phoneActive, keyActive, faceActive].filter(Boolean).length;
+  document.getElementById("frameStatusText").textContent = `● ${count} MASKS APPLIED`;
+  document.getElementById("frameStatusText").style.color = count > 0 ? "var(--accent-emerald)" : "var(--accent-rose)";
+}
+
+function seekDemoVideo(seconds) {
+  const vid = document.getElementById("demoVideoPlayer");
+  if (!vid) return;
+  vid.currentTime = seconds;
+  vid.play().catch(() => {});
+  const sec = document.getElementById("video-demo");
+  if (sec) sec.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+function toggleVideoFullscreen() {
+  const vid = document.getElementById("demoVideoPlayer");
+  if (!vid) return;
+  if (!document.fullscreenElement) {
+    if (vid.requestFullscreen) vid.requestFullscreen();
+    else if (vid.webkitRequestFullscreen) vid.webkitRequestFullscreen();
+  } else {
+    if (document.exitFullscreen) document.exitFullscreen();
+  }
+}
+</script>
+</body>
+</html>

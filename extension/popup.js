@@ -468,6 +468,49 @@ if ($("addVaultFieldBtn")) {
   });
 }
 
+// Instant 1-click restore for ISRO Telemetry Defaults
+if ($("restoreTelemetryDefaultsBtn")) {
+  $("restoreTelemetryDefaultsBtn").addEventListener("click", async () => {
+    try {
+      const telemetryDefaults = {
+        satellite_name: "INSAT-4B",
+        mission_id: "INSAT-4B / M-201",
+        operator: "R. Sharma",
+        launch_date: "2007-03-12",
+        orbit_type: "Geostationary (GEO)",
+        orbital_inclination: "0.05°",
+        apogee: "35,786 km",
+        perigee: "35,786 km",
+        tle_line_1: "1 30798U 07007A 26248.51249811 -.00000124 00000-0 10000-4 0 9991",
+        tle_line_2: "2 30798 0.0512 87.2145 0001248 145.2104 214.8901 1.00273412 71234",
+        ground_station_freq: "14.250 GHz (Ku-Band)",
+        encryption_key_ref: "ISRO-KMS-EK-2026-04871"
+      };
+
+      let current = {};
+      if (typeof getVault === "function") {
+        try { current = await getVault(); } catch (_) {}
+      } else {
+        const res = await chrome.storage.local.get("vault");
+        current = res.vault || {};
+      }
+
+      const merged = Object.assign({}, current, telemetryDefaults);
+      if (typeof saveVault === "function") {
+        await saveVault(merged);
+      } else {
+        await chrome.storage.local.set({ vault: merged });
+      }
+
+      await loadVault();
+      showStatus("vaultStatus", "success", "ISRO Mission Telemetry restored to INSAT-4B defaults!");
+      setTimeout(() => hideStatus("vaultStatus"), 3500);
+    } catch (err) {
+      showStatus("vaultStatus", "error", "Failed to restore telemetry: " + err.message);
+    }
+  });
+}
+
 // Reset vault to default ISRO profile
 if ($("resetVaultBtn")) {
   $("resetVaultBtn").addEventListener("click", async () => {
@@ -1187,7 +1230,8 @@ scanBtn.addEventListener("click", async () => {
         return;
       }
       const n = res.count || Object.keys(res.stored || {}).length;
-      showStatus("statusMsg", "success", `Stored ${n} value${n === 1 ? "" : "s"} from this page into vault.`);
+      const sat = res.stored?.satellite_name ? ` (${res.stored.satellite_name})` : "";
+      showStatus("statusMsg", "success", `✓ Stored ${n} mission & credentials values into Encrypted Vault${sat}.`);
       loadVault();
       // Background scan to update preview without blocking UI
       chrome.runtime.sendMessage({ type: "SCAN", task, tabId }, (scanRes) => {

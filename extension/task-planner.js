@@ -553,9 +553,9 @@
       result.openTargets.push(onPageTargetMatch[1].toLowerCase());
     }
 
-    // Extract form navigation / fill targets (e.g. "fill form 2", "fill the form fill form 2", "click that form 2 and fill that form", "open form 2")
-    const formNumMatch = text.match(/\bform\s*(\d+)\b/i);
-    const formSlugMatch = text.match(/\bform\s*-\s*([a-z0-9_-]+)\b/i);
+    // Extract form / database navigation / fill targets (e.g. "fill form 2", "fill database 2", "open payroll database", "open form 2")
+    const formNumMatch = text.match(/\b(?:form|database|db)\s*(\d+)\b/i);
+    const formSlugMatch = text.match(/\b(?:form|database|db)\s*-\s*([a-z0-9_-]+)\b/i);
     const formNamedMatch = text.match(/\b(payroll|hr|mission\s*systems?|it\b|housing|medical)\b/i);
 
     if (formNumMatch) {
@@ -566,16 +566,19 @@
       const fTarget = `form-${formSlugMatch[1].toLowerCase()}`;
       if (!result.openTargets.includes(fTarget)) result.openTargets.push(fTarget);
       result.wantsFill = true;
-    } else if (formNamedMatch && /\b(fill|form|click|open|switch)\b/i.test(text)) {
+    } else if (formNamedMatch && /\b(fill|form|database|db|registry|click|open|switch)\b/i.test(text)) {
       const fTarget = formNamedMatch[1].toLowerCase();
       if (!result.openTargets.includes(fTarget)) result.openTargets.push(fTarget);
       result.wantsFill = true;
-    } else if (/\bfill\s+(?:the\s+)?(?:form|details|fields|values)\b/i.test(text) || /\b(fill|autofill)\b/i.test(text)) {
+    } else if (/\bfill\s+(?:the\s+)?(?:form|database|db|registry|details|fields|values)\b/i.test(text) || /\b(fill|autofill)\b/i.test(text)) {
       result.wantsFill = true;
     }
 
-    if (/\b(?:store|save)\s+(?:the\s+)?(?:values?|details?|fields?|data)\s+(?:in|to|into)\s+(?:the\s+)?vault\b/i.test(text) ||
-        /\b(?:store|save)\s+(?:to|in|into)\s+(?:the\s+)?vault\b/i.test(text)) {
+    if (
+      /\b(?:store|save|sync|add|capture|extract|put|write|record|import|read|keep)\b.*?\b(?:vault|vualt|valut)\b/i.test(text) ||
+      /\b(?:vault|vualt|valut)\b.*?\b(?:store|save|sync|add|capture|extract|put|write|record|import|read|keep|fill|update)\b/i.test(text) ||
+      /\b(?:store|save|read|sync)\s+(?:all\s+)?(?:these\s+|this\s+|the\s+|my\s+|encrypted\s+)?(?:vaules?|values?|details?|fields?|data|telemetry|payload|message|info|information)?\s*(?:in|to|into)?\s*(?:the\s+|my\s+|our\s+|local\s+|encrypted\s+)?(?:vault|vualt)\b/i.test(text)
+    ) {
       result.wantsStoreVault = true;
     }
 
@@ -914,11 +917,11 @@
 
     // 4. Explicit follow-up target clicks
     const FORM_TARGET_ALIASES = {
-      "form 1": ["form 1", "form1", "form-hr", "personal", "hr"],
-      "form 2": ["form 2", "form2", "form-payroll", "payroll", "banking", "salary", "isro mission payroll"],
-      "form 3": ["form 3", "form3", "form-it", "asset", "access", "itam", "mission systems"],
-      "form 4": ["form 4", "form4", "form-housing", "housing", "quarters", "allotment", "staff quarters"],
-      "form 5": ["form 5", "form5", "form-medical", "medical", "insurance", "dependents", "health & welfare", "health and welfare"],
+      "form 1": ["form 1", "form1", "form-hr", "personal", "hr", "hr database", "personnel database", "database 1"],
+      "form 2": ["form 2", "form2", "form-payroll", "payroll", "banking", "salary", "isro mission payroll", "payroll database", "database 2", "banking database"],
+      "form 3": ["form 3", "form3", "form-it", "asset", "access", "itam", "mission systems", "it database", "database 3"],
+      "form 4": ["form 4", "form4", "form-housing", "housing", "quarters", "allotment", "staff quarters", "housing database", "database 4"],
+      "form 5": ["form 5", "form5", "form-medical", "medical", "insurance", "dependents", "health & welfare", "health and welfare", "medical database", "database 5"],
     };
 
     for (const target of parsed.openTargets) {
@@ -1572,7 +1575,7 @@
       // 1. Open "Add New Mission" page if not visible
       const addMissionNav = available.find(m =>
         (m.role === "link" || m.role === "clickable" || m.role === "tab" || m.role === "nav-item") &&
-        /add\s*(?:new\s*)?mission/i.test(m.label || "")
+        /(?:add|register)\s*(?:new\s*)?mission/i.test(m.label || "")
       );
       const isAddMissionVisible = available.some(m =>
         FILLABLE_ROLES.has(m.role) && (/satellite_name|mission_id|orbit_type|vehicle|launch_date/i.test(m.label || "") || m.vaultKey === "satellite_name" || m.id === "n-satellite_name")

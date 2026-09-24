@@ -52,6 +52,9 @@
         const rw = box.w * sx;
         const rh = box.h * sy;
 
+        // Discard regions completely outside the current screenshot canvas
+        if (rx + rw <= 0 || rx >= bitmap.width || ry + rh <= 0 || ry >= bitmap.height) continue;
+
         // Line-height adaptive boundary dilation: swallows glyph descenders (g, y, j, p, q) without merging adjacent lines
         const isAadhaarField = (r.label === "aadhaar_card_pii" || r.label === "aadhaar" || r.label === "vid" || (r.reason && r.reason.includes("aadhaar")));
         const isVehicleField = (r.label === "vehicle_rc_pii" || r.label === "vehicle_reg" || r.label === "chassis_number" || (r.reason && r.reason.includes("vehicle")));
@@ -70,14 +73,36 @@
         const w0 = Math.max(1, Math.min(bitmap.width - x0, Math.round(rw) + padX * 2));
         const h0 = Math.max(1, Math.min(bitmap.height - y0, Math.round(rh) + padY * 2));
 
-        const isFaceOrMedia = (r.type === "face" || r.type === "media" || r.reason === "face_detection" || r.reason === "face_detection_patch" || r.reason === "possible_face_or_media" || (r.label && /avatar|face|profile/i.test(r.label)));
-        const isCircle = Boolean(r.circular || (isFaceOrMedia && Math.abs(w0 - h0) <= 12 && Math.max(w0, h0) <= 120));
+        const isFaceOrMedia = (
+          r.type === "face" ||
+          r.type === "media" ||
+          r.reason === "face_detection" ||
+          r.reason === "face_detection_patch" ||
+          r.reason === "possible_face_or_media" ||
+          r.reason === "profile_avatar" ||
+          (r.label && /avatar|face|profile/i.test(r.label))
+        );
+        const isCircle = Boolean(
+          r.circular ||
+          r.isCircle ||
+          (r.reason === "profile_avatar") ||
+          (r.label && /avatar/i.test(r.label)) ||
+          ((r.type === "face" || r.type === "media") && Math.abs(rw - rh) <= 8 && Math.max(rw, rh) <= 120 && (r.reason === "profile_avatar" || (r.label && /avatar/i.test(r.label))))
+        );
+        let circleRadius = Math.min(w0, h0) / 2;
+        let cx = x0 + w0 / 2;
+        let cy = y0 + h0 / 2;
+        if (isCircle) {
+          circleRadius = (Math.max(rw, rh) / 2) + 2.0;
+          cx = rx + rw / 2;
+          cy = ry + rh / 2;
+        }
 
         if ((mode || "black") === "blur") {
           if (isCircle) {
             ctx.save();
             ctx.beginPath();
-            ctx.arc(x0 + w0 / 2, y0 + h0 / 2, Math.min(w0, h0) / 2, 0, Math.PI * 2);
+            ctx.arc(cx, cy, circleRadius, 0, Math.PI * 2);
             ctx.clip();
           }
           const step = Math.max(8, Math.min(20, Math.round(Math.min(w0, h0) / 4)));
@@ -99,7 +124,7 @@
             ctx.save();
             if (isCircle) {
               ctx.beginPath();
-              ctx.arc(x0 + w0 / 2, y0 + h0 / 2, Math.min(w0, h0) / 2, 0, Math.PI * 2);
+              ctx.arc(cx, cy, circleRadius, 0, Math.PI * 2);
               ctx.clip();
             }
             ctx.fillStyle = "#0f172a";
@@ -110,8 +135,6 @@
               ctx.strokeRect(x0 + 0.5, y0 + 0.5, w0 - 1, h0 - 1);
             }
 
-            const cx = x0 + w0 / 2;
-            const cy = y0 + h0 / 2;
             const radius = Math.min(w0, h0) * 0.22;
             ctx.fillStyle = "#6366f1";
             ctx.beginPath();
@@ -165,7 +188,7 @@
           ctx.fillStyle = "#020617";
           if (isCircle) {
             ctx.beginPath();
-            ctx.arc(x0 + w0 / 2, y0 + h0 / 2, Math.min(w0, h0) / 2, 0, Math.PI * 2);
+            ctx.arc(cx, cy, circleRadius, 0, Math.PI * 2);
             ctx.fill();
           } else if (typeof ctx.roundRect === "function") {
             ctx.beginPath();

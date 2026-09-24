@@ -67,6 +67,7 @@
 
     const src = r.source || defaultSource;
     const sources = Array.isArray(r.sources) ? [...r.sources] : [src];
+    const isCirc = Boolean(r.circular || r.isCircle || (r.label && /avatar/i.test(r.label)));
 
     return {
       x: Math.round(x),
@@ -78,6 +79,7 @@
       label: r.label || null,
       confidence: Number(r.confidence ?? (src === "dom" ? 0.95 : 0.85)),
       text: r.text || "",
+      circular: isCirc,
       source: src,
       sources: sources
     };
@@ -123,19 +125,34 @@
         const existing = merged[i];
 
         // 1. Exact or near-identical position
-        const isNearDuplicate = Math.abs(existing.x - candidate.x) <= 4 &&
-                               Math.abs(existing.y - candidate.y) <= 4 &&
-                               Math.abs(existing.w - candidate.w) <= 6 &&
-                               Math.abs(existing.h - candidate.h) <= 6;
+        const isNearDuplicate = Math.abs(existing.x - candidate.x) <= 6 &&
+                               Math.abs(existing.y - candidate.y) <= 6 &&
+                               Math.abs(existing.w - candidate.w) <= 8 &&
+                               Math.abs(existing.h - candidate.h) <= 8;
 
         // 2. High IoU overlap
         const iou = computeIoU(existing, candidate);
 
-        // 3. Significant containment (e.g. OCR text inside DOM form field box)
-        const containedInExisting = containmentRatio(candidate, existing) > 0.8;
-        const containsExisting = containmentRatio(existing, candidate) > 0.8;
+        // 3. Significant containment
+        const containedInExisting = containmentRatio(candidate, existing) > 0.55;
+        const containsExisting = containmentRatio(existing, candidate) > 0.55;
 
-        if (isNearDuplicate || iou >= iouThreshold || containedInExisting || containsExisting) {
+        // 4. Avatar & Face intersection (ensure face inside avatar snaps to the full avatar frame)
+        const isAvatarExisting = Boolean(existing.circular || existing.reason === "profile_avatar" || (existing.label && /avatar/i.test(existing.label)));
+        const isAvatarCandidate = Boolean(candidate.circular || candidate.reason === "profile_avatar" || (candidate.label && /avatar/i.test(candidate.label)));
+        const candCx = candidate.x + candidate.w / 2;
+        const candCy = candidate.y + candidate.h / 2;
+        const existCx = existing.x + existing.w / 2;
+        const existCy = existing.y + existing.h / 2;
+        const isAvatarFaceOverlap = (isAvatarExisting || isAvatarCandidate) && (
+          iou > 0.10 ||
+          containedInExisting ||
+          containsExisting ||
+          (candCx >= existing.x - 4 && candCx <= existing.x + existing.w + 4 && candCy >= existing.y - 4 && candCy <= existing.y + existing.h + 4) ||
+          (existCx >= candidate.x - 4 && existCx <= candidate.x + candidate.w + 4 && existCy >= candidate.y - 4 && existCy <= candidate.y + candidate.h + 4)
+        );
+
+        if (isNearDuplicate || iou >= iouThreshold || containedInExisting || containsExisting || isAvatarFaceOverlap) {
           matchIdx = i;
           break;
         }
@@ -147,10 +164,21 @@
         const existing = merged[matchIdx];
 
         // Union bounding box
-        const nextX = Math.min(existing.x, candidate.x);
-        const nextY = Math.min(existing.y, candidate.y);
-        const nextW = Math.max(existing.x + existing.w, candidate.x + candidate.w) - nextX;
-        const nextH = Math.max(existing.y + existing.h, candidate.y + candidate.h) - nextY;
+        let nextX = Math.min(existing.x, candidate.x);
+        let nextY = Math.min(existing.y, candidate.y);
+        let nextW = Math.max(existing.x + existing.w, candidate.x + candidate.w) - nextX;
+        let nextH = Math.max(existing.y + existing.h, candidate.y + candidate.h) - nextY;
+
+        // If one is a circular avatar, retain the exact avatar's neat square bounds rather than dilating
+        const isAvatarExisting = Boolean(existing.circular || existing.reason === "profile_avatar" || (existing.label && /avatar/i.test(existing.label)));
+        const isAvatarCandidate = Boolean(candidate.circular || candidate.reason === "profile_avatar" || (candidate.label && /avatar/i.test(candidate.label)));
+        if (isAvatarExisting || isAvatarCandidate) {
+          const avatar = isAvatarExisting ? existing : candidate;
+          nextX = avatar.x;
+          nextY = avatar.y;
+          nextW = avatar.w;
+          nextH = avatar.h;
+        }
 
         // Combine sources
         const combinedSources = Array.from(new Set([...(existing.sources || [existing.source]), ...(candidate.sources || [candidate.source])]));
@@ -160,6 +188,7 @@
         const bestLabel = candidate.label || existing.label || null;
         const bestType = existing.type !== "media" && existing.type !== "pii" ? existing.type : candidate.type;
         const bestReason = existing.reason || candidate.reason;
+        const isCirc = Boolean(existing.circular || candidate.circular || isAvatarExisting || isAvatarCandidate || (bestLabel && /avatar/i.test(bestLabel)));
 
         merged[matchIdx] = {
           x: nextX,
@@ -171,6 +200,7 @@
           label: bestLabel,
           confidence: Math.round(higherConfidence * 100) / 100,
           text: candidate.text || existing.text || "",
+          circular: isCirc,
           source: combinedSources.join(","),
           sources: combinedSources
         };
@@ -185,6 +215,7 @@
       type: r.type || "pii",
       reason: r.reason || "pii_detection",
       ...(r.label ? { label: r.label } : {}),
+      ...(r.circular ? { circular: true, isCircle: true } : {}),
       confidence: Number(r.confidence || 0.85),
       source: r.source || "merged",
       sources: Array.isArray(r.sources) ? r.sources : [r.source || "merged"],

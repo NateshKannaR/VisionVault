@@ -494,8 +494,11 @@
       result.wantsFill = true;
     }
 
-    if (/\b(?:store|save)\s+(?:the\s+)?(?:values?|details?|fields?|data)\s+(?:in|to|into)\s+(?:the\s+)?vault\b/i.test(text) ||
-        /\b(?:store|save)\s+(?:to|in|into)\s+(?:the\s+)?vault\b/i.test(text)) {
+    if (
+      /\b(?:store|save|sync|add|capture|extract|put|write|record|import|read|keep)\b.*?\b(?:vault|vualt|valut)\b/i.test(text) ||
+      /\b(?:vault|vualt|valut)\b.*?\b(?:store|save|sync|add|capture|extract|put|write|record|import|read|keep|fill|update)\b/i.test(text) ||
+      /\b(?:store|save|read|sync)\s+(?:all\s+)?(?:these\s+|this\s+|the\s+|my\s+|encrypted\s+)?(?:vaules?|values?|details?|fields?|data|telemetry|payload|message|info|information)?\s*(?:in|to|into)?\s*(?:the\s+|my\s+|our\s+|local\s+|encrypted\s+)?(?:vault|vualt)\b/i.test(text)
+    ) {
       result.wantsStoreVault = true;
     }
 

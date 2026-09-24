@@ -271,9 +271,9 @@
         const end = start + captured.length;
 
         if (val.length >= 4 && !isCovered(start, end)) {
-          // Filter common false positives for phone/card (e.g. isolated years or small numbers)
-          if (label === "phone" && val.replace(/\D/g, "").length < 8) continue;
-          if (label === "card" && val.replace(/\D/g, "").length < 13) continue;
+          // Filter common false positives for phone/card (e.g. isolated years, decimals, telemetry or small numbers)
+          if (label === "phone" && (val.includes(".") || /[a-zA-Z]/.test(val) || val.replace(/\D/g, "").length < 9)) continue;
+          if (label === "card" && (val.includes(".") || /[a-zA-Z]/.test(val) || val.replace(/\D/g, "").length < 13)) continue;
           // A labelled value must look like a value, not a sentence fragment or app status.
           if (label === "labelled_value" && (
             val.split(/\s+/).length > 4 ||

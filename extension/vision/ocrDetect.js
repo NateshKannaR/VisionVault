@@ -274,8 +274,13 @@
           // Filter common false positives for phone/card (e.g. isolated years or small numbers)
           if (label === "phone" && val.replace(/\D/g, "").length < 8) continue;
           if (label === "card" && val.replace(/\D/g, "").length < 13) continue;
-          // A labelled value must look like a value, not a sentence fragment.
-          if (label === "labelled_value" && (val.split(/\s+/).length > 6 || /[.?!]$/.test(val))) continue;
+          // A labelled value must look like a value, not a sentence fragment or app status.
+          if (label === "labelled_value" && (
+            val.split(/\s+/).length > 4 ||
+            /[.?!]$/.test(val) ||
+            /\b(?:unread|messages?|not a contact|reserve bank|state bank|central bank|world bank)\b/i.test(val) ||
+            /\b(?:unread|messages?|not a contact|reserve bank|state bank|central bank|world bank)\b/i.test(rawVal)
+          )) continue;
 
           results.push({
             label,

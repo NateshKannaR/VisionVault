@@ -507,13 +507,21 @@ const SAFE_APP_CHROME_WORDS = new Set([
   "whatsapp", "search", "search or start a new chat", "all", "unread", "favourites", "groups",
   "communities", "status", "channels", "chats", "calls", "settings", "profile", "ask meta ai",
   "send document", "add contact", "new chat", "menu", "attach", "type a message", "online",
-  "voice and video calling is now available", "go to calls"
+  "voice and video calling is now available", "go to calls", "not a contact", "yesterday", "today"
 ]);
 
 function isSafeAppChrome(text) {
   if (!text) return false;
-  const clean = String(text).trim().toLowerCase();
+  // Strip Unicode directional marks (LTR/RTL \u200E, \u200F), zero-width characters, and bullet separators
+  const clean = String(text)
+    .replace(/[\u200B-\u200D\uFEFF\u200E\u200F\u00A0\u202A-\u202E]/g, " ")
+    .replace(/[•·|—–-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
   if (SAFE_APP_CHROME_WORDS.has(clean)) return true;
+  if (/^\d+\s+unread(?:\s+messages?)?$/i.test(clean)) return true;
+  if (/^not a contact/i.test(clean)) return true;
   return false;
 }
 
@@ -645,8 +653,8 @@ function findContextLabelledPII() {
       return;
     }
 
-    // NEVER treat sidebar navigation items, header titles, tabs, or buttons as PII label-value pairs!
-    if (el.closest("nav, .sidebar, .topbar, .topbar-title, .topbar-actions, [role='navigation'], [role='tablist'], .nav-item, .nav-link, button, .btn, .switch-link")) {
+    // NEVER treat sidebar navigation items, header titles, tabs, buttons, or messaging chat items as PII label-value pairs!
+    if (el.closest("nav, .sidebar, .topbar, .topbar-title, .topbar-actions, [role='navigation'], [role='tablist'], .nav-item, .nav-link, button, .btn, .switch-link, [role='listitem'], [data-testid*='chat'], [data-testid*='conversation'], [data-testid*='msg'], .message-in, .message-out, [role='feed']")) {
       return;
     }
 
@@ -659,6 +667,10 @@ function findContextLabelledPII() {
     if (!prev) return;
     const label = (prev.innerText || prev.textContent || "").trim();
     if (!label || label.length > MAX_LABEL_LEN) return;
+    if (isSafeAppChrome(label)) return;
+    // Genuine form labels are short descriptors (e.g. "Name:", "Account:"), not status phrases or full sentences
+    if (label.split(/\s+/).length > 3 && !label.includes(":")) return;
+    if (/\b(?:unread|messages?|not a contact|reserve bank|state bank|central bank|world bank)\b/i.test(label)) return;
     if (!matchesPiiKeyword(label)) return;
 
     const value = (el.innerText || el.textContent || (el.value !== undefined ? el.value : "") || "").trim();

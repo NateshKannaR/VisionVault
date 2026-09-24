@@ -352,6 +352,25 @@
       if (!result.query && !result.wantsTenders && !result.wantsCareers && !result.wantsAudit) result.query = "chandrayaan";
     }
 
+    // Cross-Site Mission Sync Workflow (fetch from isro.gov.in -> register in ISRO demo panel)
+    const wantsMissionSync = /\b(?:fetch|get|extract|gather|pull|sync|retrieve|collect|find|read)\b.*\b(?:isro\.gov\.in|isro\s*(?:website|portal|official)?|launch|satellite|mission)\b.*\b(?:demo|panel|local|portal|intranet|registry|form|hr-portal|dashboard|mission\s*log|log)\b/i.test(text) ||
+                             /\b(?:sync|fill|register|add|update|log)\b.*\b(?:demo|panel|intranet|registry|form|hr-portal|dashboard|mission\s*dashboard|mission\s*log)\b.*\b(?:from|using|with)\s+(?:isro|https?:\/\/www\.isro\.gov\.in)\b/i.test(text) ||
+                             /\b(?:isro\.gov\.in)\b.*\b(?:to|in|into)\s+(?:demo|panel|intranet|registry|form|hr-portal|dashboard|log)\b/i.test(text) ||
+                             /\bget\s+(?:the\s+)?(?:next\s+)?isro\s+launch\s+details\b/i.test(text) ||
+                             /\b(?:next\s+)?isro\s+launch\s+details\b.*\b(?:log|dashboard|registry|panel)\b/i.test(text);
+    if (wantsMissionSync) {
+      result.wantsMissionSync = true;
+      result.site = "isro";
+      result.siteUrl = "https://www.isro.gov.in";
+      if (!result.mission) {
+        if (/nisar/i.test(text)) result.mission = "nisar";
+        else if (/gaganyaan/i.test(text)) result.mission = "gaganyaan";
+        else if (/aditya/i.test(text)) result.mission = "aditya-l1";
+        else if (/chandrayaan/i.test(text)) result.mission = "chandrayaan";
+        else result.mission = "nisar"; // default upcoming ISRO launch
+      }
+    }
+
     const wantsNewRepo = /\b(?:create|make|add|new|init|initialize)\s+(?:a\s+)?(?:new\s+)?repo(?:sitory)?\b/i.test(text) ||
                          /\brepo(?:sitory)?\s+creation\b/i.test(text);
     const isGitHub = (result.site && /github/i.test(result.site)) || /\bgithub\b/i.test(text) || wantsNewRepo;

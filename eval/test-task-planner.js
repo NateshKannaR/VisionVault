@@ -1104,6 +1104,120 @@ const syncStep8 = planNextAction({
 });
 is(syncStep8.action, 'done', 'sync step 8 completes with cross-site synchronization complete');
 
+// 8. NISAR Dashboard Variant: "Get the next ISRO launch details and log it in our mission dashboard."
+const nisarTask = 'Get the next ISRO launch details and log it in our mission dashboard.';
+const nisarParsed = TaskPlanner.parseTask(nisarTask);
+is(nisarParsed.wantsMissionSync, true, 'nisar task wantsMissionSync is true');
+is(nisarParsed.mission, 'nisar', 'nisar task mission defaults to nisar');
+
+// Step 1: Navigate to ISRO website
+const nisarStep1 = planNextAction({
+  task: nisarTask,
+  parsed: nisarParsed,
+  pageInfo: { url: 'https://google.com' },
+  marks: [],
+  progress: {}
+});
+is(nisarStep1.action, 'navigate', 'nisar step 1 navigates to isro.gov.in');
+is(nisarStep1.value, 'https://www.isro.gov.in', 'nisar step 1 navigates to https://www.isro.gov.in');
+
+// Step 2: Click NISAR mission link
+const nisarStep2 = planNextAction({
+  task: nisarTask,
+  parsed: nisarParsed,
+  pageInfo: { url: 'https://www.isro.gov.in' },
+  marks: [
+    { id: 101, role: 'link', label: 'Mission_GSLVF16_NISAR.html — NISAR upcoming launch' }
+  ],
+  progress: {}
+});
+is(nisarStep2.action, 'click', 'nisar step 2 clicks NISAR mission link');
+is(nisarStep2.mark_id, 101, 'targets NISAR mark on isro.gov.in');
+
+// Step 3: Transition to employee portal mission dashboard after data captured
+const nisarStep3 = planNextAction({
+  task: nisarTask,
+  parsed: nisarParsed,
+  pageInfo: { url: 'https://www.isro.gov.in/Mission_GSLVF16_NISAR.html' },
+  marks: [],
+  progress: { missionInspected: true }
+});
+is(nisarStep3.action, 'navigate', 'nisar step 3 navigates to local mission dashboard');
+
+// Step 5: Fill Satellite Name with NISAR data
+const nisarStep5 = planNextAction({
+  task: nisarTask,
+  parsed: nisarParsed,
+  pageInfo: { url: 'http://localhost:3000/employee-portal.html' },
+  marks: [
+    { id: 301, role: 'input:text', label: 'Satellite Name', vaultKey: 'satellite_name' },
+    { id: 302, role: 'input:text', label: 'Mission ID', vaultKey: 'mission_id' },
+    { id: 303, role: 'input:date', label: 'Launch Date', vaultKey: 'launch_date' },
+    { id: 304, role: 'input:text', label: 'Orbit Type', vaultKey: 'orbit_type' },
+    { id: 305, role: 'input:text', label: 'Launch Vehicle', vaultKey: 'vehicle' },
+    { id: 306, role: 'button', label: 'Add Mission to Registry' }
+  ],
+  progress: { isroDataFetched: true, addMissionTabOpened: true }
+});
+is(nisarStep5.action, 'type', 'nisar step 5 fills Satellite Name');
+is(nisarStep5.mark_id, 301, 'targets Satellite Name input');
+is(nisarStep5.value, 'NISAR (NASA-ISRO SAR)', 'fills NISAR satellite name');
+
+// Step 6: Fill Launch Date
+const nisarStep6 = planNextAction({
+  task: nisarTask,
+  parsed: nisarParsed,
+  pageInfo: { url: 'http://localhost:3000/employee-portal.html' },
+  marks: [
+    { id: 303, role: 'input:date', label: 'Launch Date', vaultKey: 'launch_date' },
+    { id: 304, role: 'input:text', label: 'Orbit Type', vaultKey: 'orbit_type' },
+    { id: 305, role: 'input:text', label: 'Launch Vehicle', vaultKey: 'vehicle' },
+    { id: 306, role: 'button', label: 'Add Mission to Registry' }
+  ],
+  progress: { isroDataFetched: true, addMissionTabOpened: true }
+});
+is(nisarStep6.action, 'type', 'nisar step 6 fills Launch Date');
+is(nisarStep6.mark_id, 303, 'targets Launch Date input');
+is(nisarStep6.value, '2025-07-30', 'fills NISAR launch date 2025-07-30');
+
+// Step 7: Fill Launch Vehicle with GSLV-F16
+const nisarStep7 = planNextAction({
+  task: nisarTask,
+  parsed: nisarParsed,
+  pageInfo: { url: 'http://localhost:3000/employee-portal.html' },
+  marks: [
+    { id: 305, role: 'input:text', label: 'Launch Vehicle', vaultKey: 'vehicle' },
+    { id: 306, role: 'button', label: 'Add Mission to Registry' }
+  ],
+  progress: { isroDataFetched: true, addMissionTabOpened: true }
+});
+is(nisarStep7.action, 'type', 'nisar step 7 fills Launch Vehicle');
+is(nisarStep7.mark_id, 305, 'targets Launch Vehicle input');
+is(nisarStep7.value, 'GSLV-F16', 'fills GSLV-F16 as launch vehicle');
+
+// Step 8: Submit mission to dashboard
+const nisarStep8 = planNextAction({
+  task: nisarTask,
+  parsed: nisarParsed,
+  pageInfo: { url: 'http://localhost:3000/employee-portal.html' },
+  marks: [
+    { id: 306, role: 'button', label: 'Add Mission to Registry' }
+  ],
+  progress: { isroDataFetched: true, addMissionTabOpened: true }
+});
+is(nisarStep8.action, 'click', 'nisar step 8 clicks Add Mission to Registry');
+is(nisarStep8.mark_id, 306, 'targets Add Mission button');
+
+// Step 9: Done after submission
+const nisarStep9 = planNextAction({
+  task: nisarTask,
+  parsed: nisarParsed,
+  pageInfo: { url: 'http://localhost:3000/employee-portal.html' },
+  marks: [],
+  progress: { isroDataFetched: true, addMissionTabOpened: true, missionSubmitted: true }
+});
+is(nisarStep9.action, 'done', 'nisar step 9 completes mission dashboard sync');
+
 console.log('\n' + '='.repeat(60));
 if (failures.length) {
   console.log(`${failures.length} of ${checks} checks FAILED`);

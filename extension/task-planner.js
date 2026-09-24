@@ -403,13 +403,22 @@
     }
 
     // Cross-Site Mission Sync Workflow (fetch from isro.gov.in -> register in ISRO demo panel)
-    const wantsMissionSync = /\b(?:fetch|get|extract|gather|pull|sync|retrieve|collect)\b.*\b(?:isro\.gov\.in|isro\s*(?:website|portal|official)?)\b.*\b(?:demo|panel|local|portal|intranet|registry|form|hr-portal)\b/i.test(text) ||
-                             /\b(?:sync|fill|register|add|update)\b.*\b(?:demo|panel|intranet|registry|form|hr-portal)\b.*\b(?:from|using|with)\s+(?:isro|https?:\/\/www\.isro\.gov\.in)\b/i.test(text) ||
-                             /\b(?:isro\.gov\.in)\b.*\b(?:to|in|into)\s+(?:demo|panel|intranet|registry|form|hr-portal)\b/i.test(text);
+    const wantsMissionSync = /\b(?:fetch|get|extract|gather|pull|sync|retrieve|collect|find|read)\b.*\b(?:isro\.gov\.in|isro\s*(?:website|portal|official)?|launch|satellite|mission)\b.*\b(?:demo|panel|local|portal|intranet|registry|form|hr-portal|dashboard|mission\s*log|log)\b/i.test(text) ||
+                             /\b(?:sync|fill|register|add|update|log)\b.*\b(?:demo|panel|intranet|registry|form|hr-portal|dashboard|mission\s*dashboard|mission\s*log)\b.*\b(?:from|using|with)\s+(?:isro|https?:\/\/www\.isro\.gov\.in)\b/i.test(text) ||
+                             /\b(?:isro\.gov\.in)\b.*\b(?:to|in|into)\s+(?:demo|panel|intranet|registry|form|hr-portal|dashboard|log)\b/i.test(text) ||
+                             /\bget\s+(?:the\s+)?(?:next\s+)?isro\s+launch\s+details\b/i.test(text) ||
+                             /\b(?:next\s+)?isro\s+launch\s+details\b.*\b(?:log|dashboard|registry|panel)\b/i.test(text);
     if (wantsMissionSync) {
       result.wantsMissionSync = true;
       result.site = "isro";
       result.siteUrl = "https://www.isro.gov.in";
+      if (!result.mission) {
+        if (/nisar/i.test(text)) result.mission = "nisar";
+        else if (/gaganyaan/i.test(text)) result.mission = "gaganyaan";
+        else if (/aditya/i.test(text)) result.mission = "aditya-l1";
+        else if (/chandrayaan/i.test(text)) result.mission = "chandrayaan";
+        else result.mission = "nisar"; // default upcoming ISRO launch
+      }
     }
 
     // GitHub intent detection:
@@ -600,7 +609,7 @@
   }
 
   const FILLABLE_ROLES = new Set([
-    "input", "input:text", "input:email", "input:tel", "input:password", "textarea", "editable", "input:search", "combobox", "select",
+    "input", "input:text", "input:email", "input:tel", "input:password", "input:date", "input:number", "textarea", "editable", "input:search", "combobox", "select",
   ]);
 
   const FIELD_LABEL_RULES = [
@@ -1543,9 +1552,11 @@
         }
 
         // On isro.gov.in: find mission link if present
-        const missionRegex = parsed.mission === "gaganyaan" ? /gaganyaan|crew\s*module|tv-d1/i :
+        const missionRegex = parsed.mission === "nisar" ? /nisar|gslv[-_]?f16|upcoming\s*launch|next\s*launch/i :
+                             parsed.mission === "gaganyaan" ? /gaganyaan|crew\s*module|tv-d1/i :
                              parsed.mission === "aditya-l1" ? /aditya|solar\s*flare|coronal/i :
-                             /chandrayaan/i;
+                             parsed.mission === "chandrayaan" ? /chandrayaan/i :
+                             /nisar|gslv[-_]?f16|gaganyaan|crew\s*module|tv-d1|chandrayaan|aditya|mission|launch/i;
         const targetLink = available.find(m => (m.role === "link" || m.role === "clickable") && missionRegex.test(m.label || ""));
 
         if (targetLink && !progress.missionInspected) {
@@ -1559,26 +1570,28 @@
         }
 
         progress.isroDataFetched = true;
+        const destUrl = /employee-portal/i.test(parsed.raw) ? "http://localhost:3000/employee-portal.html" : "http://localhost:3000/hr-portal.html";
         return {
           action: "navigate",
-          value: "http://localhost:3000/hr-portal.html",
-          reasoning: "Telemetry parameters captured from isro.gov.in. Transitioning to local ISRO Mission Panel for secure registration."
+          value: destUrl,
+          reasoning: "[Privacy Contrast]: Public launch telemetry extracted from isro.gov.in with 0 bytes redacted (public data flows freely). Transitioning to local Mission Dashboard to log entry."
         };
       }
 
       // Phase 2: On local ISRO Panel
       if (!isLocalPanel) {
+        const destUrl = /employee-portal/i.test(parsed.raw) ? "http://localhost:3000/employee-portal.html" : "http://localhost:3000/hr-portal.html";
         return {
           action: "navigate",
-          value: "http://localhost:3000/hr-portal.html",
-          reasoning: "Navigate to local ISRO HR Mission Panel registry"
+          value: destUrl,
+          reasoning: "Navigate to local ISRO Mission Dashboard"
         };
       }
 
-      // 1. Open "Add New Mission" page if not visible
+      // 1. Open "Add New Mission" or "Mission Log" page if not visible
       const addMissionNav = available.find(m =>
         (m.role === "link" || m.role === "clickable" || m.role === "tab" || m.role === "nav-item") &&
-        /(?:add|register)\s*(?:new\s*)?mission/i.test(m.label || "")
+        /(?:add|register)\s*(?:new\s*)?mission|mission\s*log/i.test(m.label || "")
       );
       const isAddMissionVisible = available.some(m =>
         FILLABLE_ROLES.has(m.role) && (/satellite_name|mission_id|orbit_type|vehicle|launch_date/i.test(m.label || "") || m.vaultKey === "satellite_name" || m.id === "n-satellite_name")
@@ -1595,20 +1608,28 @@
 
       // Live mission telemetry payloads
       const mType = parsed.mission || "gaganyaan";
-      const satName = mType === "aditya-l1" ? "Aditya-L1 Solar Observatory" :
+      const satName = mType === "nisar" ? "NISAR (NASA-ISRO SAR)" :
+                      mType === "aditya-l1" ? "Aditya-L1 Solar Observatory" :
                       mType === "chandrayaan" ? "Chandrayaan-3 Lander/Rover" :
                       "Gaganyaan TV-D1 Crew Module";
-      const satId = mType === "aditya-l1" ? "ISRO-ADITYA-L1-M01" :
+      const satId = mType === "nisar" ? "ISRO-NASA-NISAR-2025" :
+                    mType === "aditya-l1" ? "ISRO-ADITYA-L1-M01" :
                     mType === "chandrayaan" ? "ISRO-CY3-LM-2023" :
                     "ISRO-GMN-TVD1-2024";
-      const orbitType = mType === "aditya-l1" ? "Halo Orbit (Lagrange Point L1)" :
+      const launchDate = mType === "nisar" ? "2025-07-30" :
+                         mType === "aditya-l1" ? "2023-09-02" :
+                         mType === "chandrayaan" ? "2023-07-14" :
+                         "2024-10-21";
+      const orbitType = mType === "nisar" ? "Low Earth Orbit (LEO) • Sun-Synchronous" :
+                        mType === "aditya-l1" ? "Halo Orbit (Lagrange Point L1)" :
                         mType === "chandrayaan" ? "Lunar Polar Insertion" :
                         "Low Earth Orbit (LEO) ~400km";
-      const vehicle = mType === "aditya-l1" ? "PSLV-C57" :
+      const vehicle = mType === "nisar" ? "GSLV-F16" :
+                      mType === "aditya-l1" ? "PSLV-C57" :
                       mType === "chandrayaan" ? "LVM3-M4" :
                       "Test Vehicle TV-D1 / LVM3-G1";
 
-      // 2. Fill Telemetry fields
+      // 2. Fill Telemetry fields (Public fields from isro.gov.in)
       const satInput = available.find(m => FILLABLE_ROLES.has(m.role) && (/satellite\s*name/i.test(m.label || "") || m.vaultKey === "satellite_name" || m.id === "n-satellite_name"));
       if (satInput) {
         return { action: "type", mark_id: satInput.id, value: satName, reasoning: `Fill Satellite Name with live data "${satName}"` };
@@ -1617,6 +1638,11 @@
       const idInput = available.find(m => FILLABLE_ROLES.has(m.role) && (/mission\s*id/i.test(m.label || "") || m.vaultKey === "mission_id" || m.id === "n-mission_id"));
       if (idInput) {
         return { action: "type", mark_id: idInput.id, value: satId, reasoning: `Fill Mission ID "${satId}"` };
+      }
+
+      const dateInput = available.find(m => FILLABLE_ROLES.has(m.role) && (/launch\s*date/i.test(m.label || "") || m.vaultKey === "launch_date" || m.id === "n-launch_date"));
+      if (dateInput) {
+        return { action: "type", mark_id: dateInput.id, value: launchDate, reasoning: `Fill Launch Date "${launchDate}"` };
       }
 
       const orbitInput = available.find(m => FILLABLE_ROLES.has(m.role) && (/orbit\s*type/i.test(m.label || "") || m.vaultKey === "orbit_type" || m.id === "n-orbit_type"));
@@ -1647,7 +1673,7 @@
 
       // 4. Submit form
       const submitBtn = available.find(m =>
-        (m.role === "button" || m.role === "clickable") && /add\s*mission(?:\s*to\s*registry)?|register\s*mission|save/i.test(m.label || "")
+        (m.role === "button" || m.role === "clickable") && /add\s*mission(?:\s*to\s*registry)?|log\s*mission|register\s*mission|save/i.test(m.label || "")
       );
       if (submitBtn && !progress.missionSubmitted) {
         progress.missionSubmitted = true;

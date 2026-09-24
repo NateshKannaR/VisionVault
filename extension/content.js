@@ -1838,6 +1838,13 @@ function initInPageShield() {
     "huggingface.co"
   ];
 
+  const currentHost = (window.location.hostname || "").toLowerCase();
+  const isLlmHost = LLM_HOSTS.some(host => currentHost === host || currentHost.endsWith("." + host));
+  if (!isLlmHost) {
+    // PrivacyScrubber, file interception, and RAM Redaction HUD only activate on LLM interfaces (ChatGPT, Claude, etc.)
+    return;
+  }
+
   let sessionRedactions = 0;
   let activePopover = null;
   let lastRedactedDoc = null;

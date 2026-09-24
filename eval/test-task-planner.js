@@ -987,6 +987,123 @@ is(demoStep2.action, 'type', 'flagship demo step 2 types satellite name');
 is(demoStep2.mark_id, 10, 'targets satellite name input');
 is(demoStep2.use_vault_field, 'satellite_name', 'uses vault field satellite_name');
 
+// 7. Cross-Site Autonomous Intelligence Sync: isro.gov.in -> Local ISRO Mission Panel
+const syncTask = 'fetch Gaganyaan mission details from isro.gov.in and register in ISRO Panel';
+const syncParsed = TaskPlanner.parseTask(syncTask);
+is(syncParsed.site, 'isro', 'sync task site is isro');
+is(syncParsed.mission, 'gaganyaan', 'sync task mission is gaganyaan');
+is(syncParsed.wantsMissionSync, true, 'sync task wantsMissionSync is true');
+
+// Step 1: Navigate to official ISRO website
+const syncStep1 = planNextAction({
+  task: syncTask,
+  parsed: syncParsed,
+  pageInfo: { url: 'https://google.com' },
+  marks: [],
+  progress: {}
+});
+is(syncStep1.action, 'navigate', 'sync step 1 navigates to isro.gov.in');
+is(syncStep1.value, 'https://www.isro.gov.in', 'navigates to https://www.isro.gov.in');
+
+// Step 2: On isro.gov.in, inspect Gaganyaan milestone link
+const syncStep2 = planNextAction({
+  task: syncTask,
+  parsed: syncParsed,
+  pageInfo: { url: 'https://www.isro.gov.in' },
+  marks: [
+    { id: 101, role: 'link', label: 'Gaganyaan Flight Test Vehicle Abort Mission-1 (TV-D1)' }
+  ],
+  progress: {}
+});
+is(syncStep2.action, 'click', 'sync step 2 clicks Gaganyaan telemetry link on isro.gov.in');
+is(syncStep2.mark_id, 101, 'targets Gaganyaan mark on isro.gov.in');
+
+// Step 3: Telemetry captured, transition to local ISRO Panel
+const syncStep3 = planNextAction({
+  task: syncTask,
+  parsed: syncParsed,
+  pageInfo: { url: 'https://www.isro.gov.in/Gaganyaan.html' },
+  marks: [],
+  progress: { missionInspected: true }
+});
+is(syncStep3.action, 'navigate', 'sync step 3 transitions to local ISRO HR Mission Panel');
+is(syncStep3.value, 'http://localhost:3000/hr-portal.html', 'navigates to http://localhost:3000/hr-portal.html');
+
+// Step 4: On local ISRO panel, open Add New Mission tab
+const syncStep4 = planNextAction({
+  task: syncTask,
+  parsed: syncParsed,
+  pageInfo: { url: 'http://localhost:3000/hr-portal.html' },
+  marks: [
+    { id: 201, role: 'tab', label: 'Active Missions' },
+    { id: 202, role: 'tab', label: 'Add New Mission' }
+  ],
+  progress: { isroDataFetched: true }
+});
+is(syncStep4.action, 'click', 'sync step 4 clicks Add New Mission tab in registry');
+is(syncStep4.mark_id, 202, 'targets Add New Mission tab mark');
+
+// Step 5: Autofill live telemetry: Satellite Name
+const syncStep5 = planNextAction({
+  task: syncTask,
+  parsed: syncParsed,
+  pageInfo: { url: 'http://localhost:3000/hr-portal.html' },
+  marks: [
+    { id: 301, role: 'input:text', label: 'Satellite Name', vaultKey: 'satellite_name' },
+    { id: 302, role: 'input:text', label: 'Mission ID', vaultKey: 'mission_id' },
+    { id: 303, role: 'input:text', label: 'Orbit Type', vaultKey: 'orbit_type' },
+    { id: 304, role: 'input:text', label: 'Launch Vehicle' },
+    { id: 305, role: 'input:text', label: 'Operator on Duty (Full Name)', vaultKey: 'operator' },
+    { id: 306, role: 'input:tel', label: 'Phone', vaultKey: 'phone' },
+    { id: 307, role: 'input:text', label: 'Encryption Key Reference', vaultKey: 'encryption_key_ref' },
+    { id: 308, role: 'button', label: 'Add Mission to Registry' }
+  ],
+  progress: { isroDataFetched: true, addMissionTabOpened: true }
+});
+is(syncStep5.action, 'type', 'sync step 5 fills Satellite Name');
+is(syncStep5.mark_id, 301, 'targets Satellite Name input');
+is(syncStep5.value, 'Gaganyaan TV-D1 Crew Module', 'fills extracted Gaganyaan satellite name');
+
+// Step 6: Autofill Zero-PII Vault credentials for Operator on duty
+const syncStep6 = planNextAction({
+  task: syncTask,
+  parsed: syncParsed,
+  pageInfo: { url: 'http://localhost:3000/hr-portal.html' },
+  marks: [
+    { id: 305, role: 'input:text', label: 'Operator on Duty (Full Name)', vaultKey: 'operator' },
+    { id: 306, role: 'input:tel', label: 'Phone', vaultKey: 'phone' },
+    { id: 307, role: 'input:text', label: 'Encryption Key Reference', vaultKey: 'encryption_key_ref' },
+    { id: 308, role: 'button', label: 'Add Mission to Registry' }
+  ],
+  progress: { isroDataFetched: true, addMissionTabOpened: true }
+});
+is(syncStep6.action, 'type', 'sync step 6 fills Operator from Vault');
+is(syncStep6.mark_id, 305, 'targets operator input mark');
+is(syncStep6.use_vault_field, 'operator', 'uses vault field operator');
+
+// Step 7: Submit synchronized mission form
+const syncStep7 = planNextAction({
+  task: syncTask,
+  parsed: syncParsed,
+  pageInfo: { url: 'http://localhost:3000/hr-portal.html' },
+  marks: [
+    { id: 308, role: 'button', label: 'Add Mission to Registry' }
+  ],
+  progress: { isroDataFetched: true, addMissionTabOpened: true }
+});
+is(syncStep7.action, 'click', 'sync step 7 clicks Add Mission to Registry button');
+is(syncStep7.mark_id, 308, 'targets Add Mission button mark');
+
+// Step 8: Completes with verified Zero-PII registry sync
+const syncStep8 = planNextAction({
+  task: syncTask,
+  parsed: syncParsed,
+  pageInfo: { url: 'http://localhost:3000/hr-portal.html' },
+  marks: [],
+  progress: { isroDataFetched: true, addMissionTabOpened: true, missionSubmitted: true }
+});
+is(syncStep8.action, 'done', 'sync step 8 completes with cross-site synchronization complete');
+
 console.log('\n' + '='.repeat(60));
 if (failures.length) {
   console.log(`${failures.length} of ${checks} checks FAILED`);

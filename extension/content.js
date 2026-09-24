@@ -1719,13 +1719,21 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       "salary": "annual_income"
     };
 
-    // Helper: detect active employee ID if present on page
+    // Helper: detect active employee ID and name if present on page
     let activeEmp = "";
+    let activeName = "";
     try {
       activeEmp = localStorage.getItem("isro_active_emp") || "";
       if (!activeEmp) {
         const selectEl = document.querySelector("#emp-select-box, select[name='active_employee']");
         if (selectEl) activeEmp = selectEl.value;
+      }
+      const nameEl = document.querySelector("#ov-name, .emp-chat-item.active .emp-chat-name, #topbar-emp-sub");
+      if (nameEl) {
+        const rawName = (nameEl.innerText || nameEl.textContent || "").trim();
+        const m = rawName.match(/([A-Z][a-z]+(?:\s+[A-Z][a-z]*)+)/);
+        if (m) activeName = m[1];
+        else activeName = rawName;
       }
     } catch (_) {}
 
@@ -1762,17 +1770,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       }
     } catch (_) {}
 
-    // Priority 2: Scan window.vaultData or document variables if present
-    try {
-      if (typeof window.vaultData === "object" && window.vaultData !== null) {
-        for (const [k, v] of Object.entries(window.vaultData)) {
-          if (v && typeof v === "string" && v.trim()) fields[k] = v.trim();
-        }
-      }
-    } catch (_) {}
-
-    // Priority 3: Inputs/controls with explicit data-vault-key
-    document.querySelectorAll("[data-vault-key]").forEach(el => {
+    // Priority 2: Inputs/controls on active page
+    document.querySelectorAll(".page.active [data-vault-key], [data-vault-key]").forEach(el => {
+      if (el.closest(".page:not(.active)")) return;
       const key = el.getAttribute("data-vault-key");
       const val = (el.value || el.innerText || el.textContent || "").trim();
       if (!key || !val || val === "Loading…") return;
@@ -1783,7 +1783,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       if (!fields[key]) fields[key] = val;
     });
 
-    // Priority 4: Overview & Badge Elements on page
+    // Priority 3: Overview & Badge Elements on page (Synchronous ground truth for active scientist)
     const ovMappings = [
       ["#ov-name", "name"],
       ["#ov-empid", "username"],
@@ -1803,8 +1803,17 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       }
     }
 
-    // Priority 5: Structured Key-Value blocks in visible DOM (.datablock, .bubble, .msg-row)
-    const structuredContainers = document.querySelectorAll(".datablock, [data-vault-source='verified'], pre, code, .bubble.in, .bubble, .msg-row");
+    // Priority 4: window.vaultData (authoritative full mission telemetry for active employee)
+    try {
+      if (typeof window.vaultData === "object" && window.vaultData !== null) {
+        for (const [k, v] of Object.entries(window.vaultData)) {
+          if (v && typeof v === "string" && v.trim()) fields[k] = v.trim();
+        }
+      }
+    } catch (_) {}
+
+    // Priority 5: Structured Key-Value blocks in visible DOM on active page
+    const structuredContainers = document.querySelectorAll(".page.active .datablock, .page.active [data-vault-source='verified'], .page.active .bubble.in, .page.active .msg-row");
     for (const container of structuredContainers) {
       const text = container.innerText || container.textContent || "";
       if (!text || text.length < 5) continue;
@@ -1822,14 +1831,25 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       }
     }
 
-    // Priority 6 (HIGHEST): Explicit verified JSON payload on the active screen
-    const payloadEls = document.querySelectorAll("[data-vault-payload]");
+    // Priority 6 (HIGHEST): Explicit verified JSON payload on the ACTIVE screen
+    const payloadEls = document.querySelectorAll(".page.active [data-vault-payload], [data-vault-payload]");
     payloadEls.forEach(payloadEl => {
+      if (payloadEl.closest(".page:not(.active)")) return; // Skip inactive tabs
       try {
         const raw = payloadEl.getAttribute("data-vault-payload");
         if (raw) {
           const parsed = JSON.parse(raw);
           if (parsed && typeof parsed === "object") {
+            // Guard: ensure payload belongs to active scientist if known
+            if (activeName && (parsed.operator || parsed.name)) {
+              const op = (parsed.operator || parsed.name).toLowerCase();
+              const an = activeName.toLowerCase();
+              const opFirst = op.split(" ")[0];
+              const anFirst = an.split(" ")[0];
+              if (!op.includes(anFirst) && !an.includes(opFirst)) {
+                return; // Discard payload belonging to previous/different employee!
+              }
+            }
             for (const [k, v] of Object.entries(parsed)) {
               const cleanKey = k.toLowerCase().trim().replace(/[-_]/g, " ");
               const mappedKey = KEY_ALIASES[cleanKey] || KEY_ALIASES[k.toLowerCase().trim()] || k;

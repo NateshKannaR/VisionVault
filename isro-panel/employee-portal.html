@@ -1941,6 +1941,9 @@ function onSelectEmployee(initials) {
   if (!EMPLOYEES_DATA[initials]) return;
   currentEmp = initials;
   localStorage.setItem("isro_active_emp", currentEmp);
+  lastEmpMsgsJson = "";
+  const box = document.getElementById("emp-messages");
+  if (box) box.innerHTML = "";
   applyActiveEmployeeUI();
   updateProgress();
   loadEmpMessages();
@@ -2058,12 +2061,11 @@ async function loadEmpMessages(){
   const prevEl = document.getElementById("emp-prev-HR");
   if (prevEl) prevEl.textContent = "Mission vault data received";
   
-  const currentJson = JSON.stringify(msgs);
-  if (currentJson === lastEmpMsgsJson) return;
-  lastEmpMsgsJson = currentJson;
-  
   const box = document.getElementById("emp-messages");
-  box.innerHTML = "";
+  const currentJson = JSON.stringify(msgs);
+  if (currentJson === lastEmpMsgsJson && box && box.children.length > 0) return;
+  lastEmpMsgsJson = currentJson;
+  if (box) box.innerHTML = "";
   for (const m of msgs) {
     const plain = m.text || await decryptMsg(m.enc);
     let content = plain;

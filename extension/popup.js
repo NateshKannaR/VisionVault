@@ -162,6 +162,7 @@ async function updateVaultUI() {
 }
 
 async function loadVault() {
+
   let v = {};
   if (typeof getVault === "function") {
     try {
@@ -234,6 +235,16 @@ async function loadVault() {
       });
     }
   }
+}
+
+if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.onChanged) {
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === "local" && (changes.vault || changes.vault_ciphertext || changes.vault_mission)) {
+      if (typeof isVaultUnlocked === "undefined" || isVaultUnlocked) {
+        loadVault().catch(() => {});
+      }
+    }
+  });
 }
 
 function lockVaultNow() {

@@ -1719,7 +1719,110 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       "salary": "annual_income"
     };
 
-    // 0. Explicit JSON payload from verified datablocks (e.g. data-vault-payload in chat or page)
+    // Helper: detect active employee ID if present on page
+    let activeEmp = "";
+    try {
+      activeEmp = localStorage.getItem("isro_active_emp") || "";
+      if (!activeEmp) {
+        const selectEl = document.querySelector("#emp-select-box, select[name='active_employee']");
+        if (selectEl) activeEmp = selectEl.value;
+      }
+    } catch (_) {}
+
+    // Priority 1 (Base): Scan localStorage for stored plaintext vault object or active chat messages
+    try {
+      const plainRaw = localStorage.getItem("isro_vault_plain");
+      if (plainRaw) {
+        const parsed = JSON.parse(plainRaw);
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+          for (const [k, v] of Object.entries(parsed)) {
+            if (v && typeof v === "string" && v.trim()) fields[k] = v.trim();
+          }
+        }
+      }
+      if (activeEmp) {
+        const empChatRaw = localStorage.getItem("isro_chat_hr_" + activeEmp);
+        if (empChatRaw) {
+          const msgs = JSON.parse(empChatRaw);
+          if (Array.isArray(msgs)) {
+            for (const m of msgs) {
+              if (m.text) {
+                try {
+                  const obj = JSON.parse(m.text);
+                  if (obj.type === "VAULT_MISSION" && obj.vault) {
+                    for (const [vk, vv] of Object.entries(obj.vault)) {
+                      if (vv && typeof vv === "string" && vv.trim()) fields[vk] = vv.trim();
+                    }
+                  }
+                } catch (_) {}
+              }
+            }
+          }
+        }
+      }
+    } catch (_) {}
+
+    // Priority 2: Scan window.vaultData or document variables if present
+    try {
+      if (typeof window.vaultData === "object" && window.vaultData !== null) {
+        for (const [k, v] of Object.entries(window.vaultData)) {
+          if (v && typeof v === "string" && v.trim()) fields[k] = v.trim();
+        }
+      }
+    } catch (_) {}
+
+    // Priority 3: Inputs/controls with explicit data-vault-key
+    document.querySelectorAll("[data-vault-key]").forEach(el => {
+      const key = el.getAttribute("data-vault-key");
+      const val = (el.value || el.innerText || el.textContent || "").trim();
+      if (!key || !val || val === "Loading…") return;
+      if (TELEMETRY_KEYS.has(key)) {
+        if (fields.name && val.toLowerCase() === fields.name.toLowerCase()) return;
+        if (/natesh/i.test(val) && key !== "operator") return;
+      }
+      if (!fields[key]) fields[key] = val;
+    });
+
+    // Priority 4: Overview & Badge Elements on page
+    const ovMappings = [
+      ["#ov-name", "name"],
+      ["#ov-empid", "username"],
+      ["#ov-email", "email"],
+      ["#ov-org", "company"],
+      ["#ov-sat-name", "satellite_name"],
+      ["#ov-orbit-type", "orbit_type"],
+      ["#ov-freq", "ground_station_freq"],
+      ["#ov-dept", "about"]
+    ];
+    for (const [sel, key] of ovMappings) {
+      const el = document.querySelector(sel);
+      if (el) {
+        let val = (el.innerText || el.textContent || "").trim();
+        if (key === "ground_station_freq") val = val.replace(/^[●\s]+/, "").replace(/\s*LOCKED\s*$/i, "").trim();
+        if (val && val !== "Loading…" && !val.includes("───")) fields[key] = val;
+      }
+    }
+
+    // Priority 5: Structured Key-Value blocks in visible DOM (.datablock, .bubble, .msg-row)
+    const structuredContainers = document.querySelectorAll(".datablock, [data-vault-source='verified'], pre, code, .bubble.in, .bubble, .msg-row");
+    for (const container of structuredContainers) {
+      const text = container.innerText || container.textContent || "";
+      if (!text || text.length < 5) continue;
+      const lines = text.split(/[\r\n|]+/);
+      for (const line of lines) {
+        const match = line.match(/^\s*([A-Za-z0-9\s_-]+)\s*[:=]\s*(.+?)\s*$/);
+        if (match) {
+          const rawKey = match[1].toLowerCase().trim();
+          const rawVal = match[2].trim();
+          const mappedKey = KEY_ALIASES[rawKey] || rawKey.replace(/[^a-z0-9]+/g, "_");
+          if (mappedKey && rawVal && rawVal !== "Loading…" && !rawVal.includes("───")) {
+            fields[mappedKey] = rawVal;
+          }
+        }
+      }
+    }
+
+    // Priority 6 (HIGHEST): Explicit verified JSON payload on the active screen
     const payloadEls = document.querySelectorAll("[data-vault-payload]");
     payloadEls.forEach(payloadEl => {
       try {
@@ -1735,132 +1838,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           }
         }
       } catch (_) {}
-    });
-
-    // 0b. Extract from ISRO Overview & Badge Elements if present
-    const ovMappings = [
-      ["#ov-name", "name"],
-      ["#ov-empid", "username"],
-      ["#ov-email", "email"],
-      ["#ov-org", "company"],
-      ["#ov-sat-name", "satellite_name"],
-      ["#ov-orbit-type", "orbit_type"],
-      ["#ov-freq", "ground_station_freq"],
-      ["#ov-dept", "about"]
-    ];
-    for (const [sel, key] of ovMappings) {
-      if (!fields[key]) {
-        const el = document.querySelector(sel);
-        if (el) {
-          let val = (el.innerText || el.textContent || "").trim();
-          if (key === "ground_station_freq") val = val.replace(/^[●\s]+/, "").replace(/\s*LOCKED\s*$/i, "").trim();
-          if (val && val !== "Loading…" && !val.includes("───")) fields[key] = val;
-        }
-      }
-    }
-
-    // 1. Structured Key-Value block parser on the page (e.g. .datablock in decrypted chat messages)
-    // Verified datablocks represent authentic ground truth directly from Mission Control / HR
-    const structuredContainers = document.querySelectorAll(".datablock, [data-vault-source='verified'], pre, code, .bubble, .msg-row");
-    for (const container of structuredContainers) {
-      const text = container.innerText || container.textContent || "";
-      if (!text || text.length < 5) continue;
-
-      const lines = text.split(/[\r\n|]+/);
-      for (const line of lines) {
-        const match = line.match(/^\s*([A-Za-z0-9\s_-]+)\s*[:=]\s*(.+?)\s*$/);
-        if (match) {
-          const rawKey = match[1].toLowerCase().trim();
-          const rawVal = match[2].trim();
-          const mappedKey = KEY_ALIASES[rawKey] || rawKey.replace(/[^a-z0-9]+/g, "_");
-          if (mappedKey && rawVal && rawVal !== "Loading…" && !rawVal.includes("───")) {
-            if (!fields[mappedKey] || fields[mappedKey].length < rawVal.length) {
-              fields[mappedKey] = rawVal;
-            }
-          }
-        }
-      }
-    }
-
-    // 2. Scan window.vaultData or document variables if present
-    try {
-      if (typeof window.vaultData === "object" && window.vaultData !== null) {
-        for (const [k, v] of Object.entries(window.vaultData)) {
-          if (v && typeof v === "string" && v.trim()) {
-            fields[k] = v.trim();
-          }
-        }
-      }
-    } catch (_) {}
-
-    // 3. Scan localStorage for any stored plaintext vault object or chat messages
-    try {
-      for (let i = 0; i < localStorage.length; i++) {
-        const lsKey = localStorage.key(i);
-        if (/vault.*plain|plain.*vault/i.test(lsKey) || lsKey === "isro_vault_plain") {
-          const raw = localStorage.getItem(lsKey);
-          if (raw) {
-            const parsed = JSON.parse(raw);
-            if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-              for (const [k, v] of Object.entries(parsed)) {
-                if (v && typeof v === "string" && v.trim()) {
-                  fields[k] = v.trim();
-                }
-              }
-            }
-          }
-        } else if (lsKey.startsWith("isro_chat_hr_")) {
-          const raw = localStorage.getItem(lsKey);
-          if (raw) {
-            try {
-              const msgs = JSON.parse(raw);
-              if (Array.isArray(msgs)) {
-                for (const m of msgs) {
-                  if (m.text) {
-                    try {
-                      const obj = JSON.parse(m.text);
-                      if (obj.type === "VAULT_MISSION" && obj.vault) {
-                        for (const [vk, vv] of Object.entries(obj.vault)) {
-                          if (vv && typeof vv === "string" && vv.trim()) fields[vk] = vv.trim();
-                        }
-                      }
-                    } catch (_) {}
-                  }
-                }
-              }
-            } catch (_) {}
-          }
-        }
-      }
-    } catch (_) {}
-
-    // 4. Inputs/controls or elements with explicit data-vault-key
-    // Guard against Chrome Autofill dumping the user's name across all text inputs!
-    document.querySelectorAll("[data-vault-key]").forEach(el => {
-      const key = el.getAttribute("data-vault-key");
-      const val = (el.value || el.innerText || el.textContent || "").trim();
-      if (!key || !val || val === "Loading…") return;
-
-      // Telemetry fields should NEVER be set to a person's name or autofill value if structured telemetry exists
-      if (TELEMETRY_KEYS.has(key)) {
-        if (fields[key]) {
-          // Already have verified structured telemetry value; do not overwrite with unverified input
-          return;
-        }
-        // If the value in this telemetry input is identical to the employee/user name, reject it!
-        if (fields.name && val.toLowerCase() === fields.name.toLowerCase()) {
-          return;
-        }
-        // If it's a person's name format (e.g. contains "Natesh" or identical to user profile), reject
-        if (/natesh/i.test(val)) {
-          return;
-        }
-      }
-
-      // If not yet set or not protected telemetry, assign
-      if (!fields[key]) {
-        fields[key] = val;
-      }
     });
 
     // 5. Specific regex extraction for TLE lines if present in text

@@ -779,9 +779,12 @@
     // 0. Store to Vault flow
     if (parsed.wantsStoreVault) {
       if (progress.vaultStored) {
-        return { action: "done", reasoning: "Values stored to vault successfully." };
+        if (!parsed.wantsFill && !parsed.wantsBatchFill && !parsed.isroScenario && !parsed.wantsSearch && !parsed.wantsAudit) {
+          return { action: "done", reasoning: "Values stored to vault successfully." };
+        }
+      } else {
+        return { action: "store_vault", reasoning: "Read page data and store into encrypted local vault." };
       }
-      return { action: "store_vault", reasoning: "Read page data and store into encrypted local vault." };
     }
 
     // 1. Initial navigation if on the wrong site.

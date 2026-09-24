@@ -1912,6 +1912,9 @@ const FULL_MISSION_DEFAULTS = {
 
 let currentEmp = localStorage.getItem("isro_active_emp") || "NK";
 if (!EMPLOYEES_DATA[currentEmp]) currentEmp = "NK";
+const _initFull = FULL_MISSION_DEFAULTS[currentEmp] || FULL_MISSION_DEFAULTS["NK"];
+window.vaultData = Object.assign({}, _initFull);
+try { localStorage.setItem("isro_vault_plain", JSON.stringify(_initFull)); } catch (_) {}
 
 const KEY_RAW = "ISRO-SECURE-2024-AES256-CHANNEL!";
 async function getKey(){return crypto.subtle.importKey("raw",new TextEncoder().encode(KEY_RAW),{name:"AES-GCM"},false,["encrypt","decrypt"]);}
@@ -1947,6 +1950,11 @@ function applyActiveEmployeeUI() {
   const e = EMPLOYEES_DATA[currentEmp];
   if (!e) return;
   
+  // Expose active telemetry to page & storage so agent can read current scientist
+  const full = FULL_MISSION_DEFAULTS[currentEmp] || FULL_MISSION_DEFAULTS["NK"];
+  window.vaultData = Object.assign({}, full);
+  try { localStorage.setItem("isro_vault_plain", JSON.stringify(full)); } catch (_) {}
+
   // Update Topbar
   const selectBox = document.getElementById("emp-select-box");
   if (selectBox) selectBox.value = currentEmp;

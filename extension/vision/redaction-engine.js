@@ -71,8 +71,15 @@
         const h0 = Math.max(1, Math.min(bitmap.height - y0, Math.round(rh) + padY * 2));
 
         const isFaceOrMedia = (r.type === "face" || r.type === "media" || r.reason === "face_detection" || r.reason === "face_detection_patch" || r.reason === "possible_face_or_media" || (r.label && /avatar|face|profile/i.test(r.label)));
+        const isCircle = Boolean(r.circular || (isFaceOrMedia && Math.abs(w0 - h0) <= 12 && Math.max(w0, h0) <= 120));
 
         if ((mode || "black") === "blur") {
+          if (isCircle) {
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(x0 + w0 / 2, y0 + h0 / 2, Math.min(w0, h0) / 2, 0, Math.PI * 2);
+            ctx.clip();
+          }
           const step = Math.max(8, Math.min(20, Math.round(Math.min(w0, h0) / 4)));
           for (let bx = x0; bx < x0 + w0; bx += step) {
             for (let by = y0; by < y0 + h0; by += step) {
@@ -83,19 +90,26 @@
               ctx.fillRect(bx, by, sw, sh);
             }
           }
+          if (isCircle) {
+            ctx.restore();
+          }
         } else if ((mode || "black") === "synthetic") {
           if (isFaceOrMedia) {
             // Enterprise synthetic silhouette avatar
+            ctx.save();
+            if (isCircle) {
+              ctx.beginPath();
+              ctx.arc(x0 + w0 / 2, y0 + h0 / 2, Math.min(w0, h0) / 2, 0, Math.PI * 2);
+              ctx.clip();
+            }
             ctx.fillStyle = "#0f172a";
             ctx.fillRect(x0, y0, w0, h0);
-            ctx.strokeStyle = "#475569";
-            ctx.lineWidth = 1;
-            ctx.strokeRect(x0 + 0.5, y0 + 0.5, w0 - 1, h0 - 1);
+            if (!isCircle) {
+              ctx.strokeStyle = "#475569";
+              ctx.lineWidth = 1;
+              ctx.strokeRect(x0 + 0.5, y0 + 0.5, w0 - 1, h0 - 1);
+            }
 
-            ctx.save();
-            ctx.beginPath();
-            ctx.rect(x0, y0, w0, h0);
-            ctx.clip();
             const cx = x0 + w0 / 2;
             const cy = y0 + h0 / 2;
             const radius = Math.min(w0, h0) * 0.22;
@@ -147,9 +161,13 @@
             }
           }
         } else {
-          // Fail-closed 100% black ink blot with clean rounded corners
+          // Fail-closed 100% black ink blot with clean rounded corners or circular shape
           ctx.fillStyle = "#020617";
-          if (typeof ctx.roundRect === "function") {
+          if (isCircle) {
+            ctx.beginPath();
+            ctx.arc(x0 + w0 / 2, y0 + h0 / 2, Math.min(w0, h0) / 2, 0, Math.PI * 2);
+            ctx.fill();
+          } else if (typeof ctx.roundRect === "function") {
             ctx.beginPath();
             ctx.roundRect(x0, y0, w0, h0, Math.min(3, Math.min(w0, h0) / 4));
             ctx.fill();

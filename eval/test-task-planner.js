@@ -1256,46 +1256,46 @@ is(gyStep3.action, 'type', 'gy step 3 fills Mission Name when form is visible');
 is(gyStep3.mark_id, 101, 'targets Mission Name input');
 is(gyStep3.value, 'Gaganyaan', 'fills "Gaganyaan" as mission name');
 
-// Step 4: Fill Mission Program
+// Step 4: Fill Mandate & Lead Centre
 const gyStep4 = planNextAction({
   task: gyTask, parsed: gyParsed,
   pageInfo: { url: 'http://localhost:3000/employee-portal.html' },
   marks: [
-    { id: 102, role: 'input:text', label: 'Mission Program' },
-    { id: 103, role: 'input:text', label: 'Launch Vehicle' }
+    { id: 102, role: 'input:text', label: 'Mandate & Lead Centre' },
+    { id: 103, role: 'input:text', label: 'Primary Mandate' }
   ],
   progress: { isroDataFetched: true, gaganyaanTabOpened: true, gy_mission_name: true }
 });
-is(gyStep4.action, 'type', 'gy step 4 fills Mission Program');
-is(gyStep4.mark_id, 102, 'targets Mission Program input');
+is(gyStep4.action, 'type', 'gy step 4 fills Mandate & Lead Centre');
+is(gyStep4.mark_id, 102, 'targets Mandate & Lead Centre input');
+is(gyStep4.value, 'HSFC (Human Space Flight Centre), Bengaluru', 'fills HSFC as lead centre');
 
-// Step 5: Fill Launch Vehicle (HLVM3)
+// Step 5: Fill Primary Mandate
 const gyStep5 = planNextAction({
   task: gyTask, parsed: gyParsed,
   pageInfo: { url: 'http://localhost:3000/employee-portal.html' },
   marks: [
-    { id: 103, role: 'input:text', label: 'Launch Vehicle' },
-    { id: 104, role: 'input:text', label: 'Target Orbit Altitude' }
+    { id: 103, role: 'input:text', label: 'Primary Mandate' },
+    { id: 104, role: 'input:text', label: 'Crew Members' }
   ],
-  progress: { isroDataFetched: true, gaganyaanTabOpened: true, gy_mission_name: true, gy_program: true }
+  progress: { isroDataFetched: true, gaganyaanTabOpened: true, gy_mission_name: true, gy_centre: true }
 });
-is(gyStep5.action, 'type', 'gy step 5 fills Launch Vehicle');
-is(gyStep5.mark_id, 103, 'targets Launch Vehicle input');
-is(gyStep5.value, 'HLVM3 (Human Rated LVM3)', 'fills HLVM3 as launch vehicle');
+is(gyStep5.action, 'type', 'gy step 5 fills Primary Mandate');
+is(gyStep5.mark_id, 103, 'targets Primary Mandate input');
 
-// Step 6: Fill Crew Capacity
+// Step 6: Fill Crew Members
 const gyStep6 = planNextAction({
   task: gyTask, parsed: gyParsed,
   pageInfo: { url: 'http://localhost:3000/employee-portal.html' },
   marks: [
-    { id: 105, role: 'input:text', label: 'Crew Capacity' },
-    { id: 106, role: 'input:text', label: 'Mission Duration' }
+    { id: 104, role: 'input:text', label: 'Crew Members' },
+    { id: 105, role: 'input:text', label: 'Target Orbit' }
   ],
-  progress: { isroDataFetched: true, gaganyaanTabOpened: true, gy_mission_name: true, gy_program: true, gy_vehicle: true, gy_orbit_altitude: true, gy_orbit_type: true }
+  progress: { isroDataFetched: true, gaganyaanTabOpened: true, gy_mission_name: true, gy_centre: true, gy_mandate: true }
 });
-is(gyStep6.action, 'type', 'gy step 6 fills Crew Capacity');
-is(gyStep6.mark_id, 105, 'targets Crew Capacity input');
-is(gyStep6.value, '3 Astronauts (Vyomanauts)', 'fills 3 Vyomanauts as crew');
+is(gyStep6.action, 'type', 'gy step 6 fills Crew Members');
+is(gyStep6.mark_id, 104, 'targets Crew Members input');
+is(gyStep6.value, '3 members', 'fills 3 members as crew');
 
 // Step 7: Submit Gaganyaan form
 const gyStep7 = planNextAction({
@@ -1304,7 +1304,7 @@ const gyStep7 = planNextAction({
   marks: [
     { id: 999, role: 'button', label: 'Commit Gaganyaan Database Record' }
   ],
-  progress: { isroDataFetched: true, gaganyaanTabOpened: true, gy_mission_name: true, gy_program: true, gy_vehicle: true, gy_orbit_altitude: true, gy_orbit_type: true, gy_crew_count: true, gy_duration: true, gy_recovery: true, gy_crew_module: true, gy_centre: true, gy_mission_id: true, gy_operator: true, gy_phone: true }
+  progress: { isroDataFetched: true, gaganyaanTabOpened: true, gy_mission_name: true, gy_centre: true, gy_mandate: true, gy_crew_count: true, gy_orbit: true, gy_duration: true, gy_recovery: true, gy_vehicle: true, gy_crew_module: true, gy_service_module: true, gy_ces: true, gy_lss: true, gy_tps: true, gy_precursor: true, gy_training: true, gy_milestone: true, gy_contact: true }
 });
 is(gyStep7.action, 'click', 'gy step 7 clicks Commit Gaganyaan Database Record');
 is(gyStep7.mark_id, 999, 'targets Commit Gaganyaan button');
@@ -1314,7 +1314,7 @@ const gyStep8 = planNextAction({
   task: gyTask, parsed: gyParsed,
   pageInfo: { url: 'http://localhost:3000/employee-portal.html' },
   marks: [],
-  progress: { isroDataFetched: true, gaganyaanTabOpened: true, gy_mission_name: true, gy_program: true, gy_vehicle: true, gy_orbit_altitude: true, gy_orbit_type: true, gy_crew_count: true, gy_duration: true, gy_recovery: true, gy_crew_module: true, gy_centre: true, gy_mission_id: true, gy_operator: true, gy_phone: true, missionSubmitted: true }
+  progress: { isroDataFetched: true, gaganyaanTabOpened: true, gy_mission_name: true, gy_centre: true, gy_mandate: true, gy_crew_count: true, gy_orbit: true, gy_duration: true, gy_recovery: true, gy_vehicle: true, gy_crew_module: true, gy_service_module: true, gy_ces: true, gy_lss: true, gy_tps: true, gy_precursor: true, gy_training: true, gy_milestone: true, gy_contact: true, missionSubmitted: true }
 });
 is(gyStep8.action, 'done', 'gy step 8 reports done after Gaganyaan DB6 sync complete');
 

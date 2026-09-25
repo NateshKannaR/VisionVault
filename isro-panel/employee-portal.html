@@ -1900,53 +1900,44 @@ Click 'Run Full Autonomous Simulation' or step through each stage.</div>
         <!-- Source sync banner -->
         <div id="gaganyaan-sync-banner" style="display:none; align-items:center; gap:10px; background:rgba(167,139,250,0.08); border:1px solid rgba(167,139,250,0.3); border-radius:8px; padding:12px 16px; margin-bottom:16px; font-size:12.5px; color:#a78bfa;">
           <i class="fa-solid fa-satellite-dish fa-spin" style="font-size:15px;"></i>
-          <span><strong>SYNCHRONIZED:</strong> Mission parameters extracted from <strong>isro.gov.in/Gaganyaan.html</strong> by VisionVault agent. Public data — zero bytes redacted.</span>
+          <span><strong>SYNCHRONIZED:</strong> Official Gaganyaan mission parameters extracted verbatim from <strong>isro.gov.in/Gaganyaan.html</strong> by VisionVault agent. 100% public data — zero personal PII.</span>
         </div>
 
-        <div class="fsection" style="color:#a78bfa;">Mission Overview (from ISRO.gov.in)</div>
+        <div class="fsection" style="color:#a78bfa;">Mission Profile (isro.gov.in/Gaganyaan.html)</div>
         <div class="grid3">
-          <div class="fg"><label>Mission Name</label><input type="text" id="gy-mission_name" placeholder="Gaganyaan" data-vault-key="satellite_name"/></div>
-          <div class="fg"><label>Mission Program</label><input type="text" id="gy-program" placeholder="Human Space Flight Programme"/></div>
-          <div class="fg"><label>Mission Phase</label>
-            <select id="gy-phase">
-              <option>TV-D1 (Abort Test) — Completed</option>
-              <option selected>G1 Unmanned Mission — Upcoming</option>
-              <option>G2 Unmanned Mission</option>
-              <option>H1 Human Spaceflight</option>
-            </select>
-          </div>
+          <div class="fg"><label>Mission Name</label><input type="text" id="gy-mission_name" placeholder="Gaganyaan"/></div>
+          <div class="fg"><label>Mandate &amp; Lead Centre</label><input type="text" id="gy-centre" placeholder="HSFC (Human Space Flight Centre), Bengaluru"/></div>
+          <div class="fg"><label>Primary Mandate</label><input type="text" id="gy-mandate" placeholder="Spearhead ISRO's Gaganyaan programme"/></div>
         </div>
         <div class="grid3">
-          <div class="fg"><label>Launch Vehicle</label><input type="text" id="gy-vehicle" placeholder="HLVM3 (Human Rated LVM3)" data-vault-key="vehicle"/></div>
-          <div class="fg"><label>Target Orbit Altitude</label><input type="text" id="gy-orbit_altitude" placeholder="400 km LEO"/></div>
-          <div class="fg"><label>Orbit Type</label><input type="text" id="gy-orbit_type" placeholder="Low Earth Orbit (LEO)" data-vault-key="orbit_type"/></div>
-        </div>
-        <div class="grid3">
-          <div class="fg"><label>Crew Capacity</label><input type="text" id="gy-crew_count" placeholder="3 Astronauts (Vyomanauts)"/></div>
-          <div class="fg"><label>Mission Duration</label><input type="text" id="gy-duration" placeholder="3 Days"/></div>
-          <div class="fg"><label>Recovery Zone</label><input type="text" id="gy-recovery" placeholder="Indian Ocean Sea Waters"/></div>
-        </div>
-
-        <div class="fsection" style="color:#a78bfa;">Spacecraft Systems</div>
-        <div class="grid3">
-          <div class="fg"><label>Crew Module (CM)</label><input type="text" id="gy-crew_module" placeholder="Pressurised habitable space capsule"/></div>
-          <div class="fg"><label>Service Module (SM)</label><input type="text" id="gy-service_module" placeholder="Thermal / Propulsion support structure"/></div>
-          <div class="fg"><label>Crew Escape System</label><input type="text" id="gy-ces" placeholder="CES — Quick-acting solid motors (SDSC)"/></div>
+          <div class="fg"><label>Crew Members</label><input type="text" id="gy-crew_count" placeholder="3 members"/></div>
+          <div class="fg"><label>Target Orbit</label><input type="text" id="gy-orbit" placeholder="400 km Low Earth Orbit"/></div>
+          <div class="fg"><label>Mission Duration</label><input type="text" id="gy-duration" placeholder="3 days"/></div>
         </div>
         <div class="grid2">
-          <div class="fg"><label>Life Support System</label><input type="text" id="gy-lss" placeholder="Earth-like environment (O₂, pressure, temp)"/></div>
-          <div class="fg"><label>Thermal Protection</label><input type="text" id="gy-tps" placeholder="TPS — Re-entry rated double-wall construction"/></div>
+          <div class="fg"><label>Landing &amp; Recovery Zone</label><input type="text" id="gy-recovery" placeholder="Indian sea waters"/></div>
+          <div class="fg"><label>Launch Vehicle</label><input type="text" id="gy-vehicle" placeholder="Human Rated LVM3 (HLVM3)"/></div>
         </div>
 
-        <div class="fsection" style="color:#a78bfa;">HSFC Lead Centre &amp; Mission Officer</div>
+        <div class="fsection" style="color:#a78bfa;">Orbital Module &amp; Safety Systems</div>
+        <div class="grid2">
+          <div class="fg"><label>Crew Module (CM)</label><input type="text" id="gy-crew_module" placeholder="Habitable space, double walled metallic inner structure &amp; TPS"/></div>
+          <div class="fg"><label>Service Module (SM)</label><input type="text" id="gy-service_module" placeholder="Unpressurized structure, thermal, propulsion &amp; power systems"/></div>
+        </div>
         <div class="grid3">
-          <div class="fg"><label>Lead Centre</label><input type="text" id="gy-centre" placeholder="Human Space Flight Centre (HSFC), Bengaluru" data-vault-key="company"/></div>
-          <div class="fg"><label>Mission Officer / Operator</label><input type="text" id="gy-operator" data-vault-key="operator" placeholder="Assigned operator name"/></div>
-          <div class="fg"><label>Officer Phone</label><input type="tel" id="gy-phone" data-vault-key="phone" placeholder="+91…"/></div>
+          <div class="fg"><label>Crew Escape System (CES)</label><input type="text" id="gy-ces" placeholder="Quick acting, high burn rate solid motors"/></div>
+          <div class="fg"><label>Life Support System (LSS)</label><input type="text" id="gy-lss" placeholder="Provide earth like environment to crew in space"/></div>
+          <div class="fg"><label>Thermal Protection System</label><input type="text" id="gy-tps" placeholder="TPS designed for re-entry till touchdown"/></div>
+        </div>
+
+        <div class="fsection" style="color:#a78bfa;">Precursor Demonstrators &amp; Training</div>
+        <div class="grid2">
+          <div class="fg"><label>Precursor Missions</label><input type="text" id="gy-precursor" placeholder="Integrated Air Drop Test (IADT), Pad Abort Test (PAT), Test Vehicle (TV)"/></div>
+          <div class="fg"><label>Astronaut Training Facility</label><input type="text" id="gy-training" placeholder="Classroom, Physical Fitness, Simulator, Flight suit &amp; Aero-medical (Bengaluru)"/></div>
         </div>
         <div class="grid2">
-          <div class="fg"><label>Official Email</label><input type="email" id="gy-email" data-vault-key="email" placeholder="@isro.gov.in"/></div>
-          <div class="fg"><label>Mission ID / Reference</label><input type="text" id="gy-mission_id" data-vault-key="mission_id" placeholder="GAGANYAAN-H1-2025"/></div>
+          <div class="fg"><label>Milestones Achieved</label><input type="text" id="gy-milestone" placeholder="Test vehicle for characterisation of Crew Escape System ready at SDSC"/></div>
+          <div class="fg"><label>Lead Centre Contact</label><input type="text" id="gy-contact" placeholder="ISRO Headquarters, Antariksh Bhavan, Bengaluru | +91 80 22172294"/></div>
         </div>
 
         <button class="btn" style="background:linear-gradient(135deg,#7c3aed,#a78bfa);border:none;color:#fff;" onclick="submitForm('gaganyaan')">

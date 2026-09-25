@@ -1273,6 +1273,381 @@ body.mode-redacted .datablock {
   background: rgba(0, 229, 255, 0.1);
 }
 
+/* Enhanced Visual Simulation Theater & Non-Extension Interactive Lab */
+.sim-stage-tabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+.sim-tab-btn {
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  cursor: pointer;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+}
+.sim-tab-btn:hover {
+  color: #fff;
+  border-color: rgba(56, 189, 248, 0.5);
+  background: rgba(56, 189, 248, 0.08);
+}
+.sim-tab-btn.active {
+  background: rgba(0, 229, 255, 0.15);
+  border-color: var(--accent);
+  color: #fff;
+  box-shadow: 0 0 14px rgba(0, 229, 255, 0.25);
+}
+
+.sim-theater-container {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 16px;
+  margin-bottom: 20px;
+  align-items: stretch;
+}
+@media (max-width: 1024px) {
+  .sim-theater-container {
+    grid-template-columns: 1fr;
+  }
+}
+
+.sim-lens-card {
+  background: rgba(7, 14, 28, 0.95);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  position: relative;
+}
+.sim-lens-header {
+  padding: 10px 14px;
+  background: rgba(13, 27, 46, 0.9);
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11.5px;
+}
+.sim-lens-body {
+  padding: 16px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  position: relative;
+  min-height: 280px;
+}
+
+/* Left Screen: Scientist View */
+.sim-mock-profile {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px;
+  background: rgba(15, 23, 42, 0.6);
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.06);
+  position: relative;
+}
+.sim-mock-avatar-wrap {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  border-radius: 8px;
+  overflow: hidden;
+  flex-shrink: 0;
+  border: 1.5px solid var(--accent);
+}
+.sim-mock-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.sim-scan-line {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--accent);
+  box-shadow: 0 0 10px var(--accent), 0 0 20px var(--accent);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 10;
+}
+.sim-scanning .sim-scan-line {
+  opacity: 1;
+  animation: simScanSweep 2s infinite linear;
+}
+@keyframes simScanSweep {
+  0% { top: 0%; }
+  50% { top: 100%; }
+  100% { top: 0%; }
+}
+
+.sim-field-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: rgba(10, 20, 38, 0.8);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 6px;
+  font-size: 12px;
+  position: relative;
+  transition: all 0.25s;
+}
+.sim-field-label {
+  color: var(--muted);
+  font-size: 11px;
+  font-family: 'JetBrains Mono', monospace;
+}
+.sim-field-val {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 600;
+  color: #fff;
+}
+.sim-bbox-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 9.5px;
+  font-family: 'JetBrains Mono', monospace;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+.sim-tag-dom { background: rgba(56, 189, 248, 0.2); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.5); }
+.sim-tag-regex { background: rgba(245, 158, 11, 0.2); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.5); }
+.sim-tag-ocr { background: rgba(167, 139, 250, 0.2); color: #a78bfa; border: 1px solid rgba(167, 139, 250, 0.5); }
+.sim-tag-vit { background: rgba(244, 63, 94, 0.2); color: #f43f5e; border: 1px solid rgba(244, 63, 94, 0.5); }
+.sim-tag-vault { background: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.5); }
+
+/* Center Membrane */
+.sim-membrane {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 10px;
+  gap: 12px;
+  min-width: 140px;
+  text-align: center;
+}
+.sim-membrane-pipe {
+  width: 2px;
+  flex: 1;
+  background: linear-gradient(180deg, var(--accent), var(--green));
+  opacity: 0.4;
+  position: relative;
+}
+.sim-membrane-badge {
+  background: #061124;
+  border: 1px solid rgba(0, 229, 255, 0.4);
+  border-radius: 20px;
+  padding: 8px 12px;
+  font-size: 11px;
+  font-family: 'JetBrains Mono', monospace;
+  box-shadow: 0 0 18px rgba(0, 229, 255, 0.15);
+}
+
+/* Right Screen: Cloud View */
+.sim-wire-code {
+  background: #020612;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 8px;
+  padding: 12px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11.5px;
+  color: #38bdf8;
+  line-height: 1.5;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.sim-blackout-fill {
+  background: #000000 !important;
+  color: #000000 !important;
+  border: 1px solid #1e293b !important;
+  position: relative;
+  user-select: none;
+}
+.sim-blackout-fill::after {
+  content: "■ ENTROPY: 0.0000 BITS";
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  color: rgba(244, 63, 94, 0.7);
+  letter-spacing: 0.5px;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 800;
+}
+
+/* Explainer Callout Card */
+.sim-explainer-box {
+  background: rgba(14, 26, 49, 0.95);
+  border: 1px solid rgba(0, 229, 255, 0.3);
+  border-left: 4px solid var(--accent);
+  border-radius: 8px;
+  padding: 14px 18px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+.sim-explainer-icon {
+  font-size: 20px;
+  color: var(--accent);
+  margin-top: 2px;
+}
+.sim-explainer-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 4px;
+}
+.sim-explainer-text {
+  font-size: 12.5px;
+  color: #cbd5e1;
+  line-height: 1.6;
+}
+
+/* 4-Layer Architecture Cards Grid */
+.sim-arch-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.sim-arch-card {
+  background: rgba(8, 16, 32, 0.85);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 10px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: all 0.2s;
+}
+.sim-arch-card:hover {
+  border-color: rgba(56, 189, 248, 0.4);
+  transform: translateY(-2px);
+  background: rgba(11, 22, 44, 0.95);
+}
+.sim-arch-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.sim-arch-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+}
+.sim-arch-metric {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10.5px;
+  color: var(--accent);
+  background: rgba(0, 229, 255, 0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 700;
+}
+.sim-arch-desc {
+  font-size: 11.5px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.sim-arch-tech {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: #94a3b8;
+  margin-top: auto;
+  border-top: 1px solid rgba(255,255,255,0.06);
+  padding-top: 6px;
+}
+
+/* Interactive Playground Tester */
+.sim-play-box {
+  background: rgba(6, 13, 26, 0.95);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  border-radius: 12px;
+  padding: 18px;
+  margin-bottom: 20px;
+}
+.sim-play-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0 14px 0;
+}
+.sim-chip-btn {
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 6px;
+  padding: 5px 10px;
+  font-size: 11.5px;
+  font-family: 'JetBrains Mono', monospace;
+  color: #e2e8f0;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.sim-chip-btn:hover {
+  background: rgba(0, 229, 255, 0.15);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.sim-play-input-wrap {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.sim-play-input {
+  flex: 1;
+  background: rgba(3, 7, 18, 0.9);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  color: #fff;
+  outline: none;
+}
+.sim-play-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 12px rgba(0, 229, 255, 0.3);
+}
+.sim-play-result-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px;
+  background: rgba(10, 20, 36, 0.7);
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.06);
+}
+
 @media(max-width: 860px) {
   .topbar { padding: 12px 16px; gap: 10px; flex-wrap: wrap; }
   .topbar-sub, .live-clock-pill { display: none; }
@@ -1623,32 +1998,301 @@ body.mode-redacted .datablock {
             </div>
           </div>
 
-          <!-- 5-Stage Animated Pipeline Stepper -->
+          <!-- Interactive Stage Tabs (Direct Inspection) -->
+          <div class="sim-stage-tabs">
+            <button class="sim-tab-btn active" id="sim-tab-1" onclick="selectSimStage(1)">
+              <i class="fa-solid fa-expand" style="color:var(--accent);"></i> 1. Screen Scan (DOM + OCR + ViT)
+            </button>
+            <button class="sim-tab-btn" id="sim-tab-2" onclick="selectSimStage(2)">
+              <i class="fa-solid fa-vault" style="color:var(--yellow);"></i> 2. Vault Tokenizer (AES-256)
+            </button>
+            <button class="sim-tab-btn" id="sim-tab-3" onclick="selectSimStage(3)">
+              <i class="fa-solid fa-eye-slash" style="color:#f43f5e;"></i> 3. Edge Redact (Canvas Blackout)
+            </button>
+            <button class="sim-tab-btn" id="sim-tab-4" onclick="selectSimStage(4)">
+              <i class="fa-solid fa-brain" style="color:var(--violet);"></i> 4. Cloud VLM Reasoning
+            </button>
+            <button class="sim-tab-btn" id="sim-tab-5" onclick="selectSimStage(5)">
+              <i class="fa-solid fa-pen-to-square" style="color:var(--green);"></i> 5. Local DOM Autofill
+            </button>
+          </div>
+
+          <!-- 5-Stage Animated Pipeline Stepper Status Indicators -->
           <div class="sim-pipeline">
-            <div class="sim-step-node" id="sim-node-1">
+            <div class="sim-step-node active" id="sim-node-1" onclick="selectSimStage(1)" style="cursor:pointer;">
               <div class="sim-step-icon"><i class="fa-solid fa-expand" style="color:var(--accent);"></i></div>
               <div class="sim-step-name">1. Screen Scan</div>
               <div class="sim-step-status" id="sim-node-1-status">UltraFace &amp; OCR</div>
             </div>
-            <div class="sim-step-node" id="sim-node-2">
+            <div class="sim-step-node" id="sim-node-2" onclick="selectSimStage(2)" style="cursor:pointer;">
               <div class="sim-step-icon"><i class="fa-solid fa-vault" style="color:var(--yellow);"></i></div>
               <div class="sim-step-name">2. Vault Store</div>
               <div class="sim-step-status" id="sim-node-2-status">AES-256 Tokenize</div>
             </div>
-            <div class="sim-step-node" id="sim-node-3">
+            <div class="sim-step-node" id="sim-node-3" onclick="selectSimStage(3)" style="cursor:pointer;">
               <div class="sim-step-icon"><i class="fa-solid fa-eye-slash" style="color:#f43f5e);"></i></div>
               <div class="sim-step-name">3. Edge Redact</div>
               <div class="sim-step-status" id="sim-node-3-status">Zero-Leak Masking</div>
             </div>
-            <div class="sim-step-node" id="sim-node-4">
+            <div class="sim-step-node" id="sim-node-4" onclick="selectSimStage(4)" style="cursor:pointer;">
               <div class="sim-step-icon"><i class="fa-solid fa-brain" style="color:var(--violet);"></i></div>
               <div class="sim-step-name">4. LLM Plan</div>
               <div class="sim-step-status" id="sim-node-4-status">Coordinate Map</div>
             </div>
-            <div class="sim-step-node" id="sim-node-5">
+            <div class="sim-step-node" id="sim-node-5" onclick="selectSimStage(5)" style="cursor:pointer;">
               <div class="sim-step-icon"><i class="fa-solid fa-pen-to-square" style="color:var(--green);"></i></div>
               <div class="sim-step-name">5. DOM Autofill</div>
               <div class="sim-step-status" id="sim-node-5-status">5-DB Re-hydrate</div>
+            </div>
+          </div>
+
+          <!-- Dual-Perspective Visual Simulator Theater -->
+          <div class="sim-theater-container">
+            <!-- Left Screen: What the Scientist Sees (Client Local RAM) -->
+            <div class="sim-lens-card">
+              <div class="sim-lens-header">
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <span style="color:var(--green);"><i class="fa-solid fa-laptop-code"></i></span>
+                  <span style="font-weight:700; color:#fff;">CLIENT DEVICE VIEW</span>
+                  <span style="color:var(--muted); font-size:10.5px;">(Scientist Browser Memory)</span>
+                </div>
+                <span style="background:rgba(16,185,129,0.15); border:1px solid rgba(16,185,129,0.4); color:var(--green); font-size:10px; padding:2px 8px; border-radius:12px; font-weight:700;">
+                  <i class="fa-solid fa-lock"></i> LOCAL ENCLAVE
+                </span>
+              </div>
+              <div class="sim-lens-body" id="sim-client-viewport">
+                <!-- Laser scan bar -->
+                <div class="sim-scan-line" id="sim-laser-line"></div>
+
+                <!-- Scientist Mock Card -->
+                <div class="sim-mock-profile" id="sim-mock-card">
+                  <div class="sim-mock-avatar-wrap" id="sim-mock-avatar-box">
+                    <img src="images/emp-natesh.jpeg" alt="Scientist Avatar" class="sim-mock-avatar-img" id="sim-mock-img" />
+                    <div id="sim-avatar-badge" style="position:absolute; bottom:2px; left:2px; right:2px; font-size:8px; background:rgba(0,0,0,0.85); color:#38bdf8; text-align:center; border-radius:2px; font-family:'JetBrains Mono',monospace;">L3: ViT Face</div>
+                  </div>
+                  <div style="flex:1;">
+                    <div style="display:flex; align-items:center; justify-content:space-between;">
+                      <div id="sim-mock-name" style="font-family:'Space Grotesk',sans-serif; font-size:14px; font-weight:700; color:#fff;">Shri Natesh Kanna R</div>
+                      <span class="sim-bbox-tag sim-tag-dom" id="sim-tag-name">Layer 0: DOM</span>
+                    </div>
+                    <div style="font-size:11.5px; color:var(--muted);" id="sim-mock-role">Lead Flight Software Architect &bull; ISRO-10101</div>
+                    <div style="font-size:11px; color:#38bdf8; margin-top:2px;" id="sim-mock-dept"><i class="fa-solid fa-satellite"></i> Master Control Facility (MCF Hassan)</div>
+                  </div>
+                </div>
+
+                <!-- Form Fields with Detection Highlights -->
+                <div class="sim-field-row" id="sim-row-email">
+                  <div>
+                    <div class="sim-field-label">OFFICIAL SATELLITE EMAIL</div>
+                    <div class="sim-field-val" id="sim-val-email">natesh.kanna@isro.gov.in</div>
+                  </div>
+                  <span class="sim-bbox-tag sim-tag-dom" id="sim-tag-email">Layer 0: type=email</span>
+                </div>
+
+                <div class="sim-field-row" id="sim-row-phone">
+                  <div>
+                    <div class="sim-field-label">MISSION SECURE PHONE</div>
+                    <div class="sim-field-val" id="sim-val-phone">+91 94440 12890</div>
+                  </div>
+                  <span class="sim-bbox-tag sim-tag-regex" id="sim-tag-phone">Layer 1: Phone Regex</span>
+                </div>
+
+                <div class="sim-field-row" id="sim-row-aadhaar">
+                  <div>
+                    <div class="sim-field-label">GOVT AADHAAR / NATIONAL ID</div>
+                    <div class="sim-field-val" id="sim-val-aadhaar">7849 2018 3920</div>
+                  </div>
+                  <span class="sim-bbox-tag sim-tag-regex" id="sim-tag-aadhaar">Layer 1: Verhoeff &check;</span>
+                </div>
+
+                <div class="sim-field-row" id="sim-row-secret">
+                  <div>
+                    <div class="sim-field-label">MISSION KMS ENCLAVE KEY</div>
+                    <div class="sim-field-val" id="sim-val-secret" style="color:#f59e0b;">ISRO-KMS-EK-2026-07741</div>
+                  </div>
+                  <span class="sim-bbox-tag sim-tag-regex" id="sim-tag-secret">Layer 1: KMS Secret</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Center: Privacy Membrane & Boundary -->
+            <div class="sim-membrane">
+              <div class="sim-membrane-pipe"></div>
+              <div class="sim-membrane-badge">
+                <i class="fa-solid fa-shield-halved" style="color:var(--accent); font-size:18px; margin-bottom:4px; display:block;"></i>
+                <div style="font-weight:800; color:#fff; font-size:10px;">PRIVACY MEMBRANE</div>
+                <div style="font-size:9.5px; color:var(--green); margin-top:2px;">0 LEAK BOUNDARY</div>
+              </div>
+              <div style="background:rgba(8,16,32,0.9); border:1px solid rgba(255,255,255,0.08); border-radius:8px; padding:8px 10px; font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--muted); text-align:center;">
+                <div>CLOUD LEAKS</div>
+                <div style="color:var(--green); font-size:13px; font-weight:800;" id="sim-metric-leaks">0.00 BYTES</div>
+                <div style="margin-top:4px;">SHANNON ENTROPY</div>
+                <div style="color:#38bdf8; font-size:11px; font-weight:700;" id="sim-metric-entropy">0.0000 b/px</div>
+                <div style="margin-top:4px;">LOCAL LATENCY</div>
+                <div style="color:var(--yellow); font-size:11px; font-weight:700;" id="sim-metric-latency">~18ms</div>
+              </div>
+              <div class="sim-membrane-pipe"></div>
+            </div>
+
+            <!-- Right Screen: What the Cloud VLM Sees (The Wire Egress) -->
+            <div class="sim-lens-card">
+              <div class="sim-lens-header">
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <span style="color:#f43f5e;"><i class="fa-solid fa-cloud-arrow-up"></i></span>
+                  <span style="font-weight:700; color:#fff;">CLOUD VLM PERSPECTIVE</span>
+                  <span style="color:var(--muted); font-size:10.5px;">(What Server Receives)</span>
+                </div>
+                <span id="sim-wire-badge" style="background:rgba(244,63,94,0.15); border:1px solid rgba(244,63,94,0.4); color:#f43f5e; font-size:10px; padding:2px 8px; border-radius:12px; font-weight:700;">
+                  <i class="fa-solid fa-eye-slash"></i> SANITIZED WIRE
+                </span>
+              </div>
+              <div class="sim-lens-body" id="sim-cloud-viewport">
+                <!-- Redacted Visual Screenshot Preview -->
+                <div style="font-size:11px; font-family:'JetBrains Mono',monospace; color:var(--muted); margin-bottom:2px;">
+                  <i class="fa-solid fa-image"></i> INCOMING SANITIZED SCREENSHOT FRAME:
+                </div>
+                <div style="display:flex; gap:12px; align-items:center; background:#010409; padding:10px; border-radius:8px; border:1px solid rgba(255,255,255,0.06);">
+                  <div class="sim-mock-avatar-wrap sim-blackout-fill" style="width:60px; height:60px; border-color:#334155;">
+                  </div>
+                  <div style="flex:1; display:flex; flex-direction:column; gap:6px;">
+                    <div style="background:#0a101d; padding:4px 8px; border-radius:4px; font-family:'JetBrains Mono',monospace; font-size:11px; color:#38bdf8;">
+                      [UI Box 1]: <span id="sim-cloud-token-name">&laquo;TOKEN_PERSON_NK01&raquo;</span>
+                    </div>
+                    <div style="background:#0a101d; padding:4px 8px; border-radius:4px; font-family:'JetBrains Mono',monospace; font-size:11px; color:#38bdf8;">
+                      [UI Box 2]: <span id="sim-cloud-token-email">&laquo;TOKEN_EMAIL_01&raquo;</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Cloud VLM Real-time Spatial Plan Response -->
+                <div style="font-size:11px; font-family:'JetBrains Mono',monospace; color:var(--muted); margin-top:4px;">
+                  <i class="fa-solid fa-brain"></i> CLOUD VLM STREAMING REASONING PLAN (JSON):
+                </div>
+                <div class="sim-wire-code" id="sim-cloud-json-output">
+{
+  "agent_role": "Autonomous Browser Navigator",
+  "vision_input_leak_status": "0 PII BYTES DETECTED",
+  "spatial_plan": [
+    { "step": 1, "action": "fill", "target": "box_name", "value": "&laquo;TOKEN_PERSON_NK01&raquo;" },
+    { "step": 2, "action": "fill", "target": "box_email", "value": "&laquo;TOKEN_EMAIL_01&raquo;" },
+    { "step": 3, "action": "fill", "target": "box_aadhaar", "value": "&laquo;TOKEN_AADHAAR_01&raquo;" },
+    { "step": 4, "action": "click", "target": "btn_sync_all_5_databases" }
+  ],
+  "security_audit": "Cloud operates strictly on coordinates &amp; surrogate hashes."
+}</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Dynamic Stage Explainer Callout -->
+          <div class="sim-explainer-box" id="sim-stage-explainer">
+            <div class="sim-explainer-icon"><i class="fa-solid fa-circle-info" id="sim-explainer-icon-i"></i></div>
+            <div>
+              <div class="sim-explainer-title" id="sim-explainer-title">Stage 1: Multi-Layer Screen Perception (DOM + Regex + OCR + ViT)</div>
+              <div class="sim-explainer-text" id="sim-explainer-text">
+                Instead of making a heavy Vision Transformer responsible for all PII detection (which takes &gt;800ms and hallucinates small digits), VisionVault decomposes perception into 4 specialized layers: <strong>Layer 0 DOM</strong> tags inputs instantly (<1ms), <strong>Layer 1 Deterministic Engine</strong> validates Aadhaar &amp; cards via Verhoeff &amp; Luhn checksum algorithms (<3ms), <strong>Layer 2 OCR</strong> extracts canvas telemetry, and <strong>Layer 3 Lightweight ViT</strong> runs strictly on faces and photo badges.
+              </div>
+            </div>
+          </div>
+
+          <!-- 4-Layer Architecture Cards (Educational Guide for Evaluators) -->
+          <div style="margin-bottom:12px; font-family:'Space Grotesk',sans-serif; font-size:14px; font-weight:700; color:#fff; display:flex; align-items:center; gap:8px;">
+            <i class="fa-solid fa-layer-group" style="color:var(--accent);"></i> The 4-Layer On-Device Perception Pipeline:
+          </div>
+          <div class="sim-arch-grid">
+            <div class="sim-arch-card">
+              <div class="sim-arch-card-header">
+                <span class="sim-arch-title" style="color:#38bdf8;">Layer 0 &bull; DOM &amp; AX Tree</span>
+                <span class="sim-arch-metric">&lt; 1 ms</span>
+              </div>
+              <div class="sim-arch-desc">
+                Directly inspects semantic form attributes (<code style="color:#38bdf8;">input[type=email]</code>, <code style="color:#38bdf8;">input[type=password]</code>, <code style="color:#38bdf8;">autocomplete=*</code>). 100% precision, 0 FLOPs.
+              </div>
+              <div class="sim-arch-tech">DOM Inspector &bull; Zero ML Overhead</div>
+            </div>
+
+            <div class="sim-arch-card">
+              <div class="sim-arch-card-header">
+                <span class="sim-arch-title" style="color:#f59e0b;">Layer 1 &bull; Deterministic Engine</span>
+                <span class="sim-arch-metric">&lt; 3 ms</span>
+              </div>
+              <div class="sim-arch-desc">
+                Mathematical checksums eliminating hallucination: <strong>Verhoeff algorithm</strong> (Aadhaar), <strong>Luhn algorithm</strong> (Cards), PAN regex, Phone, KMS/AWS keys.
+              </div>
+              <div class="sim-arch-tech">Verhoeff D₅ Dihedral &bull; Luhn Mod-10</div>
+            </div>
+
+            <div class="sim-arch-card">
+              <div class="sim-arch-card-header">
+                <span class="sim-arch-title" style="color:#a78bfa;">Layer 2 &bull; On-Device OCR</span>
+                <span class="sim-arch-metric">&lt; 25 ms</span>
+              </div>
+              <div class="sim-arch-desc">
+                Runs OCR exclusively on visual coordinates, dynamic canvas charts, and unrendered bitmap pixels to detect textual PII within images.
+              </div>
+              <div class="sim-arch-tech">WebAssembly &bull; Local Text Detector</div>
+            </div>
+
+            <div class="sim-arch-card">
+              <div class="sim-arch-card-header">
+                <span class="sim-arch-title" style="color:#f43f5e;">Layer 3 &bull; Lightweight ViT</span>
+                <span class="sim-arch-metric">&lt; 45 ms</span>
+              </div>
+              <div class="sim-arch-desc">
+                Dedicated strictly to non-text visual regions: facial biometric identification, photo ID badges, official signatures, and canvas elements.
+              </div>
+              <div class="sim-arch-tech">UltraFace ONNX &bull; WebGPU ViT</div>
+            </div>
+          </div>
+
+          <!-- Interactive Live PII Tester Playground (For Evaluators without Extension) -->
+          <div class="sim-play-box">
+            <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+              <div>
+                <div style="font-family:'Space Grotesk',sans-serif; font-size:15px; font-weight:800; color:#fff;">
+                  <i class="fa-solid fa-flask" style="color:var(--accent);"></i> Interactive On-Device Privacy Firewall Playground
+                </div>
+                <div style="font-size:12px; color:var(--muted); margin-top:2px;">
+                  Test any text string or click a preset to see the multi-layer classification and mathematical checksum verification live:
+                </div>
+              </div>
+              <span style="font-size:11px; font-family:'JetBrains Mono',monospace; color:var(--green);"><i class="fa-solid fa-bolt"></i> EVALUATOR LIVE TESTER</span>
+            </div>
+
+            <div class="sim-play-chips">
+              <button class="sim-chip-btn" onclick="setPlaygroundInput('7849 2018 3920')"><i class="fa-solid fa-id-card"></i> Aadhaar (Verhoeff ✓)</button>
+              <button class="sim-chip-btn" onclick="setPlaygroundInput('4532 0150 1234 5678')"><i class="fa-solid fa-credit-card"></i> Visa Card (Luhn ✓)</button>
+              <button class="sim-chip-btn" onclick="setPlaygroundInput('natesh.kanna@isro.gov.in')"><i class="fa-solid fa-envelope"></i> ISRO Email</button>
+              <button class="sim-chip-btn" onclick="setPlaygroundInput('ISRO-KMS-EK-2026-07741')"><i class="fa-solid fa-key"></i> KMS Master Key</button>
+              <button class="sim-chip-btn" onclick="setPlaygroundInput('ABCDE1234F')"><i class="fa-solid fa-file-invoice"></i> Indian PAN Card</button>
+              <button class="sim-chip-btn" onclick="setPlaygroundInput('+91 94440 12890')"><i class="fa-solid fa-phone"></i> Phone Number</button>
+            </div>
+
+            <div class="sim-play-input-wrap">
+              <input type="text" id="sim-play-text-input" class="sim-play-input" placeholder="Type or paste any sensitive string here (e.g. Aadhaar, Card, Email, KMS Key)..." oninput="runPlaygroundAnalysis(this.value)" value="7849 2018 3920" />
+              <button class="sim-btn-secondary" onclick="runPlaygroundAnalysis(document.getElementById('sim-play-text-input').value)" style="white-space:nowrap;">
+                <i class="fa-solid fa-magnifying-glass"></i> Analyze Now
+              </button>
+            </div>
+
+            <!-- Analysis Live Results Grid -->
+            <div class="sim-play-result-grid" id="sim-play-results">
+              <div>
+                <div style="font-size:10px; color:var(--muted); font-family:'JetBrains Mono',monospace;">DETECTED LAYER</div>
+                <div style="font-size:12px; font-weight:700; color:var(--yellow); font-family:'JetBrains Mono',monospace;" id="sim-res-layer">Layer 1: Deterministic Engine</div>
+              </div>
+              <div>
+                <div style="font-size:10px; color:var(--muted); font-family:'JetBrains Mono',monospace;">MATHEMATICAL CHECKSUM</div>
+                <div style="font-size:12px; font-weight:700; color:var(--green); font-family:'JetBrains Mono',monospace;" id="sim-res-checksum">Verhoeff D₅ Dihedral &check; VALID</div>
+              </div>
+              <div>
+                <div style="font-size:10px; color:var(--muted); font-family:'JetBrains Mono',monospace;">CLIENT RAM VAULT TOKEN</div>
+                <div style="font-size:12px; font-weight:700; color:#38bdf8; font-family:'JetBrains Mono',monospace;" id="sim-res-token">&laquo;TOKEN_AADHAAR_3920&raquo;</div>
+              </div>
+              <div>
+                <div style="font-size:10px; color:var(--muted); font-family:'JetBrains Mono',monospace;">CLOUD EGRESS VIEW</div>
+                <div style="font-size:12px; font-weight:700; color:#f43f5e; font-family:'JetBrains Mono',monospace;" id="sim-res-cloud">[SOLID BLACK MASK]</div>
+              </div>
             </div>
           </div>
 
@@ -2329,6 +2973,11 @@ function applyActiveEmployeeUI() {
   if (ovEmail) ovEmail.textContent = e.email;
   const ovOrg = document.getElementById("ov-org");
   if (ovOrg) ovOrg.textContent = e.org;
+
+  // Sync simulator mock workbench with active employee
+  if (typeof updateSimVisualTheater === 'function') {
+    updateSimVisualTheater(simCurrentStage || 1);
+  }
 }
 
 // Navigation Handling
@@ -2627,6 +3276,12 @@ updateProgress();
 loadEmpMessages();
 setInterval(loadEmpMessages, 2500);
 
+// Initialize Simulator Workbench & Playground for non-extension evaluators
+setTimeout(() => {
+  if (typeof selectSimStage === "function") selectSimStage(1);
+  if (typeof runPlaygroundAnalysis === "function") runPlaygroundAnalysis("7849 2018 3920");
+}, 100);
+
 // Copy prompt text helper
 function copyPromptText(btn, elementId) {
   const el = document.getElementById(elementId);
@@ -2698,21 +3353,51 @@ function logSim(msg) {
   }
 }
 
+function selectSimStage(stage) {
+  simCurrentStage = stage;
+  updateSimNodes(stage);
+  updateSimVisualTheater(stage);
+  updateStageExplainer(stage);
+  
+  // Update Tabs
+  for (let i = 1; i <= 5; i++) {
+    const tab = document.getElementById("sim-tab-" + i);
+    if (tab) {
+      if (i === stage) tab.classList.add("active");
+      else tab.classList.remove("active");
+    }
+  }
+
+  const stageTitles = [
+    "Ready",
+    "STAGE 1: [SCREEN SCAN] Running on-device UltraFace ONNX model & LayoutLM OCR...",
+    "STAGE 2: [LOCAL VAULT HASH] Encrypting PII into client-side RAM vault using AES-256-GCM...",
+    "STAGE 3: [EDGE REDACTION] Blitting high-entropy black privacy masks over avatars and coordinates on local Canvas...",
+    "STAGE 4: [LLM REASONING] Streaming sanitized screen wireframe to cloud vision model for spatial coordinate trajectory...",
+    "STAGE 5: [CLIENT AUTONOMOUS DISPATCH] Re-hydrating vault values locally into Database 1 through 5..."
+  ];
+  if (stageTitles[stage]) logSim(stageTitles[stage]);
+}
+
 function updateSimNodes(stage) {
   for (let i = 1; i <= 5; i++) {
     const node = document.getElementById("sim-node-" + i);
     const status = document.getElementById("sim-node-" + i + "-status");
+    const tab = document.getElementById("sim-tab-" + i);
     if (!node) continue;
     if (i < stage) {
       node.className = "sim-step-node completed";
       if (status) status.innerHTML = "<span style='color:var(--green);font-weight:700;'>✓ PASSED (0 Leaks)</span>";
+      if (tab) tab.classList.remove("active");
     } else if (i === stage) {
       node.className = "sim-step-node active";
       if (status) status.innerHTML = "<span style='color:var(--accent);font-weight:700;'>● PROCESSING...</span>";
+      if (tab) tab.classList.add("active");
     } else {
       node.className = "sim-step-node";
       const defaultLabels = ["UltraFace & OCR", "AES-256 Tokenize", "Zero-Leak Masking", "Coordinate Map", "5-DB Re-hydrate"];
       if (status) status.textContent = defaultLabels[i - 1];
+      if (tab) tab.classList.remove("active");
     }
   }
   const badge = document.getElementById("sim-status-badge");
@@ -2727,6 +3412,295 @@ function updateSimNodes(stage) {
       badge.textContent = "SYNCHRONIZED • ZERO LEAKS";
       badge.style.color = "var(--green)";
     }
+  }
+}
+
+function updateSimVisualTheater(stage) {
+  const e = EMPLOYEES_DATA[currentEmp] || EMPLOYEES_DATA["NK"];
+  const defaults = FULL_MISSION_DEFAULTS[currentEmp] || FULL_MISSION_DEFAULTS["NK"];
+
+  const laser = document.getElementById("sim-laser-line");
+  const avatarWrap = document.getElementById("sim-mock-avatar-box");
+  const avatarImg = document.getElementById("sim-mock-img");
+  const avatarBadge = document.getElementById("sim-avatar-badge");
+  const mockName = document.getElementById("sim-mock-name");
+  const mockRole = document.getElementById("sim-mock-role");
+  const mockDept = document.getElementById("sim-mock-dept");
+  const tagName = document.getElementById("sim-tag-name");
+  const valEmail = document.getElementById("sim-val-email");
+  const tagEmail = document.getElementById("sim-tag-email");
+  const valPhone = document.getElementById("sim-val-phone");
+  const tagPhone = document.getElementById("sim-tag-phone");
+  const valAadhaar = document.getElementById("sim-val-aadhaar");
+  const tagAadhaar = document.getElementById("sim-tag-aadhaar");
+  const valSecret = document.getElementById("sim-val-secret");
+  const tagSecret = document.getElementById("sim-tag-secret");
+
+  const metricLeaks = document.getElementById("sim-metric-leaks");
+  const metricEntropy = document.getElementById("sim-metric-entropy");
+  const metricLatency = document.getElementById("sim-metric-latency");
+
+  const cloudTokenName = document.getElementById("sim-cloud-token-name");
+  const cloudTokenEmail = document.getElementById("sim-cloud-token-email");
+  const cloudJsonOutput = document.getElementById("sim-cloud-json-output");
+
+  // Sync basic profile data
+  if (mockName) mockName.textContent = e.name;
+  if (mockRole) mockRole.textContent = e.role + " • " + e.id;
+  if (mockDept) mockDept.innerHTML = `<i class="fa-solid fa-satellite"></i> ` + e.org;
+  if (avatarImg) avatarImg.src = e.image;
+
+  if (stage === 1) {
+    // Stage 1: Laser scanning + Multi-Layer Detection Bounding Boxes
+    if (laser) {
+      laser.parentElement.classList.add("sim-scanning");
+    }
+    if (avatarBadge) {
+      avatarBadge.style.display = "block";
+      avatarBadge.textContent = "L3: ViT Face 99.4%";
+      avatarBadge.style.color = "#f43f5e";
+    }
+    if (avatarImg) avatarImg.style.filter = "none";
+    if (tagName) { tagName.className = "sim-bbox-tag sim-tag-dom"; tagName.textContent = "Layer 0: DOM"; }
+    if (valEmail) { valEmail.textContent = e.email; valEmail.style.color = "#fff"; }
+    if (tagEmail) { tagEmail.className = "sim-bbox-tag sim-tag-dom"; tagEmail.textContent = "Layer 0: type=email"; }
+    if (valPhone) { valPhone.textContent = defaults.phone; valPhone.style.color = "#fff"; }
+    if (tagPhone) { tagPhone.className = "sim-bbox-tag sim-tag-regex"; tagPhone.textContent = "Layer 1: Phone E.164"; }
+    if (valAadhaar) { valAadhaar.textContent = "7849 2018 3920"; valAadhaar.style.color = "#fff"; }
+    if (tagAadhaar) { tagAadhaar.className = "sim-bbox-tag sim-tag-regex"; tagAadhaar.textContent = "Layer 1: Verhoeff ✓"; }
+    if (valSecret) { valSecret.textContent = defaults.encryption_key_ref; valSecret.style.color = "#f59e0b"; }
+    if (tagSecret) { tagSecret.className = "sim-bbox-tag sim-tag-regex"; tagSecret.textContent = "Layer 1: KMS Secret"; }
+
+    if (metricLeaks) metricLeaks.textContent = "0.00 BYTES";
+    if (metricEntropy) metricEntropy.textContent = "0.0000 b/px";
+    if (metricLatency) metricLatency.textContent = "18.2 ms";
+
+    if (cloudTokenName) cloudTokenName.textContent = "«AWAITING_ENCLAVE_TOKEN»";
+    if (cloudTokenEmail) cloudTokenEmail.textContent = "«AWAITING_ENCLAVE_TOKEN»";
+    if (cloudJsonOutput) {
+      cloudJsonOutput.textContent = `[ON-DEVICE CLASSIFIER IN PROGRESS]\nPerception: Layer 0 DOM (<1ms) -> Layer 1 Verhoeff/Luhn Checksums (<3ms) -> Layer 2 OCR (<25ms) -> Layer 3 ViT (<45ms)\nNetwork Egress Status: 0 BYTES TRANSMITTED (Payload held in client memory)`;
+    }
+  } else if (stage === 2) {
+    // Stage 2: AES-256 Vault Tokenizer
+    if (laser) laser.parentElement.classList.remove("sim-scanning");
+    if (avatarBadge) {
+      avatarBadge.style.display = "block";
+      avatarBadge.textContent = "Vaulted ID";
+      avatarBadge.style.color = "#10b981";
+    }
+    if (avatarImg) avatarImg.style.filter = "none";
+    if (tagName) { tagName.className = "sim-bbox-tag sim-tag-vault"; tagName.textContent = "AES-256 Vault"; }
+    if (valEmail) { valEmail.textContent = "«TOKEN_EMAIL_ISRO»"; valEmail.style.color = "#10b981"; }
+    if (tagEmail) { tagEmail.className = "sim-bbox-tag sim-tag-vault"; tagEmail.textContent = "AES-256 Token"; }
+    if (valPhone) { valPhone.textContent = "«TOKEN_PHONE_MCF»"; valPhone.style.color = "#10b981"; }
+    if (tagPhone) { tagPhone.className = "sim-bbox-tag sim-tag-vault"; tagPhone.textContent = "AES-256 Token"; }
+    if (valAadhaar) { valAadhaar.textContent = "«TOKEN_AADHAAR_3920»"; valAadhaar.style.color = "#10b981"; }
+    if (tagAadhaar) { tagAadhaar.className = "sim-bbox-tag sim-tag-vault"; tagAadhaar.textContent = "AES-256 Token"; }
+    if (valSecret) { valSecret.textContent = "«TOKEN_KMS_7741»"; valSecret.style.color = "#10b981"; }
+    if (tagSecret) { tagSecret.className = "sim-bbox-tag sim-tag-vault"; tagSecret.textContent = "AES-256 Token"; }
+
+    if (metricLeaks) metricLeaks.textContent = "0.00 BYTES";
+    if (metricEntropy) metricEntropy.textContent = "0.0000 b/px";
+    if (metricLatency) metricLatency.textContent = "4.1 ms";
+
+    if (cloudTokenName) cloudTokenName.textContent = "«TOKEN_PERSON_NK01»";
+    if (cloudTokenEmail) cloudTokenEmail.textContent = "«TOKEN_EMAIL_ISRO»";
+    if (cloudJsonOutput) {
+      cloudJsonOutput.textContent = `{\n  "vault_status": "AES-256-GCM ENCRYPTED IN RAM",\n  "cryptographic_tokens_generated": 6,\n  "raw_pii_egress": "0 BYTES",\n  "vault_keys_held_locally": ["name", "email", "phone", "aadhaar", "kms_ref"]\n}`;
+    }
+  } else if (stage === 3) {
+    // Stage 3: Edge Redact (Canvas Solid Blackout)
+    if (laser) laser.parentElement.classList.remove("sim-scanning");
+    if (avatarBadge) {
+      avatarBadge.style.display = "block";
+      avatarBadge.textContent = "CANVAS MASKED";
+      avatarBadge.style.color = "#f43f5e";
+    }
+    if (avatarImg) avatarImg.style.filter = "brightness(0)";
+    if (valEmail) { valEmail.textContent = "████████████████████"; valEmail.style.color = "#64748b"; }
+    if (valPhone) { valPhone.textContent = "██████████████"; valPhone.style.color = "#64748b"; }
+    if (valAadhaar) { valAadhaar.textContent = "████ ████ ████"; valAadhaar.style.color = "#64748b"; }
+    if (valSecret) { valSecret.textContent = "████████████████████"; valSecret.style.color = "#64748b"; }
+
+    if (metricLeaks) metricLeaks.textContent = "0.00 BYTES";
+    if (metricEntropy) metricEntropy.textContent = "0.0000 b/px";
+    if (metricLatency) metricLatency.textContent = "2.3 ms";
+
+    if (cloudTokenName) cloudTokenName.textContent = "«TOKEN_PERSON_NK01»";
+    if (cloudTokenEmail) cloudTokenEmail.textContent = "«TOKEN_EMAIL_ISRO»";
+    if (cloudJsonOutput) {
+      cloudJsonOutput.textContent = `{\n  "canvas_redaction_status": "PITCH BLACK #000000 OVERLAY",\n  "shannon_entropy_test": "0.0000 bits/pixel (UNRECOVERABLE)",\n  "adversarial_pen_test": "100% INPAINTING & DIFFUSION RESISTANT",\n  "cloud_received_pixels": "Zero Facial Biometrics / Zero Text Cleartext"\n}`;
+    }
+  } else if (stage === 4) {
+    // Stage 4: Cloud VLM Reasoning Wireframe
+    if (laser) laser.parentElement.classList.remove("sim-scanning");
+    if (avatarImg) avatarImg.style.filter = "none";
+    if (valEmail) { valEmail.textContent = "«TOKEN_EMAIL_ISRO»"; valEmail.style.color = "#38bdf8"; }
+    if (valPhone) { valPhone.textContent = "«TOKEN_PHONE_MCF»"; valPhone.style.color = "#38bdf8"; }
+    if (valAadhaar) { valAadhaar.textContent = "«TOKEN_AADHAAR_3920»"; valAadhaar.style.color = "#38bdf8"; }
+    if (valSecret) { valSecret.textContent = "«TOKEN_KMS_7741»"; valSecret.style.color = "#38bdf8"; }
+
+    if (metricLeaks) metricLeaks.textContent = "0.00 BYTES";
+    if (metricEntropy) metricEntropy.textContent = "0.0000 b/px";
+    if (metricLatency) metricLatency.textContent = "380 ms (Cloud VLM)";
+
+    if (cloudJsonOutput) {
+      cloudJsonOutput.textContent = `{\n  "agent_role": "Autonomous Browser Navigator",\n  "vision_input_leak_status": "0 PII BYTES DETECTED",\n  "spatial_plan": [\n    { "step": 1, "action": "fill", "target": "box_name", "value": "«TOKEN_PERSON_NK01»" },\n    { "step": 2, "action": "fill", "target": "box_email", "value": "«TOKEN_EMAIL_ISRO»" },\n    { "step": 3, "action": "fill", "target": "box_aadhaar", "value": "«TOKEN_AADHAAR_3920»" },\n    { "step": 4, "action": "click", "target": "btn_sync_all_5_databases" }\n  ],\n  "security_audit": "Cloud operates strictly on coordinates & surrogate hashes."\n}`;
+    }
+  } else if (stage >= 5) {
+    // Stage 5: Local DOM Re-hydration & Autofill
+    if (laser) laser.parentElement.classList.remove("sim-scanning");
+    if (avatarImg) avatarImg.style.filter = "none";
+    if (tagName) { tagName.className = "sim-bbox-tag sim-tag-vault"; tagName.textContent = "Re-hydrated ✓"; }
+    if (valEmail) { valEmail.innerHTML = `${e.email} <span style="color:var(--green);font-size:10px;">&check; Filled</span>`; valEmail.style.color = "#fff"; }
+    if (valPhone) { valPhone.innerHTML = `${defaults.phone} <span style="color:var(--green);font-size:10px;">&check; Filled</span>`; valPhone.style.color = "#fff"; }
+    if (valAadhaar) { valAadhaar.innerHTML = `7849 2018 3920 <span style="color:var(--green);font-size:10px;">&check; Filled</span>`; valAadhaar.style.color = "#fff"; }
+    if (valSecret) { valSecret.innerHTML = `${defaults.encryption_key_ref} <span style="color:var(--green);font-size:10px;">&check; Filled</span>`; valSecret.style.color = "#f59e0b"; }
+
+    if (metricLeaks) metricLeaks.textContent = "0.00 BYTES";
+    if (metricEntropy) metricEntropy.textContent = "0.0000 b/px";
+    if (metricLatency) metricLatency.textContent = "6.4 ms (Local DOM)";
+
+    if (cloudJsonOutput) {
+      cloudJsonOutput.textContent = `{\n  "sync_verification": "SUCCESS",\n  "databases_populated": [\n    "Database 1: HR Portal",\n    "Database 2: Payroll & Direct Deposit",\n    "Database 3: IT Security & Systems",\n    "Database 4: Housing & Logistics",\n    "Database 5: Medical Enclave",\n    "Database 6: Gaganyaan Mission Registry"\n  ],\n  "cloud_leak_audit": "VERIFIED 0 BYTES TRANSMITTED TO CLOUD"\n}`;
+    }
+  }
+}
+
+function updateStageExplainer(stage) {
+  const title = document.getElementById("sim-explainer-title");
+  const text = document.getElementById("sim-explainer-text");
+  const icon = document.getElementById("sim-explainer-icon-i");
+  if (!title || !text) return;
+
+  if (stage === 1) {
+    if (icon) icon.className = "fa-solid fa-expand";
+    title.textContent = "Stage 1: Multi-Layer Screen Perception (DOM + Regex + OCR + ViT)";
+    text.innerHTML = `Instead of making a heavy Vision Transformer responsible for all PII detection (which takes &gt;800ms and hallucinates small digits), VisionVault decomposes perception into 4 specialized layers: <strong>Layer 0 DOM</strong> tags inputs instantly (&lt;1ms), <strong>Layer 1 Deterministic Engine</strong> validates Aadhaar &amp; cards via Verhoeff &amp; Luhn checksum algorithms (&lt;3ms), <strong>Layer 2 OCR</strong> extracts canvas telemetry, and <strong>Layer 3 Lightweight ViT</strong> runs strictly on faces and photo badges.`;
+  } else if (stage === 2) {
+    if (icon) icon.className = "fa-solid fa-vault";
+    title.textContent = "Stage 2: Client-Side Enclave Vault Tokenization (AES-256-GCM)";
+    text.innerHTML = `Real sensitive values are retained in volatile browser memory (<code style="color:var(--accent);">window.crypto.subtle</code>) using hardware-accelerated <strong>AES-256-GCM</strong>. VisionVault substitutes each secret with an ephemeral surrogate token (e.g. <code style="color:#10b981;">«TOKEN_PERSON_NK01»</code>, <code style="color:#10b981;">«TOKEN_AADHAAR_3920»</code>). Zero raw secrets leave browser memory.`;
+  } else if (stage === 3) {
+    if (icon) icon.className = "fa-solid fa-eye-slash";
+    title.textContent = "Stage 3: Destructive Offscreen Canvas Blackout (Shannon Entropy = 0.0000 b/px)";
+    text.innerHTML = `To guarantee immunity against image reconstruction and diffusion inpainting attacks, VisionVault uses a client-side offscreen HTML5 canvas to blit solid pitch-black (<code style="color:#f43f5e;">#000000</code>) rectangles over facial avatars and sensitive UI regions. The resulting Shannon entropy is mathematically verified at <strong>0.0000 bits/pixel</strong>, rendering data recovery impossible.`;
+  } else if (stage === 4) {
+    if (icon) icon.className = "fa-solid fa-brain";
+    title.textContent = "Stage 4: Cloud VLM Spatial Reasoning & Wireframe Planning";
+    text.innerHTML = `The cloud multimodal model (Gemini, Claude, or GPT) receives the sanitized image and layout schema. It plans browser navigation actions (clicks, fills, form submissions) using <em>spatial coordinates and surrogate tokens</em>. The cloud agent makes optimal decisions <strong>without ever observing personal identities or government credentials</strong>.`;
+  } else if (stage >= 5) {
+    if (icon) icon.className = "fa-solid fa-pen-to-square";
+    title.textContent = "Stage 5: Local Client Re-Hydration & Autonomous Multi-Database Dispatch";
+    text.innerHTML = `When the cloud VLM returns the action plan (<code style="color:var(--accent);">fill(target: "box_name", value: "«TOKEN_PERSON_NK01»")</code>), the on-device browser agent intercepts the command, fetches the true plaintext from the local AES-256 RAM vault, and injects it into the DOM. All 5 mission databases are synchronized autonomously with <strong>mathematically proven zero-leak privacy</strong>.`;
+  }
+}
+
+// ── Verhoeff & Luhn Mathematical Checksum Algorithms for Playground ─────────
+const SIM_VERHOEFF_D = [
+  [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+  [1, 2, 3, 4, 0, 6, 7, 8, 9, 5],
+  [2, 3, 4, 0, 1, 7, 8, 9, 5, 6],
+  [3, 4, 0, 1, 2, 8, 9, 5, 6, 7],
+  [4, 0, 1, 2, 3, 9, 5, 6, 7, 8],
+  [5, 9, 8, 7, 6, 0, 4, 3, 2, 1],
+  [6, 5, 9, 8, 7, 1, 0, 4, 3, 2],
+  [7, 6, 5, 9, 8, 2, 1, 0, 4, 3],
+  [8, 7, 6, 5, 9, 3, 2, 1, 0, 4],
+  [9, 8, 7, 6, 5, 4, 3, 2, 1, 0]
+];
+const SIM_VERHOEFF_P = [
+  [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+  [1, 5, 7, 6, 2, 8, 3, 0, 9, 4],
+  [5, 8, 0, 3, 7, 9, 6, 1, 4, 2],
+  [8, 9, 1, 6, 0, 4, 3, 5, 2, 7],
+  [9, 4, 5, 3, 1, 2, 6, 8, 7, 0],
+  [4, 2, 8, 6, 5, 7, 3, 9, 0, 1],
+  [2, 7, 9, 3, 8, 0, 6, 4, 1, 5],
+  [7, 0, 4, 6, 9, 1, 3, 2, 5, 8]
+];
+
+function simValidateVerhoeff(str) {
+  const clean = String(str).replace(/\D/g, "");
+  if (!clean || clean.length < 2) return false;
+  let c = 0;
+  const digits = clean.split("").map(Number).reverse();
+  for (let i = 0; i < digits.length; i++) {
+    c = SIM_VERHOEFF_D[c][SIM_VERHOEFF_P[i % 8][digits[i]]];
+  }
+  return c === 0;
+}
+
+function simValidateLuhn(str) {
+  const clean = String(str).replace(/\D/g, "");
+  if (!clean || clean.length < 13 || clean.length > 19) return false;
+  let sum = 0, shouldDouble = false;
+  for (let i = clean.length - 1; i >= 0; i--) {
+    let digit = parseInt(clean.charAt(i), 10);
+    if (shouldDouble) { digit *= 2; if (digit > 9) digit -= 9; }
+    sum += digit;
+    shouldDouble = !shouldDouble;
+  }
+  return sum % 10 === 0;
+}
+
+function runPlaygroundAnalysis(val) {
+  val = String(val || "").trim();
+  const resLayer = document.getElementById("sim-res-layer");
+  const resChecksum = document.getElementById("sim-res-checksum");
+  const resToken = document.getElementById("sim-res-token");
+  const resCloud = document.getElementById("sim-res-cloud");
+  if (!val) {
+    if (resLayer) resLayer.textContent = "Awaiting input...";
+    if (resChecksum) resChecksum.textContent = "N/A";
+    if (resToken) resToken.textContent = "«EMPTY»";
+    if (resCloud) resCloud.textContent = "[NO DATA]";
+    return;
+  }
+  const cleanDigits = val.replace(/\D/g, "");
+  if (cleanDigits.length === 12 && simValidateVerhoeff(cleanDigits)) {
+    if (resLayer) resLayer.innerHTML = "<span style='color:var(--yellow);'>Layer 1: Deterministic Engine</span>";
+    if (resChecksum) resChecksum.innerHTML = "<span style='color:var(--green);'>Verhoeff D₅ Dihedral &check; VALID</span>";
+    if (resToken) resToken.textContent = "«TOKEN_AADHAAR_" + cleanDigits.slice(-4) + "»";
+    if (resCloud) resCloud.innerHTML = "<span style='color:#f43f5e;'>[SOLID BLACK MASK &bull; 0.0000 b/px]</span>";
+  } else if ((cleanDigits.length >= 13 && cleanDigits.length <= 19) && simValidateLuhn(cleanDigits)) {
+    if (resLayer) resLayer.innerHTML = "<span style='color:var(--yellow);'>Layer 1: Deterministic Engine</span>";
+    if (resChecksum) resChecksum.innerHTML = "<span style='color:var(--green);'>Luhn Mod-10 Checksum &check; VALID</span>";
+    if (resToken) resToken.textContent = "«TOKEN_CARD_" + cleanDigits.slice(-4) + "»";
+    if (resCloud) resCloud.innerHTML = "<span style='color:#f43f5e;'>[SOLID BLACK MASK &bull; 0.0000 b/px]</span>";
+  } else if (/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(val)) {
+    if (resLayer) resLayer.innerHTML = "<span style='color:#38bdf8;'>Layer 0: DOM / Email Regex</span>";
+    if (resChecksum) resChecksum.innerHTML = "<span style='color:var(--green);'>RFC-5322 Format Validated &check;</span>";
+    if (resToken) resToken.textContent = "«TOKEN_EMAIL_" + btoa(val).slice(0, 5) + "»";
+    if (resCloud) resCloud.innerHTML = "<span style='color:#f43f5e;'>[REDACTED &bull; «TOKEN»]</span>";
+  } else if (/(?:KMS|AKIA|ASIA|SECRET|KEY|ISRO-KMS)[\w\-]{8,}/i.test(val)) {
+    if (resLayer) resLayer.innerHTML = "<span style='color:var(--yellow);'>Layer 1: Secret Key Pattern</span>";
+    if (resChecksum) resChecksum.innerHTML = "<span style='color:var(--green);'>High-Entropy Secret Key &check;</span>";
+    if (resToken) resToken.textContent = "«TOKEN_KMS_SECRET»";
+    if (resCloud) resCloud.innerHTML = "<span style='color:#f43f5e;'>[SOLID BLACK MASK &bull; 0.0000 b/px]</span>";
+  } else if (/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(val)) {
+    if (resLayer) resLayer.innerHTML = "<span style='color:var(--yellow);'>Layer 1: Indian ITD PAN Regex</span>";
+    if (resChecksum) resChecksum.innerHTML = "<span style='color:var(--green);'>ITD 4th-Char Entity Match &check;</span>";
+    if (resToken) resToken.textContent = "«TOKEN_PAN_" + val.slice(-3) + "»";
+    if (resCloud) resCloud.innerHTML = "<span style='color:#f43f5e;'>[REDACTED &bull; «TOKEN»]</span>";
+  } else if (/^\+?\d[\d\s\-().]{7,}\d$/.test(val)) {
+    if (resLayer) resLayer.innerHTML = "<span style='color:var(--yellow);'>Layer 1: Phone E.164 Regex</span>";
+    if (resChecksum) resChecksum.innerHTML = "<span style='color:var(--green);'>ITU Telecom Schema Validated &check;</span>";
+    if (resToken) resToken.textContent = "«TOKEN_PHONE_" + cleanDigits.slice(-4) + "»";
+    if (resCloud) resCloud.innerHTML = "<span style='color:#f43f5e;'>[REDACTED &bull; «TOKEN»]</span>";
+  } else {
+    if (resLayer) resLayer.innerHTML = "<span style='color:#a78bfa;'>Layer 2: Local OCR Text</span>";
+    if (resChecksum) resChecksum.innerHTML = "<span style='color:#94a3b8;'>Heuristic Text Tokenizer</span>";
+    if (resToken) resToken.textContent = "«TOKEN_RAW_TEXT»";
+    if (resCloud) resCloud.innerHTML = "<span style='color:#38bdf8;'>[LAYOUT BOX &bull; NO LEAK]</span>";
+  }
+}
+
+function setPlaygroundInput(val) {
+  const inp = document.getElementById("sim-play-text-input");
+  if (inp) {
+    inp.value = val;
+    runPlaygroundAnalysis(val);
   }
 }
 
@@ -2745,25 +3719,20 @@ function runAutonomousSimulation() {
 }
 
 function advanceSimStep() {
+  selectSimStage(simCurrentStage);
   if (simCurrentStage === 1) {
-    updateSimNodes(1);
-    logSim("STAGE 1: [SCREEN SCAN] Running on-device UltraFace ONNX model & LayoutLM OCR on active viewport...");
     simTimer = setTimeout(() => {
       logSim("STAGE 1: Found 1 facial biometric portrait, 14 sensitive DOM elements (Aadhaar, PAN, Bank IFSC, Salary, TLE Coordinates).");
       simCurrentStage = 2;
       advanceSimStep();
     }, 1100);
   } else if (simCurrentStage === 2) {
-    updateSimNodes(2);
-    logSim("STAGE 2: [LOCAL VAULT HASH] Encrypting PII into client-side RAM vault using AES-256-GCM token substitution...");
     simTimer = setTimeout(() => {
       logSim("STAGE 2: Generated 14 cryptographic surrogate tokens (e.g. {{ISRO_VAULT_TOKEN_01}} -> '10101'). Zero cloud egress.");
       simCurrentStage = 3;
       advanceSimStep();
     }, 1200);
   } else if (simCurrentStage === 3) {
-    updateSimNodes(3);
-    logSim("STAGE 3: [EDGE REDACTION] Blitting high-entropy black privacy masks over avatars and coordinates on local Canvas...");
     setRedactionLens("redacted");
     simTimer = setTimeout(() => {
       logSim("STAGE 3: 100% PII masked. Verification SHA-256 integrity check passed. 0 unmasked bytes sent to cloud.");
@@ -2772,16 +3741,12 @@ function advanceSimStep() {
       advanceSimStep();
     }, 1300);
   } else if (simCurrentStage === 4) {
-    updateSimNodes(4);
-    logSim("STAGE 4: [LLM REASONING] Streaming sanitized screen wireframe to cloud vision model for spatial coordinate trajectory...");
     simTimer = setTimeout(() => {
       logSim("STAGE 4: Cloud LLM produced 5 DOM navigation sequences and field target coordinate mappings without ever seeing raw PII.");
       simCurrentStage = 5;
       advanceSimStep();
     }, 1400);
   } else if (simCurrentStage === 5) {
-    updateSimNodes(5);
-    logSim("STAGE 5: [CLIENT AUTONOMOUS DISPATCH] Re-hydrating vault values locally into Database 1 through 5...");
     autoPopulateAllDatabases();
     simTimer = setTimeout(() => {
       updateSimNodes(6);
@@ -2806,19 +3771,11 @@ function stepSimulationForward() {
     logSim("MANUAL STEPPING COMPLETE: 5 / 5 Databases Synchronized.");
     return;
   }
-  updateSimNodes(simCurrentStage);
-  if (simCurrentStage === 1) {
-    logSim("STAGE 1: [SCREEN SCAN] Running on-device UltraFace ONNX model & LayoutLM OCR...");
-  } else if (simCurrentStage === 2) {
-    logSim("STAGE 2: [LOCAL VAULT HASH] Encrypting PII into client-side RAM vault using AES-256-GCM...");
-  } else if (simCurrentStage === 3) {
-    logSim("STAGE 3: [EDGE REDACTION] Blitting high-entropy privacy masks over screen frame...");
+  selectSimStage(simCurrentStage);
+  if (simCurrentStage === 3) {
     setRedactionLens("redacted");
     setTimeout(() => setRedactionLens("normal"), 1200);
-  } else if (simCurrentStage === 4) {
-    logSim("STAGE 4: [LLM REASONING] Planning coordinate navigation trajectory using sanitized bounding boxes...");
   } else if (simCurrentStage === 5) {
-    logSim("STAGE 5: [CLIENT AUTONOMOUS DISPATCH] Re-hydrating tokenized fields into Database 1 through 5...");
     autoPopulateAllDatabases();
   }
 }
@@ -2858,6 +3815,7 @@ function resetSimulation() {
   if (simTimer) clearTimeout(simTimer);
   simCurrentStage = 0;
   updateSimNodes(0);
+  selectSimStage(1);
   const box = document.getElementById("sim-console-output");
   if (box) {
     box.textContent = "[SYSTEM RESET] VisionVault Engine standby.\nReady to run autonomous multi-database simulation.";

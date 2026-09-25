@@ -1261,6 +1261,7 @@ scanBtn.addEventListener("click", async () => {
       { re: /form\s*3|asset|it|system/i,         page: "form-it" },
       { re: /form\s*4|housing|quarter/i,        page: "form-housing" },
       { re: /form\s*5|medical|health|depend/i,     page: "form-medical" },
+      { re: /form\s*6|gaganyaan|spaceflight/i,     page: "form-gaganyaan" },
       { re: /mission\s*reg/i,                    page: "form1" },
       { re: /frequen/i,                          page: "form2" },
       { re: /ground\s*station/i,                 page: "form3" },

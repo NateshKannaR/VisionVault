@@ -383,6 +383,8 @@
       result.mission = "gaganyaan";
       result.site = "isro";
       result.siteUrl = "https://www.isro.gov.in/Gaganyaan.html";
+      result.query = null;
+      result.wantsSearch = false;
     }
 
     const wantsNewRepo = /\b(?:create|make|add|new|init|initialize)\s+(?:a\s+)?(?:new\s+)?repo(?:sitory)?\b/i.test(text) ||
@@ -507,24 +509,26 @@
       result.openTargets.push(onPageTargetMatch[1].toLowerCase());
     }
 
-    const formNumMatch = text.match(/\bform\s*(\d+)\b/i);
-    const formSlugMatch = text.match(/\bform\s*-\s*([a-z0-9_-]+)\b/i);
-    const formNamedMatch = text.match(/\b(payroll|hr|mission\s*systems?|it\b|housing|medical)\b/i);
+    if (!result.wantsMissionSync) {
+      const formNumMatch = text.match(/\bform\s*(\d+)\b/i);
+      const formSlugMatch = text.match(/\bform\s*-\s*([a-z0-9_-]+)\b/i);
+      const formNamedMatch = text.match(/\b(payroll|hr|mission\s*systems?|it\b|housing|medical)\b/i);
 
-    if (formNumMatch) {
-      const fTarget = `form ${formNumMatch[1]}`;
-      if (!result.openTargets.includes(fTarget)) result.openTargets.push(fTarget);
-      result.wantsFill = true;
-    } else if (formSlugMatch) {
-      const fTarget = `form-${formSlugMatch[1].toLowerCase()}`;
-      if (!result.openTargets.includes(fTarget)) result.openTargets.push(fTarget);
-      result.wantsFill = true;
-    } else if (formNamedMatch && /\b(fill|form|click|open|switch)\b/i.test(text)) {
-      const fTarget = formNamedMatch[1].toLowerCase();
-      if (!result.openTargets.includes(fTarget)) result.openTargets.push(fTarget);
-      result.wantsFill = true;
-    } else if (/\bfill\s+(?:the\s+)?(?:form|details|fields|values)\b/i.test(text) || /\b(fill|autofill)\b/i.test(text)) {
-      result.wantsFill = true;
+      if (formNumMatch) {
+        const fTarget = `form ${formNumMatch[1]}`;
+        if (!result.openTargets.includes(fTarget)) result.openTargets.push(fTarget);
+        result.wantsFill = true;
+      } else if (formSlugMatch) {
+        const fTarget = `form-${formSlugMatch[1].toLowerCase()}`;
+        if (!result.openTargets.includes(fTarget)) result.openTargets.push(fTarget);
+        result.wantsFill = true;
+      } else if (formNamedMatch && /\b(fill|form|click|open|switch)\b/i.test(text)) {
+        const fTarget = formNamedMatch[1].toLowerCase();
+        if (!result.openTargets.includes(fTarget)) result.openTargets.push(fTarget);
+        result.wantsFill = true;
+      } else if (/\bfill\s+(?:the\s+)?(?:form|details|fields|values)\b/i.test(text) || /\b(fill|autofill)\b/i.test(text)) {
+        result.wantsFill = true;
+      }
     }
 
     if (

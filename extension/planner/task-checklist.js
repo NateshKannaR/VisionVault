@@ -27,8 +27,32 @@
       });
     }
 
-    // Step 2: Form filling or Search
-    if (p.isFormFill) {
+    // Step 2: Form filling, Mission Sync, or Search
+    if (p.wantsGaganyaanSync) {
+      items.push({
+        id: "extract_mission",
+        label: "Extract Gaganyaan telemetry from isro.gov.in",
+        status: "pending",
+        detail: "Zero personal data transmitted to cloud"
+      });
+      items.push({
+        id: "fill_db6",
+        label: "Populate Database 6 & resolve PII from on-device vault",
+        status: "pending"
+      });
+    } else if (p.wantsMissionSync) {
+      items.push({
+        id: "extract_mission",
+        label: `Extract ${p.mission || "ISRO"} launch telemetry from isro.gov.in`,
+        status: "pending",
+        detail: "Zero personal data transmitted to cloud"
+      });
+      items.push({
+        id: "fill_mission_registry",
+        label: "Log launch telemetry into Mission Dashboard",
+        status: "pending"
+      });
+    } else if (p.isFormFill) {
       items.push({
         id: "fill_form",
         label: "Fill form fields using on-device Vault",

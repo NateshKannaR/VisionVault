@@ -1909,6 +1909,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         "form5": ["form-medical", "form5", "medical"],
         "form-medical": ["form-medical", "form5", "medical"],
         "medical": ["form-medical", "form5", "medical"],
+        "form6": ["form-gaganyaan", "form6", "gaganyaan"],
+        "form-gaganyaan": ["form-gaganyaan", "form6", "gaganyaan"],
+        "gaganyaan": ["form-gaganyaan", "form6", "gaganyaan"],
       };
       const candidateIds = pageAliases[pageKey] || [pageKey];
       let navEl = null;

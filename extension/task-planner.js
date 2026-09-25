@@ -433,6 +433,8 @@
       result.mission = "gaganyaan";
       result.site = "isro";
       result.siteUrl = "https://www.isro.gov.in/Gaganyaan.html";
+      result.query = null;
+      result.wantsSearch = false;
     }
 
     // GitHub intent detection:
@@ -577,24 +579,26 @@
     }
 
     // Extract form / database navigation / fill targets (e.g. "fill form 2", "fill database 2", "open payroll database", "open form 2")
-    const formNumMatch = text.match(/\b(?:form|database|db)\s*(\d+)\b/i);
-    const formSlugMatch = text.match(/\b(?:form|database|db)\s*-\s*([a-z0-9_-]+)\b/i);
-    const formNamedMatch = text.match(/\b(payroll|hr|mission\s*systems?|it\b|housing|medical)\b/i);
+    if (!result.wantsMissionSync) {
+      const formNumMatch = text.match(/\b(?:form|database|db)\s*(\d+)\b/i);
+      const formSlugMatch = text.match(/\b(?:form|database|db)\s*-\s*([a-z0-9_-]+)\b/i);
+      const formNamedMatch = text.match(/\b(payroll|hr|mission\s*systems?|it\b|housing|medical)\b/i);
 
-    if (formNumMatch) {
-      const fTarget = `form ${formNumMatch[1]}`;
-      if (!result.openTargets.includes(fTarget)) result.openTargets.push(fTarget);
-      result.wantsFill = true;
-    } else if (formSlugMatch) {
-      const fTarget = `form-${formSlugMatch[1].toLowerCase()}`;
-      if (!result.openTargets.includes(fTarget)) result.openTargets.push(fTarget);
-      result.wantsFill = true;
-    } else if (formNamedMatch && /\b(fill|form|database|db|registry|click|open|switch)\b/i.test(text)) {
-      const fTarget = formNamedMatch[1].toLowerCase();
-      if (!result.openTargets.includes(fTarget)) result.openTargets.push(fTarget);
-      result.wantsFill = true;
-    } else if (/\bfill\s+(?:the\s+)?(?:form|database|db|registry|details|fields|values)\b/i.test(text) || /\b(fill|autofill)\b/i.test(text)) {
-      result.wantsFill = true;
+      if (formNumMatch) {
+        const fTarget = `form ${formNumMatch[1]}`;
+        if (!result.openTargets.includes(fTarget)) result.openTargets.push(fTarget);
+        result.wantsFill = true;
+      } else if (formSlugMatch) {
+        const fTarget = `form-${formSlugMatch[1].toLowerCase()}`;
+        if (!result.openTargets.includes(fTarget)) result.openTargets.push(fTarget);
+        result.wantsFill = true;
+      } else if (formNamedMatch && /\b(fill|form|database|db|registry|click|open|switch)\b/i.test(text)) {
+        const fTarget = formNamedMatch[1].toLowerCase();
+        if (!result.openTargets.includes(fTarget)) result.openTargets.push(fTarget);
+        result.wantsFill = true;
+      } else if (/\bfill\s+(?:the\s+)?(?:form|database|db|registry|details|fields|values)\b/i.test(text) || /\b(fill|autofill)\b/i.test(text)) {
+        result.wantsFill = true;
+      }
     }
 
     if (
@@ -948,6 +952,7 @@
       "form 3": ["form 3", "form3", "form-it", "asset", "access", "itam", "mission systems", "it database", "database 3"],
       "form 4": ["form 4", "form4", "form-housing", "housing", "quarters", "allotment", "staff quarters", "housing database", "database 4"],
       "form 5": ["form 5", "form5", "form-medical", "medical", "insurance", "dependents", "health & welfare", "health and welfare", "medical database", "database 5"],
+      "form 6": ["form 6", "form6", "form-gaganyaan", "gaganyaan", "human spaceflight", "gaganyaan database", "database 6"],
     };
 
     for (const target of parsed.openTargets) {

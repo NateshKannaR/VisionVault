@@ -1315,6 +1315,10 @@ body.mode-redacted .datablock {
       <span class="ni"><i class="fa-solid fa-heart-pulse"></i></span>
       Database 5 — Health &amp; Welfare <span class="tick" id="tick-medical">✓</span>
     </div>
+    <div class="nav-item" data-page="form-gaganyaan">
+      <span class="ni"><i class="fa-solid fa-user-astronaut"></i></span>
+      Database 6 — Gaganyaan <span class="tick" id="tick-gaganyaan">✓</span>
+    </div>
   </nav>
 
   <!-- Main Content Area -->
@@ -1421,6 +1425,13 @@ body.mode-redacted .datablock {
                 <span class="prompt-tag" style="color:#f59e0b; border-color:rgba(245,158,11,0.4); background:rgba(245,158,11,0.12);">CROSS-SITE SYNC</span>
                 <span id="prompt-p3" style="flex:1; font-weight:700; color:#fff;">Get the next ISRO launch details and log it in our mission dashboard.</span>
                 <button class="prompt-copy-btn" onclick="copyPromptText(this, 'prompt-p3')"><i class="fa-regular fa-copy"></i> Copy Prompt</button>
+              </div>
+
+              <!-- Gaganyaan sync prompt -->
+              <div class="prompt-box featured" style="border-color:rgba(167,139,250,0.5); background:rgba(167,139,250,0.07);">
+                <span class="prompt-tag" style="color:#a78bfa; border-color:rgba(167,139,250,0.4); background:rgba(167,139,250,0.12);">GAGANYAAN SYNC</span>
+                <span id="prompt-p4" style="flex:1; font-weight:700; color:#fff;">Fetch Gaganyaan mission details from isro.gov.in and fill Database 6.</span>
+                <button class="prompt-copy-btn" onclick="copyPromptText(this, 'prompt-p4')"><i class="fa-regular fa-copy"></i> Copy Prompt</button>
               </div>
             </div>
           </div>
@@ -1536,6 +1547,7 @@ Click 'Run Full Autonomous Simulation' or step through each stage.</div>
             <button class="topbar-action" style="justify-content:flex-start;padding:12px 14px;font-size:13px;" onclick="navigateToPage('form-it')"><i class="fa-solid fa-microchip" style="color:var(--yellow);font-size:15px;"></i> Database 3 — Systems</button>
             <button class="topbar-action" style="justify-content:flex-start;padding:12px 14px;font-size:13px;" onclick="navigateToPage('form-housing')"><i class="fa-solid fa-building-user" style="color:var(--violet);font-size:15px;"></i> Database 4 — Housing</button>
             <button class="topbar-action" style="justify-content:flex-start;padding:12px 14px;font-size:13px;" onclick="navigateToPage('form-medical')"><i class="fa-solid fa-heart-pulse" style="color:#f43f5e;font-size:15px;"></i> Database 5 — Medical</button>
+            <button class="topbar-action" style="justify-content:flex-start;padding:12px 14px;font-size:13px;" onclick="navigateToPage('form-gaganyaan')"><i class="fa-solid fa-user-astronaut" style="color:#a78bfa;font-size:15px;"></i> Database 6 — Gaganyaan</button>
           </div>
         </div>
 
@@ -1879,6 +1891,72 @@ Click 'Run Full Autonomous Simulation' or step through each stage.</div>
 
         <button class="btn btn-red" onclick="submitForm('medical')"><i class="fa-solid fa-floppy-disk"></i> Commit Healthcare Database Record</button>
         <div class="toast" id="toast-medical"><i class="fa-solid fa-circle-check"></i> Healthcare database record updated successfully.</div>
+      </div>
+    </div>
+
+    <!-- FORM 6: Gaganyaan Human Spaceflight Database -->
+    <div class="page" id="page-form-gaganyaan">
+      <div class="inner">
+        <div class="page-badge" style="background:rgba(167,139,250,.14);border:1px solid rgba(167,139,250,.35);color:#a78bfa;">DATABASE 6 — GAGANYAAN HUMAN SPACEFLIGHT</div>
+        <div class="page-title">Gaganyaan Mission Intelligence Database</div>
+        <div class="page-sub">HSFC — Human Space Flight Centre, Bengaluru &nbsp;|&nbsp; Source: <a href="https://www.isro.gov.in/Gaganyaan.html" target="_blank" style="color:#a78bfa;text-decoration:underline;">isro.gov.in/Gaganyaan.html</a></div>
+
+        <!-- Source sync banner -->
+        <div id="gaganyaan-sync-banner" style="display:none; align-items:center; gap:10px; background:rgba(167,139,250,0.08); border:1px solid rgba(167,139,250,0.3); border-radius:8px; padding:12px 16px; margin-bottom:16px; font-size:12.5px; color:#a78bfa;">
+          <i class="fa-solid fa-satellite-dish fa-spin" style="font-size:15px;"></i>
+          <span><strong>SYNCHRONIZED:</strong> Mission parameters extracted from <strong>isro.gov.in/Gaganyaan.html</strong> by VisionVault agent. Public data — zero bytes redacted.</span>
+        </div>
+
+        <div class="fsection" style="color:#a78bfa;">Mission Overview (from ISRO.gov.in)</div>
+        <div class="grid3">
+          <div class="fg"><label>Mission Name</label><input type="text" id="gy-mission_name" placeholder="Gaganyaan" data-vault-key="satellite_name"/></div>
+          <div class="fg"><label>Mission Program</label><input type="text" id="gy-program" placeholder="Human Space Flight Programme"/></div>
+          <div class="fg"><label>Mission Phase</label>
+            <select id="gy-phase">
+              <option>TV-D1 (Abort Test) — Completed</option>
+              <option selected>G1 Unmanned Mission — Upcoming</option>
+              <option>G2 Unmanned Mission</option>
+              <option>H1 Human Spaceflight</option>
+            </select>
+          </div>
+        </div>
+        <div class="grid3">
+          <div class="fg"><label>Launch Vehicle</label><input type="text" id="gy-vehicle" placeholder="HLVM3 (Human Rated LVM3)" data-vault-key="vehicle"/></div>
+          <div class="fg"><label>Target Orbit Altitude</label><input type="text" id="gy-orbit_altitude" placeholder="400 km LEO"/></div>
+          <div class="fg"><label>Orbit Type</label><input type="text" id="gy-orbit_type" placeholder="Low Earth Orbit (LEO)" data-vault-key="orbit_type"/></div>
+        </div>
+        <div class="grid3">
+          <div class="fg"><label>Crew Capacity</label><input type="text" id="gy-crew_count" placeholder="3 Astronauts (Vyomanauts)"/></div>
+          <div class="fg"><label>Mission Duration</label><input type="text" id="gy-duration" placeholder="3 Days"/></div>
+          <div class="fg"><label>Recovery Zone</label><input type="text" id="gy-recovery" placeholder="Indian Ocean Sea Waters"/></div>
+        </div>
+
+        <div class="fsection" style="color:#a78bfa;">Spacecraft Systems</div>
+        <div class="grid3">
+          <div class="fg"><label>Crew Module (CM)</label><input type="text" id="gy-crew_module" placeholder="Pressurised habitable space capsule"/></div>
+          <div class="fg"><label>Service Module (SM)</label><input type="text" id="gy-service_module" placeholder="Thermal / Propulsion support structure"/></div>
+          <div class="fg"><label>Crew Escape System</label><input type="text" id="gy-ces" placeholder="CES — Quick-acting solid motors (SDSC)"/></div>
+        </div>
+        <div class="grid2">
+          <div class="fg"><label>Life Support System</label><input type="text" id="gy-lss" placeholder="Earth-like environment (O₂, pressure, temp)"/></div>
+          <div class="fg"><label>Thermal Protection</label><input type="text" id="gy-tps" placeholder="TPS — Re-entry rated double-wall construction"/></div>
+        </div>
+
+        <div class="fsection" style="color:#a78bfa;">HSFC Lead Centre &amp; Mission Officer</div>
+        <div class="grid3">
+          <div class="fg"><label>Lead Centre</label><input type="text" id="gy-centre" placeholder="Human Space Flight Centre (HSFC), Bengaluru" data-vault-key="company"/></div>
+          <div class="fg"><label>Mission Officer / Operator</label><input type="text" id="gy-operator" data-vault-key="operator" placeholder="Assigned operator name"/></div>
+          <div class="fg"><label>Officer Phone</label><input type="tel" id="gy-phone" data-vault-key="phone" placeholder="+91…"/></div>
+        </div>
+        <div class="grid2">
+          <div class="fg"><label>Official Email</label><input type="email" id="gy-email" data-vault-key="email" placeholder="@isro.gov.in"/></div>
+          <div class="fg"><label>Mission ID / Reference</label><input type="text" id="gy-mission_id" data-vault-key="mission_id" placeholder="GAGANYAAN-H1-2025"/></div>
+        </div>
+
+        <button class="btn" style="background:linear-gradient(135deg,#7c3aed,#a78bfa);border:none;color:#fff;" onclick="submitForm('gaganyaan')">
+          <i class="fa-solid fa-rocket"></i> Commit Gaganyaan Database Record
+        </button>
+        <div class="toast" id="toast-gaganyaan"><i class="fa-solid fa-circle-check"></i> Gaganyaan mission database record synchronized successfully.</div>
       </div>
     </div>
 
@@ -2348,13 +2426,13 @@ async function clearEmployeeForms(){
   updateProgress();
 }
 
-const FORMS = ["hr", "payroll", "it", "housing", "medical"];
+const FORMS = ["hr", "payroll", "it", "housing", "medical", "gaganyaan"];
 function updateProgress(){
   const done = FORMS.filter(f => localStorage.getItem(`isro_form_${currentEmp}_${f}`)).length;
-  const pct = Math.round(done / 5 * 100);
+  const pct = Math.round(done / 6 * 100);
   document.getElementById("prog-fill").style.width = pct + "%";
   document.getElementById("prog-pct").textContent = pct + "%";
-  document.getElementById("prog-count").textContent = `${done} / 5 Synchronized`;
+  document.getElementById("prog-count").textContent = `${done} / 6 Synchronized`;
   FORMS.forEach(f => {
     const t = document.getElementById("tick-" + f);
     if (t) t.style.display = localStorage.getItem(`isro_form_${currentEmp}_${f}`) ? "inline" : "none";

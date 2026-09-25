@@ -1218,6 +1218,106 @@ const nisarStep9 = planNextAction({
 });
 is(nisarStep9.action, 'done', 'nisar step 9 completes mission dashboard sync');
 
+// 9. Gaganyaan DB6 Cross-Site Sync: "Fetch Gaganyaan mission details from isro.gov.in and fill Database 6."
+const gyTask = 'Fetch Gaganyaan mission details from isro.gov.in and fill Database 6.';
+const gyParsed = TaskPlanner.parseTask(gyTask);
+is(gyParsed.wantsGaganyaanSync, true, 'gy task wantsGaganyaanSync is true');
+is(gyParsed.wantsMissionSync, true, 'gy task wantsMissionSync is true');
+is(gyParsed.mission, 'gaganyaan', 'gy task mission is gaganyaan');
+is(gyParsed.siteUrl, 'https://www.isro.gov.in/Gaganyaan.html', 'gy task siteUrl points to Gaganyaan.html');
+
+// Step 1: Navigate to isro.gov.in/Gaganyaan.html
+const gyStep1 = planNextAction({
+  task: gyTask, parsed: gyParsed,
+  pageInfo: { url: 'https://google.com' }, marks: [], progress: {}
+});
+is(gyStep1.action, 'navigate', 'gy step 1 navigates to isro.gov.in');
+
+// Step 2: On Gaganyaan page, already have data → navigate to employee portal
+const gyStep2 = planNextAction({
+  task: gyTask, parsed: gyParsed,
+  pageInfo: { url: 'https://www.isro.gov.in/Gaganyaan.html' }, marks: [], progress: { missionInspected: true }
+});
+is(gyStep2.action, 'navigate', 'gy step 2 navigates to local employee portal');
+
+// Step 3: On employee portal — click DB6 nav item
+const gyStep3 = planNextAction({
+  task: gyTask, parsed: gyParsed,
+  pageInfo: { url: 'http://localhost:3000/employee-portal.html' },
+  marks: [
+    { id: 601, role: 'nav-item', label: 'Database 6 — Gaganyaan' },
+    { id: 101, role: 'input:text', label: 'Mission Name' }
+  ],
+  progress: { isroDataFetched: true }
+});
+// When DB6 form not visible yet but nav exists, should click nav
+// (If mission name input is visible, it skips to filling)
+is(gyStep3.action, 'type', 'gy step 3 fills Mission Name when form is visible');
+is(gyStep3.mark_id, 101, 'targets Mission Name input');
+is(gyStep3.value, 'Gaganyaan', 'fills "Gaganyaan" as mission name');
+
+// Step 4: Fill Mission Program
+const gyStep4 = planNextAction({
+  task: gyTask, parsed: gyParsed,
+  pageInfo: { url: 'http://localhost:3000/employee-portal.html' },
+  marks: [
+    { id: 102, role: 'input:text', label: 'Mission Program' },
+    { id: 103, role: 'input:text', label: 'Launch Vehicle' }
+  ],
+  progress: { isroDataFetched: true, gaganyaanTabOpened: true, gy_mission_name: true }
+});
+is(gyStep4.action, 'type', 'gy step 4 fills Mission Program');
+is(gyStep4.mark_id, 102, 'targets Mission Program input');
+
+// Step 5: Fill Launch Vehicle (HLVM3)
+const gyStep5 = planNextAction({
+  task: gyTask, parsed: gyParsed,
+  pageInfo: { url: 'http://localhost:3000/employee-portal.html' },
+  marks: [
+    { id: 103, role: 'input:text', label: 'Launch Vehicle' },
+    { id: 104, role: 'input:text', label: 'Target Orbit Altitude' }
+  ],
+  progress: { isroDataFetched: true, gaganyaanTabOpened: true, gy_mission_name: true, gy_program: true }
+});
+is(gyStep5.action, 'type', 'gy step 5 fills Launch Vehicle');
+is(gyStep5.mark_id, 103, 'targets Launch Vehicle input');
+is(gyStep5.value, 'HLVM3 (Human Rated LVM3)', 'fills HLVM3 as launch vehicle');
+
+// Step 6: Fill Crew Capacity
+const gyStep6 = planNextAction({
+  task: gyTask, parsed: gyParsed,
+  pageInfo: { url: 'http://localhost:3000/employee-portal.html' },
+  marks: [
+    { id: 105, role: 'input:text', label: 'Crew Capacity' },
+    { id: 106, role: 'input:text', label: 'Mission Duration' }
+  ],
+  progress: { isroDataFetched: true, gaganyaanTabOpened: true, gy_mission_name: true, gy_program: true, gy_vehicle: true, gy_orbit_altitude: true, gy_orbit_type: true }
+});
+is(gyStep6.action, 'type', 'gy step 6 fills Crew Capacity');
+is(gyStep6.mark_id, 105, 'targets Crew Capacity input');
+is(gyStep6.value, '3 Astronauts (Vyomanauts)', 'fills 3 Vyomanauts as crew');
+
+// Step 7: Submit Gaganyaan form
+const gyStep7 = planNextAction({
+  task: gyTask, parsed: gyParsed,
+  pageInfo: { url: 'http://localhost:3000/employee-portal.html' },
+  marks: [
+    { id: 999, role: 'button', label: 'Commit Gaganyaan Database Record' }
+  ],
+  progress: { isroDataFetched: true, gaganyaanTabOpened: true, gy_mission_name: true, gy_program: true, gy_vehicle: true, gy_orbit_altitude: true, gy_orbit_type: true, gy_crew_count: true, gy_duration: true, gy_recovery: true, gy_crew_module: true, gy_centre: true, gy_mission_id: true, gy_operator: true, gy_phone: true }
+});
+is(gyStep7.action, 'click', 'gy step 7 clicks Commit Gaganyaan Database Record');
+is(gyStep7.mark_id, 999, 'targets Commit Gaganyaan button');
+
+// Step 8: Done
+const gyStep8 = planNextAction({
+  task: gyTask, parsed: gyParsed,
+  pageInfo: { url: 'http://localhost:3000/employee-portal.html' },
+  marks: [],
+  progress: { isroDataFetched: true, gaganyaanTabOpened: true, gy_mission_name: true, gy_program: true, gy_vehicle: true, gy_orbit_altitude: true, gy_orbit_type: true, gy_crew_count: true, gy_duration: true, gy_recovery: true, gy_crew_module: true, gy_centre: true, gy_mission_id: true, gy_operator: true, gy_phone: true, missionSubmitted: true }
+});
+is(gyStep8.action, 'done', 'gy step 8 reports done after Gaganyaan DB6 sync complete');
+
 console.log('\n' + '='.repeat(60));
 if (failures.length) {
   console.log(`${failures.length} of ${checks} checks FAILED`);

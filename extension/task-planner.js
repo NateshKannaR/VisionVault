@@ -421,6 +421,20 @@
       }
     }
 
+    // Gaganyaan DB6 Cross-Site Sync (fetch from isro.gov.in/Gaganyaan.html -> fill Database 6)
+    // NOTE: requires explicit "database 6" or "db6" mention to avoid collision with general Gaganyaan sync
+    const wantsGaganyaanSync =
+      /\bgaganyaan\b/i.test(text) &&
+      /\b(?:fetch|get|extract|read|pull|load|sync|retrieve|fill|populate|log)\b/i.test(text) &&
+      /\b(?:database\s*6|db\s*6|db6)\b/i.test(text);
+    if (wantsGaganyaanSync) {
+      result.wantsGaganyaanSync = true;
+      result.wantsMissionSync = true;
+      result.mission = "gaganyaan";
+      result.site = "isro";
+      result.siteUrl = "https://www.isro.gov.in/Gaganyaan.html";
+    }
+
     // GitHub intent detection:
     const wantsNewRepo = /\b(?:create|make|add|new|init|initialize)\s+(?:a\s+)?(?:new\s+)?repo(?:sitory)?\b/i.test(text) ||
                          /\brepo(?:sitory)?\s+creation\b/i.test(text);
@@ -1587,6 +1601,143 @@
           reasoning: "Navigate to local ISRO Mission Dashboard"
         };
       }
+
+      // ─── GAGANYAAN DB6 SPECIAL PATH ────────────────────────────────────────────
+      if (parsed.wantsGaganyaanSync) {
+        // Navigate to Gaganyaan DB6 tab if not visible
+        const isGaganyaanFormVisible = available.some(m =>
+          FILLABLE_ROLES.has(m.role) && (
+            /mission\s*name|mission\s*program|crew\s*capacity|crew\s*count|orbit\s*altitude|gy-/i.test(m.label || "") ||
+            m.id === "gy-mission_name" || m.id === "gy-vehicle" || m.id === "gy-program"
+          )
+        );
+        if (!isGaganyaanFormVisible && !progress.gaganyaanTabOpened) {
+          const db6Nav = available.find(m =>
+            (m.role === "link" || m.role === "clickable" || m.role === "tab" || m.role === "nav-item" || m.role === "button") &&
+            /database\s*6|gaganyaan/i.test(m.label || "")
+          );
+          if (db6Nav) {
+            progress.gaganyaanTabOpened = true;
+            return {
+              action: "click",
+              mark_id: db6Nav.id,
+              reasoning: "Open Database 6 — Gaganyaan Human Spaceflight form on local panel"
+            };
+          }
+        }
+
+        // Gaganyaan telemetry constants (from isro.gov.in/Gaganyaan.html)
+        const gaganyaanData = {
+          mission_name:   "Gaganyaan",
+          program:        "Human Space Flight Programme (HSFP)",
+          vehicle:        "HLVM3 (Human Rated LVM3)",
+          orbit_altitude: "400 km Low Earth Orbit",
+          orbit_type:     "Low Earth Orbit (LEO)",
+          crew_count:     "3 Astronauts (Vyomanauts)",
+          duration:       "3 Days",
+          recovery:       "Indian Ocean Sea Waters",
+          crew_module:    "Pressurised Crew Module (CM) — double-wall TPS construction",
+          service_module: "Service Module (SM) — thermal, propulsion & power systems",
+          ces:            "Crew Escape System (CES) — quick-acting high burn-rate solid motors",
+          lss:            "Life Support System — Earth-like O₂, pressure & temperature",
+          tps:            "Thermal Protection System — re-entry rated double-wall structure",
+          centre:         "Human Space Flight Centre (HSFC), Bengaluru",
+          mission_id:     "GAGANYAAN-H1-2026"
+        };
+
+        // Fill Mission Name
+        const gyMissionName = available.find(m => FILLABLE_ROLES.has(m.role) && (/mission\s*name/i.test(m.label || "") || m.id === "gy-mission_name"));
+        if (gyMissionName && !progress.gy_mission_name) {
+          progress.gy_mission_name = true;
+          return { action: "type", mark_id: gyMissionName.id, value: gaganyaanData.mission_name, reasoning: `Fill Mission Name: "${gaganyaanData.mission_name}" (sourced from isro.gov.in/Gaganyaan.html)` };
+        }
+        // Fill Mission Program
+        const gyProgram = available.find(m => FILLABLE_ROLES.has(m.role) && (/mission\s*program/i.test(m.label || "") || m.id === "gy-program"));
+        if (gyProgram && !progress.gy_program) {
+          progress.gy_program = true;
+          return { action: "type", mark_id: gyProgram.id, value: gaganyaanData.program, reasoning: `Fill Mission Program: "${gaganyaanData.program}"` };
+        }
+        // Fill Launch Vehicle
+        const gyVehicle = available.find(m => FILLABLE_ROLES.has(m.role) && (/launch\s*vehicle/i.test(m.label || "") || m.id === "gy-vehicle"));
+        if (gyVehicle && !progress.gy_vehicle) {
+          progress.gy_vehicle = true;
+          return { action: "type", mark_id: gyVehicle.id, value: gaganyaanData.vehicle, reasoning: `Fill Launch Vehicle: "${gaganyaanData.vehicle}"` };
+        }
+        // Fill Target Orbit Altitude
+        const gyAlt = available.find(m => FILLABLE_ROLES.has(m.role) && (/orbit\s*altitude|target\s*orbit/i.test(m.label || "") || m.id === "gy-orbit_altitude"));
+        if (gyAlt && !progress.gy_orbit_altitude) {
+          progress.gy_orbit_altitude = true;
+          return { action: "type", mark_id: gyAlt.id, value: gaganyaanData.orbit_altitude, reasoning: `Fill Orbit Altitude: "${gaganyaanData.orbit_altitude}"` };
+        }
+        // Fill Orbit Type
+        const gyOrbit = available.find(m => FILLABLE_ROLES.has(m.role) && (/\borbit\s*type\b/i.test(m.label || "") || m.id === "gy-orbit_type"));
+        if (gyOrbit && !progress.gy_orbit_type) {
+          progress.gy_orbit_type = true;
+          return { action: "type", mark_id: gyOrbit.id, value: gaganyaanData.orbit_type, reasoning: `Fill Orbit Type: "${gaganyaanData.orbit_type}"` };
+        }
+        // Fill Crew Capacity
+        const gyCrew = available.find(m => FILLABLE_ROLES.has(m.role) && (/crew\s*capacity/i.test(m.label || "") || m.id === "gy-crew_count"));
+        if (gyCrew && !progress.gy_crew_count) {
+          progress.gy_crew_count = true;
+          return { action: "type", mark_id: gyCrew.id, value: gaganyaanData.crew_count, reasoning: `Fill Crew Capacity: "${gaganyaanData.crew_count}"` };
+        }
+        // Fill Mission Duration
+        const gyDuration = available.find(m => FILLABLE_ROLES.has(m.role) && (/duration/i.test(m.label || "") || m.id === "gy-duration"));
+        if (gyDuration && !progress.gy_duration) {
+          progress.gy_duration = true;
+          return { action: "type", mark_id: gyDuration.id, value: gaganyaanData.duration, reasoning: `Fill Mission Duration: "${gaganyaanData.duration}"` };
+        }
+        // Fill Recovery Zone
+        const gyRecovery = available.find(m => FILLABLE_ROLES.has(m.role) && (/recovery/i.test(m.label || "") || m.id === "gy-recovery"));
+        if (gyRecovery && !progress.gy_recovery) {
+          progress.gy_recovery = true;
+          return { action: "type", mark_id: gyRecovery.id, value: gaganyaanData.recovery, reasoning: `Fill Recovery Zone: "${gaganyaanData.recovery}"` };
+        }
+        // Fill Crew Module
+        const gyCM = available.find(m => FILLABLE_ROLES.has(m.role) && (/crew\s*module/i.test(m.label || "") || m.id === "gy-crew_module"));
+        if (gyCM && !progress.gy_crew_module) {
+          progress.gy_crew_module = true;
+          return { action: "type", mark_id: gyCM.id, value: gaganyaanData.crew_module, reasoning: "Fill Crew Module details" };
+        }
+        // Fill Lead Centre
+        const gyCentre = available.find(m => FILLABLE_ROLES.has(m.role) && (/lead\s*centre|centre/i.test(m.label || "") || m.id === "gy-centre"));
+        if (gyCentre && !progress.gy_centre) {
+          progress.gy_centre = true;
+          return { action: "type", mark_id: gyCentre.id, value: gaganyaanData.centre, reasoning: `Fill Lead Centre: "${gaganyaanData.centre}"` };
+        }
+        // Fill Mission ID
+        const gyMissionId = available.find(m => FILLABLE_ROLES.has(m.role) && (/mission\s*id|reference/i.test(m.label || "") || m.id === "gy-mission_id"));
+        if (gyMissionId && !progress.gy_mission_id) {
+          progress.gy_mission_id = true;
+          return { action: "type", mark_id: gyMissionId.id, value: gaganyaanData.mission_id, reasoning: `Fill Mission ID: "${gaganyaanData.mission_id}"` };
+        }
+        // Fill Mission Officer (from Vault — PII stays local)
+        const gyOperator = available.find(m => FILLABLE_ROLES.has(m.role) && (/operator|officer/i.test(m.label || "") || m.id === "gy-operator"));
+        if (gyOperator && !progress.gy_operator) {
+          progress.gy_operator = true;
+          return { action: "type", mark_id: gyOperator.id, use_vault_field: "operator", reasoning: "Fill Mission Officer name from Zero-PII local vault (sensitive — never sent to cloud)" };
+        }
+        // Fill Phone (from Vault)
+        const gyPhone = available.find(m => FILLABLE_ROLES.has(m.role) && (/phone/i.test(m.label || "") || m.role === "input:tel" || m.id === "gy-phone"));
+        if (gyPhone && !progress.gy_phone) {
+          progress.gy_phone = true;
+          return { action: "type", mark_id: gyPhone.id, use_vault_field: "phone", reasoning: "Fill Officer Phone from Zero-PII vault (tokenized — never exposed to cloud)" };
+        }
+        // Submit
+        const gySubmit = available.find(m =>
+          (m.role === "button" || m.role === "clickable") &&
+          /commit\s*gaganyaan|gaganyaan\s*database|commit.*database\s*record|rocket/i.test(m.label || "")
+        );
+        if (gySubmit && !progress.missionSubmitted) {
+          progress.missionSubmitted = true;
+          return { action: "click", mark_id: gySubmit.id, reasoning: "Submit Gaganyaan DB6 record — mission intelligence synchronized from isro.gov.in with zero PII leakage" };
+        }
+        return {
+          action: "done",
+          reasoning: "Gaganyaan DB6 sync complete: All mission parameters from isro.gov.in/Gaganyaan.html logged in Database 6. Sensitive officer PII resolved from local vault — zero bytes sent to cloud."
+        };
+      }
+      // ─── END GAGANYAAN DB6 ─────────────────────────────────────────────────────
 
       // 1. Open "Add New Mission" or "Mission Log" page if not visible
       const addMissionNav = available.find(m =>

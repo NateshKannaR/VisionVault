@@ -371,6 +371,20 @@
       }
     }
 
+    // Gaganyaan DB6 Cross-Site Sync
+    // NOTE: requires explicit "database 6" or "db6" mention to avoid collision with general Gaganyaan sync
+    const wantsGaganyaanSync =
+      /\bgaganyaan\b/i.test(text) &&
+      /\b(?:fetch|get|extract|read|pull|load|sync|retrieve|fill|populate|log)\b/i.test(text) &&
+      /\b(?:database\s*6|db\s*6|db6)\b/i.test(text);
+    if (wantsGaganyaanSync) {
+      result.wantsGaganyaanSync = true;
+      result.wantsMissionSync = true;
+      result.mission = "gaganyaan";
+      result.site = "isro";
+      result.siteUrl = "https://www.isro.gov.in/Gaganyaan.html";
+    }
+
     const wantsNewRepo = /\b(?:create|make|add|new|init|initialize)\s+(?:a\s+)?(?:new\s+)?repo(?:sitory)?\b/i.test(text) ||
                          /\brepo(?:sitory)?\s+creation\b/i.test(text);
     const isGitHub = (result.site && /github/i.test(result.site)) || /\bgithub\b/i.test(text) || wantsNewRepo;

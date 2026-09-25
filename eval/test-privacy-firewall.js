@@ -125,4 +125,68 @@ assert.strictEqual(snap.rawPixelsTransmitted, 0);
 assert.strictEqual(snap.piiBytesTransmitted, 0);
 console.log("    ✓ Telemetry snapshot confirms 0 raw pixels and 0 PII bytes transmitted");
 
-console.log("\n[PASS] All VisionVault Privacy Firewall™ tests passed with 100% compliance!");
+// 6. Adversarial Inpainting & Anti-Reconstruction Pen-Test Suite
+console.log("  [6] Adversarial Inpainting & Anti-Reconstruction Pen-Test Suite");
+// Test A: Solid Destructive Blackout
+const solidPenTest = firewall.runAdversarialPenTest("solid_blackout");
+assert.strictEqual(solidPenTest.zeroInformationBoundary, true);
+assert.strictEqual(solidPenTest.shannonEntropyBits, 0);
+assert.strictEqual(solidPenTest.laplacianEdgeResidual, 0);
+assert.strictEqual(solidPenTest.inpaintingResistanceScore, 100.0);
+assert.strictEqual(solidPenTest.recoverableCharacters, 0);
+assert.strictEqual(solidPenTest.biometricFeaturesRecoverable, 0);
+assert.strictEqual(solidPenTest.defenseVerdict, "MATHEMATICALLY_IRRECOVERABLE");
+
+// Test B: Gaussian Blur Vulnerability Detection
+const blurPenTest = firewall.runAdversarialPenTest("gaussian_blur");
+assert.strictEqual(blurPenTest.zeroInformationBoundary, false);
+assert.ok(blurPenTest.shannonEntropyBits > 4.0, "Blur must preserve high entropy");
+assert.ok(blurPenTest.laplacianEdgeResidual > 10.0, "Blur must leave edge ghost contours");
+assert.ok(blurPenTest.inpaintingResistanceScore < 25.0, "Blur must fail anti-inpainting benchmark");
+assert.strictEqual(blurPenTest.defenseVerdict, "VULNERABLE_TO_DIFFUSION_INPAINTING");
+
+// Test C: True Pixel Buffer Entropy Verification
+const blackBuffer = new Uint8ClampedArray(64 * 64 * 4); // all 0 (solid black)
+const realBlackTest = firewall.runAdversarialPenTest({ data: blackBuffer, width: 64, height: 64 });
+assert.strictEqual(realBlackTest.shannonEntropyBits, 0);
+assert.strictEqual(realBlackTest.laplacianEdgeResidual, 0);
+assert.strictEqual(realBlackTest.inpaintingResistanceScore, 100.0);
+console.log("    ✓ Solid blackout mathematically verified at 0.0000 bits entropy and 100% inpainting resistance");
+
+// 7. Lightweight UI Object Detector (MobileNet-SSD / YOLO-nano UI element classes)
+console.log("  [7] Lightweight UI Object Detector (11 UI Element Classes)");
+const vitDetector = require("../extension/vision/vitScreenDetector.js");
+const expectedClasses = [
+  "button", "input", "checkbox", "radio", "dropdown",
+  "link", "avatar", "signature", "canvas_chart", "modal", "qr_code"
+];
+expectedClasses.forEach(cls => {
+  assert.ok(vitDetector.UI_CLASSES.includes(cls), `UI_CLASSES must include '${cls}'`);
+});
+
+// Test visual detection over synthetic components
+const candidates = [
+  { x: 10, y: 20, w: 120, h: 40, isButton: true, label: "Authenticate Officer" },
+  { x: 10, y: 70, w: 280, h: 36, isInput: true, label: "Security Clearance Token" },
+  { x: 10, y: 120, w: 20, h: 20, isCheckbox: true, label: "Confirm Downlink" },
+  { x: 10, y: 150, w: 18, h: 18, isRadio: true, isCircular: true, label: "GSLV Vehicle Mode" },
+  { x: 10, y: 180, w: 220, h: 38, isDropdown: true, hasArrow: true, label: "Orbital Tier" },
+  { x: 10, y: 230, w: 80, h: 18, isLink: true, label: "ISRO Telemetry Docs" },
+  { x: 300, y: 20, w: 64, h: 64, isAvatar: true, textureEnergy: 25, label: "Officer Biometrics" },
+  { x: 300, y: 100, w: 160, h: 60, isSignature: true, strokeDispersion: 0.8, label: "Director Signature" },
+  { x: 300, y: 180, w: 320, h: 180, isCanvasChart: true, textureEnergy: 30, label: "Orbital Altitude Plot" },
+  { x: 50, y: 50, w: 400, h: 250, isModal: true, label: "Override Telemetry Modal" },
+  { x: 500, y: 20, w: 80, h: 80, isQRCode: true, textureEnergy: 55, label: "ISRO KMS QR Key" }
+];
+
+vitDetector.detectUIElements(null, { candidates, targetWidth: 800, targetHeight: 600 }).then(results => {
+  assert.strictEqual(results.totalElements, 11, "All 11 candidate UI elements must be classified");
+  expectedClasses.forEach(cls => {
+    assert.ok(results.classesDetected.includes(cls), `Must have detected class '${cls}'`);
+  });
+  console.log("    ✓ UI Object Detector classified all 11 classes (button, input, checkbox, radio, dropdown, link, avatar, signature, canvas_chart, modal, qr_code)");
+  console.log("\n[PASS] All VisionVault Privacy Firewall™ & UI Object Detector tests passed with 100% compliance!");
+}).catch(err => {
+  console.error("Detector test failed:", err);
+  process.exit(1);
+});

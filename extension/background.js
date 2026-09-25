@@ -753,7 +753,10 @@ async function phaseScan(task, preferredTabId = null) {
 
   // If the user's task explicitly asks to navigate to a site (e.g. "open amazon and search for earphones")
   // and the current tab is not already on that site, navigate immediately to the target URL before scanning.
-  if (parsedTask?.siteUrl && !TaskPlanner.alreadyOnSite(tab.url || "", parsedTask.siteUrl)) {
+  const isLocalPortal = /localhost|127\.0\.0\.1|hr-portal|isro-intranet|isro-panel|employee-portal|isrovisionvault/i.test(tab.url || "");
+  if (parsedTask?.wantsGaganyaanSync && isLocalPortal) {
+    // Already on the portal containing Database 6 — do not navigate away
+  } else if (parsedTask?.siteUrl && !TaskPlanner.alreadyOnSite(tab.url || "", parsedTask.siteUrl)) {
     notifyPopup({ type: "step", step: 0, status: `Navigating to ${parsedTask.site || parsedTask.siteUrl}…` });
     try {
       await chrome.tabs.update(tab.id, { url: parsedTask.siteUrl, active: true });
@@ -1316,7 +1319,11 @@ async function phaseRun() {
       // and we are not on it yet, navigate first — no model call needed.
       if (session.parsedTask?.siteUrl && !session.progress.navigated) {
         const currentUrl = session.pageInfo?.url || "";
-        if (!TaskPlanner.alreadyOnSite(currentUrl, session.parsedTask.siteUrl)) {
+        const isLocalPortal = /localhost|127\.0\.0\.1|hr-portal|isro-intranet|isro-panel|employee-portal|isrovisionvault/i.test(currentUrl);
+        if (session.parsedTask?.wantsGaganyaanSync && isLocalPortal) {
+          session.progress.navigated = true;
+          session.progress.isroDataFetched = true;
+        } else if (!TaskPlanner.alreadyOnSite(currentUrl, session.parsedTask.siteUrl)) {
           notifyPopup({ type: "step", step: session.stepCount, status: `Navigating to ${session.parsedTask.site}...` });
           session.progress.navigated = true;
           session.lastNavUrl = session.parsedTask.siteUrl;

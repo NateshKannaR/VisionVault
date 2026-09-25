@@ -185,7 +185,7 @@
       const item = updated[i];
 
       if (item.id === "navigate") {
-        if (prog.navigated || (action && action.action === "navigate")) {
+        if (prog.navigated || prog.isroDataFetched || (action && action.action === "navigate")) {
           item.status = "done";
         }
       }

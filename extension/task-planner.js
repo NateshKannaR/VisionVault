@@ -816,7 +816,12 @@
 
     // 1. Initial navigation if on the wrong site.
     if (parsed.siteUrl && !progress.navigated && !alreadyOnSite(url, parsed.siteUrl) && (!parsed.wantsMissionSync || !progress.isroDataFetched)) {
-      return { action: "navigate", value: parsed.siteUrl, reasoning: `Open ${parsed.site}` };
+      const isPortal = /localhost|127\.0\.0\.1|hr-portal|isro-intranet|isro-panel|employee-portal|isrovisionvault/i.test(url);
+      if (parsed.wantsGaganyaanSync && isPortal) {
+        progress.isroDataFetched = true;
+      } else {
+        return { action: "navigate", value: parsed.siteUrl, reasoning: `Open ${parsed.site}` };
+      }
     }
 
     // 2. Booking/travel flow — deterministic city-picker sequence.
@@ -1557,17 +1562,25 @@
 
     // Scenario 0: Cross-Site Mission Synchronization (fetch live telemetry from isro.gov.in -> autofill local ISRO Mission Panel with zero PII exposure)
     if (parsed.wantsMissionSync) {
-      const isLocalPanel = /localhost|127\.0\.0\.1|hr-portal|isro-intranet|isro-panel|employee-portal/i.test(url);
+      const isLocalPanel = /localhost|127\.0\.0\.1|hr-portal|isro-intranet|isro-panel|employee-portal|isrovisionvault/i.test(url);
       const isIsroGov = /isro\.gov\.in/i.test(url);
+
+      if (isLocalPanel && parsed.wantsGaganyaanSync) {
+        progress.isroDataFetched = true;
+      }
 
       // Phase 1: On isro.gov.in (or before reaching local panel)
       if (!progress.isroDataFetched) {
         if (!isIsroGov) {
-          return {
-            action: "navigate",
-            value: "https://www.isro.gov.in",
-            reasoning: "Navigate to official ISRO portal (isro.gov.in) to extract live mission telemetry"
-          };
+          if (isLocalPanel) {
+            progress.isroDataFetched = true;
+          } else {
+            return {
+              action: "navigate",
+              value: "https://www.isro.gov.in",
+              reasoning: "Navigate to official ISRO portal (isro.gov.in) to extract live mission telemetry"
+            };
+          }
         }
 
         // On isro.gov.in: find mission link if present

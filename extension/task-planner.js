@@ -1584,7 +1584,7 @@
         }
 
         progress.isroDataFetched = true;
-        const destUrl = /employee-portal/i.test(parsed.raw) ? "http://localhost:3000/employee-portal.html" : "http://localhost:3000/hr-portal.html";
+        const destUrl = (parsed.wantsGaganyaanSync || /employee-portal/i.test(parsed.raw)) ? "http://localhost:3000/employee-portal.html" : "http://localhost:3000/hr-portal.html";
         return {
           action: "navigate",
           value: destUrl,
@@ -1594,7 +1594,7 @@
 
       // Phase 2: On local ISRO Panel
       if (!isLocalPanel) {
-        const destUrl = /employee-portal/i.test(parsed.raw) ? "http://localhost:3000/employee-portal.html" : "http://localhost:3000/hr-portal.html";
+        const destUrl = (parsed.wantsGaganyaanSync || /employee-portal/i.test(parsed.raw)) ? "http://localhost:3000/employee-portal.html" : "http://localhost:3000/hr-portal.html";
         return {
           action: "navigate",
           value: destUrl,
@@ -1604,6 +1604,15 @@
 
       // ─── GAGANYAAN DB6 SPECIAL PATH ────────────────────────────────────────────
       if (parsed.wantsGaganyaanSync) {
+        // If on hr-portal, navigate to employee-portal where Database 6 exists
+        if (/hr-portal/i.test(url)) {
+          return {
+            action: "navigate",
+            value: "http://localhost:3000/employee-portal.html",
+            reasoning: "Navigate to ISRO Employee Portal containing Database 6 (Gaganyaan Human Spaceflight)"
+          };
+        }
+
         // Navigate to Gaganyaan DB6 tab if not visible
         const isGaganyaanFormVisible = available.some(m =>
           FILLABLE_ROLES.has(m.role) && (

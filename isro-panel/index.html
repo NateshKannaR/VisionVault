@@ -1113,34 +1113,56 @@ footer {
   color: var(--text-muted);
   text-decoration: none;
   font-weight: 600;
+  transition: color 0.2s ease;
+}
+.footer-links a:hover {
+  color: var(--accent-cyan);
+}
+
 /* ==========================================================================
    FEATURE 6: 4-LAYER DEFENSE & PRIVACY BUDGET ENHANCEMENTS
    ========================================================================== */
-.defense-section { padding: 5.5rem 0; }
+.defense-section {
+  padding: 6rem 0;
+  position: relative;
+}
 .defense-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 1.35rem;
-  margin-top: 2.2rem;
+  gap: 1.5rem;
+  margin-top: 2.5rem;
 }
 @media (max-width: 1080px) { .defense-grid { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 640px) { .defense-grid { grid-template-columns: 1fr; } }
 .defense-card {
-  background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: 16px;
-  padding: 1.6rem;
+  background: linear-gradient(160deg, rgba(16, 24, 46, 0.85) 0%, rgba(9, 14, 28, 0.95) 100%);
+  border: 1px solid rgba(0, 229, 255, 0.18);
+  border-radius: 18px;
+  padding: 1.75rem;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  transition: all 0.3s ease;
+  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
   position: relative;
   overflow: hidden;
+  backdrop-filter: blur(16px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+}
+.defense-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(0, 229, 255, 0.6), transparent);
+  opacity: 0;
+  transition: opacity 0.3s ease;
 }
 .defense-card:hover {
   border-color: var(--accent-cyan);
-  transform: translateY(-4px);
-  box-shadow: 0 16px 36px rgba(0, 229, 255, 0.12);
+  transform: translateY(-6px);
+  box-shadow: 0 20px 45px rgba(0, 229, 255, 0.18), 0 0 30px rgba(0, 229, 255, 0.1);
+}
+.defense-card:hover::before {
+  opacity: 1;
 }
 .defense-card-top {
   display: flex;
@@ -1152,98 +1174,181 @@ footer {
   font-family: var(--font-mono);
   font-size: 0.72rem;
   font-weight: 800;
-  padding: 3px 8px;
+  padding: 4px 10px;
   border-radius: 6px;
+  letter-spacing: 0.5px;
 }
-.badge-layer0 { background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); }
-.badge-layer1 { background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); }
-.badge-layer2 { background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); }
-.badge-layer3 { background: rgba(139, 92, 246, 0.15); color: #a78bfa; border: 1px solid rgba(139, 92, 246, 0.3); }
+.badge-layer0 { background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.35); }
+.badge-layer1 { background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.35); }
+.badge-layer2 { background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.35); }
+.badge-layer3 { background: rgba(139, 92, 246, 0.15); color: #a78bfa; border: 1px solid rgba(139, 92, 246, 0.35); }
 .defense-icon {
-  width: 42px;
-  height: 42px;
-  border-radius: 10px;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
   display: grid;
   place-items: center;
   font-size: 19px;
+  transition: transform 0.3s ease;
+}
+.defense-card:hover .defense-icon {
+  transform: scale(1.1);
 }
 .defense-title {
   font-family: var(--font-display);
-  font-size: 1.15rem;
+  font-size: 1.18rem;
   font-weight: 800;
   color: #fff;
-  margin-bottom: 0.45rem;
+  margin-bottom: 0.5rem;
+  letter-spacing: -0.3px;
 }
 .defense-desc {
-  font-size: 0.86rem;
-  color: var(--text-muted);
-  line-height: 1.55;
+  font-size: 0.88rem;
+  color: #94a3b8;
+  line-height: 1.6;
+  margin-bottom: 1.2rem;
+}
+.tech-pills-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
   margin-bottom: 1.1rem;
 }
+.tech-pill {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  color: #94a3b8;
+}
+.tech-pill.cyan { background: rgba(0, 229, 255, 0.09); border-color: rgba(0, 229, 255, 0.28); color: #67e8f9; }
+.tech-pill.green { background: rgba(16, 185, 129, 0.09); border-color: rgba(16, 185, 129, 0.28); color: #6ee7b7; }
+.tech-pill.amber { background: rgba(245, 158, 11, 0.09); border-color: rgba(245, 158, 11, 0.28); color: #fcd34d; }
+.tech-pill.purple { background: rgba(139, 92, 246, 0.09); border-color: rgba(139, 92, 246, 0.28); color: #c4b5fd; }
+
 .defense-meta {
   font-family: var(--font-mono);
   font-size: 0.74rem;
   color: var(--accent-cyan);
-  border-top: 1px solid var(--border-subtle);
-  padding-top: 0.85rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 0.9rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
 
 /* Privacy Budget Section */
-.budget-section { padding: 5.5rem 0; }
+.budget-section {
+  padding: 6rem 0;
+  position: relative;
+}
 .budget-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 1.35rem;
-  margin-top: 2.2rem;
+  gap: 1.5rem;
+  margin-top: 2.5rem;
 }
 @media (max-width: 1080px) { .budget-grid { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 640px) { .budget-grid { grid-template-columns: 1fr; } }
 .budget-card {
-  background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: 16px;
-  padding: 1.6rem;
+  background: linear-gradient(160deg, rgba(16, 24, 46, 0.85) 0%, rgba(9, 14, 28, 0.95) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 18px;
+  padding: 1.75rem;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  transition: all 0.3s ease;
+  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+  overflow: hidden;
+  backdrop-filter: blur(16px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+}
+.budget-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(16, 185, 129, 0.6), transparent);
+  opacity: 0;
+  transition: opacity 0.3s ease;
 }
 .budget-card:hover {
-  border-color: var(--accent-emerald);
-  transform: translateY(-4px);
-  box-shadow: 0 16px 36px rgba(16, 185, 129, 0.12);
+  transform: translateY(-6px);
 }
+.budget-card:hover::before {
+  opacity: 1;
+}
+.budget-card.tier-0 {
+  border-color: rgba(16, 185, 129, 0.45);
+  background: linear-gradient(160deg, rgba(16, 185, 129, 0.08) 0%, rgba(9, 14, 28, 0.95) 100%);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.4), inset 0 0 25px rgba(16, 185, 129, 0.06);
+}
+.budget-card.tier-0:hover {
+  border-color: #10b981;
+  box-shadow: 0 20px 45px rgba(16, 185, 129, 0.22), 0 0 35px rgba(16, 185, 129, 0.15);
+}
+.budget-card.tier-1:hover {
+  border-color: var(--accent-cyan);
+  box-shadow: 0 20px 45px rgba(0, 229, 255, 0.2), 0 0 35px rgba(0, 229, 255, 0.12);
+}
+.budget-card.tier-2:hover {
+  border-color: #818cf8;
+  box-shadow: 0 20px 45px rgba(129, 140, 248, 0.2), 0 0 35px rgba(129, 140, 248, 0.12);
+}
+.budget-card.tier-3 {
+  border-color: rgba(139, 92, 246, 0.35);
+  background: linear-gradient(160deg, rgba(139, 92, 246, 0.06) 0%, rgba(9, 14, 28, 0.95) 100%);
+}
+.budget-card.tier-3:hover {
+  border-color: #c084fc;
+  box-shadow: 0 20px 45px rgba(168, 85, 247, 0.22), 0 0 35px rgba(168, 85, 247, 0.15);
+}
+
 .budget-tier-num {
   font-family: var(--font-mono);
-  font-size: 0.75rem;
+  font-size: 0.74rem;
   font-weight: 800;
+  letter-spacing: 0.5px;
   color: var(--accent-emerald);
   margin-bottom: 0.45rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.pulse-indicator {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 8px currentColor;
+  animation: pulse-live 2s infinite ease-in-out;
 }
 .budget-title {
   font-family: var(--font-display);
-  font-size: 1.15rem;
+  font-size: 1.18rem;
   font-weight: 800;
   color: #fff;
-  margin-bottom: 0.45rem;
+  margin-bottom: 0.5rem;
+  letter-spacing: -0.3px;
 }
 .budget-desc {
-  font-size: 0.86rem;
-  color: var(--text-muted);
-  line-height: 1.55;
-  margin-bottom: 1.1rem;
+  font-size: 0.88rem;
+  color: #94a3b8;
+  line-height: 1.6;
+  margin-bottom: 1.2rem;
 }
 .budget-stats {
   display: flex;
   flex-direction: column;
-  gap: 7px;
-  border-top: 1px solid var(--border-subtle);
-  padding-top: 0.85rem;
+  gap: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 0.9rem;
   font-family: var(--font-mono);
-  font-size: 0.74rem;
+  font-size: 0.75rem;
 }
 .budget-stat-row {
   display: flex;
@@ -1251,6 +1356,117 @@ footer {
   color: var(--text-faint);
 }
 .budget-stat-row strong { color: #fff; }
+
+/* Interactive Budget Flight Console */
+.budget-simulator {
+  margin-top: 3rem;
+  background: linear-gradient(180deg, rgba(14, 21, 38, 0.9) 0%, rgba(8, 12, 24, 0.98) 100%);
+  border: 1px solid rgba(0, 229, 255, 0.25);
+  border-radius: 20px;
+  padding: 2.2rem;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.6), inset 0 0 40px rgba(0, 229, 255, 0.03);
+  backdrop-filter: blur(20px);
+}
+.simulator-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+.simulator-title {
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.simulator-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.sim-tab-btn {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  font-weight: 700;
+  padding: 8px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.sim-tab-btn:hover {
+  background: rgba(0, 229, 255, 0.1);
+  border-color: rgba(0, 229, 255, 0.4);
+  color: #fff;
+}
+.sim-tab-btn.active {
+  background: rgba(16, 185, 129, 0.16);
+  border-color: var(--accent-emerald);
+  color: #6ee7b7;
+  box-shadow: 0 0 16px rgba(16, 185, 129, 0.3);
+}
+.simulator-body {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr;
+  gap: 1.5rem;
+}
+@media (max-width: 960px) { .simulator-body { grid-template-columns: 1fr; } }
+.sim-metrics-box {
+  background: rgba(4, 7, 18, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 1.2rem;
+}
+.sim-gauge-bar {
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  height: 10px;
+  overflow: hidden;
+  margin-top: 6px;
+  position: relative;
+}
+.sim-gauge-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #10b981, #00e5ff);
+  transition: width 0.4s ease, background 0.4s ease;
+}
+.sim-wire-box {
+  background: #030712;
+  border: 1px solid rgba(0, 229, 255, 0.2);
+  border-radius: 14px;
+  padding: 1.2rem;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: #94a3b8;
+  overflow-x: auto;
+  max-height: 280px;
+  display: flex;
+  flex-direction: column;
+}
+.sim-wire-header {
+  display: flex;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 8px;
+  margin-bottom: 10px;
+  font-size: 0.72rem;
+  color: var(--accent-cyan);
+}
 
 /* Enhanced Video Demo Alignment */
 .video-mockup {
@@ -1621,7 +1837,7 @@ footer {
 <!-- FEATURE 2A: 4-LAYER DEFENSE-IN-DEPTH PII PIPELINE -->
 <section class="defense-section container" id="defense-pipeline">
   <div class="section-header">
-    <div class="section-tag"><i class="fa-solid fa-shield-halved"></i> Security Architecture</div>
+    <div class="section-tag"><i class="fa-solid fa-shield-halved"></i> Multi-Tier Enclave Architecture</div>
     <h2 class="section-title">4-Layer Defense-in-Depth PII Pipeline</h2>
     <p class="section-desc">
       Rather than relying on a single fallible vision model for sensitive data, VisionVault implements a dedicated multi-layer verification waterfall before any data leaves the device.
@@ -1633,16 +1849,21 @@ footer {
     <div class="defense-card">
       <div>
         <div class="defense-card-top">
-          <span class="defense-layer-badge badge-layer0">LAYER 0 — DOM</span>
-          <div class="defense-icon" style="background:rgba(56,189,248,0.1); color:#38bdf8; border:1px solid rgba(56,189,248,0.3);"><i class="fa-solid fa-code"></i></div>
+          <span class="defense-layer-badge badge-layer0">LAYER 0 &bull; DOM FAST-PATH</span>
+          <div class="defense-icon" style="background:rgba(56,189,248,0.12); color:#38bdf8; border:1px solid rgba(56,189,248,0.3);"><i class="fa-solid fa-code"></i></div>
         </div>
         <div class="defense-title">DOM Heuristics</div>
         <div class="defense-desc">
-          Zero-compute instant inspection of browser accessibility trees and HTML semantics (e.g. <code>input[type="password"]</code>, <code>autocomplete="email"</code>, <code>cc-number</code>) before executing any ML.
+          Zero-compute instant inspection of browser accessibility trees and HTML semantics before executing any machine learning.
+        </div>
+        <div class="tech-pills-row">
+          <span class="tech-pill cyan">&lt;input type="password"&gt;</span>
+          <span class="tech-pill cyan">&lt;input type="email"&gt;</span>
+          <span class="tech-pill">autocomplete="cc-num"</span>
         </div>
       </div>
       <div class="defense-meta">
-        <span>Latency: &lt; 2 ms</span>
+        <span><i class="fa-solid fa-bolt" style="color:var(--accent-cyan); margin-right:4px;"></i> Latency: &lt; 2 ms</span>
         <span>Compute: 0 FLOPs</span>
       </div>
     </div>
@@ -1651,16 +1872,22 @@ footer {
     <div class="defense-card">
       <div>
         <div class="defense-card-top">
-          <span class="defense-layer-badge badge-layer1">LAYER 1 — MATH CHECK</span>
-          <div class="defense-icon" style="background:rgba(16,185,129,0.1); color:#10b981; border:1px solid rgba(16,185,129,0.3);"><i class="fa-solid fa-calculator"></i></div>
+          <span class="defense-layer-badge badge-layer1">LAYER 1 &bull; DETERMINISTIC CHECKSUMS</span>
+          <div class="defense-icon" style="background:rgba(16,185,129,0.12); color:#10b981; border:1px solid rgba(16,185,129,0.3);"><i class="fa-solid fa-calculator"></i></div>
         </div>
         <div class="defense-title">Deterministic Algorithms</div>
         <div class="defense-desc">
-          Mathematical checksum validation: <strong>Luhn Algorithm</strong> for credit cards &amp; <strong>Verhoeff Checksum Algorithm</strong> (UIDAI standard) for Aadhaar numbers, plus regex for PAN, UPI, JWT, and AWS secrets.
+          Mathematical checksum validation eliminating hallucination: Luhn algorithm for cards &amp; Verhoeff D₅ dihedrals for UIDAI Aadhaar.
+        </div>
+        <div class="tech-pills-row">
+          <span class="tech-pill green">Luhn Mod 10</span>
+          <span class="tech-pill green">Verhoeff D₅ Checksum</span>
+          <span class="tech-pill">PAN Regex</span>
+          <span class="tech-pill">JWT / AWS Secrets</span>
         </div>
       </div>
       <div class="defense-meta">
-        <span>Precision: 99.98%</span>
+        <span><i class="fa-solid fa-circle-check" style="color:var(--accent-emerald); margin-right:4px;"></i> Precision: 99.98%</span>
         <span>Zero False Positives</span>
       </div>
     </div>
@@ -1669,17 +1896,22 @@ footer {
     <div class="defense-card">
       <div>
         <div class="defense-card-top">
-          <span class="defense-layer-badge badge-layer2">LAYER 2 — PIXEL OCR</span>
-          <div class="defense-icon" style="background:rgba(245,158,11,0.1); color:#f59e0b; border:1px solid rgba(245,158,11,0.3);"><i class="fa-solid fa-font"></i></div>
+          <span class="defense-layer-badge badge-layer2">LAYER 2 &bull; PIXEL-ISOLATED OCR</span>
+          <div class="defense-icon" style="background:rgba(245,158,11,0.12); color:#f59e0b; border:1px solid rgba(245,158,11,0.3);"><i class="fa-solid fa-font"></i></div>
         </div>
         <div class="defense-title">Offline Visual OCR</div>
         <div class="defense-desc">
-          Tesseract.js WASM-SIMD engine runs targeted optical character recognition exclusively over rendered canvas, image badges, and unrendered graphics to capture text embedded in flattened pixels.
+          Tesseract.js WASM-SIMD engine runs targeted optical character recognition exclusively over rendered canvas, image badges, and unrendered graphics.
+        </div>
+        <div class="tech-pills-row">
+          <span class="tech-pill amber">Tesseract v5 WASM</span>
+          <span class="tech-pill amber">SIMD 128-bit Vector</span>
+          <span class="tech-pill">Canvas Only</span>
         </div>
       </div>
       <div class="defense-meta">
-        <span>Engine: Tesseract v5</span>
-        <span>Local WASM Enclave</span>
+        <span><i class="fa-solid fa-microchip" style="color:var(--accent-amber); margin-right:4px;"></i> Local WASM Enclave</span>
+        <span>Air-Gapped Client</span>
       </div>
     </div>
 
@@ -1687,17 +1919,22 @@ footer {
     <div class="defense-card">
       <div>
         <div class="defense-card-top">
-          <span class="defense-layer-badge badge-layer3">LAYER 3 — NEURAL VISION</span>
-          <div class="defense-icon" style="background:rgba(139,92,246,0.1); color:#a78bfa; border:1px solid rgba(139,92,246,0.3);"><i class="fa-solid fa-brain"></i></div>
+          <span class="defense-layer-badge badge-layer3">LAYER 3 &bull; NEURAL VISION ENGINE</span>
+          <div class="defense-icon" style="background:rgba(139,92,246,0.12); color:#a78bfa; border:1px solid rgba(139,92,246,0.3);"><i class="fa-solid fa-brain"></i></div>
         </div>
         <div class="defense-title">On-Device ViT &amp; Face ONNX</div>
         <div class="defense-desc">
-          UltraFace-RFB-320 ONNX neural network detects biometric faces and employee photo badges, while local Vision Transformer (ViT) self-attention clusters visual document geometry and canvas bounds.
+          UltraFace-RFB-320 ONNX network detects biometric faces and badge photos, while local ViT self-attention clusters visual document geometry.
+        </div>
+        <div class="tech-pills-row">
+          <span class="tech-pill purple">UltraFace-RFB-320</span>
+          <span class="tech-pill purple">ViT Patch Attention</span>
+          <span class="tech-pill">WebGPU / FP16</span>
         </div>
       </div>
       <div class="defense-meta">
-        <span>Model: 1.27 MB ONNX</span>
-        <span>WebGPU / SIMD</span>
+        <span><i class="fa-solid fa-shield-halved" style="color:var(--accent-violet); margin-right:4px;"></i> Model: 1.27 MB ONNX</span>
+        <span>0 Raw Pixels Sent</span>
       </div>
     </div>
   </div>
@@ -1706,7 +1943,7 @@ footer {
 <!-- FEATURE 2B: 4-TIER PRIVACY BUDGET ENGINE -->
 <section class="budget-section container" id="privacy-budget">
   <div class="section-header">
-    <div class="section-tag"><i class="fa-solid fa-coins"></i> Dynamic Escalation</div>
+    <div class="section-tag"><i class="fa-solid fa-coins"></i> Dynamic Escalation &amp; Zero-Pixel Telemetry</div>
     <h2 class="section-title">4-Tier Privacy Budget &amp; Minimal Disclosure</h2>
     <p class="section-desc">
       VisionVault enforces the principle of least privilege: simple tasks dispatch zero pixels, and visual information is only captured when spatial grounding strictly demands it.
@@ -1715,66 +1952,174 @@ footer {
 
   <div class="budget-grid">
     <!-- Level 0 -->
-    <div class="budget-card" style="border-color:rgba(16,185,129,0.35); background:linear-gradient(180deg, rgba(16,185,129,0.06) 0%, var(--bg-surface) 100%);">
+    <div class="budget-card tier-0">
       <div>
-        <div class="budget-tier-num">LEVEL 0 &bull; DEFAULT</div>
+        <div class="budget-tier-num"><span class="pulse-indicator" style="color:var(--accent-emerald);"></span> LEVEL 0 &bull; DEFAULT ACTIVE</div>
         <div class="budget-title">Zero-Pixel DOM Mode</div>
         <div class="budget-desc">
           For form-fills, search queries, and button clicks, the agent transmits pure semantic JSON without capturing or dispatching a single screenshot pixel.
         </div>
+        <div class="tech-pills-row">
+          <span class="tech-pill green">0 Screenshots</span>
+          <span class="tech-pill green">0 Pixels</span>
+          <span class="tech-pill">Semantic Tree</span>
+        </div>
       </div>
       <div class="budget-stats">
-        <div class="budget-stat-row"><span>Pixels Sent:</span><strong style="color:var(--accent-emerald);">0 KB (None)</strong></div>
+        <div class="budget-stat-row"><span>Pixels Sent:</span><strong style="color:var(--accent-emerald);">0 KB (100% Off-Wire)</strong></div>
         <div class="budget-stat-row"><span>Cloud Latency:</span><strong style="color:var(--accent-cyan);">&lt; 180 ms (-85%)</strong></div>
         <div class="budget-stat-row"><span>Token Cost:</span><strong style="color:var(--accent-emerald);">-90% Saved</strong></div>
       </div>
     </div>
 
     <!-- Level 1 -->
-    <div class="budget-card">
+    <div class="budget-card tier-1">
       <div>
-        <div class="budget-tier-num">LEVEL 1 &bull; LAYOUT</div>
+        <div class="budget-tier-num" style="color:var(--accent-cyan);"><span class="pulse-indicator" style="color:var(--accent-cyan);"></span> LEVEL 1 &bull; SPATIAL LAYOUT</div>
         <div class="budget-title">Semantic Bounding Boxes</div>
         <div class="budget-desc">
           When the planner requires spatial relation context, element normalized bounding boxes are transmitted alongside semantic roles with zero image frames.
         </div>
+        <div class="tech-pills-row">
+          <span class="tech-pill cyan">Normalized BBoxes</span>
+          <span class="tech-pill cyan">&lt; 3.5 KB JSON</span>
+          <span class="tech-pill">0 Pixels</span>
+        </div>
       </div>
       <div class="budget-stats">
-        <div class="budget-stat-row"><span>Pixels Sent:</span><strong>0 KB (None)</strong></div>
-        <div class="budget-stat-row"><span>Payload:</span><strong>&lt; 3.5 KB JSON</strong></div>
+        <div class="budget-stat-row"><span>Pixels Sent:</span><strong style="color:var(--accent-cyan);">0 KB (None)</strong></div>
+        <div class="budget-stat-row"><span>Wire Payload:</span><strong>&lt; 3.5 KB JSON</strong></div>
         <div class="budget-stat-row"><span>Token Cost:</span><strong style="color:var(--accent-cyan);">-80% Saved</strong></div>
       </div>
     </div>
 
     <!-- Level 2 -->
-    <div class="budget-card">
+    <div class="budget-card tier-2">
       <div>
-        <div class="budget-tier-num">LEVEL 2 &bull; STRUCTURE</div>
+        <div class="budget-tier-num" style="color:#818cf8;"><span class="pulse-indicator" style="color:#818cf8;"></span> LEVEL 2 &bull; WIREFRAME VECTOR</div>
         <div class="budget-title">Structural Wireframe</div>
         <div class="budget-desc">
           Abstract UI geometry and landmark bounding boxes are sent for multi-column layouts without textures, text, or human imagery.
         </div>
+        <div class="tech-pills-row">
+          <span class="tech-pill">Vector SVG</span>
+          <span class="tech-pill">Air-Gapped UI</span>
+          <span class="tech-pill">No Textures</span>
+        </div>
       </div>
       <div class="budget-stats">
-        <div class="budget-stat-row"><span>Raw Pixels:</span><strong>0 KB (Masked)</strong></div>
+        <div class="budget-stat-row"><span>Raw Pixels:</span><strong style="color:var(--accent-emerald);">0 KB (Masked)</strong></div>
         <div class="budget-stat-row"><span>Visual Structure:</span><strong>Wireframe Vector</strong></div>
-        <div class="budget-stat-row"><span>Security Level:</span><strong>Air-Gapped</strong></div>
+        <div class="budget-stat-row"><span>Security Level:</span><strong style="color:var(--accent-cyan);">Air-Gapped</strong></div>
       </div>
     </div>
 
     <!-- Level 3 -->
-    <div class="budget-card" style="border-color:rgba(129,140,248,0.35); background:linear-gradient(180deg, rgba(129,140,248,0.06) 0%, var(--bg-surface) 100%);">
+    <div class="budget-card tier-3">
       <div>
-        <div class="budget-tier-num" style="color:var(--accent-violet);">LEVEL 3 &bull; ESCALATION</div>
+        <div class="budget-tier-num" style="color:var(--accent-violet);"><span class="pulse-indicator" style="color:var(--accent-violet);"></span> LEVEL 3 &bull; ESCALATION</div>
         <div class="budget-title">Redacted Vision Fallback</div>
         <div class="budget-desc">
-          Only when the task requires visual grounding (e.g. icon recognition, canvas drawing, chart reading), the offscreen canvas redacts PII before sending the image.
+          Only when the task requires visual grounding (e.g. icon recognition, canvas drawing), the offscreen canvas redacts PII before sending the image.
+        </div>
+        <div class="tech-pills-row">
+          <span class="tech-pill purple">Fail-Closed Masking</span>
+          <span class="tech-pill purple">Destructive Blackout</span>
+          <span class="tech-pill">WASM Shield</span>
         </div>
       </div>
       <div class="budget-stats">
         <div class="budget-stat-row"><span>Raw Pixels:</span><strong style="color:var(--accent-emerald);">0 KB (0 leaks)</strong></div>
-        <div class="budget-stat-row"><span>Redaction:</span><strong>Fail-Closed Masked</strong></div>
-        <div class="budget-stat-row"><span>Exfiltration Guard:</span><strong style="color:var(--accent-emerald);">✓ Verified Safe</strong></div>
+        <div class="budget-stat-row"><span>Redaction:</span><strong>Hardware Enclave Masked</strong></div>
+        <div class="budget-stat-row"><span>Exfiltration Guard:</span><strong style="color:var(--accent-emerald);">&check; Verified Safe</strong></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- INTERACTIVE PRIVACY BUDGET FLIGHT CONSOLE -->
+  <div class="budget-simulator">
+    <div class="simulator-header">
+      <div class="simulator-title">
+        <i class="fa-solid fa-satellite-dish" style="color:var(--accent-cyan);"></i>
+        <span>Live Privacy Budget Transmission Console</span>
+      </div>
+      <div class="simulator-tabs">
+        <button class="sim-tab-btn active" id="btn-budget-0" onclick="simulateBudgetTier(0)">
+          <i class="fa-solid fa-code"></i> LEVEL 0: ZERO-PIXEL
+        </button>
+        <button class="sim-tab-btn" id="btn-budget-1" onclick="simulateBudgetTier(1)">
+          <i class="fa-solid fa-vector-square"></i> LEVEL 1: LAYOUT
+        </button>
+        <button class="sim-tab-btn" id="btn-budget-2" onclick="simulateBudgetTier(2)">
+          <i class="fa-solid fa-diagram-project"></i> LEVEL 2: WIREFRAME
+        </button>
+        <button class="sim-tab-btn" id="btn-budget-3" onclick="simulateBudgetTier(3)">
+          <i class="fa-solid fa-eye-slash"></i> LEVEL 3: REDACTED VISION
+        </button>
+      </div>
+    </div>
+
+    <div class="simulator-body">
+      <!-- Left Panel: Live Transmission Gauge -->
+      <div class="sim-metrics-box">
+        <div>
+          <div style="font-family:var(--font-mono); font-size:0.75rem; color:var(--accent-cyan); display:flex; justify-content:space-between; margin-bottom:6px;">
+            <span id="simActiveTierLabel">ACTIVE TIER: LEVEL 0 (ZERO-PIXEL DOM)</span>
+            <span id="simBandwidthLabel" style="color:var(--accent-emerald);">0.0 KB (0% WIRE USAGE)</span>
+          </div>
+          <div class="sim-gauge-bar">
+            <div class="sim-gauge-fill" id="simGaugeFill" style="width: 0%; background:#10b981;"></div>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:repeat(2, 1fr); gap:12px;">
+          <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06); border-radius:10px; padding:12px;">
+            <div style="font-size:0.72rem; color:var(--text-faint); font-family:var(--font-mono);">RAW PIXELS EGRESS</div>
+            <div style="font-size:1.15rem; font-weight:800; color:var(--accent-emerald); font-family:var(--font-mono); margin-top:4px;" id="simMetricPixels">0 KB (0 Frames)</div>
+          </div>
+          <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06); border-radius:10px; padding:12px;">
+            <div style="font-size:0.72rem; color:var(--text-faint); font-family:var(--font-mono);">VLM TOKEN OVERHEAD</div>
+            <div style="font-size:1.15rem; font-weight:800; color:var(--accent-cyan); font-family:var(--font-mono); margin-top:4px;" id="simMetricTokens">48 Tokens (-90%)</div>
+          </div>
+          <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06); border-radius:10px; padding:12px;">
+            <div style="font-size:0.72rem; color:var(--text-faint); font-family:var(--font-mono);">ROUNDTRIP LATENCY</div>
+            <div style="font-size:1.15rem; font-weight:800; color:#fff; font-family:var(--font-mono); margin-top:4px;" id="simMetricLatency">&lt; 140 ms</div>
+          </div>
+          <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06); border-radius:10px; padding:12px;">
+            <div style="font-size:0.72rem; color:var(--text-faint); font-family:var(--font-mono);">EXFILTRATION GUARD</div>
+            <div style="font-size:1.15rem; font-weight:800; color:var(--accent-emerald); font-family:var(--font-mono); margin-top:4px;" id="simMetricGuard">&check; PASS (0 Leaks)</div>
+          </div>
+        </div>
+
+        <div style="font-family:var(--font-mono); font-size:0.76rem; color:#94a3b8; border-top:1px solid rgba(255,255,255,0.08); padding-top:10px; display:flex; align-items:center; gap:8px;">
+          <i class="fa-solid fa-lock" style="color:var(--accent-emerald);"></i>
+          <span id="simSecurityDesc">Hardware Enclave Invariant: Zero screenshot buffers captured in memory.</span>
+        </div>
+      </div>
+
+      <!-- Right Panel: Live Wire JSON Payload -->
+      <div class="sim-wire-box">
+        <div class="sim-wire-header">
+          <span><i class="fa-solid fa-network-wired"></i> WIRE BUFFER INSPECTION</span>
+          <span id="simPayloadSizeTag">SIZE: 1.82 KB</span>
+        </div>
+        <pre id="simWirePre" style="margin:0; font-size:0.74rem; line-height:1.45; color:#a5f3fc;">{
+  "privacy_budget": {
+    "tier": 0,
+    "id": "ZERO_PIXEL_DOM",
+    "transmits_pixels": false
+  },
+  "semantic_screen": {
+    "viewport": { "width": 1920, "height": 1080 },
+    "elements": [
+      { "id": "e1", "role": "textbox", "label": "Full Name", "vaultKey": "fullname", "value": "VAULT:FULLNAME" },
+      { "id": "e2", "role": "button", "label": "Deploy Gaganyaan Payload" }
+    ]
+  },
+  "image": null,
+  "raw_pixels_sent": 0,
+  "pii_sent_bytes": 0
+}</pre>
       </div>
     </div>
   </div>
@@ -2164,6 +2509,168 @@ footer {
 </footer>
 
 <script>
+// ==========================================================================
+// FEATURE: INTERACTIVE PRIVACY BUDGET FLIGHT CONSOLE
+// ==========================================================================
+const BUDGET_SIMULATION_DATA = {
+  0: {
+    activeLabel: "ACTIVE TIER: LEVEL 0 (ZERO-PIXEL DOM)",
+    bandwidthLabel: "0.0 KB (0% WIRE USAGE)",
+    gaugeWidth: "0%",
+    gaugeColor: "#10b981",
+    pixels: "0 KB (0 Frames)",
+    tokens: "48 Tokens (-90%)",
+    latency: "< 140 ms",
+    guard: "✓ PASS (0 Leaks)",
+    securityDesc: "Hardware Enclave Invariant: Zero screenshot buffers captured in memory.",
+    wirePayload: JSON.stringify({
+      session_id: "vv-isro-session-2026-9a81",
+      task: "Fill Mission Telemetry and Quarters records",
+      privacy_budget: {
+        level: 0,
+        id: "ZERO_PIXEL_DOM",
+        description: "Pure semantic DOM representation. Zero screenshots captured or sent.",
+        transmitsPixels: false
+      },
+      semantic_screen: {
+        viewport: { width: 1920, height: 1080, devicePixelRatio: 1 },
+        elements: [
+          { id: "e1", type: "input", role: "textbox", label: "Operator Name", sensitive: true, vaultKey: "operator", value: "VAULT:OPERATOR" },
+          { id: "e2", type: "input", role: "textbox", label: "Official Email", sensitive: true, vaultKey: "email", value: "VAULT:EMAIL" },
+          { id: "e3", type: "button", role: "button", label: "Submit Mission Telemetry", sensitive: false }
+        ]
+      },
+      image: null,
+      raw_pixels_sent: 0,
+      pii_sent_bytes: 0
+    }, null, 2),
+    payloadSize: "SIZE: 1.82 KB"
+  },
+  1: {
+    activeLabel: "ACTIVE TIER: LEVEL 1 (SEMANTIC LAYOUT)",
+    bandwidthLabel: "3.4 KB (0.1% WIRE USAGE)",
+    gaugeWidth: "8%",
+    gaugeColor: "#00e5ff",
+    pixels: "0 KB (0 Frames)",
+    tokens: "120 Tokens (-80%)",
+    latency: "< 210 ms",
+    guard: "✓ PASS (0 Leaks)",
+    securityDesc: "Normalized bounding boxes transmitted alongside semantic tags with zero image raster data.",
+    wirePayload: JSON.stringify({
+      session_id: "vv-isro-session-2026-9a81",
+      privacy_budget: {
+        level: 1,
+        id: "SEMANTIC_LAYOUT",
+        description: "Element hierarchy and normalized bounding boxes without image payload.",
+        transmitsPixels: false
+      },
+      semantic_screen: {
+        viewport: { width: 1920, height: 1080 },
+        elements: [
+          { id: "e1", role: "textbox", label: "Operator Name", bbox: [410, 220, 300, 45], sensitive: true, vaultKey: "operator", value: "VAULT:OPERATOR" },
+          { id: "e2", role: "button", label: "Submit Telemetry", bbox: [410, 290, 160, 45], sensitive: false }
+        ]
+      },
+      image: null,
+      raw_pixels_sent: 0,
+      pii_sent_bytes: 0
+    }, null, 2),
+    payloadSize: "SIZE: 3.40 KB"
+  },
+  2: {
+    activeLabel: "ACTIVE TIER: LEVEL 2 (STRUCTURAL WIREFRAME)",
+    bandwidthLabel: "7.8 KB (0.3% WIRE USAGE)",
+    gaugeWidth: "18%",
+    gaugeColor: "#818cf8",
+    pixels: "0 KB (Masked)",
+    tokens: "310 Tokens (-65%)",
+    latency: "< 340 ms",
+    guard: "✓ PASS (0 Leaks)",
+    securityDesc: "Abstract UI geometry & landmark vectors sent for multi-column layouts without human imagery or textures.",
+    wirePayload: JSON.stringify({
+      session_id: "vv-isro-session-2026-9a81",
+      privacy_budget: {
+        level: 2,
+        id: "STRUCTURAL_WIREFRAME",
+        description: "Geometry wireframe overlay without raw pixels.",
+        transmitsPixels: false
+      },
+      wireframe: {
+        landmarks: ["header", "main_form", "sidebar_metrics"],
+        geometry: [[410, 220, 300, 45], [410, 290, 160, 45]]
+      },
+      raw_pixels_sent: 0,
+      pii_sent_bytes: 0
+    }, null, 2),
+    payloadSize: "SIZE: 7.85 KB"
+  },
+  3: {
+    activeLabel: "ACTIVE TIER: LEVEL 3 (REDACTED VISION ESCALATION)",
+    bandwidthLabel: "38.2 KB (1.2% WIRE USAGE)",
+    gaugeWidth: "40%",
+    gaugeColor: "#a855f7",
+    pixels: "0 KB Raw (38 KB Redacted)",
+    tokens: "950 Tokens",
+    latency: "< 520 ms",
+    guard: "✓ VERIFIED SAFE (0 Raw Pixels)",
+    securityDesc: "Fail-closed client canvas blackout mask applied before image serialization. Exfiltration guard verified safe.",
+    wirePayload: JSON.stringify({
+      session_id: "vv-isro-session-2026-9a81",
+      privacy_budget: {
+        level: 3,
+        id: "REDACTED_VISION",
+        description: "Offscreen canvas destructively blacks out sensitive regions before sending JPEG.",
+        transmitsPixels: true
+      },
+      image: "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD...[REDACTED_FAIL_CLOSED_MASK_APPLIED]",
+      raw_pixels_sent: 0,
+      pii_sent_bytes: 0,
+      redaction_algorithm: "OffscreenCanvas2D_DestructiveBlackout"
+    }, null, 2),
+    payloadSize: "SIZE: 38.2 KB"
+  }
+};
+
+function simulateBudgetTier(tier) {
+  for (let i = 0; i <= 3; i++) {
+    const btn = document.getElementById("btn-budget-" + i);
+    if (btn) {
+      if (i === tier) {
+        btn.classList.add("active");
+      } else {
+        btn.classList.remove("active");
+      }
+    }
+  }
+  const data = BUDGET_SIMULATION_DATA[tier];
+  if (!data) return;
+
+  const activeLabel = document.getElementById("simActiveTierLabel");
+  const bandwidthLabel = document.getElementById("simBandwidthLabel");
+  const gaugeFill = document.getElementById("simGaugeFill");
+  const metricPixels = document.getElementById("simMetricPixels");
+  const metricTokens = document.getElementById("simMetricTokens");
+  const metricLatency = document.getElementById("simMetricLatency");
+  const metricGuard = document.getElementById("simMetricGuard");
+  const securityDesc = document.getElementById("simSecurityDesc");
+  const wirePre = document.getElementById("simWirePre");
+  const payloadSizeTag = document.getElementById("simPayloadSizeTag");
+
+  if (activeLabel) activeLabel.textContent = data.activeLabel;
+  if (bandwidthLabel) bandwidthLabel.textContent = data.bandwidthLabel;
+  if (gaugeFill) {
+    gaugeFill.style.width = data.gaugeWidth;
+    gaugeFill.style.background = data.gaugeColor;
+  }
+  if (metricPixels) metricPixels.textContent = data.pixels;
+  if (metricTokens) metricTokens.textContent = data.tokens;
+  if (metricLatency) metricLatency.textContent = data.latency;
+  if (metricGuard) metricGuard.textContent = data.guard;
+  if (securityDesc) securityDesc.textContent = data.securityDesc;
+  if (wirePre) wirePre.textContent = data.wirePayload;
+  if (payloadSizeTag) payloadSizeTag.textContent = data.payloadSize;
+}
+
 // Stage Details for 8-Stage Loop
 const STAGE_DETAILS = {
   1: {

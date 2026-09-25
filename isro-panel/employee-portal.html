@@ -898,19 +898,19 @@ textarea { resize: vertical; min-height: 65px; font-size: 14px; line-height: 1.5
   font-family: 'JetBrains Mono', monospace;
 }
 
-/* Executive Aerospace Mission Command Deck */
-.mission-command-deck {
+/* Clean Extension Demonstration & Setup Guide Deck */
+.demo-guide-deck {
   background: linear-gradient(135deg, rgba(8, 20, 44, 0.96) 0%, rgba(4, 10, 24, 0.98) 100%);
-  border: 1px solid rgba(0, 229, 255, 0.35);
+  border: 1px solid rgba(0, 229, 255, 0.3);
   border-radius: 18px;
   padding: 24px 28px;
   margin-bottom: 24px;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6), 0 0 35px rgba(0, 229, 255, 0.1);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6), 0 0 35px rgba(0, 229, 255, 0.08);
   position: relative;
   overflow: hidden;
   backdrop-filter: blur(20px);
 }
-.mission-command-deck::before {
+.demo-guide-deck::before {
   content: '';
   position: absolute;
   top: 0; left: 0; right: 0; height: 2px;
@@ -942,7 +942,7 @@ textarea { resize: vertical; min-height: 65px; font-size: 14px; line-height: 1.5
 }
 .command-deck-title {
   font-family: 'Space Grotesk', sans-serif;
-  font-size: 26px;
+  font-size: 24px;
   font-weight: 800;
   color: #fff;
   letter-spacing: -0.5px;
@@ -954,140 +954,104 @@ textarea { resize: vertical; min-height: 65px; font-size: 14px; line-height: 1.5
   line-height: 1.5;
   margin-top: 4px;
 }
-.command-telemetry-strip {
+.steps-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 12px;
-}
-.telemetry-chip {
-  background: rgba(6, 14, 28, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  border-radius: 10px;
-  padding: 10px 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.telemetry-chip-label {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 10.5px;
-  color: #64748b;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-.telemetry-chip-val {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 13px;
-  font-weight: 700;
-  color: #fff;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-/* Aerospace Tactical Consoles Grid */
-.aerospace-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 20px;
-  margin-bottom: 28px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+  margin-top: 14px;
+  margin-bottom: 20px;
 }
 @media (max-width: 980px) {
-  .aerospace-grid { grid-template-columns: 1fr; }
+  .steps-grid { grid-template-columns: 1fr; }
 }
-.tactical-console-card {
-  background: linear-gradient(160deg, rgba(10, 20, 42, 0.92) 0%, rgba(5, 11, 24, 0.98) 100%);
-  border: 1px solid rgba(0, 229, 255, 0.22);
-  border-radius: 16px;
-  padding: 22px;
+.step-card {
+  background: rgba(6, 14, 30, 0.85);
+  border: 1px solid rgba(56, 189, 248, 0.22);
+  border-radius: 14px;
+  padding: 20px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(16px);
+  transition: all 0.25s ease;
   position: relative;
-  overflow: hidden;
-  transition: all 0.3s ease;
 }
-.tactical-console-card:hover {
+.step-card:hover {
   border-color: var(--accent);
-  box-shadow: 0 15px 35px rgba(0, 229, 255, 0.15);
-  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(0, 229, 255, 0.15);
+  transform: translateY(-2px);
 }
-.tactical-console-card.full-span {
-  grid-column: 1 / -1;
-}
-.console-card-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 14px;
-}
-.console-tag {
+.step-badge {
   font-family: 'JetBrains Mono', monospace;
   font-size: 11px;
   font-weight: 800;
-  color: var(--accent);
-  background: rgba(0, 229, 255, 0.12);
-  border: 1px solid rgba(0, 229, 255, 0.35);
-  padding: 3px 10px;
+  padding: 3px 8px;
   border-radius: 6px;
-  letter-spacing: 0.6px;
-}
-.console-title {
-  font-family: 'Space Grotesk', sans-serif;
-  font-size: 17px;
-  font-weight: 800;
-  color: #fff;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.console-desc {
-  font-size: 13.5px;
-  color: #94a3b8;
-  line-height: 1.55;
-  margin-bottom: 14px;
-}
-.telemetry-spec-row {
-  display: flex;
-  justify-content: space-between;
-  padding: 7px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 12px;
-}
-.telemetry-spec-row span { color: #64748b; }
-.telemetry-spec-row strong { color: #f1f5f9; font-weight: 600; }
-
-.tactical-sop-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-bottom: 16px;
-}
-.tactical-sop-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  border-radius: 8px;
-  padding: 10px 14px;
-  font-size: 13px;
-}
-.sop-badge {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 10.5px;
-  font-weight: 800;
-  padding: 2px 8px;
-  border-radius: 4px;
   background: rgba(0, 229, 255, 0.12);
   color: var(--accent);
   border: 1px solid rgba(0, 229, 255, 0.3);
-  white-space: nowrap;
+  display: inline-block;
 }
-
+.step-icon-wrap {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: rgba(0, 229, 255, 0.08);
+  border: 1px solid rgba(0, 229, 255, 0.25);
+  display: grid;
+  place-items: center;
+  margin-bottom: 14px;
+}
+.step-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 17px;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 8px;
+}
+.step-desc {
+  font-size: 13px;
+  color: #94a3b8;
+  line-height: 1.6;
+  margin-bottom: 14px;
+}
+.step-desc ol {
+  margin-left: 18px;
+  margin-top: 6px;
+}
+.step-desc li {
+  margin-bottom: 4px;
+}
+.btn-step-action {
+  background: rgba(14, 30, 60, 0.9);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  color: #fff;
+  padding: 9px 14px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.2s;
+  width: 100%;
+}
+.btn-step-action:hover {
+  background: rgba(0, 229, 255, 0.18);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.code-inline {
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--accent);
+}
 .lens-btn-group { display: flex; gap: 8px; }
 .lens-btn {
   padding: 8px 14px;
@@ -1429,250 +1393,212 @@ body.mode-redacted .datablock {
           <span id="ov-freq">● 8.400 GHz LOCKED</span>
         </div>
 
-        <!-- EXECUTIVE AEROSPACE MISSION COMMAND DECK -->
-        <div class="mission-command-deck">
+        <!-- LIVE EXTENSION DEMO & INSTALLATION HUB -->
+        <div class="demo-guide-deck">
           <div class="command-deck-top">
             <div>
               <div class="command-deck-badge">
-                <span class="pulse-indicator" style="color:var(--green);"></span>
-                <span>ISRO SATELLITE COMMAND &bull; DEEP SPACE NETWORK &bull; FLIGHT ENCLAVE</span>
+                <i class="fa-solid fa-puzzle-piece"></i>
+                <span>CHROME EXTENSION &bull; LIVE DEMONSTRATION &amp; EVALUATION HUB</span>
               </div>
-              <div class="command-deck-title">Mission Operations &amp; Orbital Telemetry Console</div>
+              <div class="command-deck-title">How to Install the Extension &amp; Run the Live Demo</div>
               <div class="command-deck-sub">
-                Master Control Facility (MCF Hassan) &amp; ISTRAC Ground Station Network &bull; Zero-PII Hardware Cryptographic Enclave
+                Follow these 3 simple steps to load the VisionVault extension in Chrome and execute the autonomous on-device privacy workflow on this portal.
               </div>
             </div>
             <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
-              <div class="lens-btn-group" title="Presentation View Filter">
-                <button class="lens-btn active" id="lens-normal" onclick="setRedactionLens('normal')">
-                  <i class="fa-solid fa-desktop"></i> Human View
-                </button>
-                <button class="lens-btn" id="lens-redacted" onclick="setRedactionLens('redacted')">
-                  <i class="fa-solid fa-shield-halved"></i> Cloud LLM (Masked)
-                </button>
-              </div>
-              <button class="topbar-action active" style="padding:9px 18px; font-size:13px; font-weight:700;" onclick="navigateToPage('messages')">
-                <i class="fa-solid fa-satellite-dish"></i> Secure Comms Terminal &rarr;
+              <a href="visionvault-extension.zip" download class="topbar-action active" style="background:linear-gradient(135deg, #00e5ff, #0284c7); color:#000; font-weight:800; border:none; padding:10px 18px; font-size:13.5px; box-shadow:0 0 16px rgba(0,229,255,0.4);">
+                <i class="fa-solid fa-file-arrow-down"></i> Download Extension (.zip)
+              </a>
+              <button class="topbar-action" onclick="document.getElementById('demo-prompts-section').scrollIntoView({behavior:'smooth'})">
+                <i class="fa-solid fa-terminal"></i> Demo Prompts &darr;
               </button>
             </div>
           </div>
 
-          <!-- Live Aerospace Telemetry Strip -->
-          <div class="command-telemetry-strip">
+          <!-- 3-Step Clear, Modern Visual Setup Grid -->
+          <div class="steps-grid">
+            <!-- Step 1 -->
+            <div class="step-card">
+              <div>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+                  <div class="step-icon-wrap">
+                    <i class="fa-solid fa-file-zipper" style="color:var(--accent); font-size:20px;"></i>
+                  </div>
+                  <span class="step-badge">STEP 01</span>
+                </div>
+                <div class="step-title">1. Download &amp; Extract</div>
+                <div class="step-desc">
+                  Download the extension package archive and unzip it to any local directory on your machine:
+                  <div style="margin-top:10px;">
+                    <a href="visionvault-extension.zip" download class="btn-step-action">
+                      <i class="fa-solid fa-download"></i> visionvault-extension.zip (10 MB)
+                    </a>
+                  </div>
+                  <div style="margin-top:8px; font-size:11.5px; color:#64748b;">
+                    Or use the existing <code class="code-inline">extension/</code> directory from the repository.
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Step 2 -->
+            <div class="step-card">
+              <div>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+                  <div class="step-icon-wrap" style="background:rgba(56,189,248,0.1); border-color:rgba(56,189,248,0.3);">
+                    <i class="fa-brands fa-chrome" style="color:#38bdf8; font-size:22px;"></i>
+                  </div>
+                  <span class="step-badge" style="color:#38bdf8; border-color:rgba(56,189,248,0.3); background:rgba(56,189,248,0.12);">STEP 02</span>
+                </div>
+                <div class="step-title">2. Load into Chrome</div>
+                <div class="step-desc">
+                  <ol>
+                    <li>Open Chrome and navigate to <code class="code-inline">chrome://extensions</code></li>
+                    <li>Toggle <strong>Developer mode</strong> in the top-right corner.</li>
+                    <li>Click <strong>Load unpacked</strong> button.</li>
+                    <li>Select the unzipped <code class="code-inline">extension</code> directory.</li>
+                    <li>Pin the <strong>VisionVault</strong> icon to your toolbar.</li>
+                  </ol>
+                  <div style="margin-top:10px;">
+                    <button class="btn-step-action" onclick="copyChromeExtensionsUrl(this)">
+                      <i class="fa-regular fa-copy"></i> Copy chrome://extensions
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Step 3 -->
+            <div class="step-card">
+              <div>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+                  <div class="step-icon-wrap" style="background:rgba(16,185,129,0.1); border-color:rgba(16,185,129,0.3);">
+                    <i class="fa-solid fa-play" style="color:#10b981; font-size:20px;"></i>
+                  </div>
+                  <span class="step-badge" style="color:#10b981; border-color:rgba(16,185,129,0.3); background:rgba(16,185,129,0.12);">STEP 03</span>
+                </div>
+                <div class="step-title">3. Launch Live Demo</div>
+                <div class="step-desc">
+                  <ol>
+                    <li>Click the <strong>VisionVault</strong> icon in your Chrome toolbar to open the Side Panel.</li>
+                    <li>Copy one of the <strong>Demo Prompts</strong> below.</li>
+                    <li>Paste into the agent chat box and press <strong>Enter</strong>.</li>
+                    <li>Watch the agent locally redact sensitive PII and auto-fill these portal databases!</li>
+                  </ol>
+                  <div style="margin-top:10px;">
+                    <button class="btn-step-action" style="background:rgba(16,185,129,0.15); border-color:rgba(16,185,129,0.4); color:#10b981;" onclick="document.getElementById('demo-prompts-section').scrollIntoView({behavior:'smooth'})">
+                      <i class="fa-solid fa-bolt"></i> View Ready Demo Prompts &darr;
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Live Telemetry Status Invariant Strip -->
+          <div class="command-telemetry-strip" style="background:rgba(6,14,28,0.5); border-radius:10px; padding:8px;">
             <div class="telemetry-chip">
-              <span class="telemetry-chip-label">Target Spacecraft</span>
+              <span class="telemetry-chip-label">Active Target Portal</span>
               <span class="telemetry-chip-val" style="color:#38bdf8;">
-                <i class="fa-solid fa-shuttle-space"></i> Gaganyaan-1 (HLVM3)
+                <i class="fa-solid fa-globe"></i> localhost:3000/employee-portal.html
               </span>
             </div>
             <div class="telemetry-chip">
-              <span class="telemetry-chip-label">Orbital Dynamics</span>
+              <span class="telemetry-chip-label">Local Enclave Defense</span>
               <span class="telemetry-chip-val" style="color:#10b981;">
-                <i class="fa-solid fa-circle-notch fa-spin" style="--fa-animation-duration: 8s;"></i> 400 km LEO &bull; 7.82 km/s
+                <i class="fa-solid fa-shield-halved"></i> 4-Layer PII Waterfall Active
               </span>
             </div>
             <div class="telemetry-chip">
-              <span class="telemetry-chip-label">Downlink Telemetry</span>
+              <span class="telemetry-chip-label">Network Egress Bound</span>
               <span class="telemetry-chip-val" style="color:#00e5ff;">
-                <i class="fa-solid fa-tower-broadcast"></i> 8.400 GHz X-Band LOCKED
+                <i class="fa-solid fa-lock"></i> 0 Raw Pixels &bull; 0 PII Bytes
               </span>
             </div>
             <div class="telemetry-chip">
-              <span class="telemetry-chip-label">Privacy Budget Tier</span>
-              <span class="telemetry-chip-val" style="color:#10b981;">
-                <i class="fa-solid fa-shield-halved"></i> Level 0 (Zero-Pixel Active)
+              <span class="telemetry-chip-label">Target Databases</span>
+              <span class="telemetry-chip-val" style="color:#f59e0b;">
+                <i class="fa-solid fa-database"></i> 6 Live Databases Ready
               </span>
             </div>
           </div>
         </div>
 
-        <!-- AEROSPACE TACTICAL OPERATIONS MATRIX -->
-        <div class="aerospace-grid">
-          
-          <!-- Tactical Console 1: Gaganyaan Orbital Telemetry -->
-          <div class="tactical-console-card">
+        <!-- DEMO PROMPTS LAUNCHER CARD -->
+        <div class="demo-guide-deck" id="demo-prompts-section" style="padding:22px 28px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
             <div>
-              <div class="console-card-header">
-                <span class="console-tag"><i class="fa-solid fa-satellite"></i> ORBITAL CONSOLE</span>
-                <span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:#10b981; font-weight:700;">● TELEMETRY NOMINAL</span>
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span style="background:rgba(16,185,129,0.15); border:1px solid rgba(16,185,129,0.4); color:var(--green); font-size:11px; font-family:'JetBrains Mono',monospace; padding:3px 9px; border-radius:4px; font-weight:800;">ONE-CLICK RUN</span>
+                <span style="font-size:12.5px; color:#94a3b8; font-family:'JetBrains Mono',monospace;">COPY &amp; PASTE INTO EXTENSION SIDE PANEL</span>
               </div>
-              <div class="console-title"><i class="fa-solid fa-shuttle-space" style="color:var(--accent);"></i> Gaganyaan Mission Flight Telemetry</div>
-              <div class="console-desc">
-                High-precision orbital state vector tracking and synchronization interface between national launch telemetry and local security registries.
-              </div>
-
-              <div style="margin-bottom:16px;">
-                <div class="telemetry-spec-row">
-                  <span>Target Vehicle</span>
-                  <strong>HLVM3-G1 (Human-Rated LVM3)</strong>
-                </div>
-                <div class="telemetry-spec-row">
-                  <span>Primary Mandate</span>
-                  <strong>3-Member Crew LEO Insertion (HSFC)</strong>
-                </div>
-                <div class="telemetry-spec-row">
-                  <span>Ground Link Relay</span>
-                  <strong>MCF Hassan &bull; ISTRAC Bengaluru</strong>
-                </div>
-                <div class="telemetry-spec-row">
-                  <span>Downlink Enclave</span>
-                  <strong style="color:var(--green);"><i class="fa-solid fa-lock"></i> AES-GCM-256 Air-Gapped</strong>
-                </div>
+              <div style="font-family:'Space Grotesk',sans-serif; font-size:20px; font-weight:800; color:#fff; margin-top:4px;">
+                Calibrated Live Demonstration Prompts
               </div>
             </div>
-
-            <div>
-              <button class="topbar-action" style="width:100%; justify-content:center; padding:10px 14px; font-size:12.5px; font-weight:700;" onclick="navigateToPage('messages')">
-                <i class="fa-solid fa-satellite-dish"></i> Open Secure Comms Channel
-              </button>
-            </div>
+            <button class="topbar-action" onclick="resetAllPortalRecords()" style="font-size:12.5px;">
+              <i class="fa-solid fa-rotate-left"></i> Reset Form Fields
+            </button>
           </div>
 
-          <!-- Tactical Console 2: Officer Identity & Biometric Clearance -->
-          <div class="tactical-console-card">
-            <div>
-              <div class="console-card-header">
-                <span class="console-tag" style="color:var(--accent2); background:rgba(56,189,248,0.12); border-color:rgba(56,189,248,0.35);"><i class="fa-solid fa-user-shield"></i> SECURITY DOSSIER</span>
-                <span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--accent2); font-weight:700;">TOP SECRET // LEVEL 5</span>
-              </div>
-              <div class="console-title"><i class="fa-solid fa-id-card-clip" style="color:var(--accent2);"></i> Biometric Hardware Enclave</div>
-              <div class="console-desc">
-                Local on-device cryptographic tokenization prevents real employee PII, Aadhaar numbers, and biometric photos from crossing network boundaries.
-              </div>
-
-              <div style="margin-bottom:16px;">
-                <div class="telemetry-spec-row">
-                  <span>Station Officer</span>
-                  <strong>Scientist Natesh Kanna R (ISRO-10101)</strong>
+          <div style="display:flex; flex-direction:column; gap:12px;">
+            <!-- Prompt 1: 5-DB Autopilot -->
+            <div class="prompt-box featured">
+              <div style="display:flex; flex-direction:column; gap:4px; flex:1;">
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <span class="prompt-tag" style="color:var(--green); border-color:rgba(16,185,129,0.4); background:rgba(16,185,129,0.12);">FLAGSHIP &bull; 5-DATABASE AUTOPILOT</span>
+                  <span style="font-size:11px; color:#64748b; font-family:'JetBrains Mono',monospace;">Most Impressive Autonomous Multi-Step Run</span>
                 </div>
-                <div class="telemetry-spec-row">
-                  <span>Operational Centre</span>
-                  <strong>Master Control Facility (MCF)</strong>
-                </div>
-                <div class="telemetry-spec-row">
-                  <span>Biometric Detection</span>
-                  <strong>UltraFace-RFB-320 ONNX (WASM)</strong>
-                </div>
-                <div class="telemetry-spec-row">
-                  <span>Vault Tokens</span>
-                  <strong style="color:var(--accent);">«VAULT:OPERATOR», «VAULT:EMAIL»</strong>
+                <div id="prompt-p1" style="font-size:13px; color:#f8fafc; font-family:'Inter',sans-serif; font-weight:500; margin-top:2px;">
+                  Read the encrypted mission transmission in Secure Comms Channel, securely store all fields in the local vault, and autonomously populate and submit all 5 ISRO databases (HR, Payroll, Mission Systems, Staff Housing, and Health).
                 </div>
               </div>
+              <button class="prompt-copy-btn" onclick="copyPromptText(this, 'prompt-p1')"><i class="fa-regular fa-copy"></i> Copy Prompt</button>
             </div>
 
-            <div>
-              <button class="topbar-action" style="width:100%; justify-content:center; padding:10px 14px; font-size:12.5px; font-weight:700; border-color:rgba(16,185,129,0.4); color:var(--green);" onclick="setRedactionLens('redacted')">
-                <i class="fa-solid fa-eye-slash"></i> Inspect Redaction Lens (0 Leaks)
-              </button>
+            <!-- Prompt 2: Single DB Quick Fill -->
+            <div class="prompt-box">
+              <div style="display:flex; flex-direction:column; gap:4px; flex:1;">
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <span class="prompt-tag" style="color:var(--accent); border-color:rgba(0,229,255,0.4); background:rgba(0,229,255,0.12);">FAST PATH &bull; DATABASE 1 HR PERSONNEL</span>
+                  <span style="font-size:11px; color:#64748b; font-family:'JetBrains Mono',monospace;">Single Form Auto-Fill</span>
+                </div>
+                <div id="prompt-p2" style="font-size:13px; color:#f8fafc; font-family:'Inter',sans-serif; font-weight:500; margin-top:2px;">
+                  Autonomously populate Database 1 HR Personnel details from vault and submit.
+                </div>
+              </div>
+              <button class="prompt-copy-btn" onclick="copyPromptText(this, 'prompt-p2')"><i class="fa-regular fa-copy"></i> Copy Prompt</button>
             </div>
-          </div>
 
-          <!-- Tactical Console 3 (Full Span): Autonomous Mission Dispatcher & Prompt Matrix -->
-          <div class="tactical-console-card full-span">
-            <div>
-              <div class="console-card-header">
-                <span class="console-tag" style="color:var(--green); background:rgba(16,185,129,0.12); border-color:rgba(16,185,129,0.4);"><i class="fa-solid fa-robot"></i> AGENT DISPATCH MATRIX</span>
-                <span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:#fff; font-weight:700;">VISIONVAULT ORCHESTRATOR CALIBRATED</span>
+            <!-- Prompt 3: Cross-Site Sync -->
+            <div class="prompt-box featured" style="border-color:rgba(167,139,250,0.4); background:rgba(167,139,250,0.06);">
+              <div style="display:flex; flex-direction:column; gap:4px; flex:1;">
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <span class="prompt-tag" style="color:#a78bfa; border-color:rgba(167,139,250,0.4); background:rgba(167,139,250,0.12);">CROSS-SITE &bull; GAGANYAAN SYNC</span>
+                  <span style="font-size:11px; color:#64748b; font-family:'JetBrains Mono',monospace;">Cross-Tab Telemetry Synchronization</span>
+                </div>
+                <div id="prompt-p4" style="font-size:13px; color:#f8fafc; font-family:'Inter',sans-serif; font-weight:500; margin-top:2px;">
+                  Fetch Gaganyaan mission details from isro.gov.in and fill Database 6.
+                </div>
               </div>
-              <div class="console-title"><i class="fa-solid fa-terminal" style="color:var(--green);"></i> Mission Automation Command &amp; Prompt Dispatcher</div>
-              <div class="console-desc">
-                Dispatch calibrated mission prompts to the VisionVault Chrome Extension Side Panel. The agent autonomously plans and executes tasks across all 6 databases with zero cloud PII egress:
+              <button class="prompt-copy-btn" onclick="copyPromptText(this, 'prompt-p4')"><i class="fa-regular fa-copy"></i> Copy Prompt</button>
+            </div>
+
+            <!-- Prompt 4: Vault Ingestion -->
+            <div class="prompt-box">
+              <div style="display:flex; flex-direction:column; gap:4px; flex:1;">
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <span class="prompt-tag" style="color:#f59e0b; border-color:rgba(245,158,11,0.4); background:rgba(245,158,11,0.12);">CREDENTIAL VAULT &bull; ENCLAVE INGESTION</span>
+                  <span style="font-size:11px; color:#64748b; font-family:'JetBrains Mono',monospace;">Zero-Pixel Direct RAM Storage</span>
+                </div>
+                <div id="prompt-p0" style="font-size:13px; color:#f8fafc; font-family:'JetBrains Mono',monospace; font-weight:700; margin-top:2px;">
+                  store these values to the vault
+                </div>
               </div>
-
-              <div style="display:flex; flex-direction:column; gap:10px; margin-top:10px;">
-                
-                <!-- Prompt 0: Store values to vault -->
-                <div class="prompt-box featured">
-                  <span class="prompt-tag">VAULT INGESTION</span>
-                  <span id="prompt-p0" style="flex:1; font-weight:700; color:#fff; font-family:'JetBrains Mono',monospace; font-size:12.5px;">store these values to the vault</span>
-                  <button class="prompt-copy-btn" onclick="copyPromptText(this, 'prompt-p0')"><i class="fa-regular fa-copy"></i> Copy Prompt</button>
-                </div>
-
-                <!-- Prompt 1: Main 5-DB prompt -->
-                <div class="prompt-box">
-                  <span class="prompt-tag" style="color:var(--green); border-color:rgba(16,185,129,0.4); background:rgba(16,185,129,0.12);">5-DB AUTOPILOT</span>
-                  <span id="prompt-p1" style="flex:1; font-size:13px;">Read the encrypted mission transmission in Secure Comms Channel, securely store all fields in the local vault, and autonomously populate and submit all 5 ISRO databases (HR, Payroll, Mission Systems, Staff Housing, and Health).</span>
-                  <button class="prompt-copy-btn" onclick="copyPromptText(this, 'prompt-p1')"><i class="fa-regular fa-copy"></i> Copy Prompt</button>
-                </div>
-
-                <!-- Prompt 4: Gaganyaan sync prompt -->
-                <div class="prompt-box featured" style="border-color:rgba(167,139,250,0.5); background:rgba(167,139,250,0.07);">
-                  <span class="prompt-tag" style="color:#a78bfa; border-color:rgba(167,139,250,0.4); background:rgba(167,139,250,0.12);">GAGANYAAN SYNC</span>
-                  <span id="prompt-p4" style="flex:1; font-weight:700; color:#fff; font-family:'JetBrains Mono',monospace; font-size:12.5px;">Fetch Gaganyaan mission details from isro.gov.in and fill Database 6.</span>
-                  <button class="prompt-copy-btn" onclick="copyPromptText(this, 'prompt-p4')"><i class="fa-regular fa-copy"></i> Copy Prompt</button>
-                </div>
-
-                <!-- Prompt 3: Cross-site sync prompt -->
-                <div class="prompt-box featured" style="border-color:rgba(245,158,11,0.5); background:rgba(245,158,11,0.07);">
-                  <span class="prompt-tag" style="color:#f59e0b; border-color:rgba(245,158,11,0.4); background:rgba(245,158,11,0.12);">CROSS-SITE SYNC</span>
-                  <span id="prompt-p3" style="flex:1; font-weight:700; color:#fff; font-family:'JetBrains Mono',monospace; font-size:12.5px;">Get the next ISRO launch details and log it in our mission dashboard.</span>
-                  <button class="prompt-copy-btn" onclick="copyPromptText(this, 'prompt-p3')"><i class="fa-regular fa-copy"></i> Copy Prompt</button>
-                </div>
-
-                <!-- Prompt 2: DB 1 prompt -->
-                <div class="prompt-box">
-                  <span class="prompt-tag" style="color:var(--yellow); border-color:rgba(245,158,11,0.4); background:rgba(245,158,11,0.12);">SINGLE DB</span>
-                  <span id="prompt-p2" style="flex:1; font-size:13px;">Autonomously populate Database 1 HR Personnel details from vault and submit.</span>
-                  <button class="prompt-copy-btn" onclick="copyPromptText(this, 'prompt-p2')"><i class="fa-regular fa-copy"></i> Copy Prompt</button>
-                </div>
-
-              </div>
+              <button class="prompt-copy-btn" onclick="copyPromptText(this, 'prompt-p0')"><i class="fa-regular fa-copy"></i> Copy Prompt</button>
             </div>
           </div>
-
-          <!-- Tactical Console 4 (Full Span): Procedural Flight Checklist & DPDP Compliance -->
-          <div class="tactical-console-card full-span">
-            <div>
-              <div class="console-card-header">
-                <span class="console-tag" style="color:#38bdf8; background:rgba(56,189,248,0.12); border-color:rgba(56,189,248,0.35);"><i class="fa-solid fa-list-check"></i> FLIGHT CHECKLIST</span>
-                <span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:#10b981; font-weight:700;">SOP-VV-2026 // AUDITED</span>
-              </div>
-              <div class="console-title"><i class="fa-solid fa-file-shield" style="color:#38bdf8;"></i> Procedural Flight Checklist &amp; DPDP 2023 Attestation</div>
-              <div class="console-desc">
-                Verified zero-leakage procedural invariants enforced by VisionVault's fail-closed on-device hardware enclave:
-              </div>
-
-              <div class="tactical-sop-list">
-                <div class="tactical-sop-item">
-                  <span class="sop-badge">SOP 1.0</span>
-                  <span style="color:#fff; font-weight:600;">MV3 Enclave Runtime Initialized:</span>
-                  <span style="color:#94a3b8;">Chrome Extension runs in an isolated client context (0 cloud dependencies).</span>
-                  <span style="margin-left:auto; color:var(--green); font-family:'JetBrains Mono',monospace; font-weight:700;">&check; VERIFIED</span>
-                </div>
-                <div class="tactical-sop-item">
-                  <span class="sop-badge">SOP 2.0</span>
-                  <span style="color:#fff; font-weight:600;">Secure Comms Telemetry Decryption:</span>
-                  <span style="color:#94a3b8;">AES-256 encrypted mission cards decrypted exclusively in volatile client RAM.</span>
-                  <span style="margin-left:auto; color:var(--green); font-family:'JetBrains Mono',monospace; font-weight:700;">&check; VERIFIED</span>
-                </div>
-                <div class="tactical-sop-item">
-                  <span class="sop-badge">SOP 3.0</span>
-                  <span style="color:#fff; font-weight:600;">4-Layer Defense Waterfall:</span>
-                  <span style="color:#94a3b8;">L0 DOM heuristics &bull; L1 Luhn/Verhoeff checksums &bull; L2 WASM OCR &bull; L3 ViT vision model.</span>
-                  <span style="margin-left:auto; color:var(--green); font-family:'JetBrains Mono',monospace; font-weight:700;">&check; VERIFIED</span>
-                </div>
-                <div class="tactical-sop-item">
-                  <span class="sop-badge">SOP 4.0</span>
-                  <span style="color:#fff; font-weight:600;">Privacy Budget Telemetry Guard:</span>
-                  <span style="color:#94a3b8;">Level 0 Zero-Pixel DOM mode transmits 0 screenshots and 0 raw pixels across wire.</span>
-                  <span style="margin-left:auto; color:var(--green); font-family:'JetBrains Mono',monospace; font-weight:700;">&check; VERIFIED</span>
-                </div>
-                <div class="tactical-sop-item">
-                  <span class="sop-badge">SOP 5.0</span>
-                  <span style="color:#fff; font-weight:600;">DPDP Act 2023 Compliance Attestation:</span>
-                  <span style="color:#94a3b8;">Zero personal data egress, continuous audit logging, and cryptographic compliance certification.</span>
-                  <span style="margin-left:auto; color:var(--green); font-family:'JetBrains Mono',monospace; font-weight:700;">&check; VERIFIED</span>
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <button class="topbar-action" style="width:100%; justify-content:center; padding:11px 16px; font-size:13px; font-weight:700; border-color:rgba(56,189,248,0.4); color:var(--accent2);" onclick="generateDPDPCertificate()">
-                <i class="fa-solid fa-certificate"></i> View Cryptographic DPDP 2023 Compliance Report
-              </button>
-            </div>
-          </div>
-
         </div>
 
         <!-- In-Browser System Simulator Card -->
@@ -2737,6 +2663,24 @@ function fallbackCopy(text) {
   ta.select();
   try { document.execCommand("copy"); } catch (e) {}
   document.body.removeChild(ta);
+}
+
+function copyChromeExtensionsUrl(btn) {
+  const text = "chrome://extensions";
+  const original = btn.innerHTML;
+  btn.innerHTML = '<i class="fa-solid fa-check" style="color:var(--green)"></i> Copied!';
+  btn.style.borderColor = "var(--green)";
+  btn.style.color = "var(--green)";
+  setTimeout(() => {
+    btn.innerHTML = original;
+    btn.style.borderColor = "";
+    btn.style.color = "";
+  }, 2000);
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).catch(() => fallbackCopy(text));
+  } else {
+    fallbackCopy(text);
+  }
 }
 
 // In-Browser Zero-Leak System Simulator

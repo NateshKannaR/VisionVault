@@ -2928,6 +2928,7 @@ function copyChromeExtensionsUrl(btn) {
     navigator.clipboard.writeText(text).catch(() => fallbackCopy(text));
   } else {
     fallbackCopy(text);
+  }
 }
 
 function autoPopulateAllDatabases() {

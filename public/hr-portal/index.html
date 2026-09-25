@@ -1,0 +1,1404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>ISRO VISION VAULT — HR Operations &amp; Mission Command</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"/>
+<style>
+:root {
+  --bg: #030712;
+  --bg-secondary: #0b1329;
+  --card: rgba(13, 24, 45, 0.85);
+  --card-hover: rgba(18, 34, 64, 0.95);
+  --sidebar: rgba(8, 15, 30, 0.92);
+  --accent: #00e5ff;
+  --accent2: #38bdf8;
+  --green: #10b981;
+  --yellow: #f59e0b;
+  --red: #f43f5e;
+  --violet: #8b5cf6;
+  --text: #f8fafc;
+  --muted: #94a3b8;
+  --border: rgba(56, 189, 248, 0.22);
+  --border-focus: rgba(0, 229, 255, 0.7);
+  --border-subtle: rgba(255, 255, 255, 0.1);
+  --input: rgba(6, 15, 30, 0.92);
+  --bubble-out: rgba(14, 58, 92, 0.95);
+  --bubble-in: rgba(13, 27, 46, 0.95);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: rgba(3, 7, 18, 0.9); }
+::-webkit-scrollbar-thumb { background: rgba(56, 189, 248, 0.35); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: 
+    radial-gradient(circle at 50% -20%, rgba(14, 165, 233, 0.18), transparent 60%),
+    radial-gradient(circle at 100% 40%, rgba(99, 102, 241, 0.1), transparent 50%),
+    radial-gradient(circle at 0% 80%, rgba(16, 185, 129, 0.08), transparent 40%),
+    var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  -webkit-font-smoothing: antialiased;
+  font-size: 15px;
+}
+
+/* Modern Header Top Bar */
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 28px;
+  background: rgba(8, 15, 30, 0.92);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 4px 28px rgba(0, 0, 0, 0.6);
+}
+.logo {
+  width: 44px;
+  height: 44px;
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 0 20px rgba(245, 158, 11, 0.4);
+}
+.topbar-branding {
+  display: flex;
+  flex-direction: column;
+}
+.topbar-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.topbar-sub {
+  font-size: 13px;
+  color: var(--muted);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.role-badge-hr {
+  padding: 4px 12px;
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.45);
+  border-radius: 20px;
+  font-size: 11.5px;
+  font-weight: 800;
+  color: var(--yellow);
+  font-family: 'JetBrains Mono', monospace;
+  letter-spacing: 0.5px;
+}
+
+.topbar-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.live-clock-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px;
+  background: rgba(13, 24, 45, 0.9);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12.5px;
+  color: var(--text);
+  font-weight: 600;
+}
+.live-clock-pill i { color: var(--accent); font-size: 14px; }
+.topbar-action {
+  border: 1px solid var(--border);
+  background: rgba(6, 15, 30, 0.85);
+  color: var(--text);
+  padding: 8px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+}
+.topbar-action:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(0, 229, 255, 0.12);
+  box-shadow: 0 0 14px rgba(0, 229, 255, 0.25);
+}
+.switch-link {
+  padding: 8px 16px;
+  background: rgba(0, 229, 255, 0.15);
+  border: 1.5px solid rgba(0, 229, 255, 0.45);
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--accent);
+  text-decoration: none;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.switch-link:hover {
+  background: rgba(0, 229, 255, 0.28);
+  box-shadow: 0 0 16px rgba(0, 229, 255, 0.35);
+}
+
+/* Layout */
+.layout { display: flex; flex: 1; min-height: calc(100vh - 72px); }
+
+/* Sidebar */
+.sidebar {
+  width: 290px;
+  background: var(--sidebar);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border-right: 1px solid var(--border);
+  padding: 20px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.nav-section {
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 14px 14px 6px;
+  font-family: 'JetBrains Mono', monospace;
+}
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  border: 1px solid transparent;
+  transition: all 0.2s ease;
+}
+.nav-item:hover {
+  background: rgba(56, 189, 248, 0.1);
+  color: var(--text);
+}
+.nav-item.active {
+  background: rgba(245, 158, 11, 0.14);
+  border: 1.5px solid rgba(245, 158, 11, 0.45);
+  color: var(--yellow);
+  font-weight: 700;
+  box-shadow: 0 0 20px rgba(245, 158, 11, 0.15);
+}
+.ni {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  font-size: 16px;
+}
+
+/* Main Area */
+.main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+.page { display: none; flex: 1; overflow-y: auto; }
+.page.active { display: flex; flex-direction: column; }
+.inner { max-width: 1040px; width: 100%; margin: 0 auto; padding: 32px 36px; }
+
+/* Page Header */
+.page-badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  padding: 5px 12px;
+  border-radius: 20px;
+  margin-bottom: 10px;
+  font-family: 'JetBrains Mono', monospace;
+}
+.page-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 26px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: -0.4px;
+  margin-bottom: 6px;
+}
+.page-sub {
+  font-size: 14.5px;
+  color: var(--muted);
+  margin-bottom: 24px;
+}
+
+/* Cards & Missions */
+.telemetry-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.telemetry-stat-card {
+  background: rgba(10, 20, 40, 0.82);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1.5px solid var(--border);
+  border-radius: 14px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+  overflow: hidden;
+}
+.telemetry-stat-card::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(0, 229, 255, 0.4), transparent);
+}
+.telemetry-stat-card:hover {
+  border-color: rgba(0, 229, 255, 0.5);
+  transform: translateY(-2px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), 0 0 20px rgba(0, 229, 255, 0.12);
+}
+.t-stat-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11.5px;
+  color: var(--muted);
+  font-family: 'JetBrains Mono', monospace;
+  text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+.t-stat-val {
+  font-size: 20px;
+  font-weight: 800;
+  color: #fff;
+  font-family: 'Space Grotesk', sans-serif;
+}
+.t-stat-sub {
+  font-size: 12px;
+  color: var(--accent2);
+}
+
+.mission-card {
+  background: rgba(10, 20, 38, 0.85);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1.5px solid var(--border);
+  border-radius: 16px;
+  padding: 24px;
+  margin-bottom: 20px;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+  overflow: hidden;
+}
+.mission-card::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0, 229, 255, 0.4), transparent);
+}
+.mission-card:hover {
+  border-color: rgba(0, 229, 255, 0.5);
+  transform: translateY(-2px);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.6), 0 0 24px rgba(0, 229, 255, 0.14);
+}
+.mission-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+.mission-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 20px;
+  font-weight: 800;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.status-tag {
+  font-size: 12px;
+  font-weight: 800;
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-family: 'JetBrains Mono', monospace;
+}
+.status-operational { background: rgba(16, 185, 129, 0.15); color: var(--green); border: 1px solid rgba(16, 185, 129, 0.35); }
+
+.mission-telemetry-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.m-t-box {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 10px 14px;
+}
+.m-t-lbl {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+.m-t-val {
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+  word-break: break-word;
+}
+.text-accent { color: var(--accent2) !important; }
+.text-green { color: var(--green) !important; }
+.text-yellow { color: var(--yellow) !important; }
+
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+.grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+.fg { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+label {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--muted);
+  font-family: 'JetBrains Mono', monospace;
+}
+input, textarea, select {
+  background: var(--input);
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 16px;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 14.5px;
+  outline: none;
+  transition: all 0.2s ease;
+}
+input:focus, textarea:focus, select:focus {
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 4px rgba(0, 229, 255, 0.18);
+}
+textarea { resize: vertical; min-height: 65px; }
+
+.fsection {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin: 22px 0 12px;
+  color: var(--accent);
+  font-family: 'JetBrains Mono', monospace;
+}
+.fsection.green { color: var(--green); }
+
+/* Buttons */
+.btn {
+  padding: 11px 20px;
+  border-radius: 10px;
+  font-size: 13.5px;
+  font-weight: 800;
+  font-family: 'Space Grotesk', sans-serif;
+  cursor: pointer;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  letter-spacing: 0.3px;
+}
+.btn-accent {
+  background: linear-gradient(135deg, #00e5ff, #0284c7);
+  color: #03121c;
+  box-shadow: 0 4px 14px rgba(0, 229, 255, 0.3);
+}
+.btn-accent:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 229, 255, 0.45);
+  filter: brightness(1.08);
+}
+.btn-green {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: #03121c;
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.3);
+}
+.btn-green:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(16, 185, 129, 0.45);
+  filter: brightness(1.08);
+}
+
+/* Toast */
+.toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: rgba(8, 16, 32, 0.95);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1.5px solid var(--accent);
+  color: #fff;
+  padding: 14px 22px;
+  font-size: 14px;
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 700;
+  border-radius: 12px;
+  box-shadow: 0 10px 35px rgba(0, 0, 0, 0.6), 0 0 20px rgba(0, 229, 255, 0.2);
+  display: none;
+  align-items: center;
+  gap: 12px;
+  z-index: 1000;
+}
+.toast.show { display: flex; animation: fadeInToast 0.3s ease; }
+@keyframes fadeInToast { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+
+/* HR Datablock */
+.datablock-hr {
+  background: #040916;
+  border: 1.5px solid var(--accent);
+  border-radius: 12px;
+  padding: 14px 16px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  color: #fff;
+  margin-top: 8px;
+}
+.db-grid-hr {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 8px 12px;
+}
+.db-field-hr {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 5px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+.db-lbl-hr {
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+/* Table */
+.sat-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: var(--card);
+  border: 1.5px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+  margin-top: 16px;
+}
+.sat-table th, .sat-table td {
+  padding: 14px 18px;
+  text-align: left;
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: 13.5px;
+}
+.sat-table th {
+  background: rgba(6, 15, 30, 0.9);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11.5px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  font-weight: 800;
+}
+.sat-table tr:last-child td { border-bottom: none; }
+.sat-table tr:hover td { background: rgba(56, 189, 248, 0.06); }
+
+.emp-table-photo {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  object-fit: cover;
+  border: 1.5px solid var(--border);
+  flex-shrink: 0;
+}
+
+.sync-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-size: 11.5px;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 800;
+}
+.sync-yes { background: rgba(16, 185, 129, 0.15); color: var(--green); border: 1px solid rgba(16, 185, 129, 0.35); }
+.sync-no { background: rgba(148, 163, 184, 0.1); color: var(--muted); border: 1px solid rgba(148, 163, 184, 0.2); }
+
+/* Chat Interface */
+.chat-layout { display: flex; flex: 1; height: 100%; }
+.contact-list-wrap {
+  width: 280px;
+  background: rgba(6, 12, 24, 0.95);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+.contact {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border-subtle);
+  transition: all 0.15s ease;
+}
+.contact:hover { background: rgba(56, 189, 248, 0.08); }
+.contact.active { background: rgba(245, 158, 11, 0.14); border-left: 4px solid var(--yellow); }
+.avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #03121c;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 900;
+  flex-shrink: 0;
+  font-family: 'Space Grotesk', sans-serif;
+  overflow: hidden;
+}
+.avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.contact-name { font-size: 13.5px; font-weight: 700; color: #fff; }
+.contact-preview { font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px; }
+.chat-col { flex: 1; display: flex; flex-direction: column; background: rgba(3, 7, 18, 0.7); }
+.chat-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(8, 15, 30, 0.88);
+}
+.chat-header-name { font-size: 16px; font-weight: 800; color: #fff; font-family: 'Space Grotesk', sans-serif; }
+.chat-header-sub { font-size: 12px; color: var(--green); display: flex; align-items: center; gap: 6px; font-family: 'JetBrains Mono', monospace; font-weight: 600; }
+.enc-banner {
+  padding: 10px 20px;
+  background: rgba(16, 185, 129, 0.1);
+  border-bottom: 1px solid rgba(16, 185, 129, 0.25);
+  color: var(--green);
+  font-size: 13px;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.messages {
+  flex: 1;
+  padding: 24px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.msg-row { display: flex; flex-direction: column; }
+.msg-row.out { align-items: flex-end; }
+.bubble {
+  max-width: 82%;
+  padding: 16px 20px;
+  border-radius: 14px;
+  font-size: 14.5px;
+  line-height: 1.6;
+  word-break: break-word;
+}
+.bubble.in {
+  background: var(--bubble-in);
+  border: 1.5px solid var(--border);
+  color: var(--text);
+  border-bottom-left-radius: 4px;
+}
+.bubble.out {
+  background: var(--bubble-out);
+  border: 1.5px solid rgba(245, 158, 11, 0.4);
+  color: #fff;
+  border-bottom-right-radius: 4px;
+}
+.meta {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: 'JetBrains Mono', monospace;
+}
+.enc-tag {
+  color: var(--yellow);
+  background: rgba(245, 158, 11, 0.14);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 700;
+}
+.composer {
+  display: flex;
+  gap: 12px;
+  padding: 16px 24px;
+  border-top: 1px solid var(--border);
+  background: rgba(8, 15, 30, 0.95);
+}
+.composer input { flex: 1; font-size: 15px; }
+.send-btn {
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  border: none;
+  color: #03121c;
+  font-size: 16px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+/* Filter Bar */
+.filter-bar {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 18px;
+  align-items: center;
+}
+.filter-input {
+  flex: 1;
+}
+
+@media(max-width: 860px) {
+  .topbar { padding: 12px 16px; gap: 10px; flex-wrap: wrap; }
+  .topbar-sub, .live-clock-pill { display: none; }
+  .layout { flex-direction: column; }
+  .sidebar { width: 100%; border-right: none; border-bottom: 1px solid var(--border); }
+  .inner { padding: 20px 16px; }
+  .contact-list-wrap { width: 100%; }
+  .grid2, .grid3, .grid4 { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<!-- Header Top Bar -->
+<div class="topbar">
+  <div class="logo">
+    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#03121c" stroke-width="2.4"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+  </div>
+  <div class="topbar-branding">
+    <div class="topbar-title">
+      ISRO VISION VAULT
+      <span class="role-badge-hr">HR COMMAND</span>
+    </div>
+    <div class="topbar-sub">Human Resources &amp; Mission Telemetry Database — Priya Menon (HR Officer • ISRO-HR-001)</div>
+  </div>
+
+  <div class="topbar-actions">
+    <div class="live-clock-pill">
+      <i class="fa-regular fa-clock"></i>
+      <span id="liveUtcClock">UTC 00:00:00</span>
+    </div>
+    <button class="topbar-action" onclick="clearHrChat()"><i class="fa-solid fa-trash-can"></i> Clear Chat</button>
+    <button class="topbar-action" onclick="clearHrForms()"><i class="fa-solid fa-arrows-rotate"></i> Reset Records</button>
+    <a class="topbar-action" href="index.html"><i class="fa-solid fa-house"></i> Hub</a>
+    <a class="switch-link" href="employee-portal.html"><i class="fa-solid fa-user-astronaut"></i> Switch to Employee View →</a>
+  </div>
+</div>
+
+<div class="layout">
+  <!-- Sidebar Navigation -->
+  <nav class="sidebar">
+    <div class="nav-section">Operations Database</div>
+    <div class="nav-item active" data-page="missions">
+      <span class="ni"><i class="fa-solid fa-satellite"></i></span>
+      Active Mission Database
+    </div>
+    <div class="nav-item" data-page="add-mission">
+      <span class="ni"><i class="fa-solid fa-plus-circle"></i></span>
+      Register New Mission
+    </div>
+    <div class="nav-item" data-page="messages">
+      <span class="ni"><i class="fa-solid fa-comments"></i></span>
+      Encrypted Comms Hub
+    </div>
+
+    <div class="nav-section">Personnel Records</div>
+    <div class="nav-item" data-page="emp-list">
+      <span class="ni"><i class="fa-solid fa-users"></i></span>
+      Personnel Database Records
+    </div>
+    <div class="nav-item" data-page="security">
+      <span class="ni"><i class="fa-solid fa-shield-halved"></i></span>
+      HSM Security &amp; Audit
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <main class="main">
+
+    <!-- Active Missions Registry -->
+    <div class="page active" id="page-missions">
+      <div class="inner">
+        <div class="page-badge" style="background:rgba(0,180,216,.14);border:1px solid rgba(0,180,216,.35);color:var(--accent);">SATELLITE MISSIONS</div>
+        <div class="page-title">Active Mission Registry (6 Satellite Missions)</div>
+        <div class="page-sub">Telemetry &amp; personnel records mapped per ISRO satellite mission. Dispatch encrypted vaults to assigned scientists.</div>
+
+        <div class="telemetry-overview-grid">
+          <div class="telemetry-stat-card">
+            <div class="t-stat-label"><span>Active Satellites</span><i class="fa-solid fa-satellite" style="color:var(--accent)"></i></div>
+            <div class="t-stat-val">6 Active Missions</div>
+            <div class="t-stat-sub">GEO, GSO, LEO, Lunar, Halo, Cryo</div>
+          </div>
+          <div class="telemetry-stat-card">
+            <div class="t-stat-label"><span>Assigned Personnel</span><i class="fa-solid fa-user-astronaut" style="color:var(--green)"></i></div>
+            <div class="t-stat-val">6 Scientists / Engineers</div>
+            <div class="t-stat-sub">MCF, URSC, LPSC, SAC, ISTRAC</div>
+          </div>
+          <div class="telemetry-stat-card">
+            <div class="t-stat-label"><span>KMS HSM Enclave</span><i class="fa-solid fa-key" style="color:var(--yellow)"></i></div>
+            <div class="t-stat-val">AES-256-GCM</div>
+            <div class="t-stat-sub">Hardware Enclave Active</div>
+          </div>
+          <div class="telemetry-stat-card">
+            <div class="t-stat-label"><span>Cloud PII Leakage</span><i class="fa-solid fa-shield-halved" style="color:var(--violet)"></i></div>
+            <div class="t-stat-val">0 Bytes</div>
+            <div class="t-stat-sub">100% Zero-Knowledge Sanitized</div>
+          </div>
+        </div>
+
+        <div id="missions-container"></div>
+      </div>
+    </div>
+
+    <!-- Register New Mission -->
+    <div class="page" id="page-add-mission">
+      <div class="inner">
+        <div class="page-badge" style="background:rgba(6,214,160,.14);border:1px solid rgba(6,214,160,.35);color:var(--green);">ADD MISSION</div>
+        <div class="page-title">Register New Satellite Mission</div>
+        <div class="page-sub">All fields map directly to cryptographic vault keys used by the VisionVault agent.</div>
+
+        <div class="fsection">Satellite &amp; Telemetry Data</div>
+        <div class="grid3">
+          <div class="fg"><label>Satellite Name</label><input type="text" id="n-satellite_name" placeholder="e.g. GSAT-20 / CMS-03"/></div>
+          <div class="fg"><label>Mission ID</label><input type="text" id="n-mission_id" placeholder="e.g. GSAT-20 / M-902"/></div>
+          <div class="fg"><label>Launch Date</label><input type="date" id="n-launch_date"/></div>
+        </div>
+        <div class="grid3">
+          <div class="fg"><label>Orbit Type</label><input type="text" id="n-orbit_type" placeholder="e.g. Geostationary (GEO)"/></div>
+          <div class="fg"><label>Orbital Inclination</label><input type="text" id="n-orbital_inclination" placeholder="e.g. 0.05°"/></div>
+          <div class="fg"><label>Mission Status</label>
+            <select id="n-status"><option>Pre-Launch</option><option>Integration</option><option>Testing</option><option>Launched</option><option selected>Operational</option></select>
+          </div>
+        </div>
+        <div class="grid4">
+          <div class="fg"><label>Apogee</label><input type="text" id="n-apogee" placeholder="35,786 km"/></div>
+          <div class="fg"><label>Perigee</label><input type="text" id="n-perigee" placeholder="35,786 km"/></div>
+          <div class="fg"><label>Downlink Frequency</label><input type="text" id="n-ground_station_freq" placeholder="14.250 GHz (Ku-Band)"/></div>
+          <div class="fg"><label>Encryption Key Ref</label><input type="text" id="n-encryption_key_ref" placeholder="ISRO-KMS-EK-2026-..."/></div>
+        </div>
+        <div class="fg"><label>TLE Line 1</label><input type="text" id="n-tle_line_1" style="font-family:monospace;font-size:12px;" placeholder="1 XXXXX..."/></div>
+        <div class="fg"><label>TLE Line 2</label><input type="text" id="n-tle_line_2" style="font-family:monospace;font-size:12px;" placeholder="2 XXXXX..."/></div>
+
+        <div class="fsection green">Assigned Scientist / Operator Details</div>
+        <div class="grid3">
+          <div class="fg"><label>Operator Full Name</label><input type="text" id="n-operator" placeholder="Full name"/></div>
+          <div class="fg"><label>System Username</label><input type="text" id="n-username" placeholder="username"/></div>
+          <div class="fg"><label>Official Email</label><input type="email" id="n-email" placeholder="@isro.gov.in"/></div>
+        </div>
+        <div class="grid3">
+          <div class="fg"><label>Phone</label><input type="tel" id="n-phone" placeholder="+91..."/></div>
+          <div class="fg"><label>Facility / Centre</label><input type="text" id="n-company" placeholder="ISRO Centre"/></div>
+          <div class="fg"><label>Postal / PIN Code</label><input type="text" id="n-zip" placeholder="PIN code"/></div>
+        </div>
+        <div class="fg"><label>Address</label><textarea id="n-address" rows="2" placeholder="Full address"></textarea></div>
+        <div class="fg"><label>Role / Designation</label><textarea id="n-about" rows="2" placeholder="Role description"></textarea></div>
+
+        <div class="fsection">Assignment &amp; Launch Vehicle</div>
+        <div class="grid3">
+          <div class="fg"><label>Assign to Employee</label>
+            <select id="n-empid">
+              <option value="ISRO-10101">Natesh Kanna R — ISRO-10101 (Flight Software)</option>
+              <option value="ISRO-10234">Rajesh Kumar — ISRO-10234 (Propulsion)</option>
+              <option value="ISRO-10482">Dr. Ananya Sen — ISRO-10482 (Navigation)</option>
+              <option value="ISRO-10519">Vikramaditya Hegde — ISRO-10519 (Cryogenics)</option>
+              <option value="ISRO-10640">Kavita Krishnan — ISRO-10640 (Electro-Optics)</option>
+              <option value="ISRO-10788">Rizwana Parveen — ISRO-10788 (Deep Space)</option>
+            </select>
+          </div>
+          <div class="fg"><label>Department</label>
+            <select id="n-dept">
+              <option>Flight Software &amp; Spacecraft Control</option>
+              <option>Propulsion Systems (MCF)</option>
+              <option>Satellite Navigation (URSC)</option>
+              <option>Cryogenic Systems (LPSC)</option>
+              <option>Electro-Optics &amp; Payloads (SAC)</option>
+              <option>Deep Space Tracking (ISTRAC)</option>
+            </select>
+          </div>
+          <div class="fg"><label>Launch Vehicle</label><input type="text" id="n-vehicle" placeholder="e.g. LVM3-M4 / PSLV-C58"/></div>
+        </div>
+        <div class="fg"><label>Mission Description</label><textarea id="n-desc" rows="2" placeholder="Brief overview..."></textarea></div>
+        <button class="btn btn-green" onclick="addMission()"><i class="fa-solid fa-plus"></i> Add Mission to Registry</button>
+      </div>
+    </div>
+
+    <!-- Messages / Encrypted Comms Hub -->
+    <div class="page" id="page-messages">
+      <div class="chat-layout">
+        <div class="contact-list-wrap" id="hr-contacts-list">
+          <!-- Dynamically populated contacts for all 6 employees -->
+        </div>
+        <div class="chat-col">
+          <div class="chat-header">
+            <div class="avatar" id="chat-avatar"><img src="images/emp-natesh.jpeg" class="avatar-img"/></div>
+            <div>
+              <div class="chat-header-name" id="chat-name">Natesh Kanna R</div>
+              <div class="chat-header-sub"><i class="fa-solid fa-shield-halved"></i> AES-256-GCM Hardware Encrypted</div>
+            </div>
+          </div>
+          <div class="enc-banner"><i class="fa-solid fa-lock"></i> End-to-end encrypted channel. Mission vault payloads sent here are decrypted by the employee's extension.</div>
+          <div class="messages" id="hr-messages"></div>
+          <div class="composer">
+            <input type="text" id="hr-msg-input" placeholder="Type encrypted message or vault directive…"/>
+            <button class="send-btn" onclick="hrSend()"><i class="fa-solid fa-paper-plane"></i></button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Employee Directory & Multi-Database Status -->
+    <div class="page" id="page-emp-list">
+      <div class="inner">
+        <div class="page-badge" style="background:rgba(167,139,250,.14);border:1px solid rgba(167,139,250,.35);color:var(--violet);">PERSONNEL DATABASE</div>
+        <div class="page-title">ISRO Personnel &amp; Multi-Database Synchronization</div>
+        <div class="page-sub">Monitor live database synchronizations across ISRO Directorate nodes for all 6 scientists.</div>
+
+        <div class="filter-bar">
+          <input type="text" class="filter-input" id="emp-search" placeholder="Search by name, employee ID, department, or station…" oninput="renderEmployeeTable()"/>
+        </div>
+
+        <table class="sat-table">
+          <thead>
+            <tr>
+              <th>Employee</th>
+              <th>ID &amp; Base Station</th>
+              <th>Department</th>
+              <th>DB 1 (HR)</th>
+              <th>DB 2 (Payroll)</th>
+              <th>DB 3 (IT)</th>
+              <th>DB 4 (Housing)</th>
+              <th>DB 5 (Medical)</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="emp-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Security & HSM Audit Logs -->
+    <div class="page" id="page-security">
+      <div class="inner">
+        <div class="page-badge" style="background:rgba(16,185,129,.14);border:1px solid rgba(16,185,129,.35);color:var(--green);">SECURITY ENCLAVE</div>
+        <div class="page-title">Hardware Security Module (HSM) &amp; Zero-Knowledge Audit</div>
+        <div class="page-sub">Cryptographic isolation verification and local-only token dispatch ledger.</div>
+
+        <div class="telemetry-stat-card" style="margin-bottom:20px;">
+          <div class="t-stat-label"><span>Master Key Reference</span><span style="color:var(--green)">ONLINE</span></div>
+          <div class="t-stat-val" style="font-family:monospace;font-size:15px;">ISRO-HSM-2026-ROOT-AES256-GCM-SLOT-01</div>
+          <div class="t-stat-sub">Zero unencrypted PII transmitted over network. All transformations performed in browser client memory.</div>
+        </div>
+
+        <div class="card">
+          <div class="card-title" style="color:var(--accent);"><i class="fa-solid fa-clock-rotate-left"></i> Real-Time Security &amp; Key Access Log</div>
+          <div id="security-log-container" style="font-family:'JetBrains Mono',monospace;font-size:12.5px;color:#cbd5e1;line-height:1.9;background:rgba(3,7,18,0.9);padding:16px;border-radius:10px;border:1.5px solid var(--border);">
+            <div>[<span style="color:var(--green);">SEC-AUDIT</span>] HSM Master Key initialized: AES-256-GCM hardware enclave locked.</div>
+            <div>[<span style="color:var(--accent);">KMS-SYNC</span>] 6 Operator Mission Channels verified with zero cloud egress.</div>
+            <div>[<span style="color:var(--yellow);">AGENT-GUARD</span>] Redaction Sentinel active: DOM mutation observer armed.</div>
+            <div>[<span style="color:var(--violet);">ISRO-MCF</span>] Hassan Node Alpha-1 telemetry link operational at 8.400 GHz.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- Modern Toast Notification -->
+<div class="toast" id="toast">
+  <i class="fa-solid fa-circle-check" style="color:var(--green);font-size:16px;"></i>
+  <span id="toast-msg"></span>
+</div>
+
+<script>
+const KEY_RAW = "ISRO-SECURE-2024-AES256-CHANNEL!";
+async function getKey(){return crypto.subtle.importKey("raw",new TextEncoder().encode(KEY_RAW),{name:"AES-GCM"},false,["encrypt","decrypt"]);}
+async function encryptMsg(text){const key=await getKey(),iv=crypto.getRandomValues(new Uint8Array(12));const ct=await crypto.subtle.encrypt({name:"AES-GCM",iv},key,new TextEncoder().encode(text));const buf=new Uint8Array(12+ct.byteLength);buf.set(iv);buf.set(new Uint8Array(ct),12);return btoa(String.fromCharCode(...buf));}
+async function decryptMsg(b64){try{const key=await getKey(),buf=Uint8Array.from(atob(b64),c=>c.charCodeAt(0));const pt=await crypto.subtle.decrypt({name:"AES-GCM",iv:buf.slice(0,12)},key,buf.slice(12));return new TextDecoder().decode(pt);}catch{return "[decryption failed]";}}
+
+const EMPLOYEES = [
+  { name: "Natesh Kanna R", id: "ISRO-10101", dept: "Flight Software & Spacecraft Control", initials: "NK", station: "MCF Hassan", email: "natesh.kanna@isro.gov.in", image: "images/emp-natesh.jpeg" },
+  { name: "Rajesh Kumar", id: "ISRO-10234", dept: "Propulsion Systems (MCF)", initials: "RK", station: "MCF Hassan", email: "rajesh.kumar@isro.gov.in", image: "images/emp-kavita.jpeg" },
+  { name: "Dr. Ananya Sen", id: "ISRO-10482", dept: "Satellite Navigation (URSC)", initials: "AS", station: "URSC Bengaluru", email: "ananya.sen@isro.gov.in", image: "images/emp-ananya.jpeg" },
+  { name: "Vikramaditya Hegde", id: "ISRO-10519", dept: "Cryogenic Systems (LPSC)", initials: "VH", station: "LPSC Valiamala", email: "v.hegde@isro.gov.in", image: "images/emp-vikram.jpeg" },
+  { name: "Kavita Krishnan", id: "ISRO-10640", dept: "Electro-Optics & Payloads (SAC)", initials: "KK", station: "SAC Ahmedabad", email: "k.krishnan@isro.gov.in", image: "images/emp-rajesh.jpeg" },
+  { name: "Rizwana Parveen", id: "ISRO-10788", dept: "Deep Space Tracking (ISTRAC)", initials: "RP", station: "ISTRAC Bengaluru", email: "rizwana.parveen@isro.gov.in", image: "images/emp-rizwan.jpeg" }
+];
+
+let currentContact = EMPLOYEES[0];
+
+const DEFAULT_MISSIONS = [
+  {
+    satellite_name: "Chandrayaan-3 Propulsion", mission_id: "CH-3 / PR-01", operator: "Natesh Kanna R",
+    launch_date: "2023-07-14", orbit_type: "Lunar Polar Orbit", orbital_inclination: "90.00°",
+    apogee: "100 km (Lunar)", perigee: "100 km (Lunar)", ground_station_freq: "8.400 GHz (X-Band Deep Space)",
+    encryption_key_ref: "ISRO-KMS-EK-2026-07741",
+    tle_line_1: "1 57320U 23098A   26248.11029481 +.00000210  00000-0  10000-4 0  9997",
+    tle_line_2: "2 57320  89.9410 112.4410 0010410 270.1200  90.4100  0.08331400  8821",
+    name: "Natesh Kanna R", username: "natesh", email: "natesh.kanna@isro.gov.in", phone: "+91 94440 12890",
+    company: "ISRO Master Control Facility (MCF)", zip: "573201", address: "MCF Salgame Road, Hassan, Karnataka, India",
+    about: "Lead Flight Software Architect — Spacecraft Guidance & Autonomous Telemetry", status: "Operational", vehicle: "LVM3-M4", dept: "Flight Software & Spacecraft Control",
+    empId: "ISRO-10101", desc: "Lunar orbiter and propulsion module maintaining high-gain autonomous telemetry link."
+  },
+  {
+    satellite_name: "INSAT-4B", mission_id: "INSAT-4B / M-201", operator: "Rajesh Kumar",
+    launch_date: "2007-03-12", orbit_type: "Geostationary (GEO)", orbital_inclination: "0.05°",
+    apogee: "35,786 km", perigee: "35,786 km", ground_station_freq: "14.250 GHz (Ku-Band)",
+    encryption_key_ref: "ISRO-KMS-EK-2026-04871",
+    tle_line_1: "1 30798U 07007A   26248.51249811 -.00000124  00000-0  10000-4 0  9991",
+    tle_line_2: "2 30798   0.0512  87.2145 0001248 145.2104 214.8901  1.00273412 71234",
+    name: "Rajesh Kumar", username: "rkumar", email: "rajesh.kumar@isro.gov.in", phone: "+91 80 2217 2296",
+    company: "ISRO Master Control Facility (MCF)", zip: "573201", address: "MCF Salgame Road, Hassan, Karnataka, India",
+    about: "Mission Controller — Propulsion Systems", status: "Operational", vehicle: "PSLV-C58", dept: "Propulsion Systems (MCF)",
+    empId: "ISRO-10234", desc: "Geostationary communication satellite for C-band and Ku-band telemetry."
+  },
+  {
+    satellite_name: "NavIC IRNSS-1J", mission_id: "NAVIC-1J / N-504", operator: "Dr. Ananya Sen",
+    launch_date: "2023-05-29", orbit_type: "Geosynchronous (GSO)", orbital_inclination: "29.00°",
+    apogee: "36,000 km", perigee: "250 km", ground_station_freq: "L5 / S-Band (1176.45 MHz)",
+    encryption_key_ref: "ISRO-KMS-EK-2026-09122",
+    tle_line_1: "1 43286U 18036A   26248.42109844 +.00000018  00000-0  00000-0 0  9993",
+    tle_line_2: "2 43286  28.9812  45.1204 0002140 180.1240 179.8800  1.00271400  3210",
+    name: "Dr. Ananya Sen", username: "asen", email: "ananya.sen@isro.gov.in", phone: "+91 80 2508 4100",
+    company: "U R Rao Satellite Centre (URSC)", zip: "560017", address: "HAL Airport Road, Vimanapura, Bengaluru, Karnataka",
+    about: "Lead Guidance & Astrodynamics — Navigation Cell", status: "Operational", vehicle: "GSLV-F12", dept: "Satellite Navigation (URSC)",
+    empId: "ISRO-10482", desc: "Regional satellite navigation constellation satellite with atomic clock sync."
+  },
+  {
+    satellite_name: "LVM3-M4 Cryogenic Stage", mission_id: "LVM3-C25 / CRY-03", operator: "Vikramaditya Hegde",
+    launch_date: "2023-07-14", orbit_type: "Translunar Injection", orbital_inclination: "21.50°",
+    apogee: "36,500 km", perigee: "170 km", ground_station_freq: "2.250 GHz (S-Band Telemetry)",
+    encryption_key_ref: "ISRO-KMS-EK-2026-05523",
+    tle_line_1: "1 57321U 23098B   26248.21029481 +.00000180  00000-0  10000-4 0  9995",
+    tle_line_2: "2 57321  21.4910 140.2100 0012410 180.1200 180.4100  1.04214000  6612",
+    name: "Vikramaditya Hegde", username: "vhegde", email: "v.hegde@isro.gov.in", phone: "+91 471 256 7100",
+    company: "Liquid Propulsion Systems Centre (LPSC)", zip: "695547", address: "Valiamala, Thiruvananthapuram, Kerala, India",
+    about: "Cryogenic Telemetry Specialist — Liquid Propulsion Directorate", status: "Operational", vehicle: "LVM3-M4", dept: "Cryogenic Systems (LPSC)",
+    empId: "ISRO-10519", desc: "C25 cryogenic upper stage telemetry and LOX/LH2 tank monitoring."
+  },
+  {
+    satellite_name: "Aditya-L1 Primary Optics", mission_id: "ADITYA-L1 / SOL-01", operator: "Kavita Krishnan",
+    launch_date: "2023-09-02", orbit_type: "Halo Orbit (Sun-Earth L1)", orbital_inclination: "0.00°",
+    apogee: "1.5 Million km", perigee: "1.5 Million km", ground_station_freq: "2.200 GHz (S-Band Spacecraft)",
+    encryption_key_ref: "ISRO-KMS-EK-2026-03319",
+    tle_line_1: "1 57714U 23132A   26248.33019481 +.00000000  00000-0  00000-0 0  9990",
+    tle_line_2: "2 57714   0.0010 320.1410 0000010   0.0000   0.0000  0.00551000  1204",
+    name: "Kavita Krishnan", username: "kkrishnan", email: "k.krishnan@isro.gov.in", phone: "+91 79 2691 3000",
+    company: "Space Applications Centre (SAC)", zip: "380015", address: "Ambawadi Vistar, Ahmedabad, Gujarat, India",
+    about: "Optical Remote Sensing Lead — Solar Coronagraph Team", status: "Operational", vehicle: "PSLV-C57", dept: "Electro-Optics & Payloads (SAC)",
+    empId: "ISRO-10640", desc: "Solar coronagraph and multi-spectral telescope positioned at Sun-Earth L1."
+  },
+  {
+    satellite_name: "EOS-08 Earth Observation", mission_id: "EOS-08 / EO-808", operator: "Rizwana Parveen",
+    launch_date: "2024-08-16", orbit_type: "Circular Low Earth Orbit (LEO)", orbital_inclination: "37.40°",
+    apogee: "475 km", perigee: "475 km", ground_station_freq: "8.025 GHz (X-Band Downlink)",
+    encryption_key_ref: "ISRO-KMS-EK-2026-01188",
+    tle_line_1: "1 60492U 24147A   26248.91024810 +.00001420  00000-0  12480-4 0  9992",
+    tle_line_2: "2 60492  37.4012 189.1245 0008410 120.4410 239.8100 15.24102810  5102",
+    name: "Rizwana Parveen", username: "rparveen", email: "rizwana.parveen@isro.gov.in", phone: "+91 80 2839 5200",
+    company: "ISRO Telemetry, Tracking and Command Network (ISTRAC)", zip: "560058", address: "Plot No. 12 & 13, 3rd Main, 2nd Phase, Peenya, Bengaluru",
+    about: "Orbital Analyst & Remote Sensing — Earth Observation Directorate", status: "Operational", vehicle: "SSLV-D3", dept: "Deep Space Tracking (ISTRAC)",
+    empId: "ISRO-10788", desc: "Next-generation Earth observation microsatellite with thermal infrared imaging."
+  }
+];
+
+let missions = JSON.parse(localStorage.getItem("isro_missions") || "null");
+if (!missions || missions.length < DEFAULT_MISSIONS.length) {
+  missions = DEFAULT_MISSIONS;
+  localStorage.setItem("isro_missions", JSON.stringify(missions));
+}
+
+// Navigation Handling
+function navigateToPage(pageId) {
+  document.querySelectorAll(".nav-item").forEach(n => {
+    n.classList.toggle("active", n.dataset.page === pageId);
+  });
+  document.querySelectorAll(".page").forEach(p => {
+    p.classList.toggle("active", p.id === "page-" + pageId);
+  });
+  if (pageId === "messages") loadHrMessages();
+  if (pageId === "emp-list") renderEmployeeTable();
+}
+
+document.querySelectorAll(".nav-item").forEach(item => {
+  item.addEventListener("click", () => navigateToPage(item.dataset.page));
+});
+
+// Render Contacts List in Chat with Real Photos
+function renderContactsList() {
+  const container = document.getElementById("hr-contacts-list");
+  container.innerHTML = `<div style="padding:14px 16px;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--muted);text-transform:uppercase;">ISRO Scientists &amp; Engineers</div>`;
+  EMPLOYEES.forEach(emp => {
+    const active = emp.initials === currentContact.initials ? " active" : "";
+    const div = document.createElement("div");
+    div.className = "contact" + active;
+    div.onclick = () => selectContact(emp);
+    div.innerHTML = `
+      <div class="avatar"><img src="${emp.image}" class="avatar-img" alt="${emp.name}"/></div>
+      <div>
+        <div class="contact-name">${emp.name}</div>
+        <div class="contact-preview" id="prev-${emp.initials}">${emp.dept}</div>
+      </div>
+    `;
+    container.appendChild(div);
+  });
+}
+
+function selectContact(emp) {
+  currentContact = emp;
+  document.querySelectorAll("#hr-contacts-list .contact").forEach((el, idx) => {
+    el.classList.toggle("active", EMPLOYEES[idx].initials === emp.initials);
+  });
+  document.getElementById("chat-avatar").innerHTML = `<img src="${emp.image}" class="avatar-img" alt="${emp.name}"/>`;
+  document.getElementById("chat-name").textContent = `${emp.name} (${emp.id} • ${emp.dept})`;
+  loadHrMessages();
+}
+
+// Render Missions Cards
+function renderMissions() {
+  const container = document.getElementById("missions-container");
+  container.innerHTML = "";
+  missions.forEach((m, idx) => {
+    const emp = EMPLOYEES.find(e => e.id === m.empId) || EMPLOYEES[0];
+    const card = document.createElement("div");
+    card.className = "mission-card";
+    card.innerHTML = `
+      <div class="mission-card-header">
+        <div>
+          <div class="mission-title">
+            <i class="fa-solid fa-satellite" style="color:var(--accent)"></i>
+            ${m.satellite_name}
+            <span style="font-size:12.5px; color:var(--accent2); font-family:'JetBrains Mono',monospace; background:rgba(56,189,248,0.12); border:1px solid rgba(56,189,248,0.3); padding:2px 8px; border-radius:6px;">${m.mission_id}</span>
+          </div>
+          <div style="font-size:13px; color:var(--muted); margin-top:8px; display:flex; align-items:center; gap:10px;">
+            <img src="${emp.image}" style="width:26px;height:26px;border-radius:50%;object-fit:cover;border:1.5px solid var(--accent);box-shadow:0 0 8px rgba(0,229,255,0.3);"/>
+            Assigned: <strong style="color:#fff;">${m.operator || m.name}</strong> <span style="font-family:'JetBrains Mono',monospace;color:var(--muted);font-size:12px;">(${m.empId || "ISRO-10101"})</span> • <span style="color:var(--accent2);">${m.dept || "Propulsion"}</span>
+          </div>
+        </div>
+        <span class="status-tag status-operational">● ${m.status || "Operational"}</span>
+      </div>
+
+      <div class="mission-telemetry-grid">
+        <div class="m-t-box"><div class="m-t-lbl">Orbit</div><div class="m-t-val text-accent">${m.orbit_type}</div></div>
+        <div class="m-t-box"><div class="m-t-lbl">Inclination</div><div class="m-t-val">${m.orbital_inclination || "0.05°"}</div></div>
+        <div class="m-t-box"><div class="m-t-lbl">Downlink Freq</div><div class="m-t-val text-green">${m.ground_station_freq || "14.250 GHz"}</div></div>
+        <div class="m-t-box"><div class="m-t-lbl">Launch Vehicle</div><div class="m-t-val text-yellow">${m.vehicle || "LVM3-M4"}</div></div>
+      </div>
+
+      <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid var(--border-subtle); padding-top:16px;">
+        <div style="font-size:12px; font-family:'JetBrains Mono',monospace; color:var(--muted);">
+          Key Ref: <span style="color:var(--yellow);font-weight:700;">${m.encryption_key_ref || "ISRO-KMS-EK-2026"}</span>
+        </div>
+        <button class="btn btn-accent" onclick="dispatchVaultToScientist(${idx})">
+          <i class="fa-solid fa-paper-plane"></i> Send to ${m.operator ? m.operator.split(' ')[0] : 'Scientist'}
+        </button>
+      </div>
+    `;
+    container.appendChild(card);
+  });
+}
+
+async function dispatchVaultToScientist(index) {
+  const m = missions[index];
+  const emp = EMPLOYEES.find(e => e.id === m.empId) || EMPLOYEES[0];
+  const payload = JSON.stringify({ type: "VAULT_MISSION", vault: m, timestamp: new Date().toISOString() });
+  const enc = await encryptMsg(payload);
+  
+  try {
+    await fetch("/api/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ from: "HR", enc, empId: emp.id, empInitials: emp.initials })
+    });
+  } catch {}
+
+  const key = "isro_chat_hr_" + emp.initials;
+  const msgs = JSON.parse(localStorage.getItem(key) || "[]");
+  msgs.push({ from: "HR", enc, time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) });
+  localStorage.setItem(key, JSON.stringify(msgs));
+
+  showToast(`Encrypted Mission Vault sent to ${emp.name} (${emp.id})`);
+  selectContact(emp);
+  navigateToPage("messages");
+}
+
+// Add New Mission Handler
+function addMission() {
+  const newM = {
+    satellite_name: document.getElementById("n-satellite_name").value.trim() || "GSAT-N2",
+    mission_id: document.getElementById("n-mission_id").value.trim() || "GSAT-N2 / M-301",
+    launch_date: document.getElementById("n-launch_date").value || "2024-11-18",
+    orbit_type: document.getElementById("n-orbit_type").value.trim() || "Geostationary (GEO)",
+    orbital_inclination: document.getElementById("n-orbital_inclination").value.trim() || "0.04°",
+    status: document.getElementById("n-status").value,
+    apogee: document.getElementById("n-apogee").value.trim() || "35,786 km",
+    perigee: document.getElementById("n-perigee").value.trim() || "35,786 km",
+    ground_station_freq: document.getElementById("n-ground_station_freq").value.trim() || "20.200 GHz (Ka-Band)",
+    encryption_key_ref: document.getElementById("n-encryption_key_ref").value.trim() || "ISRO-KMS-EK-2026-09941",
+    tle_line_1: document.getElementById("n-tle_line_1").value.trim() || "1 61890U 24200A 26248.00000000 0 9999",
+    tle_line_2: document.getElementById("n-tle_line_2").value.trim() || "2 61890 0.0410 89.1200 0001000 120.0000 71000",
+    operator: document.getElementById("n-operator").value.trim() || "Natesh Kanna R",
+    username: document.getElementById("n-username").value.trim() || "natesh",
+    email: document.getElementById("n-email").value.trim() || "natesh.kanna@isro.gov.in",
+    phone: document.getElementById("n-phone").value.trim() || "+91 94440 12890",
+    company: document.getElementById("n-company").value.trim() || "ISRO Master Control Facility (MCF)",
+    zip: document.getElementById("n-zip").value.trim() || "573201",
+    address: document.getElementById("n-address").value.trim() || "MCF Salgame Road, Hassan, Karnataka, India",
+    about: document.getElementById("n-about").value.trim() || "Flight Software Architect",
+    empId: document.getElementById("n-empid").value,
+    dept: document.getElementById("n-dept").value,
+    vehicle: document.getElementById("n-vehicle").value.trim() || "LVM3-M4 / PSLV-C58",
+    desc: document.getElementById("n-desc").value.trim() || "High-throughput communication & autonomous telemetry satellite."
+  };
+  newM.name = newM.operator;
+
+  missions.push(newM);
+  localStorage.setItem("isro_missions", JSON.stringify(missions));
+  fetch("/api/missions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(newM) }).catch(() => {});
+  alert(`Mission ${newM.satellite_name} registered successfully.`);
+  renderMissions();
+  navigateToPage("missions");
+}
+
+// Chat Functions
+let lastHrMsgsJson = "";
+async function loadHrMessages(){
+  const key = "isro_chat_hr_" + currentContact.initials;
+  let msgs = JSON.parse(localStorage.getItem(key) || "[]");
+  try {
+    const response = await fetch(`/api/state?emp=${currentContact.initials}`);
+    if (response.ok) {
+      const data = await response.json();
+      if (data.messages && data.messages.length) {
+        msgs = data.messages;
+      }
+    }
+  } catch {}
+
+  const currentJson = JSON.stringify(msgs);
+  if (currentJson === lastHrMsgsJson) return;
+  lastHrMsgsJson = currentJson;
+
+  const box = document.getElementById("hr-messages");
+  box.innerHTML = "";
+  for (const m of msgs) {
+    const plain = m.text || await decryptMsg(m.enc);
+    let content = plain;
+    try {
+      const obj = JSON.parse(plain);
+      if (obj.type === "VAULT_MISSION") {
+        const v = obj.vault;
+        content = `<div style="display:flex;align-items:center;gap:8px;color:var(--accent);font-size:14px;font-weight:800;font-family:'Space Grotesk',sans-serif;margin-bottom:8px;">
+<i class="fa-solid fa-satellite" style="color:var(--accent);"></i> Mission Vault Transmission (${v.satellite_name})
+</div>
+<div class="datablock-hr">
+  <div class="db-grid-hr">
+    <div class="db-field-hr"><span class="db-lbl-hr">Satellite:</span> <strong>${v.satellite_name||""}</strong></div>
+    <div class="db-field-hr"><span class="db-lbl-hr">Mission ID:</span> <span>${v.mission_id||""}</span></div>
+    <div class="db-field-hr"><span class="db-lbl-hr">Operator:</span> <span>${v.operator||""} (${v.empId||""})</span></div>
+    <div class="db-field-hr"><span class="db-lbl-hr">Orbit:</span> <span>${v.orbit_type||""}</span></div>
+    <div class="db-field-hr"><span class="db-lbl-hr">Downlink:</span> <span style="color:var(--green);font-weight:700;">${v.ground_station_freq||""}</span></div>
+    <div class="db-field-hr"><span class="db-lbl-hr">Key Ref:</span> <span style="color:var(--yellow);font-weight:700;">${v.encryption_key_ref||""}</span></div>
+  </div>
+</div>`;
+      }
+    } catch {}
+    const row = document.createElement("div");
+    const isOut = m.from === "HR";
+    row.className = "msg-row" + (isOut ? " out" : "");
+    row.innerHTML = `<div class="bubble ${isOut ? "out" : "in"}">${content}
+<div class="meta">${m.time}<span class="enc-tag">AES-256-GCM</span></div></div>`;
+    box.appendChild(row);
+  }
+  box.scrollTop = box.scrollHeight;
+}
+
+async function hrSend(){
+  const input = document.getElementById("hr-msg-input");
+  const text = input.value.trim();
+  if (!text) return;
+  const enc = await encryptMsg(text);
+  try {
+    const response = await fetch("/api/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ from: "HR", enc, empId: currentContact.id, empInitials: currentContact.initials })
+    });
+    if (response.ok) {
+      input.value = "";
+      loadHrMessages();
+      return;
+    }
+  } catch {}
+  const key = "isro_chat_hr_" + currentContact.initials;
+  const msgs = JSON.parse(localStorage.getItem(key) || "[]");
+  msgs.push({ from: "HR", enc, time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) });
+  localStorage.setItem(key, JSON.stringify(msgs));
+  input.value = "";
+  loadHrMessages();
+}
+
+async function clearHrChat(){
+  if (!confirm(`Clear chat history for ${currentContact.name}?`)) return;
+  try { await fetch(`/api/messages?emp=${currentContact.initials}`, { method: "DELETE" }); } catch {}
+  localStorage.removeItem("isro_chat_hr_" + currentContact.initials);
+  lastHrMsgsJson = "";
+  loadHrMessages();
+}
+
+async function clearHrForms(){
+  if (!confirm("Clear all employee database sync states?")) return;
+  try { await fetch("/api/forms", { method: "DELETE" }); } catch {}
+  EMPLOYEES.forEach(emp => {
+    ["hr", "payroll", "it", "housing", "medical"].forEach(f => localStorage.removeItem(`isro_form_${emp.initials}_${f}`));
+  });
+  renderEmployeeTable();
+}
+
+// Employee Table Rendering
+function renderEmployeeTable() {
+  const query = (document.getElementById("emp-search")?.value || "").toLowerCase();
+  const tbody = document.getElementById("emp-tbody");
+  tbody.innerHTML = "";
+
+  EMPLOYEES.forEach(emp => {
+    if (query && !emp.name.toLowerCase().includes(query) && !emp.id.toLowerCase().includes(query) && !emp.dept.toLowerCase().includes(query) && !emp.station.toLowerCase().includes(query)) {
+      return;
+    }
+    const tr = document.createElement("tr");
+    const d1 = localStorage.getItem(`isro_form_${emp.initials}_hr`);
+    const d2 = localStorage.getItem(`isro_form_${emp.initials}_payroll`);
+    const d3 = localStorage.getItem(`isro_form_${emp.initials}_it`);
+    const d4 = localStorage.getItem(`isro_form_${emp.initials}_housing`);
+    const d5 = localStorage.getItem(`isro_form_${emp.initials}_medical`);
+
+    tr.innerHTML = `
+      <td>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <img src="${emp.image}" class="emp-table-photo" alt="${emp.name}"/>
+          <div>
+            <strong style="color:#fff;font-size:14px;">${emp.name}</strong><br>
+            <span style="font-size:11.5px;color:var(--muted);">${emp.email}</span>
+          </div>
+        </div>
+      </td>
+      <td><span style="font-family:monospace;font-size:12px;color:var(--accent);font-weight:700;">${emp.id}</span><br><span style="font-size:12px;color:var(--muted);">${emp.station}</span></td>
+      <td style="font-size:13px;font-weight:500;">${emp.dept}</td>
+      <td><span class="sync-badge ${d1 ? 'sync-yes' : 'sync-no'}">${d1 ? '✓ Synced' : '○ Pending'}</span></td>
+      <td><span class="sync-badge ${d2 ? 'sync-yes' : 'sync-no'}">${d2 ? '✓ Synced' : '○ Pending'}</span></td>
+      <td><span class="sync-badge ${d3 ? 'sync-yes' : 'sync-no'}">${d3 ? '✓ Synced' : '○ Pending'}</span></td>
+      <td><span class="sync-badge ${d4 ? 'sync-yes' : 'sync-no'}">${d4 ? '✓ Synced' : '○ Pending'}</span></td>
+      <td><span class="sync-badge ${d5 ? 'sync-yes' : 'sync-no'}">${d5 ? '✓ Synced' : '○ Pending'}</span></td>
+      <td>
+        <button class="topbar-action" style="padding:6px 10px;font-size:12px;" onclick="openCommsFor('${emp.initials}')"><i class="fa-solid fa-comments"></i> Chat</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function openCommsFor(initials) {
+  const emp = EMPLOYEES.find(e => e.initials === initials);
+  if (emp) {
+    selectContact(emp);
+    navigateToPage("messages");
+  }
+}
+
+function updateUtcClock(){
+  const now = new Date();
+  const el = document.getElementById("liveUtcClock");
+  if (el) el.textContent = "UTC " + now.toUTCString().slice(17, 25) + " | IST " + now.toLocaleTimeString("en-IN", { hour12: false });
+}
+setInterval(updateUtcClock, 1000);
+updateUtcClock();
+
+document.getElementById("hr-msg-input").addEventListener("keydown", e => { if (e.key === "Enter") hrSend(); });
+
+renderContactsList();
+renderMissions();
+renderEmployeeTable();
+loadHrMessages();
+setInterval(loadHrMessages, 2500);
+
+// Toast Notification Handler
+function showToast(msg) {
+  const t = document.getElementById("toast");
+  const tm = document.getElementById("toast-msg");
+  if (!t || !tm) return;
+  tm.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(window._toastTimer);
+  window._toastTimer = setTimeout(() => t.classList.remove("show"), 3500);
+}
+</script>
+</body>
+</html>

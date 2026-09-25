@@ -88,10 +88,33 @@ nav {
   gap: 12px;
   text-decoration: none;
   color: #fff;
+  flex-shrink: 0;
+}
+
+.brand-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.brand-title {
   font-weight: 800;
-  font-size: 1.25rem;
+  font-size: 1.22rem;
   letter-spacing: -0.02em;
   font-family: var(--font-display);
+  line-height: 1.1;
+  color: #fff;
+}
+
+.brand-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--accent-emerald);
+  letter-spacing: 0.02em;
 }
 
 .brand-badge {
@@ -106,36 +129,42 @@ nav {
   color: var(--accent-cyan);
   font-size: 17px;
   box-shadow: 0 0 15px rgba(0, 229, 255, 0.25);
-}
-
-.nav-status {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: rgba(16, 185, 129, 0.1);
-  border: 1px solid rgba(16, 185, 129, 0.25);
-  padding: 4px 10px;
-  border-radius: 9999px;
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  font-weight: 700;
-  color: var(--accent-emerald);
+  flex-shrink: 0;
 }
 
 .status-dot {
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   background: var(--accent-emerald);
   box-shadow: 0 0 8px var(--accent-emerald);
   animation: pulseDot 2s infinite ease-in-out;
+  display: inline-block;
 }
 @keyframes pulseDot { 0%, 100% { opacity: 0.6; transform: scale(0.9); } 50% { opacity: 1; transform: scale(1.2); } }
 
 .nav-links {
   display: flex;
   align-items: center;
-  gap: 1.8rem;
+  gap: 1.4rem;
+}
+
+.nav-link-highlight {
+  color: var(--accent-cyan) !important;
+  font-weight: 700 !important;
+  background: rgba(0, 229, 255, 0.08);
+  padding: 5px 12px;
+  border-radius: 9999px;
+  border: 1px solid rgba(0, 229, 255, 0.25);
+}
+
+.nav-link-highlight:hover {
+  background: rgba(0, 229, 255, 0.16);
+  box-shadow: 0 0 15px rgba(0, 229, 255, 0.3);
+}
+
+@media (max-width: 1080px) {
+  .nav-links { display: none; }
 }
 
 .nav-link {
@@ -1507,32 +1536,27 @@ footer {
     <div class="brand-badge">
       <i class="fa-solid fa-shield-halved"></i>
     </div>
-    <span>VisionVault</span>
+    <div class="brand-text">
+      <span class="brand-title">VisionVault</span>
+      <span class="brand-tag"><span class="status-dot"></span> Zero-PII Enclave Active</span>
+    </div>
   </a>
-
-  <div class="nav-status">
-    <span class="status-dot"></span>
-    <span>ZERO-PII HARDWARE ENCLAVE ACTIVE</span>
-  </div>
 
   <div class="nav-links">
     <a href="#inspector" class="nav-link"><i class="fa-solid fa-microchip"></i> Dual-Lens Lab</a>
     <a href="#defense-pipeline" class="nav-link"><i class="fa-solid fa-shield-halved"></i> 4-Layer Defense</a>
-    <a href="#privacy-budget" class="nav-link"><i class="fa-solid fa-coins"></i> Privacy Budget</a>
-    <a href="#pipeline" class="nav-link"><i class="fa-solid fa-diagram-project"></i> 8-Stage Loop</a>
     <a href="#databases" class="nav-link"><i class="fa-solid fa-database"></i> 6 Databases</a>
-    <a href="#video-demo" class="nav-link" style="color:var(--accent-cyan); font-weight:700;">
+    <a href="#video-demo" class="nav-link nav-link-highlight">
       <i class="fa-solid fa-circle-play"></i> Video Demo
     </a>
-    <a href="#matrix" class="nav-link"><i class="fa-solid fa-chart-simple"></i> Benchmarks</a>
   </div>
 
   <div class="nav-actions">
     <a href="https://github.com/NateshKannaR/VisionVault" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm" id="btn-nav-github">
       <i class="fa-brands fa-github"></i> GitHub
     </a>
-    <a href="employee-portal.html" class="btn btn-primary btn-sm">
-      <i class="fa-solid fa-arrow-up-right-from-square"></i> Open ISRO Demo
+    <a href="employee-portal.html" class="btn btn-primary btn-sm" id="btn-nav-portal">
+      <i class="fa-solid fa-rocket"></i> Open ISRO Demo
     </a>
   </div>
 </nav>

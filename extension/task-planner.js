@@ -1037,8 +1037,8 @@
           defaultKey = "satellite_name";
         }
         const rawCleanLabel = anyText.label ? anyText.label.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 40) : "";
-        const key = fromLabel.key || rawCleanLabel || defaultKey;
-        return { action: "type", mark_id: anyText.id, use_vault_field: key, reasoning: `Fill "${anyText.label || 'field'}" from vault (${key})` };
+        const key = anyText.vaultKey || fromLabel.key || rawCleanLabel || defaultKey;
+        return { action: "type", mark_id: anyText.id, use_vault_field: key, reasoning: `Fill "${anyText.label || anyText.vaultKey || 'field'}" from vault (${key})` };
       }
 
       // Pass D: If all inputs are filled, click submit/sign-in button if present
@@ -1625,12 +1625,16 @@
             m.id === "gy-mission_name" || m.id === "gy-vehicle" || m.id === "gy-program"
           )
         );
-        if (!isGaganyaanFormVisible && !progress.gaganyaanTabOpened) {
+        if (!isGaganyaanFormVisible) {
           const db6Nav = available.find(m =>
             (m.role === "link" || m.role === "clickable" || m.role === "tab" || m.role === "nav-item" || m.role === "button") &&
             /database\s*6|gaganyaan/i.test(m.label || "")
+          ) || (state?.marks || available).find(m =>
+            (m.role === "link" || m.role === "clickable" || m.role === "tab" || m.role === "nav-item" || m.role === "button") &&
+            /database\s*6|gaganyaan/i.test(m.label || "")
           );
-          if (db6Nav) {
+          if (db6Nav && (!progress.gaganyaanTabOpened || !progress.gaganyaanTabRetried)) {
+            if (progress.gaganyaanTabOpened) progress.gaganyaanTabRetried = true;
             progress.gaganyaanTabOpened = true;
             return {
               action: "click",

@@ -197,7 +197,25 @@
       }
 
       if (item.id === "fill_form") {
-        if (prog.formFilled || (action && (action.action === "batch_form_fill" || action.action === "type_sensitive"))) {
+        if (prog.formFilled || prog.filledAny || (action && (action.action === "batch_form_fill" || action.action === "type_sensitive"))) {
+          item.status = "done";
+        }
+      }
+
+      if (item.id === "extract_mission") {
+        if (prog.isroDataFetched || prog.missionInspected) {
+          item.status = "done";
+        }
+      }
+
+      if (item.id === "fill_db6") {
+        if (prog.missionSubmitted || prog.formSubmitted || (prog.filledAny && (action?.action === "click" || action?.action === "done"))) {
+          item.status = "done";
+        }
+      }
+
+      if (item.id === "fill_mission_registry") {
+        if (prog.missionSubmitted || prog.formSubmitted || (prog.filledAny && (action?.action === "click" || action?.action === "done"))) {
           item.status = "done";
         }
       }

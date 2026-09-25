@@ -473,7 +473,7 @@ async function scanTab(tabId, windowId, settings, retries = SCAN_ATTEMPT_DELAYS_
     });
 
     // Marks sent to the server carry NO frame routing and NO raw page text beyond a safe label.
-    const safeMarks = (result.marks || []).map(m => ({ id: m.id, role: m.role, box: m.box, label: m.label }));
+    const safeMarks = (result.marks || []).map(m => ({ id: m.id, role: m.role, box: m.box, label: m.label, vaultKey: m.vaultKey || null }));
 
     // Geometry + provenance for the panel's redaction overlay. Deliberately drops `text`,
     // which holds the matched PII string.
@@ -1593,7 +1593,7 @@ async function phaseRun() {
             value = await resolveVaultField(fieldKey);
           } else if (fieldKey) {
             const vault = await getVault();
-            const key = VAULT_KEY_MAP[fieldKey] || fieldKey;
+            const key = (typeof VAULT_KEY_MAP !== "undefined" ? VAULT_KEY_MAP[fieldKey] : null) || (typeof VaultManager !== "undefined" && VaultManager.VAULT_KEY_MAP ? VaultManager.VAULT_KEY_MAP[fieldKey] : null) || fieldKey;
             value = (key && vault[key]) ? vault[key] : "";
           }
         }
@@ -1706,7 +1706,7 @@ async function phaseRun() {
         if (typedOk) {
           session.filledIds.push(resp.mark_id);
           session.progress.lastTypedMarkId = resp.mark_id;
-          if (fieldKey) session.progress.filledAny = true;
+          session.progress.filledAny = true;
           const valLower = String(value || "").toLowerCase();
           if (session.parsedTask?.from && valLower.includes(session.parsedTask.from.toLowerCase())) {
             session.progress.fromTyped = true;

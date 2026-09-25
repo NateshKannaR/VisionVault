@@ -712,6 +712,7 @@
   global.encryptVaultData = encryptVaultData;
   global.decryptVaultData = decryptVaultData;
   global.getVaultEncryptionStatus = getVaultEncryptionStatus;
+  global.VAULT_KEY_MAP = VAULT_KEY_MAP;
 
   if (typeof module !== "undefined" && module.exports) {
     module.exports = VaultManager;

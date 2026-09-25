@@ -1318,6 +1318,35 @@ const gyStep8 = planNextAction({
 });
 is(gyStep8.action, 'done', 'gy step 8 reports done after Gaganyaan DB6 sync complete');
 
+// Database 3 Telemetry Field Vault Key Preservation & Resolution
+const db3Task = "fill database 3";
+const db3Parsed = parseTask(db3Task);
+const db3PlanSat = planNextAction({
+  task: db3Task, parsed: db3Parsed,
+  pageInfo: { url: 'http://localhost:3000/employee-portal.html' },
+  marks: [
+    { id: 201, role: 'input:text', label: 'Satellite Name', vaultKey: 'satellite_name' },
+    { id: 202, role: 'input:text', label: 'Mission ID', vaultKey: 'mission_id' },
+    { id: 203, role: 'input:text', label: 'Orbit Type', vaultKey: 'orbit_type' }
+  ],
+  progress: {}
+});
+is(db3PlanSat.action, 'type', 'db3 plan types into satellite name');
+is(db3PlanSat.mark_id, 201, 'targets satellite name mark');
+is(db3PlanSat.use_vault_field, 'satellite_name', 'resolves satellite_name vault key (not name)');
+
+const db3PlanOrbit = planNextAction({
+  task: db3Task, parsed: db3Parsed,
+  pageInfo: { url: 'http://localhost:3000/employee-portal.html' },
+  marks: [
+    { id: 203, role: 'input:text', label: 'Orbit Type', vaultKey: 'orbit_type' }
+  ],
+  filledIds: [201, 202],
+  progress: {}
+});
+is(db3PlanOrbit.action, 'type', 'db3 plan types into orbit type');
+is(db3PlanOrbit.use_vault_field, 'orbit_type', 'resolves orbit_type vault key (not name)');
+
 console.log('\n' + '='.repeat(60));
 if (failures.length) {
   console.log(`${failures.length} of ${checks} checks FAILED`);

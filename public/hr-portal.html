@@ -814,14 +814,57 @@ textarea { resize: vertical; min-height: 65px; }
 }
 
 @media(max-width: 960px) {
-  .topbar { padding: 10px 16px; gap: 10px; flex-wrap: wrap; }
+  .topbar { padding: 8px 12px; gap: 8px; justify-content: space-between; }
+  .topbar-title { font-size: 13px; }
+  .role-badge-hr { font-size: 9px; padding: 2px 6px; }
   .operator-chip, .topbar-sub, .live-clock-pill { display: none; }
-  .topbar-btn-util span { display: none; }
+  .topbar-actions { gap: 6px; }
+  .topbar-btn-util span, .topbar-btn-nav span { display: none; }
+  .switch-link { padding: 5px 9px; font-size: 11px; gap: 5px; }
+  .switch-link span { display: none; }
+  .switch-link::after { content: "EMP"; font-weight: 700; }
+
   .layout { flex-direction: column; }
-  .sidebar { width: 100%; border-right: none; border-bottom: 1px solid var(--border); }
-  .inner { padding: 20px 16px; }
-  .contact-list-wrap { width: 100%; }
-  .grid2, .grid3, .grid4 { grid-template-columns: 1fr; }
+  .sidebar {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    padding: 8px 12px;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    gap: 8px;
+    align-items: center;
+    background: rgba(6, 12, 24, 0.95);
+    position: sticky;
+    top: 54px;
+    z-index: 90;
+  }
+  .sidebar .nav-section { display: none; }
+  .sidebar .nav-item {
+    flex-shrink: 0;
+    white-space: nowrap;
+    padding: 7px 12px;
+    font-size: 12px;
+    margin-bottom: 0;
+    border-radius: 8px;
+  }
+
+  .inner { padding: 16px 12px; }
+  .chat-layout { flex-direction: column; }
+  .contact-list-wrap { width: 100%; max-height: 200px; border-right: none; border-bottom: 1px solid var(--border); }
+  .chat-header { padding: 12px 16px; }
+  .messages { padding: 16px 12px; gap: 12px; }
+  .composer { padding: 12px 14px; gap: 8px; }
+  .grid2, .grid3, .grid4 { grid-template-columns: 1fr; gap: 10px; }
+  .telemetry-overview-grid { grid-template-columns: 1fr; gap: 10px; }
+  .mission-telemetry-grid { grid-template-columns: 1fr; gap: 8px; }
+  .db-grid-hr { grid-template-columns: 1fr; gap: 6px; }
+  .filter-bar { flex-direction: column; align-items: stretch; gap: 8px; }
+  .fg input, .fg select, .fg textarea, .filter-input { font-size: 15px; }
+  .pcard { padding: 14px; }
 }
 </style>
 </head>

@@ -893,7 +893,7 @@ nav {
    FEATURE 4: 1080P VIDEO SHOWCASE & CHAPTERS
    ========================================================================== */
 .video-showcase-section {
-  padding: 5.5rem 0 3.5rem 0;
+  padding: 2.5rem 0 4rem 0;
 }
 
 .video-mockup {
@@ -1543,12 +1543,12 @@ footer {
   </a>
 
   <div class="nav-links">
-    <a href="#inspector" class="nav-link"><i class="fa-solid fa-microchip"></i> Dual-Lens Lab</a>
-    <a href="#defense-pipeline" class="nav-link"><i class="fa-solid fa-shield-halved"></i> 4-Layer Defense</a>
-    <a href="#databases" class="nav-link"><i class="fa-solid fa-database"></i> 6 Databases</a>
     <a href="#video-demo" class="nav-link nav-link-highlight">
       <i class="fa-solid fa-circle-play"></i> Video Demo
     </a>
+    <a href="#inspector" class="nav-link"><i class="fa-solid fa-microchip"></i> Dual-Lens Lab</a>
+    <a href="#defense-pipeline" class="nav-link"><i class="fa-solid fa-shield-halved"></i> 4-Layer Defense</a>
+    <a href="#databases" class="nav-link"><i class="fa-solid fa-database"></i> 6 Databases</a>
   </div>
 
   <div class="nav-actions">
@@ -1603,6 +1603,75 @@ footer {
     </div>
   </div>
 </header>
+
+<!-- FEATURE: 1080P VIDEO SHOWCASE (TOP FEATURED DEMO) -->
+<section class="video-showcase-section container" id="video-demo">
+  <div class="section-header">
+    <div class="section-tag"><i class="fa-solid fa-circle-play"></i> Prototype Demonstration</div>
+    <h2 class="section-title">VisionVault in Action: Full End-to-End Walkthrough</h2>
+    <p class="section-desc">Watch how VisionVault detects on-screen credentials in real time, redacts PII before transmission, and automates multi-database forms without cloud pixel leakage.</p>
+  </div>
+
+  <div class="video-mockup">
+    <div class="video-mockup-header">
+      <div class="video-header-left">
+        <div class="window-dots">
+          <span class="window-dot close"></span>
+          <span class="window-dot min"></span>
+          <span class="window-dot max"></span>
+        </div>
+        <div class="video-filename">
+          <i class="fa-solid fa-film" style="color:var(--accent-cyan);"></i> ProtoType VisionVault.mp4
+        </div>
+      </div>
+      <div style="display:flex; align-items:center; gap:10px;">
+        <span class="video-badge"><i class="fa-solid fa-circle" style="font-size:7px; color:var(--accent-emerald); margin-right:4px;"></i> 1080P HD • ZERO-LEAK DEMO</span>
+        <button class="btn btn-secondary btn-sm" onclick="toggleVideoFullscreen()" title="Fullscreen mode" style="padding:4px 8px; font-size:11px;">
+          <i class="fa-solid fa-expand"></i>
+        </button>
+      </div>
+    </div>
+
+    <div class="video-wrapper">
+      <video id="demoVideoPlayer" controls playsinline preload="metadata" poster="images/demo-video-cover.jpg">
+        <source src="images/ProtoType VisionVault.mp4" type="video/mp4">
+        Your browser does not support the video tag.
+      </video>
+    </div>
+  </div>
+
+  <!-- Interactive Chapter Jump Navigation -->
+  <div class="video-chapters">
+    <div class="chapter-card" onclick="seekDemoVideo(0)">
+      <span class="chapter-time">00:00</span>
+      <div>
+        <div class="chapter-title"><i class="fa-solid fa-lock" style="color:var(--accent-cyan)"></i> Encrypted Comms Reception</div>
+        <div class="chapter-desc">Mission transmission received &amp; decrypted locally with AES-256-GCM.</div>
+      </div>
+    </div>
+    <div class="chapter-card" onclick="seekDemoVideo(12)">
+      <span class="chapter-time">00:12</span>
+      <div>
+        <div class="chapter-title"><i class="fa-solid fa-user-shield" style="color:var(--accent-emerald)"></i> ViT Face &amp; PII Redaction</div>
+        <div class="chapter-desc">Real-time offscreen canvas masks faces, emails, and credentials.</div>
+      </div>
+    </div>
+    <div class="chapter-card" onclick="seekDemoVideo(25)">
+      <span class="chapter-time">00:25</span>
+      <div>
+        <div class="chapter-title"><i class="fa-solid fa-vault" style="color:var(--accent-amber)"></i> Secure Vault Ingestion</div>
+        <div class="chapter-desc">Telemetry vectors &amp; parameters encrypted at rest with PBKDF2.</div>
+      </div>
+    </div>
+    <div class="chapter-card" onclick="seekDemoVideo(40)">
+      <span class="chapter-time">00:40</span>
+      <div>
+        <div class="chapter-title"><i class="fa-solid fa-database" style="color:var(--accent-violet)"></i> 6-Database Form Automation</div>
+        <div class="chapter-desc">Autonomous DOM dispatch across Payroll, Systems &amp; Quarters.</div>
+      </div>
+    </div>
+  </div>
+</section>
 
 <!-- FEATURE 1: DUAL-LENS INSPECTOR (WHAT YOU SEE vs WHAT CLOUD LLM SEES) -->
 <section class="inspector-section container" id="inspector">
@@ -2654,75 +2723,6 @@ footer {
       <div class="db-card-footer">
         <span style="font-size:0.75rem; color:var(--accent-violet);"><i class="fa-solid fa-bolt"></i> Official ISRO Feed</span>
         <a href="employee-portal.html#gaganyaan" class="db-link" style="color:var(--accent-violet);">Open DB6 <i class="fa-solid fa-arrow-right"></i></a>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- FEATURE 4: 1080P VIDEO SHOWCASE -->
-<section class="video-showcase-section container" id="video-demo">
-  <div class="section-header">
-    <div class="section-tag"><i class="fa-solid fa-circle-play"></i> Prototype Demonstration</div>
-    <h2 class="section-title">VisionVault in Action: Full End-to-End Walkthrough</h2>
-    <p class="section-desc">Watch how VisionVault detects on-screen credentials in real time, redacts PII before transmission, and automates multi-database forms without cloud pixel leakage.</p>
-  </div>
-
-  <div class="video-mockup">
-    <div class="video-mockup-header">
-      <div class="video-header-left">
-        <div class="window-dots">
-          <span class="window-dot close"></span>
-          <span class="window-dot min"></span>
-          <span class="window-dot max"></span>
-        </div>
-        <div class="video-filename">
-          <i class="fa-solid fa-film" style="color:var(--accent-cyan);"></i> ProtoType VisionVault.mp4
-        </div>
-      </div>
-      <div style="display:flex; align-items:center; gap:10px;">
-        <span class="video-badge"><i class="fa-solid fa-circle" style="font-size:7px; color:var(--accent-emerald); margin-right:4px;"></i> 1080P HD • ZERO-LEAK DEMO</span>
-        <button class="btn btn-secondary btn-sm" onclick="toggleVideoFullscreen()" title="Fullscreen mode" style="padding:4px 8px; font-size:11px;">
-          <i class="fa-solid fa-expand"></i>
-        </button>
-      </div>
-    </div>
-
-    <div class="video-wrapper">
-      <video id="demoVideoPlayer" controls playsinline preload="metadata" poster="images/demo-video-cover.jpg">
-        <source src="images/ProtoType VisionVault.mp4" type="video/mp4">
-        Your browser does not support the video tag.
-      </video>
-    </div>
-  </div>
-
-  <!-- Interactive Chapter Jump Navigation -->
-  <div class="video-chapters">
-    <div class="chapter-card" onclick="seekDemoVideo(0)">
-      <span class="chapter-time">00:00</span>
-      <div>
-        <div class="chapter-title"><i class="fa-solid fa-lock" style="color:var(--accent-cyan)"></i> Encrypted Comms Reception</div>
-        <div class="chapter-desc">Mission transmission received &amp; decrypted locally with AES-256-GCM.</div>
-      </div>
-    </div>
-    <div class="chapter-card" onclick="seekDemoVideo(12)">
-      <span class="chapter-time">00:12</span>
-      <div>
-        <div class="chapter-title"><i class="fa-solid fa-user-shield" style="color:var(--accent-emerald)"></i> ViT Face &amp; PII Redaction</div>
-        <div class="chapter-desc">Real-time offscreen canvas masks faces, emails, and credentials.</div>
-      </div>
-    </div>
-    <div class="chapter-card" onclick="seekDemoVideo(25)">
-      <span class="chapter-time">00:25</span>
-      <div>
-        <div class="chapter-title"><i class="fa-solid fa-vault" style="color:var(--accent-amber)"></i> Secure Vault Ingestion</div>
-        <div class="chapter-desc">Telemetry vectors &amp; parameters encrypted at rest with PBKDF2.</div>
-      </div>
-    </div>
-    <div class="chapter-card" onclick="seekDemoVideo(40)">
-      <span class="chapter-time">00:40</span>
-      <div>
-        <div class="chapter-title"><i class="fa-solid fa-database" style="color:var(--accent-violet)"></i> 6-Database Form Automation</div>
-        <div class="chapter-desc">Autonomous DOM dispatch across Payroll, Systems &amp; Quarters.</div>
       </div>
     </div>
   </div>

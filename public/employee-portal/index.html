@@ -1805,6 +1805,10 @@ body.mode-redacted .datablock {
       <i class="fa-regular fa-clock"></i>
       <span id="liveEmpUtcClock">UTC 00:00:00</span>
     </div>
+    <button class="topbar-btn-nav" onclick="openDemoVideoModal()" title="Watch 1080p Video Walkthrough" style="color:var(--accent); border-color:rgba(0,229,255,0.35); background:rgba(0,229,255,0.08);">
+      <i class="fa-solid fa-circle-play" style="color:#00e5ff;"></i>
+      <span>Video Demo</span>
+    </button>
     <div class="topbar-btn-group">
       <button class="topbar-btn-util" onclick="clearEmployeeChat()" title="Clear chat history">
         <i class="fa-solid fa-trash-can"></i>
@@ -1914,6 +1918,9 @@ body.mode-redacted .datablock {
               <a href="visionvault-extension.zip" download class="topbar-action active" style="background:linear-gradient(135deg, #00e5ff, #0284c7); color:#000; font-weight:800; border:none; padding:10px 18px; font-size:13.5px; box-shadow:0 0 16px rgba(0,229,255,0.4);">
                 <i class="fa-solid fa-file-arrow-down"></i> Download Extension (.zip)
               </a>
+              <button class="topbar-action" onclick="openDemoVideoModal()" style="border-color:rgba(0,229,255,0.45); background:rgba(0,229,255,0.12); color:#00e5ff; font-weight:700; padding:10px 18px; font-size:13.5px; box-shadow:0 0 16px rgba(0,229,255,0.15);">
+                <i class="fa-solid fa-circle-play"></i> Watch Video Demo (1080p)
+              </button>
               <button class="topbar-action" onclick="document.getElementById('demo-prompts-section').scrollIntoView({behavior:'smooth'})">
                 <i class="fa-solid fa-terminal"></i> Demo Prompts &darr;
               </button>

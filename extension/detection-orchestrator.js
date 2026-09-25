@@ -244,10 +244,14 @@
     const usedMarkIds = new Set();
     let skipped = 0;
 
+    let semanticScreen = null;
     for (const entry of injectionResults) {
       const frameId = entry.frameId ?? 0;
       const res = entry.result;
       if (!res || res.scanSkipped) { skipped++; continue; }
+      if (!semanticScreen && res.semanticScreen) {
+        semanticScreen = res.semanticScreen;
+      }
 
       const off = res.frameOffset;
       if (!off) { skipped++; continue; } // cross-origin frame: coordinates not mappable
@@ -276,6 +280,7 @@
     return {
       piiRegions,
       marks,
+      semanticScreen,
       frameStats: { total: injectionResults.length, merged: injectionResults.length - skipped, skipped }
     };
   }
@@ -670,6 +675,29 @@
     const scanPromise = (async () => {
       const t0 = performance.now();
 
+      // Privacy Budget Level 0: Zero-Pixel DOM Mode (0 pixels captured or sent)
+      if (settings.privacyBudget && settings.privacyBudget.level === 0) {
+        const domResult = await scanAllFrames(tabId).catch(() => ({ piiRegions: [], marks: [], semanticScreen: null, frameStats: { total: 0, merged: 0, skipped: 0 } }));
+        const tEnd = performance.now();
+        const rawDomPii = Array.isArray(domResult?.piiRegions) ? domResult.piiRegions : [];
+        const marks = Array.isArray(domResult?.marks) ? domResult.marks : [];
+        return {
+          redactedImage: "",
+          image: "",
+          rawImage: null,
+          redactionOk: true,
+          redactionVerified: true,
+          privacyBudget: settings.privacyBudget,
+          semanticScreen: domResult?.semanticScreen || null,
+          regions: rawDomPii,
+          marks,
+          sourceBreakdown: { dom: rawDomPii.length, vision_face: 0, vision_ocr: 0, merged: rawDomPii.length },
+          timings: { capture: 0, domScan: Math.round(tEnd - t0), faceInference: 0, ocrInference: 0, visionInference: 0, merge: 0, redact: 0, total: Math.round(tEnd - t0) },
+          frameStats: domResult?.frameStats || { total: 1, merged: 1, skipped: 0 },
+          debugLog: ["Zero-Pixel DOM Mode (Level 0) Active — 0 pixels captured/sent"]
+        };
+      }
+
       // 1. Capture screenshot and scan ALL frames in parallel
       // Why the capture failed matters as much as that it did. Without this the reason was
       // logged and thrown away, and the panel reported "Redaction failed" for a run in which
@@ -904,6 +932,7 @@
         redactedImage,
         ...(settings.includeRawForXRay === true ? { rawImage: rawScreenshot } : {}),
         redactionOk: true,
+        semanticScreen: domResult?.semanticScreen || null,
         regions: mergedRegions,
         sourceBreakdown,
         screenEvaluation,

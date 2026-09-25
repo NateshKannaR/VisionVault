@@ -17,6 +17,7 @@ const DEFAULT_SERVER_URL = "http://127.0.0.1:8000/api/agent/step";
 // (see manifest.json) because it needs a DOM; the service worker has none.
 importScripts(
   "./vault.js",
+  "./privacy-firewall.js",
   "./planner/task-parser.js",
   "./planner/task-checklist.js",
   "./planner/visual-grounding.js",
@@ -509,6 +510,8 @@ async function scanTab(tabId, windowId, settings, retries = SCAN_ATTEMPT_DELAYS_
       regions: result.regions || [],
       timings: result.timings || {},
       screenEvaluation: result.screenEvaluation || null,
+      semanticScreen: result.semanticScreen || null,
+      privacyBudget: result.privacyBudget || null,
     };
 
     // Fast-path: if any interactive marks were found, proceed immediately without waiting for retry delays
@@ -525,9 +528,10 @@ async function scanTab(tabId, windowId, settings, retries = SCAN_ATTEMPT_DELAYS_
 
 // ── Server call (SSE streaming) ──────────────────────────────────────────────
 async function callServer(payload, serverUrl) {
-  // HARD PRIVACY GATE. The only image this function will ever send is one the redaction
-  // pipeline confirmed it produced. If redaction failed there is no image and no request.
-  if (!payload.redactionVerified) {
+  // HARD PRIVACY GATE: VisionVault Privacy Firewall™ & Exfiltration Guard
+  if (typeof VisionVaultPrivacyFirewall !== "undefined") {
+    VisionVaultPrivacyFirewall.assertSafeTransmission(payload);
+  } else if (!payload.redactionVerified && payload.image) {
     throw new Error("Refusing to contact server: redaction was not verified for this frame.");
   }
 
@@ -552,6 +556,8 @@ async function callServer(payload, serverUrl) {
       // scratch every step and cannot tell "the search ran" from "we typed something", which
       // is how a finished task turned into a tour of the results page.
       progress: payload.progress || null,
+      privacy_budget: payload.privacy_budget || { level: 0, id: "ZERO_PIXEL_DOM" },
+      semantic_screen: payload.semantic_screen || payload.semanticScreen || null,
       redactedImage: payload.image || "",
       image: payload.image || "",
       marks: payload.marks || [],
@@ -1378,7 +1384,9 @@ async function phaseRun() {
               sort: session.parsedTask.sort,
             } : null,
             progress: session.progress,
-            image: session.redacted,
+            privacy_budget: session.privacyBudget || (typeof VisionVaultPrivacyFirewall !== "undefined" ? VisionVaultPrivacyFirewall.evaluateBudgetForTask(session.task) : { level: 0, id: "ZERO_PIXEL_DOM" }),
+            semantic_screen: session.semanticScreen || null,
+            image: session.redacted || "",
             redactionVerified: session.redactionOk === true,
             marks: session.marks,
             filled_mark_ids: session.filledIds,

@@ -1191,6 +1191,40 @@ function isInsideSensitiveText(el) {
   return false;
 }
 
+/**
+ * Extracts a lightweight, token-efficient semantic screen representation.
+ * Enables server/planner to reason over structured DOM elements with 0 pixel overhead.
+ */
+function extractSemanticScreen(marks) {
+  const elements = (marks || []).map((m) => {
+    const el = resolveMarkElement(m.id);
+    const tag = el ? el.tagName.toLowerCase() : "unknown";
+    const type = el && el.getAttribute("type") ? el.getAttribute("type").toLowerCase() : (tag === "button" ? "button" : tag);
+    const isSensitive = isInsideSensitiveText(el) || (el && PII_INPUT_SELECTORS.some(sel => {
+      try { return el.matches(sel); } catch (_) { return false; }
+    }));
+    return {
+      id: String(m.id),
+      type: type,
+      role: m.role || "clickable",
+      label: isSensitive ? null : (m.label || null),
+      bbox: [m.box.x, m.box.y, m.box.w, m.box.h],
+      sensitive: !!isSensitive,
+      vaultKey: m.vaultKey || (el ? el.getAttribute("data-vault-key") : null),
+      value: isSensitive ? (m.vaultKey ? `VAULT:${m.vaultKey.toUpperCase()}` : "VAULT:MASKED") : (el ? (el.value || el.innerText || "").slice(0, 80) : null)
+    };
+  });
+
+  return {
+    viewport: {
+      width: window.innerWidth,
+      height: window.innerHeight,
+      devicePixelRatio: window.devicePixelRatio || 1
+    },
+    elements
+  };
+}
+
 function scanPage() {
   if (domScanInFlight) {
     return { piiRegions: [], marks: [], scanSkipped: true, frameOffset: frameOffsetInTopViewport() };
@@ -1214,9 +1248,12 @@ function scanPage() {
       console.warn("[vagent] tagInteractiveElements non-fatal:", err);
     }
 
+    const semanticScreen = extractSemanticScreen(marks);
+
     return {
       piiRegions,
       marks,
+      semanticScreen,
       scanSkipped: false,
       frameOffset: frameOffsetInTopViewport(),
       frameUrl: location.href.slice(0, 200),

@@ -179,6 +179,8 @@ class AgentStepRequest(BaseModel):
     task_hints: Optional[TaskHints] = None
     progress: Optional[Progress] = None
     screen_evaluation: Optional[Dict[str, Any]] = None
+    privacy_budget: Optional[Dict[str, Any]] = None
+    semantic_screen: Optional[Dict[str, Any]] = None
 
 BOOKING_RE = re.compile(
     r"\b(book|flight|hotel|train|bus|cab|ticket|reserve|makemytrip|goibibo|irctc|redbus|cleartrip)\b",
@@ -2030,8 +2032,14 @@ async def agent_step(req: AgentStepRequest):
         "filled_count": len(req.filled_mark_ids or []),
         "step": req.step,
         "has_image": bool(req.redactedImage or req.image),
+        "privacy_budget": (req.privacy_budget.get("id") if req.privacy_budget else "LEVEL_0_ZERO_PIXEL_DOM"),
+        "has_semantic_screen": bool(req.semantic_screen),
         "page": (req.page_info.url if req.page_info else None),
     })
+
+    is_zero_pixel = bool(req.privacy_budget and req.privacy_budget.get("level") == 0)
+    if is_zero_pixel:
+        print(_console_safe("[server] 🛡️ Privacy Budget Level 0 (ZERO_PIXEL_DOM) active: 0 pixels received. Reasoning purely over semantic screen elements."))
 
     plan = None
     tier = None

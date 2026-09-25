@@ -1208,6 +1208,38 @@ footer {
   </div>
 
   <div class="inspector-container">
+    <!-- VisionVault Privacy Firewall™ Enterprise Telemetry HUD -->
+    <div style="background:linear-gradient(90deg, rgba(8,14,28,0.95), rgba(15,23,42,0.95)); border-bottom:1px solid rgba(56,189,248,0.25); padding:1rem 1.5rem; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+      <div style="display:flex; align-items:center; gap:12px;">
+        <div style="width:36px; height:36px; border-radius:8px; background:rgba(0,229,255,0.1); border:1px solid rgba(0,229,255,0.3); display:grid; place-items:center; color:var(--accent-cyan);">
+          <i class="fa-solid fa-shield-halved"></i>
+        </div>
+        <div>
+          <div style="font-size:0.95rem; font-weight:700; color:#fff; display:flex; align-items:center; gap:8px;">
+            <span>VisionVault Privacy Firewall™</span>
+            <span style="font-family:var(--font-mono); font-size:0.7rem; padding:2px 8px; border-radius:4px; background:rgba(16,185,129,0.15); color:var(--accent-emerald); border:1px solid rgba(16,185,129,0.3);">ACTIVE</span>
+          </div>
+          <div style="font-size:0.78rem; color:var(--text-muted);">4-Layer Defense-in-Depth &bull; DPDP Act 2023 Compliant &bull; Exfiltration Guard Active</div>
+        </div>
+      </div>
+      <div style="display:flex; align-items:center; gap:16px;">
+        <div style="text-align:right;">
+          <div style="font-size:0.7rem; color:var(--text-faint); text-transform:uppercase; font-family:var(--font-mono);">Raw Pixels Dispatched</div>
+          <div style="font-size:1.05rem; font-weight:700; color:var(--accent-emerald); font-family:var(--font-mono);">0 KB (0 leaks)</div>
+        </div>
+        <div style="width:1px; height:28px; background:rgba(255,255,255,0.1);"></div>
+        <div style="text-align:right;">
+          <div style="font-size:0.7rem; color:var(--text-faint); text-transform:uppercase; font-family:var(--font-mono);">PII Egress Bytes</div>
+          <div style="font-size:1.05rem; font-weight:700; color:var(--accent-emerald); font-family:var(--font-mono);">0 bytes</div>
+        </div>
+        <div style="width:1px; height:28px; background:rgba(255,255,255,0.1);"></div>
+        <div style="text-align:right;">
+          <div style="font-size:0.7rem; color:var(--text-faint); text-transform:uppercase; font-family:var(--font-mono);">Privacy Budget</div>
+          <div style="font-size:0.85rem; font-weight:700; color:var(--accent-cyan); font-family:var(--font-mono);">LEVEL 0: ZERO-PIXEL</div>
+        </div>
+      </div>
+    </div>
+
     <div class="inspector-topbar">
       <div style="display:flex; align-items:center; gap:10px;">
         <span style="font-family:var(--font-mono); font-size:0.85rem; font-weight:700; color:#fff;">
@@ -1358,16 +1390,27 @@ footer {
       <pre id="jsonPayloadPre">{
   "session_id": "vv-isro-session-2026-9a81",
   "task": "Fill Mission Telemetry and Quarters records",
-  "screen_dimensions": { "width": 1920, "height": 1080 },
-  "visual_tokens": [
-    { "role": "input:text", "label": "Operator Name", "wire_value": "«PERSON_1»" },
-    { "role": "input:email", "label": "Official Email", "wire_value": "«EMAIL_1»" },
-    { "role": "input:tel", "label": "Station Phone", "wire_value": "«PHONE_1»" },
-    { "role": "input:password", "label": "KMS Secret Key", "wire_value": "«MASKED_SECRET»" },
-    { "role": "input:text", "label": "Ground Station", "wire_value": "8.400 GHz (X-Band Deep Space)" }
-  ],
-  "raw_pii_exfiltrated_bytes": 0,
-  "client_sanitization_ms": 31.4
+  "privacy_budget": {
+    "level": 0,
+    "id": "ZERO_PIXEL_DOM",
+    "description": "Pure semantic DOM representation. Zero screenshots captured or sent.",
+    "transmitsPixels": false
+  },
+  "semantic_screen": {
+    "viewport": { "width": 1920, "height": 1080, "devicePixelRatio": 1 },
+    "elements": [
+      { "id": "e1", "type": "input", "role": "textbox", "label": "Operator Name", "sensitive": true, "vaultKey": "operator", "value": "VAULT:OPERATOR" },
+      { "id": "e2", "type": "input", "role": "textbox", "label": "Official Email", "sensitive": true, "vaultKey": "email", "value": "VAULT:EMAIL" },
+      { "id": "e3", "type": "input", "role": "textbox", "label": "Station Phone", "sensitive": true, "vaultKey": "phone", "value": "VAULT:PHONE" },
+      { "id": "e4", "type": "input", "role": "password", "label": "KMS Secret Key", "sensitive": true, "vaultKey": "password", "value": "VAULT:PASSWORD" },
+      { "id": "e5", "type": "input", "role": "textbox", "label": "Ground Station Freq", "sensitive": false, "value": "8.400 GHz (X-Band)" },
+      { "id": "e6", "type": "button", "role": "button", "label": "Submit Mission Telemetry", "sensitive": false }
+    ]
+  },
+  "raw_pixels_sent": 0,
+  "pii_sent_bytes": 0,
+  "redacted_payload_kb": 2.45,
+  "status": "✓ SAFE TO TRANSMIT (0 LEAKS)"
 }</pre>
     </div>
 

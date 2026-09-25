@@ -2,12 +2,21 @@
 
 > **A privacy-preserving browser vision agent — cloud-grade AI reasoning, with zero raw personal data ever leaving the device.**
 
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-isrovisionvault.vercel.app-00e5ff?style=for-the-badge&logo=vercel)](https://isrovisionvault.vercel.app/)
+[![ISRO Employee Portal](https://img.shields.io/badge/ISRO%20Portal-Employee%20Command-0284c7?style=for-the-badge&logo=shield)](https://isrovisionvault.vercel.app/employee-portal.html)
+[![ISRO HR Command](https://img.shields.io/badge/HR%20Command-Mission%20Control-f59e0b?style=for-the-badge&logo=satellite)](https://isrovisionvault.vercel.app/hr-portal.html)
+
+🌐 **Live Deployment**: [https://isrovisionvault.vercel.app/](https://isrovisionvault.vercel.app/)  
+🚀 **ISRO Employee Command Portal**: [https://isrovisionvault.vercel.app/employee-portal.html](https://isrovisionvault.vercel.app/employee-portal.html)  
+🛰️ **ISRO HR & Mission Portal**: [https://isrovisionvault.vercel.app/hr-portal.html](https://isrovisionvault.vercel.app/hr-portal.html)
+
 VisionVault is a browser-native AI agent that observes a webpage, redacts every sensitive element locally, sends only a sanitized, symbolic view of the page to a cloud model for reasoning, and then executes the resulting action itself — resolving any real personal values from an on-device vault. The server never sees a password, a name, an email, or a face. It only ever sees shapes, roles, and positions.
 
 ---
 
 ## Table of Contents
 
+- [Live Interactive Deployment & Showcase](#live-interactive-deployment--showcase)
 - [The Problem](#the-problem)
 - [Our Solution](#our-solution)
 - [How It Works](#how-it-works)
@@ -18,6 +27,20 @@ VisionVault is a browser-native AI agent that observes a webpage, redacts every 
 - [Getting Started](#getting-started)
 - [Evaluation](#evaluation)
 - [License](#license)
+
+---
+
+## Live Interactive Deployment & Showcase
+
+VisionVault and its production ISRO Master Control Facility showcases are deployed live on Vercel:
+
+| Destination | Live URL | Description |
+| :--- | :--- | :--- |
+| **Command Hub & Architecture Showcase** | [isrovisionvault.vercel.app](https://isrovisionvault.vercel.app/) | Interactive 4-layer defense lab, dual-lens inspector, 8-stage pipeline, and video showcase |
+| **ISRO Employee Command Portal** | [isrovisionvault.vercel.app/employee-portal.html](https://isrovisionvault.vercel.app/employee-portal.html) | Mission operations, telemetry databases, and zero-knowledge employee forms |
+| **ISRO HR & Mission Control Registry** | [isrovisionvault.vercel.app/hr-portal.html](https://isrovisionvault.vercel.app/hr-portal.html) | Multi-satellite mission telemetry and personnel registry |
+| **ISRO Intranet Security Demo** | [isrovisionvault.vercel.app/isro-intranet-demo.html](https://isrovisionvault.vercel.app/isro-intranet-demo.html) | High-clearance internal telemetry & telemetry streaming demonstration |
+| **ISRO Personnel Login** | [isrovisionvault.vercel.app/login.html](https://isrovisionvault.vercel.app/login.html) | Zero-PII authenticated personnel gate |
 
 ---
 
@@ -288,7 +311,12 @@ ollama pull qwen2.5:1.5b-instruct # ~1 GB, ~0.6s per plan on CPU
 
 ### 3. Try it
 
-1. Open `mock-apps/demo-page.html`
+#### Option A: Live Production Deployment (Instant)
+- Visit [https://isrovisionvault.vercel.app/](https://isrovisionvault.vercel.app/) to interact with the full privacy firewall visualizer, Set-of-Marks grounding demo, and interactive video showcase.
+- Test the [ISRO Employee Command Portal](https://isrovisionvault.vercel.app/employee-portal.html) and [ISRO HR Portal](https://isrovisionvault.vercel.app/hr-portal.html) live in any browser without needing to run a local server.
+
+#### Option B: Local Testing & Extension Automation
+1. Open `mock-apps/demo-page.html` or `index.html` locally.
 2. Type a task like *"fill the signup form with my details"*, then click **Scan & Redact Screen**. The panel shows exactly the redacted frame that would be uploaded before anything is sent.
 3. Click **Execute Safe Automation** to run the full loop.
 

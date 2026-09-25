@@ -51,51 +51,116 @@ body {
   font-size: 15px;
 }
 
-/* Modern Header Top Bar */
+/* Sleek, Modern Glass Top Bar */
 .topbar {
   display: flex;
   align-items: center;
   gap: 16px;
-  padding: 14px 28px;
-  background: rgba(8, 15, 30, 0.92);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border-bottom: 1px solid var(--border);
+  padding: 10px 24px;
+  background: rgba(7, 13, 24, 0.85);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   position: sticky;
   top: 0;
   z-index: 100;
-  box-shadow: 0 4px 28px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.45);
 }
 .logo {
-  width: 44px;
-  height: 44px;
-  background: linear-gradient(135deg, #00e5ff, #0284c7);
-  border-radius: 12px;
+  width: 38px;
+  height: 38px;
+  background: linear-gradient(135deg, rgba(0, 229, 255, 0.22) 0%, rgba(2, 132, 199, 0.35) 100%);
+  border: 1px solid rgba(0, 229, 255, 0.45);
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  box-shadow: 0 0 20px rgba(0, 229, 255, 0.4);
+  box-shadow: 0 0 16px rgba(0, 229, 255, 0.25);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.logo:hover {
+  transform: scale(1.04);
+  box-shadow: 0 0 22px rgba(0, 229, 255, 0.4);
 }
 .topbar-branding {
   display: flex;
   flex-direction: column;
+  gap: 2px;
 }
-.topbar-title {
-  font-family: 'Space Grotesk', sans-serif;
-  font-size: 17px;
-  font-weight: 800;
-  letter-spacing: 0.5px;
-  color: #fff;
+.brand-row {
   display: flex;
   align-items: center;
   gap: 10px;
 }
-.topbar-sub {
-  font-size: 13px;
-  color: var(--accent2);
+.topbar-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 14.5px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  line-height: 1.2;
+}
+.enclave-badge {
   font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 700;
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.28);
+  padding: 2px 8px;
+  border-radius: 9999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  letter-spacing: 0.4px;
+}
+.pulse-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 6px #10b981;
+  animation: pulseDot 2s infinite ease-in-out;
+  display: inline-block;
+}
+.pulse-dot-green {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 6px #10b981;
+  animation: pulseDot 2s infinite ease-in-out;
+  display: inline-block;
+  flex-shrink: 0;
+}
+.operator-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  line-height: 1.2;
+}
+.op-icon {
+  color: var(--accent);
+  font-size: 11px;
+}
+.op-label {
+  color: #64748b;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+.op-sub, .topbar-sub {
+  color: #94a3b8;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
   font-weight: 500;
+  letter-spacing: 0.2px;
 }
 
 /* Active Employee Switcher Pill */
@@ -139,64 +204,108 @@ body {
   font-size: 13px;
 }
 
+/* Actions */
 .topbar-actions {
   margin-left: auto;
   display: flex;
-  gap: 10px;
+  gap: 8px;
   align-items: center;
 }
 .live-clock-pill {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 7px 14px;
-  background: rgba(13, 24, 45, 0.9);
-  border: 1px solid var(--border);
-  border-radius: 10px;
+  gap: 7px;
+  padding: 5px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 9999px;
   font-family: 'JetBrains Mono', monospace;
-  font-size: 12.5px;
-  color: var(--text);
-  font-weight: 600;
+  font-size: 11px;
+  color: #94a3b8;
+  font-weight: 500;
+  letter-spacing: 0.3px;
 }
-.live-clock-pill i { color: var(--accent); font-size: 14px; }
-.topbar-action {
-  border: 1px solid var(--border);
-  background: rgba(6, 15, 30, 0.85);
-  color: var(--text);
-  padding: 8px 14px;
-  border-radius: 10px;
-  font-size: 13px;
-  font-weight: 600;
+.live-clock-pill i {
+  color: var(--accent);
+  font-size: 11px;
+}
+
+.topbar-btn-group {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 2px;
+}
+.topbar-btn-util {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  font-size: 11.5px;
+  font-weight: 500;
+  padding: 5px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+.topbar-btn-util:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+}
+.btn-group-divider {
+  width: 1px;
+  height: 14px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.topbar-btn-nav, .topbar-action {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #cbd5e1;
+  border-radius: 8px;
+  padding: 5px 12px;
+  font-size: 11.5px;
+  font-weight: 500;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   cursor: pointer;
   transition: all 0.2s ease;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  text-decoration: none;
+  font-family: inherit;
 }
-.topbar-action:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-  background: rgba(0, 229, 255, 0.12);
-  box-shadow: 0 0 14px rgba(0, 229, 255, 0.25);
+.topbar-btn-nav:hover, .topbar-action:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.16);
 }
+
 .switch-link {
-  padding: 8px 16px;
-  background: rgba(245, 158, 11, 0.15);
-  border: 1.5px solid rgba(245, 158, 11, 0.45);
-  border-radius: 10px;
-  font-size: 13px;
-  font-weight: 800;
-  color: var(--yellow);
+  padding: 5px 14px;
+  background: linear-gradient(135deg, rgba(0, 229, 255, 0.12) 0%, rgba(2, 132, 199, 0.18) 100%);
+  border: 1px solid rgba(0, 229, 255, 0.35);
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #38bdf8;
   text-decoration: none;
-  transition: all 0.2s ease;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 7px;
+  box-shadow: 0 0 16px rgba(0, 229, 255, 0.12);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .switch-link:hover {
-  background: rgba(245, 158, 11, 0.28);
-  box-shadow: 0 0 16px rgba(245, 158, 11, 0.35);
+  background: linear-gradient(135deg, rgba(0, 229, 255, 0.22) 0%, rgba(2, 132, 199, 0.3) 100%);
+  border-color: rgba(0, 229, 255, 0.6);
+  color: #ffffff;
+  box-shadow: 0 0 24px rgba(0, 229, 255, 0.28);
+  transform: translateY(-1px);
 }
 
 /* Sidebar Employee Selector List */
@@ -1648,9 +1757,10 @@ body.mode-redacted .datablock {
   border: 1px solid rgba(255,255,255,0.06);
 }
 
-@media(max-width: 860px) {
-  .topbar { padding: 12px 16px; gap: 10px; flex-wrap: wrap; }
-  .topbar-sub, .live-clock-pill { display: none; }
+@media(max-width: 960px) {
+  .topbar { padding: 10px 16px; gap: 10px; flex-wrap: wrap; }
+  .operator-chip, .topbar-sub, .live-clock-pill { display: none; }
+  .topbar-btn-util span { display: none; }
   .layout { flex-direction: column; }
   .sidebar { width: 100%; border-right: none; border-bottom: 1px solid var(--border); }
   .inner { padding: 20px 16px; }
@@ -1664,15 +1774,19 @@ body.mode-redacted .datablock {
 
 <!-- Header Top Bar -->
 <div class="topbar">
-  <div class="logo" style="background: linear-gradient(135deg, #00e5ff 0%, #0284c7 100%);">
-    <i class="fa-solid fa-satellite" style="font-size: 20px; color: #020c1b;"></i>
+  <div class="logo">
+    <i class="fa-solid fa-satellite" style="font-size: 17px; color: #00e5ff;"></i>
   </div>
   <div class="topbar-branding">
-    <div class="topbar-title">
-      ISRO VISION VAULT
-      <span style="font-size:11px; font-weight:800; color:var(--accent); background:rgba(0,229,255,0.14); border:1px solid rgba(0,229,255,0.4); padding:3px 10px; border-radius:12px; letter-spacing:0.5px;">MISSION FLIGHT ENCLAVE</span>
+    <div class="brand-row">
+      <div class="topbar-title">ISRO VISION VAULT</div>
+      <div class="enclave-badge"><span class="pulse-dot"></span> ENCLAVE ACTIVE</div>
     </div>
-    <div class="topbar-sub" id="topbar-emp-sub">Deep Space Network &bull; Gaganyaan Flight Operations &bull; Zero-PII Hardware Enclave</div>
+    <div class="operator-chip">
+      <i class="fa-solid fa-user-astronaut op-icon"></i>
+      <span class="op-label">OPERATOR:</span>
+      <span class="op-sub" id="topbar-emp-sub">Natesh Kanna R (ISRO-10101 &bull; Flight Software &amp; Spacecraft Control)</span>
+    </div>
   </div>
 
   <!-- Hidden Employee Selector for state compatibility -->
@@ -1687,14 +1801,29 @@ body.mode-redacted .datablock {
 
   <div class="topbar-actions">
     <div class="live-clock-pill">
+      <span class="pulse-dot-green"></span>
       <i class="fa-regular fa-clock"></i>
       <span id="liveEmpUtcClock">UTC 00:00:00</span>
     </div>
-    <button class="topbar-action" onclick="clearEmployeeChat()"><i class="fa-solid fa-trash-can"></i> Clear Chat</button>
-    <button class="topbar-action" onclick="clearEmployeeForms()"><i class="fa-solid fa-arrows-rotate"></i> Reset Records</button>
-    <a class="topbar-action" href="index.html"><i class="fa-solid fa-house"></i> Command Hub</a>
-    <a class="switch-link" href="hr-portal.html" style="background: rgba(0, 229, 255, 0.12); border: 1.5px solid rgba(0, 229, 255, 0.4); color: var(--accent);">
-      <i class="fa-solid fa-satellite"></i> HR &amp; Satellite Command &rarr;
+    <div class="topbar-btn-group">
+      <button class="topbar-btn-util" onclick="clearEmployeeChat()" title="Clear chat history">
+        <i class="fa-solid fa-trash-can"></i>
+        <span>Clear Chat</span>
+      </button>
+      <div class="btn-group-divider"></div>
+      <button class="topbar-btn-util" onclick="clearEmployeeForms()" title="Reset records">
+        <i class="fa-solid fa-arrows-rotate"></i>
+        <span>Reset</span>
+      </button>
+    </div>
+    <a class="topbar-btn-nav" href="index.html" title="Command Hub Landing Page">
+      <i class="fa-solid fa-house"></i>
+      <span>Hub</span>
+    </a>
+    <a class="switch-link" href="hr-portal.html">
+      <i class="fa-solid fa-satellite"></i>
+      <span>HR &amp; Satellite Command</span>
+      <i class="fa-solid fa-arrow-right" style="font-size: 10px; opacity: 0.7;"></i>
     </a>
   </div>
 </div>
@@ -2551,7 +2680,7 @@ function applyActiveEmployeeUI() {
   const topImg = document.getElementById("emp-top-img");
   if (topImg) topImg.src = e.image;
   const topSub = document.getElementById("topbar-emp-sub");
-  if (topSub) topSub.textContent = `Operator Database — ${e.name} (${e.id} | ${e.dept})`;
+  if (topSub) topSub.textContent = `${e.name} (${e.id} • ${e.dept})`;
   
   // Update Chat Contacts List Active State
   document.querySelectorAll(".emp-chat-item").forEach(item => {
@@ -2845,7 +2974,7 @@ function submitForm(id){
 function updateEmpClock(){
   const now = new Date();
   const el = document.getElementById("liveEmpUtcClock");
-  if (el) el.textContent = "UTC " + now.toUTCString().slice(17, 25) + " | IST " + now.toLocaleTimeString("en-IN", { hour12: false });
+  if (el) el.textContent = "UTC " + now.toUTCString().slice(17, 25) + " • IST " + now.toLocaleTimeString("en-IN", { hour12: false });
 }
 setInterval(updateEmpClock, 1000);
 updateEmpClock();

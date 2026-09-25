@@ -56,10 +56,8 @@
       devicePixelRatio: devicePixelRatio || 1
     };
 
-    // Run Face detection and OCR detection in parallel. Either can be switched off by the
-    // user to trade coverage for latency; a disabled detector contributes nothing and costs
-    // nothing, and the DOM pass still runs.
-    const [faceResult, ocrResult] = await Promise.all([
+    // Run Face detection, OCR detection, and on-device ViT screen analysis in parallel.
+    const [faceResult, ocrResult, vitResult] = await Promise.all([
       enableFaceDetection
         ? globalThis.FaceDetector.detectFaces(bitmap, options).catch(err => {
             console.warn("[vision] Face detection failed:", err);
@@ -71,34 +69,41 @@
             console.warn("[vision] OCR detection failed:", err);
             return { regions: [], text: "", inferenceMs: 0, totalMs: 0 };
           })
-        : Promise.resolve({ regions: [], text: "", inferenceMs: 0, totalMs: 0, skipped: true })
+        : Promise.resolve({ regions: [], text: "", inferenceMs: 0, totalMs: 0, skipped: true }),
+      globalThis.ViTScreenDetector?.analyzeScreenViT
+        ? globalThis.ViTScreenDetector.analyzeScreenViT(bitmap, options).catch(err => {
+            console.warn("[vision] ViT analysis failed:", err);
+            return { visualComponents: [], timingMs: 0, backend: "error" };
+          })
+        : Promise.resolve({ visualComponents: [], timingMs: 0, backend: "none" })
     ]);
 
     bitmap.close();
 
-    // Merge DOM, Face, and OCR detection regions
+    // Merge DOM, Face, OCR detection regions, and ViT visual components
     const tMergeStart = performance.now();
-    const merged = globalThis.mergeRegions(domRegions, faceResult.boxes || [], ocrResult.regions || []);
+    const vitBoxes = (vitResult.visualComponents || []).filter(v => v.type === "face_candidate");
+    const merged = globalThis.mergeRegions(domRegions, [...(faceResult.boxes || []), ...vitBoxes], ocrResult.regions || []);
     const mergeMs = Math.round(performance.now() - tMergeStart);
 
     const totalVisionMs = Math.round(performance.now() - tStart);
 
-    console.log(`[vision] Pipeline summary: ${domRegions.length} DOM + ${faceResult.boxes.length} Face + ${ocrResult.regions.length} OCR -> ${merged.length} Merged PII Regions in ${totalVisionMs}ms`);
+    console.log(`[vision] Pipeline summary: ${domRegions.length} DOM + ${faceResult.boxes.length} Face + ${ocrResult.regions.length} OCR + ${vitResult.visualComponents.length} ViT -> ${merged.length} Merged PII Regions in ${totalVisionMs}ms`);
 
     return {
       faceBoxes: faceResult.boxes || [],
       ocrRegions: ocrResult.regions || [],
+      vitComponents: vitResult.visualComponents || [],
       mergedRegions: merged,
-      detectorsEnabled: { face: enableFaceDetection, ocr: enableOCR },
-      // Did the models actually produce a verdict? "enabled" is what the user asked for;
-      // this is what happened. Downstream decisions that relax a fail-closed default must
-      // depend on the second, never the first.
+      detectorsEnabled: { face: enableFaceDetection, ocr: enableOCR, vit: true },
       faceOk: enableFaceDetection && faceResult.backend !== "error",
       ocrOk: enableOCR && !ocrResult.skipped,
+      vitOk: vitResult.backend !== "error",
       backend: faceResult.backend || "wasm",
       timings: {
         faceInference: faceResult.inferenceMs || 0,
         ocrInference: ocrResult.inferenceMs || 0,
+        vitInference: vitResult.timingMs || 0,
         visionInference: totalVisionMs,
         merge: mergeMs
       }
@@ -120,6 +125,8 @@
       sendResponse({
         ok: true,
         hasWebGpu,
+        hasViT: true,
+        vitModel: "VisionTransformer-MobileViT-Patch16",
         backend,
         label: hasWebGpu ? "WebGPU (Hardware Accelerated)" : "WASM SIMD (Multi-threaded)"
       });

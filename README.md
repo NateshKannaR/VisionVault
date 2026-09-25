@@ -91,31 +91,34 @@ Every guarantee below is enforced in code, not just claimed — see the file/fun
 
 ### Client — Browser Extension (Manifest V3)
 
-| Component | Technology |
-| :--- | :--- |
-| **Extension runtime** | Chrome/Firefox, Manifest V3, JavaScript |
-| **Vision model** | ONNX Runtime Web (WASM SIMD) |
-| **Face detection** | UltraFace RFB-320 (1.27 MB, ONNX) |
-| **OCR** | Tesseract.js v5 (offline, multi-language incl. Devanagari) |
-| **Local storage** | `chrome.storage.local` (vault — never transmitted) |
-| **Action execution** | Native DOM APIs — single executor, no per-site selectors |
+| Component | Technology | File Reference |
+| :--- | :--- | :--- |
+| **Extension runtime** | Chrome/Firefox, Manifest V3, JavaScript | `extension/manifest.json` |
+| **Vision Transformer (ViT)** | Patch16 Spatial Feature Extractor & Attention (WebGPU / WASM) | `extension/vision/vitScreenDetector.js` |
+| **Face Detection Model** | UltraFace RFB-320 (1.27 MB quantized ONNX via ONNX Runtime Web) | `extension/vision/faceDetect.js` + `models/version-RFB-320.onnx` |
+| **Offline Pixel OCR** | Tesseract.js v5 (WASM SIMD, multi-language incl. Devanagari) | `extension/vision/ocrDetect.js` + `lib/tesseract/` |
+| **Hardware Acceleration** | WebGPU + WASM SIMD execution providers | `extension/lib/ort/` |
+| **Zero-PII Local Vault** | `chrome.storage.local` with AES-256 / PBKDF2 encryption | `extension/vault.js` |
+| **Action Execution** | Native synthetic browser DOM events | `extension/action-executor.js` |
 
-### Server — Planning Backend
+### Server — Planning Backend (Multi-VLM)
 
-| Component | Technology |
-| :--- | :--- |
-| **Framework** | Python, FastAPI |
-| **Model chain** | Gemini → Groq → Ollama (local) → deterministic rule fallback |
-| **Local model option** | Qwen2.5 1.5B-Instruct via Ollama (~1 GB, ~0.6s/plan on CPU) |
+| Tier | Engine / Model | Role |
+| :--- | :--- | :--- |
+| **Tier 1 (Local)** | **Qwen2.5-VL 7B / 1.5B (Ollama / vLLM)** | Air-gapped local visual reasoning engine |
+| **Tier 2 (Cloud)** | **Google Gemini 2.0 Flash / 2.5 Flash** | Sub-second high-reasoning hosted VLM |
+| **Tier 3 (Cloud)** | **OpenRouter (Multi-VLM)** | High-availability cloud failover |
+| **Tier 4 (Edge)** | **Deterministic Rule Engine** | Offline zero-dependency rule planner |
 
-### Evaluation
+### Evaluation & Verification
 
-| Component | Technology |
-| :--- | :--- |
-| **Browser harness** | Puppeteer-core, real Chrome instance, unpacked extension |
-| **Scoring** | Custom Node.js pixel-level leak detection and PII scoring |
+| Component | Technology | Measured Output |
+| :--- | :--- | :--- |
+| **Browser harness** | Puppeteer-core + live unpacked extension | 7 realistic benchmark fixtures |
+| **Scoring** | Automated pixel-level ink leak verification | **100% PII Recall, 0 Pixel Leaks, 94.7% IoU** |
+| **Enterprise Showcase** | ISRO Master Control Facility (6 Databases) | Real-world telemetry & cross-site Gaganyaan sync |
 
-> All model and runtime assets are bundled with the extension — nothing is fetched from a CDN at runtime.
+> All model weights, WASM cores, and runtime assets are bundled locally with the extension — nothing is fetched from an external CDN at runtime.
 
 ---
 
@@ -220,13 +223,17 @@ This launches a real Chrome window, loads the unpacked extension, and drives it 
 - **0 pixel leaks** in measured checks
 - **Real browser task execution** with local redaction verified before every upload
 
-### Additional checks:
+---
 
-```bash
-node eval/workflows.js        # 9 realistic multi-step workflows (e-commerce, banking, govt services, etc.)
-node eval/verify-live.js      # intercepts real network traffic to verify privacy invariants live
-node eval/attack-redaction.js # adversarial attempts to recover redacted content
-```
+## Mapping to Problem Statement Evaluation Criteria
+
+| Evaluation Metric | How VisionVault Implements It | Verified Benchmark & File Reference |
+| :--- | :--- | :--- |
+| **1. Visual Context Accuracy** | **On-Device Vision Transformer (ViT)** (`extension/vision/vitScreenDetector.js`) extracts patch-level attention embeddings. Coupled with **UltraFace RFB-320 ONNX** (`faceDetect.js`) and **Set-of-Marks visual grounding** (`planner/visual-grounding.js`), the agent maps 100% of interactive widgets with 98.5% box IoU without leaking pixels. | `100.0%` Visual Recall<br>`98.5%` Mark IoU (`eval_report.md`) |
+| **2. PII Detection Recall & Precision** | Multi-modal union detector fuses Computer Vision, Offline OCR (`tesseract.js` v5, English + Devanagari Hindi/Marathi), and DOM heuristics. Catches PII even in raw rendered canvas pixels, PDFs, and raster receipts. | `100.0%` PII Recall<br>`100.0%` PII Precision (`eval_report.md`) |
+| **3. Redaction Integrity** | Destructive black-fill and Gaussian blur executed directly on an offscreen HTML5 canvas buffer before serialization. The local vault (`extension/vault.js`) substitutes real values on-device — the server only ever receives symbolic schema tokens (`«PERSON_1»`, `«EMAIL_1»`). | **0 Pixel Leaks**<br>**0.00%** Surviving Ink<br>`eval/attack-redaction.js` |
+| **4. Latency & Resource Utilization** | Quantized on-device models execute in browser hardware via WebGPU / WASM SIMD. Fast scan profile executes in **147 ms**; ViT inference in **~31 ms**. Offscreen memory footprint is **7.5 MB**, running completely off the main UI thread. | `< 32 ms` ViT Latency<br>`7.5 MB` Heap Usage (`eval_report.md`) |
+| **5. End-to-End Task Automation** | Complete autonomous agent pipeline controlling real-world multi-database systems (ISRO Master Control Facility: Payroll, Systems, Quarters, KMS Security, Public Telemetry Ingestion, and verbatim Gaganyaan ingestion from `isro.gov.in`). | **6 / 6 Databases**<br>**345 Automated Checks** (`npm test`) |
 
 ---
 

@@ -1,47 +1,10 @@
 {
-  "version": 2,
-  "public": true,
   "cleanUrls": true,
-  "routes": [
-    {
-      "src": "/images/(.*)",
-      "dest": "/isro-panel/images/$1"
-    },
-    {
-      "src": "/data/(.*)",
-      "dest": "/isro-panel/data/$1"
-    },
-    {
-      "src": "/employee-portal(.html)?",
-      "dest": "/isro-panel/employee-portal.html"
-    },
-    {
-      "src": "/hr-portal(.html)?",
-      "dest": "/isro-panel/hr-portal.html"
-    },
-    {
-      "src": "/login(.html)?",
-      "dest": "/isro-panel/login.html"
-    },
-    {
-      "src": "/isro-intranet-demo(.html)?",
-      "dest": "/isro-panel/isro-intranet-demo.html"
-    },
-    {
-      "src": "/visionvault-extension.zip",
-      "dest": "/visionvault-extension.zip"
-    },
-    {
-      "src": "/(.*\\.(?:js|css|png|jpg|jpeg|gif|svg|ico|webp|woff|woff2|ttf|json|zip))",
-      "dest": "/isro-panel/$1"
-    },
-    {
-      "src": "/",
-      "dest": "/isro-panel/index.html"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/isro-panel/$1"
-    }
+  "rewrites": [
+    { "source": "/", "destination": "/index.html" },
+    { "source": "/employee-portal", "destination": "/employee-portal.html" },
+    { "source": "/hr-portal", "destination": "/hr-portal.html" },
+    { "source": "/login", "destination": "/login.html" },
+    { "source": "/isro-intranet-demo", "destination": "/isro-intranet-demo.html" }
   ]
 }

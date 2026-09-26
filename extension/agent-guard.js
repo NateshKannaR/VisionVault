@@ -458,7 +458,10 @@
         // evaluation fixture the planner called a six-field signup done after five, leaving
         // the address blank. Bounded by MAX_DONE_OVERRIDES, so a form with fields nothing can
         // fill still terminates.
-        const fillIncomplete = !!parsed?.wantsFill && unfilledFields(marks, ctx.filledIds).length > 0;
+        const fillIncomplete = !!parsed?.wantsFill &&
+          !progress?.missionSubmitted &&
+          !progress?.formSubmitted &&
+          unfilledFields(marks, ctx.filledIds).length > 0;
 
         if ((goalSatisfied(parsed, progress) && !fillIncomplete) || doneOverrides >= MAX_DONE_OVERRIDES) {
           const unmet = describeRemaining(parsed, progress);
@@ -508,6 +511,15 @@
             action: { ...alt, action: altType },
             substituted: true,
             reason: `Refused a ${seen + 1}th identical ${type}; trying a different approach.`,
+          };
+        }
+        // If the task was filling a form and fields are filled or form was submitted, finish as done cleanly
+        if (parsed?.wantsFill && (progress?.missionSubmitted || progress?.formSubmitted || progress?.filledAny)) {
+          return {
+            action: { action: "done", reasoning: "Task complete: form parameters populated." },
+            stop: false,
+            substituted: true,
+            reason: "Completed form fill sequence.",
           };
         }
         return {

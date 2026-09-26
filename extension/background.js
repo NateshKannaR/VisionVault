@@ -1495,7 +1495,7 @@ async function phaseRun() {
       if (!actionType || actionType === "done") {
         // Before believing a form is finished, check whether the rest of it is simply below
         // the fold. Tagging is viewport-only, so "no fields left" can mean "no fields visible".
-        if (session.parsedTask?.wantsFill && await scrollForMoreFields()) {
+        if (session.parsedTask?.wantsFill && !session.progress?.formSubmitted && !session.progress?.missionSubmitted && await scrollForMoreFields()) {
           notifyPopup({ type: "step", step: session.stepCount, status: "More fields below — continuing." });
           continue;
         }
@@ -1938,6 +1938,11 @@ async function phaseRun() {
           }
           if (resp.isCreateRepo || /\bcreate\s+repository\b/i.test(tLabel)) {
             session.progress.repoCreated = true;
+          }
+          if (resp.isSubmit || /\b(submit|commit|save|add\s*mission|commit\s*gaganyaan|register)\b/i.test(tLabel) || /submit|commit/i.test(resp.reasoning || "")) {
+            session.progress.formSubmitted = true;
+            session.progress.missionSubmitted = true;
+            session.progress.filledAny = true;
           }
         }
         session.actionLog.push({ action: "click", mark_id: resp.mark_id, serverMs, ok: clickOk, error: clickOk ? undefined : exec?.error });

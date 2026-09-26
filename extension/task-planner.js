@@ -1611,19 +1611,20 @@
       if (parsed.wantsGaganyaanSync || /\b(?:database\s*6|db\s*6|db6)\b/i.test(parsed.raw || "") || available.some(m => m.id === "gy-mission_name" || (typeof m.id === "string" && m.id.startsWith("gy-")))) {
         // If on hr-portal, navigate to employee-portal where Database 6 exists
         if (/hr-portal/i.test(url)) {
+          const origin = url.includes("://") ? url.split("/hr-portal")[0] : (progress.portalOriginUrl || "http://localhost:3000");
           return {
             action: "navigate",
-            value: "http://localhost:3000/employee-portal.html",
+            value: `${origin}/employee-portal.html`,
             reasoning: "Navigate to ISRO Employee Portal containing Database 6 (Gaganyaan Human Spaceflight)"
           };
         }
 
         // Navigate to Gaganyaan DB6 tab if not visible
         const isGaganyaanFormVisible = available.some(m =>
-          FILLABLE_ROLES.has(m.role) && (
-            /mission\s*name|mission\s*program|crew\s*capacity|crew\s*count|orbit\s*altitude|gy-/i.test(m.label || "") ||
-            m.id === "gy-mission_name" || m.id === "gy-vehicle" || m.id === "gy-program"
-          )
+          (FILLABLE_ROLES.has(m.role) && (
+            /mission\s*name|mission\s*program|crew\s*capacity|crew\s*count|orbit\s*altitude|module|escape|gy-/i.test(m.label || "") ||
+            m.id === "gy-mission_name" || m.id === "gy-vehicle" || m.id === "gy-program" || m.id === "gy-submit" || m.domId === "gy-submit"
+          )) || m.id === "gy-submit" || m.domId === "gy-submit"
         );
         if (!isGaganyaanFormVisible) {
           const db6Nav = available.find(m =>
@@ -1834,6 +1835,7 @@
           return {
             action: "click",
             mark_id: gySubmit.id,
+            isSubmit: true,
             reasoning: "Submit Gaganyaan DB6 record — official mission parameters synchronized from isro.gov.in verbatim"
           };
         } else if (!progress.missionSubmitted) {

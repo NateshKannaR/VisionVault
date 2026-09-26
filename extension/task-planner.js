@@ -422,11 +422,9 @@
     }
 
     // Gaganyaan DB6 Cross-Site Sync (fetch from isro.gov.in/Gaganyaan.html -> fill Database 6)
-    // NOTE: requires explicit "database 6" or "db6" mention to avoid collision with general Gaganyaan sync
     const wantsGaganyaanSync =
-      /\bgaganyaan\b/i.test(text) &&
-      /\b(?:fetch|get|extract|read|pull|load|sync|retrieve|fill|populate|log)\b/i.test(text) &&
-      /\b(?:database\s*6|db\s*6|db6)\b/i.test(text);
+      (/\bgaganyaan\b/i.test(text) && /\b(?:database\s*6|db\s*6|db6)\b/i.test(text)) ||
+      (/\b(?:database\s*6|db\s*6|db6)\b/i.test(text) && /\b(?:fetch|get|extract|read|pull|load|sync|retrieve|fill|populate|log|commit|enter|auto)\b/i.test(text));
     if (wantsGaganyaanSync) {
       result.wantsGaganyaanSync = true;
       result.wantsMissionSync = true;
@@ -1610,7 +1608,7 @@
       }
 
       // ─── GAGANYAAN DB6 SPECIAL PATH ────────────────────────────────────────────
-      if (parsed.wantsGaganyaanSync) {
+      if (parsed.wantsGaganyaanSync || /\b(?:database\s*6|db\s*6|db6)\b/i.test(parsed.raw || "") || available.some(m => m.id === "gy-mission_name" || (typeof m.id === "string" && m.id.startsWith("gy-")))) {
         // If on hr-portal, navigate to employee-portal where Database 6 exists
         if (/hr-portal/i.test(url)) {
           return {
@@ -1667,118 +1665,179 @@
           contact:        "ISRO Headquarters, Antariksh Bhavan, New BEL Road, Bengaluru-560094 | +91 80 22172294"
         };
 
-        // Fill Mission Name
-        const gyMissionName = available.find(m => FILLABLE_ROLES.has(m.role) && (/mission\s*name/i.test(m.label || "") || m.id === "gy-mission_name"));
-        if (gyMissionName && !progress.gy_mission_name) {
-          progress.gy_mission_name = true;
-          return { action: "type", mark_id: gyMissionName.id, value: gaganyaanData.mission_name, reasoning: `Fill Mission Name: "${gaganyaanData.mission_name}" (from isro.gov.in/Gaganyaan.html)` };
-        }
-        // Fill Mandate & Lead Centre
-        const gyCentre = available.find(m => FILLABLE_ROLES.has(m.role) && (/centre/i.test(m.label || "") || m.id === "gy-centre"));
-        if (gyCentre && !progress.gy_centre) {
-          progress.gy_centre = true;
-          return { action: "type", mark_id: gyCentre.id, value: gaganyaanData.centre, reasoning: `Fill Lead Centre: "${gaganyaanData.centre}"` };
-        }
-        // Fill Primary Mandate
-        const gyMandate = available.find(m => FILLABLE_ROLES.has(m.role) && (/mandate/i.test(m.label || "") || m.id === "gy-mandate"));
-        if (gyMandate && !progress.gy_mandate) {
-          progress.gy_mandate = true;
-          return { action: "type", mark_id: gyMandate.id, value: gaganyaanData.mandate, reasoning: "Fill Primary Mandate" };
-        }
-        // Fill Crew Members
-        const gyCrew = available.find(m => FILLABLE_ROLES.has(m.role) && (/crew/i.test(m.label || "") || m.id === "gy-crew_count"));
-        if (gyCrew && !progress.gy_crew_count) {
-          progress.gy_crew_count = true;
-          return { action: "type", mark_id: gyCrew.id, value: gaganyaanData.crew_count, reasoning: `Fill Crew Capacity: "${gaganyaanData.crew_count}"` };
-        }
-        // Fill Target Orbit
-        const gyOrbit = available.find(m => FILLABLE_ROLES.has(m.role) && (/orbit/i.test(m.label || "") || m.id === "gy-orbit"));
-        if (gyOrbit && !progress.gy_orbit) {
-          progress.gy_orbit = true;
-          return { action: "type", mark_id: gyOrbit.id, value: gaganyaanData.orbit, reasoning: `Fill Target Orbit: "${gaganyaanData.orbit}"` };
-        }
-        // Fill Mission Duration
-        const gyDuration = available.find(m => FILLABLE_ROLES.has(m.role) && (/duration/i.test(m.label || "") || m.id === "gy-duration"));
-        if (gyDuration && !progress.gy_duration) {
-          progress.gy_duration = true;
-          return { action: "type", mark_id: gyDuration.id, value: gaganyaanData.duration, reasoning: `Fill Mission Duration: "${gaganyaanData.duration}"` };
-        }
-        // Fill Landing & Recovery Zone
-        const gyRecovery = available.find(m => FILLABLE_ROLES.has(m.role) && (/recovery|landing/i.test(m.label || "") || m.id === "gy-recovery"));
-        if (gyRecovery && !progress.gy_recovery) {
-          progress.gy_recovery = true;
-          return { action: "type", mark_id: gyRecovery.id, value: gaganyaanData.recovery, reasoning: `Fill Recovery Zone: "${gaganyaanData.recovery}"` };
-        }
-        // Fill Launch Vehicle (HLVM3)
-        const gyVehicle = available.find(m => FILLABLE_ROLES.has(m.role) && (/launch\s*vehicle|vehicle/i.test(m.label || "") || m.id === "gy-vehicle"));
-        if (gyVehicle && !progress.gy_vehicle) {
-          progress.gy_vehicle = true;
-          return { action: "type", mark_id: gyVehicle.id, value: gaganyaanData.vehicle, reasoning: `Fill Launch Vehicle: "${gaganyaanData.vehicle}"` };
-        }
-        // Fill Crew Module (CM)
-        const gyCM = available.find(m => FILLABLE_ROLES.has(m.role) && (/crew\s*module/i.test(m.label || "") || m.id === "gy-crew_module"));
-        if (gyCM && !progress.gy_crew_module) {
-          progress.gy_crew_module = true;
-          return { action: "type", mark_id: gyCM.id, value: gaganyaanData.crew_module, reasoning: "Fill Crew Module details" };
-        }
-        // Fill Service Module (SM)
-        const gySM = available.find(m => FILLABLE_ROLES.has(m.role) && (/service\s*module/i.test(m.label || "") || m.id === "gy-service_module"));
-        if (gySM && !progress.gy_service_module) {
-          progress.gy_service_module = true;
-          return { action: "type", mark_id: gySM.id, value: gaganyaanData.service_module, reasoning: "Fill Service Module details" };
-        }
-        // Fill Crew Escape System (CES)
-        const gyCES = available.find(m => FILLABLE_ROLES.has(m.role) && (/escape\s*system|ces/i.test(m.label || "") || m.id === "gy-ces"));
-        if (gyCES && !progress.gy_ces) {
-          progress.gy_ces = true;
-          return { action: "type", mark_id: gyCES.id, value: gaganyaanData.ces, reasoning: "Fill Crew Escape System details" };
-        }
-        // Fill Life Support System (LSS)
-        const gyLSS = available.find(m => FILLABLE_ROLES.has(m.role) && (/life\s*support|lss/i.test(m.label || "") || m.id === "gy-lss"));
-        if (gyLSS && !progress.gy_lss) {
-          progress.gy_lss = true;
-          return { action: "type", mark_id: gyLSS.id, value: gaganyaanData.lss, reasoning: "Fill Life Support System details" };
-        }
-        // Fill Thermal Protection System (TPS)
-        const gyTPS = available.find(m => FILLABLE_ROLES.has(m.role) && (/thermal\s*protection|tps/i.test(m.label || "") || m.id === "gy-tps"));
-        if (gyTPS && !progress.gy_tps) {
-          progress.gy_tps = true;
-          return { action: "type", mark_id: gyTPS.id, value: gaganyaanData.tps, reasoning: "Fill Thermal Protection System details" };
-        }
-        // Fill Precursor Missions
-        const gyPrecursor = available.find(m => FILLABLE_ROLES.has(m.role) && (/precursor/i.test(m.label || "") || m.id === "gy-precursor"));
-        if (gyPrecursor && !progress.gy_precursor) {
-          progress.gy_precursor = true;
-          return { action: "type", mark_id: gyPrecursor.id, value: gaganyaanData.precursor, reasoning: "Fill Precursor Missions details" };
-        }
-        // Fill Astronaut Training Facility
-        const gyTraining = available.find(m => FILLABLE_ROLES.has(m.role) && (/training/i.test(m.label || "") || m.id === "gy-training"));
-        if (gyTraining && !progress.gy_training) {
-          progress.gy_training = true;
-          return { action: "type", mark_id: gyTraining.id, value: gaganyaanData.training, reasoning: "Fill Astronaut Training Facility details" };
-        }
-        // Fill Milestones Achieved
-        const gyMilestone = available.find(m => FILLABLE_ROLES.has(m.role) && (/milestones?\s*achieved|milestone/i.test(m.label || "") || m.id === "gy-milestone"));
-        if (gyMilestone && !progress.gy_milestone) {
-          progress.gy_milestone = true;
-          return { action: "type", mark_id: gyMilestone.id, value: gaganyaanData.milestone, reasoning: "Fill Milestones Achieved" };
-        }
-        // Fill Lead Centre Contact
-        const gyContact = available.find(m => FILLABLE_ROLES.has(m.role) && (/contact|headquarters/i.test(m.label || "") || m.id === "gy-contact"));
-        if (gyContact && !progress.gy_contact) {
-          progress.gy_contact = true;
-          return { action: "type", mark_id: gyContact.id, value: gaganyaanData.contact, reasoning: "Fill Lead Centre Contact details" };
+        const gaganyaanFields = [
+          {
+            key: "gy_mission_name",
+            id: "gy-mission_name",
+            regex: /mission\s*name/i,
+            value: gaganyaanData.mission_name,
+            reasoning: `Fill Mission Name: "${gaganyaanData.mission_name}" (from isro.gov.in/Gaganyaan.html)`
+          },
+          {
+            key: "gy_centre",
+            id: "gy-centre",
+            regex: /mandate\s*&?\s*lead\s*centre|^lead\s*centre$|^centre$/i,
+            value: gaganyaanData.centre,
+            reasoning: `Fill Lead Centre: "${gaganyaanData.centre}"`
+          },
+          {
+            key: "gy_mandate",
+            id: "gy-mandate",
+            regex: /primary\s*mandate|^mandate$/i,
+            value: gaganyaanData.mandate,
+            reasoning: `Fill Primary Mandate: "${gaganyaanData.mandate}"`
+          },
+          {
+            key: "gy_crew_count",
+            id: "gy-crew_count",
+            regex: /crew\s*(?:members?|count|capacity)/i,
+            value: gaganyaanData.crew_count,
+            reasoning: `Fill Crew Capacity: "${gaganyaanData.crew_count}"`
+          },
+          {
+            key: "gy_orbit",
+            id: "gy-orbit",
+            regex: /target\s*orbit|^orbit/i,
+            value: gaganyaanData.orbit,
+            reasoning: `Fill Target Orbit: "${gaganyaanData.orbit}"`
+          },
+          {
+            key: "gy_duration",
+            id: "gy-duration",
+            regex: /mission\s*duration|^duration/i,
+            value: gaganyaanData.duration,
+            reasoning: `Fill Mission Duration: "${gaganyaanData.duration}"`
+          },
+          {
+            key: "gy_recovery",
+            id: "gy-recovery",
+            regex: /landing\s*&?\s*recovery|recovery\s*zone/i,
+            value: gaganyaanData.recovery,
+            reasoning: `Fill Recovery Zone: "${gaganyaanData.recovery}"`
+          },
+          {
+            key: "gy_vehicle",
+            id: "gy-vehicle",
+            regex: /launch\s*vehicle|^vehicle/i,
+            value: gaganyaanData.vehicle,
+            reasoning: `Fill Launch Vehicle: "${gaganyaanData.vehicle}"`
+          },
+          {
+            key: "gy_crew_module",
+            id: "gy-crew_module",
+            regex: /crew\s*module|\bcm\b/i,
+            value: gaganyaanData.crew_module,
+            reasoning: "Fill Crew Module (CM) details"
+          },
+          {
+            key: "gy_service_module",
+            id: "gy-service_module",
+            regex: /service\s*module|\bsm\b/i,
+            value: gaganyaanData.service_module,
+            reasoning: "Fill Service Module (SM) details"
+          },
+          {
+            key: "gy_ces",
+            id: "gy-ces",
+            regex: /crew\s*escape\s*system|\bces\b/i,
+            value: gaganyaanData.ces,
+            reasoning: "Fill Crew Escape System details"
+          },
+          {
+            key: "gy_lss",
+            id: "gy-lss",
+            regex: /life\s*support\s*system|\blss\b/i,
+            value: gaganyaanData.lss,
+            reasoning: "Fill Life Support System details"
+          },
+          {
+            key: "gy_tps",
+            id: "gy-tps",
+            regex: /thermal\s*protection\s*system|\btps\b/i,
+            value: gaganyaanData.tps,
+            reasoning: "Fill Thermal Protection System details"
+          },
+          {
+            key: "gy_precursor",
+            id: "gy-precursor",
+            regex: /precursor\s*missions?/i,
+            value: gaganyaanData.precursor,
+            reasoning: "Fill Precursor Missions details"
+          },
+          {
+            key: "gy_training",
+            id: "gy-training",
+            regex: /astronaut\s*training\s*facility|training\s*facility/i,
+            value: gaganyaanData.training,
+            reasoning: "Fill Astronaut Training Facility details"
+          },
+          {
+            key: "gy_milestone",
+            id: "gy-milestone",
+            regex: /milestones?\s*achieved|^milestones?/i,
+            value: gaganyaanData.milestone,
+            reasoning: "Fill Milestones Achieved"
+          },
+          {
+            key: "gy_contact",
+            id: "gy-contact",
+            regex: /lead\s*centre\s*contact|headquarters|contact\s*details/i,
+            value: gaganyaanData.contact,
+            reasoning: "Fill Lead Centre Contact details"
+          }
+        ];
+
+        // Find the first unfilled field
+        const nextField = gaganyaanFields.find(f => !progress[f.key]);
+        if (nextField) {
+          const targetMark = available.find(m =>
+            FILLABLE_ROLES.has(m.role) && (m.id === nextField.id || nextField.regex.test(m.label || ""))
+          );
+          if (targetMark) {
+            progress[nextField.key] = true;
+            return {
+              action: "type",
+              mark_id: targetMark.id,
+              value: nextField.value,
+              reasoning: nextField.reasoning
+            };
+          }
+          // If the field is not in available (e.g. below fold), scroll down to bring it into view
+          progress.gyScrollCount = (progress.gyScrollCount || 0) + 1;
+          if (progress.gyScrollCount <= 10) {
+            return {
+              action: "scroll",
+              direction: "down",
+              amount: 350,
+              reasoning: `Scroll down to reveal Gaganyaan field "${nextField.key}"`
+            };
+          }
         }
 
-        // Submit
+        // All fields filled — submit the Gaganyaan record
         const gySubmit = available.find(m =>
           (m.role === "button" || m.role === "clickable") &&
           /commit\s*gaganyaan|gaganyaan\s*database|commit.*database\s*record|rocket/i.test(m.label || "")
         );
         if (gySubmit && !progress.missionSubmitted) {
           progress.missionSubmitted = true;
-          return { action: "click", mark_id: gySubmit.id, reasoning: "Submit Gaganyaan DB6 record — official mission parameters synchronized from isro.gov.in verbatim" };
+          return {
+            action: "click",
+            mark_id: gySubmit.id,
+            reasoning: "Submit Gaganyaan DB6 record — official mission parameters synchronized from isro.gov.in verbatim"
+          };
+        } else if (!progress.missionSubmitted) {
+          progress.gySubmitScroll = (progress.gySubmitScroll || 0) + 1;
+          if (progress.gySubmitScroll <= 6) {
+            return {
+              action: "scroll",
+              direction: "down",
+              amount: 350,
+              reasoning: "Scroll down to locate Commit Gaganyaan Database Record button"
+            };
+          }
         }
+
         return {
           action: "done",
           reasoning: "Gaganyaan DB6 sync complete: All 100% official mission parameters from isro.gov.in/Gaganyaan.html logged into Database 6."

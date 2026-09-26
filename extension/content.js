@@ -200,10 +200,11 @@ function isElementInViewport(el) {
 
   const vw = window.innerWidth || document.documentElement.clientWidth;
   const vh = window.innerHeight || document.documentElement.clientHeight;
+  const marginY = 1000;
   return (
-    r.bottom > 0 &&
+    r.bottom > -marginY &&
     r.right > 0 &&
-    r.top < vh &&
+    r.top < vh + marginY &&
     r.left < vw
   );
 }

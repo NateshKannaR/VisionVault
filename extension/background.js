@@ -1670,7 +1670,7 @@ async function phaseRun() {
         }
 
         const exec = await withDeadlineSoft(
-          executeMarkAction("type", resp.mark_id, value || ""), 20000, "type action",
+          executeMarkAction("type", resp.mark_id, value || ""), 35000, "type action",
           { ok: false, error: "Typing timed out." });
 
         let typedOk = !!exec?.ok;

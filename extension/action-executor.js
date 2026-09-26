@@ -18,11 +18,17 @@
 
 (function (global) {
   const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-  const humanDelay = () => delay(8 + Math.random() * 12);
+  const humanDelay = (char) => {
+    let base = 42 + Math.random() * 38; // ~42-80ms realistic human keystroke cadence
+    if (char === " " || char === "," || char === "." || char === "-" || char === "/" || char === ":") {
+      base += 40 + Math.random() * 45; // natural typing pause on separators and punctuation
+    }
+    return delay(base);
+  };
 
-  // Above this length, typing is committed in one shot instead of per-character, so that long
-  // values (addresses, bios) do not add seconds of latency to a step.
-  const PER_CHAR_TYPING_LIMIT = 60;
+  // Above this length, typing is committed in one shot instead of per-character, so that massive
+  // values do not exceed timeouts. Set to 400 so all portal & form inputs type character-by-character.
+  const PER_CHAR_TYPING_LIMIT = 400;
 
   // ── Visual Ghost Cursor & Interaction Feedback ──────────────────────────────────────────
 
@@ -815,7 +821,10 @@
       if (realInput) targetEl = realInput;
     }
 
-    try { targetEl.scrollIntoView({ block: "center", behavior: "instant" }); } catch (_) {}
+    try {
+      targetEl.scrollIntoView({ block: "center", behavior: "smooth" });
+      await delay(180);
+    } catch (_) {}
 
     let r = targetEl.getBoundingClientRect();
     if (r.width < 2 || r.height < 2 || (r.left <= 0 && r.top <= 0)) {
@@ -882,7 +891,7 @@
           }));
         } catch (_) {}
         document.execCommand("insertText", false, char);
-        await humanDelay();
+        await humanDelay(char);
       }
 
       targetEl.dispatchEvent(new InputEvent("input", {
@@ -928,7 +937,7 @@
         setValue(current);
         targetEl.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: char }));
         dispatchKeyChar(targetEl, char, "keyup");
-        await humanDelay();
+        await humanDelay(char);
       }
     }
 

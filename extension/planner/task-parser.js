@@ -372,11 +372,9 @@
     }
 
     // Gaganyaan DB6 Cross-Site Sync
-    // NOTE: requires explicit "database 6" or "db6" mention to avoid collision with general Gaganyaan sync
     const wantsGaganyaanSync =
-      /\bgaganyaan\b/i.test(text) &&
-      /\b(?:fetch|get|extract|read|pull|load|sync|retrieve|fill|populate|log)\b/i.test(text) &&
-      /\b(?:database\s*6|db\s*6|db6)\b/i.test(text);
+      (/\bgaganyaan\b/i.test(text) && /\b(?:database\s*6|db\s*6|db6)\b/i.test(text)) ||
+      (/\b(?:database\s*6|db\s*6|db6)\b/i.test(text) && /\b(?:fetch|get|extract|read|pull|load|sync|retrieve|fill|populate|log|commit|enter|auto)\b/i.test(text));
     if (wantsGaganyaanSync) {
       result.wantsGaganyaanSync = true;
       result.wantsMissionSync = true;

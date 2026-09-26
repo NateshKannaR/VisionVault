@@ -1132,14 +1132,12 @@ function tagInteractiveElements() {
     markMap.set(stableId, el);
     markMap.set(String(stableId), el);
 
-    // A label is only safe to transmit if the scan did not just decide this element's text
-    // was personal data. Dropping it costs the planner a little context on that one control;
-    // sending it would put the value on the wire in clear text next to the image that was
-    // carefully masked to hide it.
-    const label = isInsideSensitiveText(el) ? null : safeLabel(el);
+    const isButtonOrSubmit = role === "button" || el.tagName === "BUTTON" || el.getAttribute("role") === "button" || el.type === "submit";
+    const label = (isInsideSensitiveText(el) && !isButtonOrSubmit) ? null : safeLabel(el);
 
     marks.push({
       id: stableId,
+      domId: el.id || null,
       role,
       box: r,
       label,

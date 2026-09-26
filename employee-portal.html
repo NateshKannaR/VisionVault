@@ -2513,7 +2513,7 @@ body.mode-redacted .datablock {
           <div class="fg"><label>Lead Centre Contact</label><input type="text" id="gy-contact" placeholder="ISRO Headquarters, Antariksh Bhavan, Bengaluru | +91 80 22172294"/></div>
         </div>
 
-        <button class="btn" style="background:linear-gradient(135deg,#7c3aed,#a78bfa);border:none;color:#fff;" onclick="submitForm('gaganyaan')">
+        <button type="button" id="gy-submit" aria-label="Commit Gaganyaan Database Record" class="btn" style="background:linear-gradient(135deg,#7c3aed,#a78bfa);border:none;color:#fff;" onclick="submitForm('gaganyaan')">
           <i class="fa-solid fa-rocket"></i> Commit Gaganyaan Database Record
         </button>
         <div class="toast" id="toast-gaganyaan"><i class="fa-solid fa-circle-check"></i> Gaganyaan mission database record synchronized successfully.</div>

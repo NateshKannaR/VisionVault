@@ -1240,7 +1240,20 @@
           const before = window.scrollY;
           window.scrollBy({ top: scrollAmount, behavior: "smooth" });
           await delay(500);
-          const moved = Math.abs(window.scrollY - before) > 4;
+          let moved = Math.abs(window.scrollY - before) > 4;
+          if (!moved) {
+            // Check for scrollable container on the page (like .page, .main, or active scroll container)
+            const scrollable = Array.from(document.querySelectorAll('.page.active, .page[style*="display: block"], [class*="page"], main, .main, [style*="overflow-y: auto"], [style*="overflow: auto"], div')).find(el => {
+              const s = window.getComputedStyle(el);
+              return (s.overflowY === "auto" || s.overflowY === "scroll") && el.scrollHeight > el.clientHeight;
+            });
+            if (scrollable) {
+              const elBefore = scrollable.scrollTop;
+              scrollable.scrollBy({ top: scrollAmount, behavior: "smooth" });
+              await delay(500);
+              moved = Math.abs(scrollable.scrollTop - elBefore) > 4;
+            }
+          }
           return { ok: true, moved, scrollY: window.scrollY };
         }
 

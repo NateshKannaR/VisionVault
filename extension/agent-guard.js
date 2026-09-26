@@ -157,7 +157,7 @@
       if (!parsed.openTargets.every((t) => openTargetMet(t, p))) return false;
     }
     if (parsed.wantsScroll && !p.scrolled) return false;
-    if (parsed.wantsFill && !p.filledAny) return false;
+    if (parsed.wantsFill && !p.filledAny && !p.missionSubmitted && !p.formSubmitted) return false;
     if (parsed.wantsMessage && !p.messageSent) return false;
     if (parsed.wantsStoreVault && !p.vaultStored) return false;
     return true;
@@ -220,7 +220,7 @@
     if (parsed?.wantsNonStop && !p.nonStopFiltered) left.push("filter non-stop flights");
     for (const t of parsed?.openTargets || []) if (!openTargetMet(t, p)) left.push(`open "${t}"`);
     if (parsed?.wantsScroll && !p.scrolled) left.push("scroll the page");
-    if (parsed?.wantsFill && !p.filledAny) left.push("fill the form");
+    if (parsed?.wantsFill && !p.filledAny && !p.missionSubmitted && !p.formSubmitted) left.push("fill the form");
     if (parsed?.wantsMessage && !p.messageSent) left.push(`send message to ${parsed.recipient || "recipient"}`);
     return left.join(", ");
   }

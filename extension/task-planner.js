@@ -1795,6 +1795,7 @@
           );
           if (targetMark) {
             progress[nextField.key] = true;
+            progress.filledAny = true;
             return {
               action: "type",
               mark_id: targetMark.id,
@@ -1809,18 +1810,27 @@
               action: "scroll",
               direction: "down",
               amount: 350,
+              value: 350,
               reasoning: `Scroll down to reveal Gaganyaan field "${nextField.key}"`
             };
           }
         }
 
         // All fields filled — submit the Gaganyaan record
-        const gySubmit = available.find(m =>
+        const allMarks = [...available, ...(state?.marks || [])];
+        const gySubmit = allMarks.find(m =>
+          m.id === "gy-submit" || m.domId === "gy-submit" || (
+            (m.role === "button" || m.role === "clickable") &&
+            /commit\s*gaganyaan|gaganyaan\s*database|commit.*database\s*record|rocket/i.test(m.label || "")
+          )
+        ) || allMarks.find(m =>
           (m.role === "button" || m.role === "clickable") &&
-          /commit\s*gaganyaan|gaganyaan\s*database|commit.*database\s*record|rocket/i.test(m.label || "")
+          /commit|submit/i.test(m.label || "")
         );
         if (gySubmit && !progress.missionSubmitted) {
           progress.missionSubmitted = true;
+          progress.formSubmitted = true;
+          progress.filledAny = true;
           return {
             action: "click",
             mark_id: gySubmit.id,
@@ -1828,11 +1838,12 @@
           };
         } else if (!progress.missionSubmitted) {
           progress.gySubmitScroll = (progress.gySubmitScroll || 0) + 1;
-          if (progress.gySubmitScroll <= 6) {
+          if (progress.gySubmitScroll <= 4) {
             return {
               action: "scroll",
               direction: "down",
               amount: 350,
+              value: 350,
               reasoning: "Scroll down to locate Commit Gaganyaan Database Record button"
             };
           }

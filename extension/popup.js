@@ -1411,21 +1411,7 @@ function renderScorecard(d) {
         + "an unmasked detection is not sent, so the alternative to 100% is no request at all."
       : "Nothing sensitive was detected on this screen. The same pipeline still ran.";
 
-  // Update Privacy Firewall HUD
-  const hudBudget = $("firewallBudgetBadge");
-  if (hudBudget) {
-    const budget = d.privacyBudget || { level: 0, id: "ZERO_PIXEL_DOM" };
-    hudBudget.textContent = budget.level === 0 ? "LEVEL 0: ZERO-PIXEL" : "LEVEL 3: REDACTED";
-  }
-  const hudRaw = $("hudRawPixels");
-  if (hudRaw) hudRaw.textContent = "0 KB";
-  const hudPii = $("hudPiiBytes");
-  if (hudPii) hudPii.textContent = "0 bytes";
-  const hudStatus = $("hudFirewallStatus");
-  if (hudStatus) {
-    hudStatus.textContent = blocked ? "✕ BLOCKED" : "✓ SAFE TO TRANSMIT (0 LEAKS)";
-    hudStatus.style.color = blocked ? "#ef4444" : "#10b981";
-  }
+
 }
 
 /** Paints a scan result into the panel. Shared by the Scan button and the run-time recovery. */

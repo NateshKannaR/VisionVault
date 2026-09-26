@@ -816,12 +816,7 @@
 
     // 1. Initial navigation if on the wrong site.
     if (parsed.siteUrl && !progress.navigated && !alreadyOnSite(url, parsed.siteUrl) && (!parsed.wantsMissionSync || !progress.isroDataFetched)) {
-      const isPortal = /localhost|127\.0\.0\.1|hr-portal|isro-intranet|isro-panel|employee-portal|isrovisionvault/i.test(url);
-      if (parsed.wantsGaganyaanSync && isPortal) {
-        progress.isroDataFetched = true;
-      } else {
-        return { action: "navigate", value: parsed.siteUrl, reasoning: `Open ${parsed.site}` };
-      }
+      return { action: "navigate", value: parsed.siteUrl, reasoning: `Open ${parsed.site}` };
     }
 
     // 2. Booking/travel flow — deterministic city-picker sequence.
@@ -1565,48 +1560,42 @@
       const isLocalPanel = /localhost|127\.0\.0\.1|hr-portal|isro-intranet|isro-panel|employee-portal|isrovisionvault/i.test(url);
       const isIsroGov = /isro\.gov\.in/i.test(url);
 
-      if (isLocalPanel && parsed.wantsGaganyaanSync) {
-        progress.isroDataFetched = true;
-      }
-
       // Phase 1: On isro.gov.in (or before reaching local panel)
       if (!progress.isroDataFetched) {
         if (!isIsroGov) {
-          if (isLocalPanel) {
-            progress.isroDataFetched = true;
-          } else {
+          return {
+            action: "navigate",
+            value: parsed.siteUrl || "https://www.isro.gov.in/Gaganyaan.html",
+            reasoning: "Navigate to official ISRO portal (isro.gov.in/Gaganyaan.html) to extract live mission telemetry"
+          };
+        }
+
+        // On isro.gov.in: find mission link if on general page, or directly extract if on mission page
+        if (!isGaganyaanPage && !progress.missionInspected) {
+          const missionRegex = parsed.mission === "nisar" ? /nisar|gslv[-_]?f16|upcoming\s*launch|next\s*launch/i :
+                               parsed.mission === "gaganyaan" ? /gaganyaan|crew\s*module|tv-d1/i :
+                               parsed.mission === "aditya-l1" ? /aditya|solar\s*flare|coronal/i :
+                               parsed.mission === "chandrayaan" ? /chandrayaan/i :
+                               /nisar|gslv[-_]?f16|gaganyaan|crew\s*module|tv-d1|chandrayaan|aditya|mission|launch/i;
+          const targetLink = available.find(m => (m.role === "link" || m.role === "clickable") && missionRegex.test(m.label || ""));
+
+          if (targetLink) {
+            progress.missionInspected = true;
             return {
-              action: "navigate",
-              value: "https://www.isro.gov.in",
-              reasoning: "Navigate to official ISRO portal (isro.gov.in) to extract live mission telemetry"
+              action: "click",
+              mark_id: targetLink.id,
+              openTarget: parsed.mission || "mission_brief",
+              reasoning: `Extract verified telemetry and launch profile for ${targetLink.label.slice(0, 60)}`
             };
           }
         }
 
-        // On isro.gov.in: find mission link if present
-        const missionRegex = parsed.mission === "nisar" ? /nisar|gslv[-_]?f16|upcoming\s*launch|next\s*launch/i :
-                             parsed.mission === "gaganyaan" ? /gaganyaan|crew\s*module|tv-d1/i :
-                             parsed.mission === "aditya-l1" ? /aditya|solar\s*flare|coronal/i :
-                             parsed.mission === "chandrayaan" ? /chandrayaan/i :
-                             /nisar|gslv[-_]?f16|gaganyaan|crew\s*module|tv-d1|chandrayaan|aditya|mission|launch/i;
-        const targetLink = available.find(m => (m.role === "link" || m.role === "clickable") && missionRegex.test(m.label || ""));
-
-        if (targetLink && !progress.missionInspected) {
-          progress.missionInspected = true;
-          return {
-            action: "click",
-            mark_id: targetLink.id,
-            openTarget: parsed.mission || "mission_brief",
-            reasoning: `Extract verified telemetry and launch profile for ${targetLink.label.slice(0, 60)}`
-          };
-        }
-
         progress.isroDataFetched = true;
-        const destUrl = (parsed.wantsGaganyaanSync || /employee-portal/i.test(parsed.raw)) ? "http://localhost:3000/employee-portal.html" : "http://localhost:3000/hr-portal.html";
+        const destUrl = progress.portalOriginUrl || ((parsed.wantsGaganyaanSync || /employee-portal/i.test(parsed.raw)) ? "http://localhost:3000/employee-portal.html" : "http://localhost:3000/hr-portal.html");
         return {
           action: "navigate",
           value: destUrl,
-          reasoning: "[Privacy Contrast]: Public launch telemetry extracted from isro.gov.in with 0 bytes redacted (public data flows freely). Transitioning to local Mission Dashboard to log entry."
+          reasoning: "[Privacy Contrast]: Public launch telemetry extracted from isro.gov.in with 0 bytes redacted (public data flows freely). Transitioning to ISRO Employee Portal to populate Database 6."
         };
       }
 

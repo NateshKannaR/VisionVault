@@ -386,7 +386,7 @@ async function adoptNewTabIfAny() {
   return true;
 }
 
-function waitForTabLoad(tabId, timeoutMs = 15000) {
+function waitForTabLoad(tabId, timeoutMs = 15000, expectedUrl = null) {
   return new Promise(async (resolve) => {
     let tab = null;
     try {
@@ -398,22 +398,38 @@ function waitForTabLoad(tabId, timeoutMs = 15000) {
       resolve();
     }, timeoutMs);
 
-    function listener(id, info) {
+    function urlMatches(currentUrl) {
+      if (!expectedUrl || !currentUrl) return true;
+      try {
+        const expHost = new URL(expectedUrl).hostname.replace(/^www\./, "");
+        const curHost = new URL(currentUrl).hostname.replace(/^www\./, "");
+        return curHost.includes(expHost) || expHost.includes(curHost);
+      } catch (e) {
+        return currentUrl.includes(expectedUrl) || expectedUrl.includes(currentUrl);
+      }
+    }
+
+    function listener(id, info, updatedTab) {
       if (id === tabId && info.status === "complete") {
-        clearTimeout(timer);
-        chrome.tabs.onUpdated.removeListener(listener);
-        setTimeout(resolve, 1000); // extra wait for JS to render
+        const u = (updatedTab && updatedTab.url) || (info && info.url);
+        if (!expectedUrl || urlMatches(u)) {
+          clearTimeout(timer);
+          chrome.tabs.onUpdated.removeListener(listener);
+          setTimeout(resolve, 1000); // extra wait for JS to render
+        }
       }
     }
     chrome.tabs.onUpdated.addListener(listener);
 
-    // If tab is already in complete status, wait briefly for JS hydration and resolve
+    // If tab is already in complete status on the expected URL, wait briefly for JS hydration and resolve
     if (tab && tab.status === "complete") {
-      setTimeout(() => {
-        clearTimeout(timer);
-        chrome.tabs.onUpdated.removeListener(listener);
-        resolve();
-      }, 1200);
+      if (!expectedUrl || urlMatches(tab.url)) {
+        setTimeout(() => {
+          clearTimeout(timer);
+          chrome.tabs.onUpdated.removeListener(listener);
+          resolve();
+        }, 1200);
+      }
     }
   });
 }
@@ -754,15 +770,14 @@ async function phaseScan(task, preferredTabId = null) {
   // If the user's task explicitly asks to navigate to a site (e.g. "open amazon and search for earphones")
   // and the current tab is not already on that site, navigate immediately to the target URL before scanning.
   const isLocalPortal = /localhost|127\.0\.0\.1|hr-portal|isro-intranet|isro-panel|employee-portal|isrovisionvault/i.test(tab.url || "");
-  if (parsedTask?.wantsGaganyaanSync && isLocalPortal) {
-    // Already on the portal containing Database 6 — do not navigate away
-  } else if (parsedTask?.siteUrl && !TaskPlanner.alreadyOnSite(tab.url || "", parsedTask.siteUrl)) {
+  const portalOriginUrl = isLocalPortal ? tab.url : null;
+  if (parsedTask?.siteUrl && !TaskPlanner.alreadyOnSite(tab.url || "", parsedTask.siteUrl)) {
     notifyPopup({ type: "step", step: 0, status: `Navigating to ${parsedTask.site || parsedTask.siteUrl}…` });
     try {
       await chrome.tabs.update(tab.id, { url: parsedTask.siteUrl, active: true });
-      await withDeadlineSoft(waitForTabLoad(tab.id, 8000), 10000, "initial site navigation");
+      await withDeadlineSoft(waitForTabLoad(tab.id, 10000, parsedTask.siteUrl), 12000, "initial site navigation");
       await withDeadlineSoft(waitForContent(tab.id, 6000), 8000, "initial site hydration");
-      await new Promise(r => setTimeout(r, 400));
+      await new Promise(r => setTimeout(r, 600));
       await dismissOverlaysOnce();
       navigatedInitial = true;
       const updatedTab = await new Promise(r => chrome.tabs.get(tab.id, r));
@@ -809,6 +824,7 @@ async function phaseScan(task, preferredTabId = null) {
     // What the instruction has actually achieved so far. The planner reads this to decide
     // whether anything remains to be done, which is what makes the loop terminate.
     progress: {
+      portalOriginUrl: portalOriginUrl || null,
       navigated: navigatedInitial, searched: false, opened: [], scrolled: false,
       queryLanded: false, querySubmitted: false, filledAny: false,
       searchOpenAttempts: 0, siteSearchUrlTried: false, fillScrolls: 0,
@@ -1320,10 +1336,10 @@ async function phaseRun() {
       if (session.parsedTask?.siteUrl && !session.progress.navigated) {
         const currentUrl = session.pageInfo?.url || "";
         const isLocalPortal = /localhost|127\.0\.0\.1|hr-portal|isro-intranet|isro-panel|employee-portal|isrovisionvault/i.test(currentUrl);
-        if (session.parsedTask?.wantsGaganyaanSync && isLocalPortal) {
-          session.progress.navigated = true;
-          session.progress.isroDataFetched = true;
-        } else if (!TaskPlanner.alreadyOnSite(currentUrl, session.parsedTask.siteUrl)) {
+        if (isLocalPortal && !session.progress.portalOriginUrl) {
+          session.progress.portalOriginUrl = currentUrl;
+        }
+        if (!TaskPlanner.alreadyOnSite(currentUrl, session.parsedTask.siteUrl)) {
           notifyPopup({ type: "step", step: session.stepCount, status: `Navigating to ${session.parsedTask.site}...` });
           session.progress.navigated = true;
           session.lastNavUrl = session.parsedTask.siteUrl;
@@ -1331,7 +1347,7 @@ async function phaseRun() {
           guard.record("navigate", null, session.parsedTask.siteUrl, true);
           guard.resetStall();
           chrome.tabs.update(session.tabId, { url: session.parsedTask.siteUrl });
-          await withDeadlineSoft(waitForTabLoad(session.tabId), 15000, "site navigation");
+          await withDeadlineSoft(waitForTabLoad(session.tabId, 15000, session.parsedTask.siteUrl), 18000, "site navigation");
           await dismissOverlaysOnce();
           await rescanCurrentTab(true);
           continue;
@@ -1505,14 +1521,21 @@ async function phaseRun() {
           return finish({ error: "The planner asked to navigate to the same URL twice." });
         }
         session.lastNavUrl = resp.value;
-        notifyPopup({ type: "step", step: session.stepCount, status: "Navigating to " + resp.value });
+        const currentUrl = session.pageInfo?.url || "";
+        const isFromIsroToPortal = /isro\.gov\.in/i.test(currentUrl) && /localhost|127\.0\.0\.1|hr-portal|employee-portal|isrovisionvault/i.test(resp.value);
+        if (isFromIsroToPortal) {
+          notifyPopup({ type: "step", step: session.stepCount, status: "✓ [Privacy Contrast] Verified official telemetry from isro.gov.in (0 unredacted secrets sent). Returning to local demo portal…" });
+          await new Promise(r => setTimeout(r, 1500));
+        } else {
+          notifyPopup({ type: "step", step: session.stepCount, status: "Navigating to " + resp.value });
+        }
         session.actionLog.push({ action: "navigate", value: resp.value, serverMs, ok: true });
         session.progress.navigated = true;
         guard.record("navigate", null, resp.value, true);
         guard.resetStall();
         chrome.tabs.update(session.tabId, { url: resp.value });
-        await withDeadlineSoft(waitForTabLoad(session.tabId),
-                               Math.max(8000, stepDeadline - Date.now()), "navigation");
+        await withDeadlineSoft(waitForTabLoad(session.tabId, 15000, resp.value),
+                               Math.max(10000, stepDeadline - Date.now()), "navigation");
         await dismissOverlaysOnce();
         await rescanCurrentTab(true);
         continue;

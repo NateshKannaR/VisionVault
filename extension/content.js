@@ -1051,7 +1051,8 @@ function scanForPII() {
 
   // 2b. Values that are sensitive because of the column/term they sit under
   findContextLabelledPII().forEach(({ el, label }) => {
-    addRegion(el, "text", "context_labelled_pii", label.slice(0, 30));
+    const isControl = el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT";
+    addRegion(el, isControl ? "form_field" : "text", "context_labelled_pii", label.slice(0, 30));
   });
 
   // 3. Text nodes matching regexes (including open shadow roots)
@@ -1192,8 +1193,9 @@ function tagInteractiveElements() {
     markMap.set(stableId, el);
     markMap.set(String(stableId), el);
 
-    const isButtonOrSubmit = role === "button" || el.tagName === "BUTTON" || el.getAttribute("role") === "button" || el.type === "submit";
-    const label = (isInsideSensitiveText(el) && !isButtonOrSubmit) ? null : safeLabel(el);
+    const isControl = role === "button" || el.tagName === "BUTTON" || el.getAttribute("role") === "button" || el.type === "submit" ||
+                      el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT";
+    const label = (isInsideSensitiveText(el) && !isControl) ? null : safeLabel(el);
 
     marks.push({
       id: stableId,

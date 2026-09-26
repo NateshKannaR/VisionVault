@@ -1792,7 +1792,12 @@
         const nextField = gaganyaanFields.find(f => !progress[f.key]);
         if (nextField) {
           const targetMark = available.find(m =>
-            FILLABLE_ROLES.has(m.role) && (m.id === nextField.id || nextField.regex.test(m.label || ""))
+            FILLABLE_ROLES.has(m.role) && (
+              m.domId === nextField.id ||
+              m.id === nextField.id ||
+              String(m.domId).toLowerCase() === String(nextField.id).toLowerCase() ||
+              (m.label && nextField.regex.test(m.label))
+            )
           );
           if (targetMark) {
             progress[nextField.key] = true;

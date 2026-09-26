@@ -10,11 +10,11 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"/>
 <style>
 :root {
-  --bg: #030712;
-  --bg-secondary: #0b1329;
-  --card: rgba(13, 24, 45, 0.85);
-  --card-hover: rgba(18, 34, 64, 0.95);
-  --sidebar: rgba(8, 15, 30, 0.92);
+  --bg: #0c1427;
+  --bg-secondary: #121d38;
+  --card: rgba(18, 31, 58, 0.88);
+  --card-hover: rgba(25, 42, 78, 0.96);
+  --sidebar: rgba(14, 23, 44, 0.95);
   --accent: #00e5ff;
   --accent2: #38bdf8;
   --green: #10b981;
@@ -23,25 +23,25 @@
   --violet: #8b5cf6;
   --text: #f8fafc;
   --muted: #94a3b8;
-  --border: rgba(56, 189, 248, 0.22);
-  --border-focus: rgba(0, 229, 255, 0.7);
-  --border-subtle: rgba(255, 255, 255, 0.1);
-  --input: rgba(6, 15, 30, 0.92);
-  --bubble-out: rgba(14, 58, 92, 0.95);
-  --bubble-in: rgba(13, 27, 46, 0.95);
+  --border: rgba(56, 189, 248, 0.25);
+  --border-focus: rgba(0, 229, 255, 0.75);
+  --border-subtle: rgba(255, 255, 255, 0.12);
+  --input: rgba(18, 30, 56, 0.95);
+  --bubble-out: rgba(16, 68, 108, 0.95);
+  --bubble-in: rgba(20, 35, 66, 0.95);
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 ::-webkit-scrollbar { width: 8px; height: 8px; }
-::-webkit-scrollbar-track { background: rgba(3, 7, 18, 0.9); }
+::-webkit-scrollbar-track { background: rgba(12, 20, 39, 0.9); }
 ::-webkit-scrollbar-thumb { background: rgba(56, 189, 248, 0.35); border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
 
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   background: 
-    radial-gradient(circle at 50% -20%, rgba(14, 165, 233, 0.18), transparent 60%),
-    radial-gradient(circle at 100% 40%, rgba(99, 102, 241, 0.1), transparent 50%),
-    radial-gradient(circle at 0% 80%, rgba(16, 185, 129, 0.08), transparent 40%),
+    radial-gradient(circle at 50% -20%, rgba(14, 165, 233, 0.22), transparent 60%),
+    radial-gradient(circle at 100% 40%, rgba(99, 102, 241, 0.15), transparent 50%),
+    radial-gradient(circle at 0% 80%, rgba(16, 185, 129, 0.12), transparent 40%),
     var(--bg);
   color: var(--text);
   min-height: 100vh;
@@ -57,7 +57,7 @@ body {
   align-items: center;
   gap: 16px;
   padding: 10px 24px;
-  background: rgba(7, 13, 24, 0.85);
+  background: rgba(12, 20, 39, 0.92);
   backdrop-filter: blur(24px) saturate(180%);
   -webkit-backdrop-filter: blur(24px) saturate(180%);
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
@@ -707,7 +707,7 @@ textarea { resize: vertical; min-height: 65px; font-size: 14px; line-height: 1.5
 .chat-layout { display: flex; flex: 1; height: 100%; }
 .contact-list-wrap {
   width: 290px;
-  background: rgba(6, 12, 24, 0.95);
+  background: rgba(14, 23, 44, 0.95);
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
@@ -746,7 +746,7 @@ textarea { resize: vertical; min-height: 65px; font-size: 14px; line-height: 1.5
 }
 .contact-name { font-size: 14px; font-weight: 700; color: #fff; }
 .contact-preview { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px; }
-.chat-col { flex: 1; display: flex; flex-direction: column; background: rgba(3, 7, 18, 0.7); }
+.chat-col { flex: 1; display: flex; flex-direction: column; background: rgba(15, 26, 50, 0.85); }
 .chat-header {
   display: flex;
   align-items: center;
@@ -859,7 +859,7 @@ textarea { resize: vertical; min-height: 65px; font-size: 14px; line-height: 1.5
 
 /* Large High-Contrast Datablock */
 .datablock {
-  background: #040916;
+  background: #121e3a;
   border: 1.5px solid var(--accent);
   border-radius: 14px;
   padding: 18px 20px;
@@ -868,7 +868,7 @@ textarea { resize: vertical; min-height: 65px; font-size: 14px; line-height: 1.5
   color: #ffffff;
   line-height: 1.6;
   margin-top: 12px;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.7), 0 0 20px rgba(0, 229, 255, 0.15);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.45), 0 0 20px rgba(0, 229, 255, 0.18);
 }
 .datablock strong { color: var(--accent); font-weight: 800; font-size: 14px; }
 .db-grid {
@@ -882,10 +882,10 @@ textarea { resize: vertical; min-height: 65px; font-size: 14px; line-height: 1.5
   align-items: baseline;
   gap: 8px;
   font-size: 14px;
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.07);
   padding: 6px 10px;
   border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.14);
   min-width: 0;
 }
 .db-field.full-width {

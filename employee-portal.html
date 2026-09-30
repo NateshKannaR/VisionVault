@@ -1221,9 +1221,76 @@ body.mode-redacted .datablock {
   background: #060d1a !important;
   border-color: var(--red) !important;
 }
+
+/* Aerospace Operations Hub Metrics & Console Grid */
+.ops-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin-bottom: 22px;
+}
+@media (max-width: 980px) {
+  .ops-metric-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 600px) {
+  .ops-metric-grid { grid-template-columns: 1fr; }
+}
+.ops-metric-card {
+  background: rgba(10, 20, 42, 0.85);
+  border: 1px solid rgba(56, 189, 248, 0.2);
+  border-radius: 12px;
+  padding: 14px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+.ops-metric-card:hover {
+  border-color: var(--accent);
+  background: rgba(14, 28, 56, 0.95);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 229, 255, 0.15);
+}
+.ops-metric-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #94a3b8;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+}
+.ops-metric-val {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 16px;
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: -0.2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ops-metric-sub {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: #38bdf8;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ops-console-grid {
+  display: grid;
+  grid-template-columns: 1fr 1.15fr;
+  gap: 18px;
+  margin-bottom: 22px;
+}
+@media (max-width: 980px) {
+  .ops-console-grid { grid-template-columns: 1fr; }
 }
 .guide-desc {
   font-size: 13px;
@@ -1925,154 +1992,221 @@ body.mode-redacted .datablock {
   <!-- Main Content Area -->
   <main class="main">
 
-    <!-- Overview / Demo Guide & Live Lab Tab -->
+    <!-- Overview / Mission Operations Console Tab -->
     <div class="page active" id="page-overview">
       <div class="inner">
         
-        <!-- Synchronous Scientist Metadata (Preserved for Extension Context & Logic) -->
-        <div id="active-scientist-meta" style="display:none;" aria-hidden="true">
-          <img id="ov-badge-img" src="images/emp-natesh.jpeg" class="badge-avatar-img" alt="Badge" />
-          <span id="ov-name" class="badge-pii-val">Natesh Kanna R</span>
-          <span id="ov-empid" class="badge-pii-val">ISRO-10101</span>
-          <span id="ov-dept">Flight Software & Spacecraft Control</span>
-          <span id="ov-org">Master Control Facility (MCF)</span>
-          <span id="ov-email" class="badge-pii-val">natesh.kanna@isro.gov.in</span>
-          <span id="ov-sat-name">Chandrayaan-3 Propulsion</span>
-          <span id="ov-orbit-type">Lunar Polar Orbit • 100 km</span>
-          <span id="ov-freq">● 8.400 GHz LOCKED</span>
-        </div>
-
-        <!-- LIVE EXTENSION DEMO & INSTALLATION HUB -->
-        <div class="demo-guide-deck">
-          <div class="command-deck-top">
-            <div>
-              <div class="command-deck-badge">
-                <i class="fa-solid fa-puzzle-piece"></i>
-                <span>CHROME EXTENSION &bull; LIVE DEMONSTRATION &amp; EVALUATION HUB</span>
-              </div>
-              <div class="command-deck-title">How to Install the Extension &amp; Run the Live Demo</div>
-              <div class="command-deck-sub">
-                Follow these 3 simple steps to load the VisionVault extension in Chrome and execute the autonomous on-device privacy workflow on this portal.
-              </div>
+        <!-- Header & Action Deck -->
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:16px; margin-bottom:20px;">
+          <div>
+            <div class="page-badge" style="background:rgba(0,229,255,0.12); border:1px solid rgba(0,229,255,0.35); color:var(--accent);">
+              <i class="fa-solid fa-satellite-dish"></i> MASTER CONTROL FACILITY (MCF) &bull; HASSAN &amp; BENGALURU
             </div>
-            <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
-              <a href="visionvault-extension.zip" download class="topbar-action active" style="background:linear-gradient(135deg, #00e5ff, #0284c7); color:#000; font-weight:800; border:none; padding:10px 18px; font-size:13.5px; box-shadow:0 0 16px rgba(0,229,255,0.4);">
-                <i class="fa-solid fa-file-arrow-down"></i> Download Extension (.zip)
-              </a>
-              <button class="topbar-action" onclick="openDemoVideoModal()" style="border-color:rgba(0,229,255,0.45); background:rgba(0,229,255,0.12); color:#00e5ff; font-weight:700; padding:10px 18px; font-size:13.5px; box-shadow:0 0 16px rgba(0,229,255,0.15);">
-                <i class="fa-solid fa-circle-play"></i> Watch Video Demo (1080p)
-              </button>
-              <button class="topbar-action" onclick="document.getElementById('demo-prompts-section').scrollIntoView({behavior:'smooth'})">
-                <i class="fa-solid fa-terminal"></i> Demo Prompts &darr;
-              </button>
-            </div>
+            <div class="page-title">Flight Operations &amp; Mission Telemetry Hub</div>
+            <div class="page-sub">Central command console for real-time spacecraft tracking, multi-database sync, and on-device privacy enclave.</div>
           </div>
-
-          <!-- 3-Step Clear, Modern Visual Setup Grid -->
-          <div class="steps-grid">
-            <!-- Step 1 -->
-            <div class="step-card">
-              <div>
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
-                  <div class="step-icon-wrap">
-                    <i class="fa-solid fa-file-zipper" style="color:var(--accent); font-size:20px;"></i>
-                  </div>
-                  <span class="step-badge">STEP 01</span>
-                </div>
-                <div class="step-title">1. Download &amp; Extract</div>
-                <div class="step-desc">
-                  Download the extension package archive and unzip it to any local directory on your machine:
-                  <div style="margin-top:10px;">
-                    <a href="visionvault-extension.zip" download class="btn-step-action">
-                      <i class="fa-solid fa-download"></i> visionvault-extension.zip (10 MB)
-                    </a>
-                  </div>
-                  <div style="margin-top:8px; font-size:11.5px; color:#64748b;">
-                    Or use the existing <code class="code-inline">extension/</code> directory from the repository.
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Step 2 -->
-            <div class="step-card">
-              <div>
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
-                  <div class="step-icon-wrap" style="background:rgba(56,189,248,0.1); border-color:rgba(56,189,248,0.3);">
-                    <i class="fa-brands fa-chrome" style="color:#38bdf8; font-size:22px;"></i>
-                  </div>
-                  <span class="step-badge" style="color:#38bdf8; border-color:rgba(56,189,248,0.3); background:rgba(56,189,248,0.12);">STEP 02</span>
-                </div>
-                <div class="step-title">2. Load into Chrome</div>
-                <div class="step-desc">
-                  <ol>
-                    <li>Open Chrome and navigate to <code class="code-inline">chrome://extensions</code></li>
-                    <li>Toggle <strong>Developer mode</strong> in the top-right corner.</li>
-                    <li>Click <strong>Load unpacked</strong> button.</li>
-                    <li>Select the unzipped <code class="code-inline">extension</code> directory.</li>
-                    <li>Pin the <strong>VisionVault</strong> icon to your toolbar.</li>
-                  </ol>
-                  <div style="margin-top:10px;">
-                    <button class="btn-step-action" onclick="copyChromeExtensionsUrl(this)">
-                      <i class="fa-regular fa-copy"></i> Copy chrome://extensions
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Step 3 -->
-            <div class="step-card">
-              <div>
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
-                  <div class="step-icon-wrap" style="background:rgba(16,185,129,0.1); border-color:rgba(16,185,129,0.3);">
-                    <i class="fa-solid fa-play" style="color:#10b981; font-size:20px;"></i>
-                  </div>
-                  <span class="step-badge" style="color:#10b981; border-color:rgba(16,185,129,0.3); background:rgba(16,185,129,0.12);">STEP 03</span>
-                </div>
-                <div class="step-title">3. Launch Live Demo</div>
-                <div class="step-desc">
-                  <ol>
-                    <li>Click the <strong>VisionVault</strong> icon in your Chrome toolbar to open the Side Panel.</li>
-                    <li>Copy one of the <strong>Demo Prompts</strong> below.</li>
-                    <li>Paste into the agent chat box and press <strong>Enter</strong>.</li>
-                    <li>Watch the agent locally redact sensitive PII and auto-fill these portal databases!</li>
-                  </ol>
-                  <div style="margin-top:10px;">
-                    <button class="btn-step-action" style="background:rgba(16,185,129,0.15); border-color:rgba(16,185,129,0.4); color:#10b981;" onclick="document.getElementById('demo-prompts-section').scrollIntoView({behavior:'smooth'})">
-                      <i class="fa-solid fa-bolt"></i> View Ready Demo Prompts &darr;
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- DEMO PROMPTS LAUNCHER CARD -->
-        <div class="demo-guide-deck" id="demo-prompts-section" style="padding:22px 28px;">
-          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
-            <div>
-              <div style="display:flex; align-items:center; gap:8px;">
-                <span style="background:rgba(16,185,129,0.15); border:1px solid rgba(16,185,129,0.4); color:var(--green); font-size:11px; font-family:'JetBrains Mono',monospace; padding:3px 9px; border-radius:4px; font-weight:800;">ONE-CLICK RUN</span>
-                <span style="font-size:12.5px; color:#94a3b8; font-family:'JetBrains Mono',monospace;">COPY &amp; PASTE INTO EXTENSION SIDE PANEL</span>
-              </div>
-              <div style="font-family:'Space Grotesk',sans-serif; font-size:20px; font-weight:800; color:#fff; margin-top:4px;">
-                Calibrated Live Demonstration Prompts
-              </div>
-            </div>
-            <button class="topbar-action" onclick="resetAllPortalRecords()" style="font-size:12.5px;">
-              <i class="fa-solid fa-rotate-left"></i> Reset Form Fields
+          <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+            <a href="visionvault-extension.zip" download class="topbar-btn-nav" style="border-color:rgba(0,229,255,0.4); background:rgba(0,229,255,0.12); color:#00e5ff; font-weight:600;">
+              <i class="fa-solid fa-file-arrow-down"></i> Extension (.zip)
+            </a>
+            <button class="topbar-btn-nav" onclick="openDemoVideoModal()" style="font-weight:600;">
+              <i class="fa-solid fa-circle-play"></i> Video Walkthrough
+            </button>
+            <button class="topbar-btn-nav" onclick="openSetupModal()" style="font-weight:600;">
+              <i class="fa-solid fa-circle-info"></i> Setup Guide
             </button>
           </div>
+        </div>
 
-          <div style="display:flex; flex-direction:column; gap:12px;">
-            <!-- Prompt: Database 3 Quick Fill from Vault -->
+        <!-- Real-Time Telemetry & Systems Status Strip (4 Sleek Metric Cards) -->
+        <div class="ops-metric-grid">
+          <div class="ops-metric-card">
+            <div class="ops-metric-label"><i class="fa-solid fa-tower-broadcast" style="color:var(--accent)"></i> Ground Station Downlink</div>
+            <div class="ops-metric-val" id="ov-stat-freq">● 8.400 GHz (X-Band)</div>
+            <div class="ops-metric-sub">MCF Hassan Dish #2 &bull; SNR +28.4 dB Nominal</div>
+          </div>
+          <div class="ops-metric-card">
+            <div class="ops-metric-label"><i class="fa-solid fa-shuttle-space" style="color:var(--accent2)"></i> Active Spacecraft Track</div>
+            <div class="ops-metric-val" id="ov-stat-sat">Chandrayaan-3 Propulsion</div>
+            <div class="ops-metric-sub" id="ov-stat-orbit">Lunar Polar Orbit &bull; 100 km</div>
+          </div>
+          <div class="ops-metric-card">
+            <div class="ops-metric-label"><i class="fa-solid fa-shield-halved" style="color:var(--green)"></i> Privacy Enclave</div>
+            <div class="ops-metric-val" style="color:var(--green)">Zero-PII Isolation</div>
+            <div class="ops-metric-sub" style="color:var(--green)">Level-4 Air-Gapped &bull; 0 Pixel Leaks</div>
+          </div>
+          <div class="ops-metric-card">
+            <div class="ops-metric-label"><i class="fa-solid fa-database" style="color:#a78bfa"></i> Database Synchronization</div>
+            <div class="ops-metric-val" id="ov-sync-summary" style="color:#a78bfa">Ready for Ingestion</div>
+            <div class="ops-metric-sub" style="color:#a78bfa">HSFC Gaganyaan DB6 Integrated</div>
+          </div>
+        </div>
+
+        <!-- 2-Column Console: Operator Security Badge & Spacecraft Orbital Telemetry -->
+        <!-- Contains #active-scientist-meta with all synchronous badge IDs for extension context -->
+        <div id="active-scientist-meta" class="ops-console-grid">
+          <!-- Active Operator Security Clearance Pass -->
+          <div class="id-badge-card" style="margin-bottom:0;">
+            <div class="id-badge-header">
+              <div style="display:flex; align-items:center; gap:8px;">
+                <div style="width:24px; height:24px; border-radius:6px; background:linear-gradient(135deg,#00e5ff,#0284c7); display:grid; place-items:center; color:#03121c; font-size:12px; font-weight:900;">
+                  <i class="fa-solid fa-satellite"></i>
+                </div>
+                <div>
+                  <div style="font-family:'Space Grotesk',sans-serif; font-size:12.5px; font-weight:800; color:#fff; letter-spacing:0.5px;">ISRO MASTER CONTROL FACILITY</div>
+                  <div style="font-family:'JetBrains Mono',monospace; font-size:10px; color:#94a3b8;">PERSONNEL FLIGHT CLEARANCE PASS</div>
+                </div>
+              </div>
+              <span class="badge-seal"><i class="fa-solid fa-shield-halved"></i> SEC-L4 CLEARANCE</span>
+            </div>
+
+            <div class="badge-photo-row">
+              <div class="badge-avatar-frame">
+                <img id="ov-badge-img" src="images/emp-natesh.jpeg" class="badge-avatar-img" alt="Badge" />
+              </div>
+              <div style="display:flex; flex-direction:column; gap:3px; min-width:0; flex:1;">
+                <div style="font-size:17px; font-weight:800; color:#fff; font-family:'Space Grotesk',sans-serif; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" id="ov-name" class="badge-pii-val">Natesh Kanna R</div>
+                <div style="font-size:12px; color:var(--accent); font-family:'JetBrains Mono',monospace; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" id="ov-dept">Flight Software &amp; Spacecraft Control</div>
+                <div style="font-size:11.5px; color:#94a3b8; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" id="ov-org">Master Control Facility (MCF)</div>
+                <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-top:4px;">
+                  <span style="font-family:'JetBrains Mono',monospace; font-size:10.5px; font-weight:700; color:var(--accent2); background:rgba(56,189,248,0.12); padding:2px 7px; border-radius:4px; border:1px solid rgba(56,189,248,0.3);" id="ov-empid" class="badge-pii-val">ISRO-10101</span>
+                  <span style="font-family:'JetBrains Mono',monospace; font-size:10.5px; color:#cbd5e1; background:rgba(255,255,255,0.06); padding:2px 7px; border-radius:4px; border:1px solid rgba(255,255,255,0.12);" id="ov-email" class="badge-pii-val">natesh.kanna@isro.gov.in</span>
+                </div>
+              </div>
+            </div>
+
+            <div style="margin-top:14px; padding-top:12px; border-top:1px solid var(--border-subtle); display:flex; justify-content:space-between; align-items:center; font-family:'JetBrains Mono',monospace; font-size:10.5px; color:#94a3b8;">
+              <div><i class="fa-solid fa-location-dot" style="color:var(--accent)"></i> Station: Hassan, Karnataka</div>
+              <div style="color:var(--green);"><i class="fa-solid fa-shield"></i> On-Device Zero PII Enclave</div>
+            </div>
+          </div>
+
+          <!-- Spacecraft Flight Dynamics & TLE Ephemeris Console -->
+          <div class="datablock" style="margin-top:0;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; border-bottom:1px solid rgba(255,255,255,0.08); padding-bottom:8px;">
+              <div style="font-size:13px; font-weight:800; color:var(--accent); font-family:'JetBrains Mono',monospace; display:flex; align-items:center; gap:6px;">
+                <i class="fa-solid fa-satellite"></i> SPACECRAFT FLIGHT DYNAMICS
+              </div>
+              <span style="font-size:10px; font-family:'JetBrains Mono',monospace; color:var(--green); background:rgba(16,185,129,0.12); border:1px solid rgba(16,185,129,0.35); padding:2px 7px; border-radius:4px; font-weight:700;">
+                <i class="fa-solid fa-circle-dot"></i> TELEMETRY NOMINAL
+              </span>
+            </div>
+
+            <div class="db-grid" style="grid-template-columns: repeat(2, 1fr); gap:6px 10px; font-size:12.5px;">
+              <div class="db-field"><span class="db-lbl">Satellite:</span> <span class="db-val highlight" id="ov-sat-name">Chandrayaan-3 Propulsion</span></div>
+              <div class="db-field"><span class="db-lbl">Orbit:</span> <span class="db-val" id="ov-orbit-type">Lunar Polar Orbit &bull; 100 km</span></div>
+              <div class="db-field"><span class="db-lbl">Carrier:</span> <span class="db-val highlight" id="ov-freq">● 8.400 GHz LOCKED</span></div>
+              <div class="db-field"><span class="db-lbl">Subsystems:</span> <span class="db-val" style="color:var(--green)">AOCS &bull; Nominal</span></div>
+            </div>
+
+            <div class="db-tle-box" style="margin:10px 0 0 0; padding:10px 14px;">
+              <div class="tle-title" style="font-size:11px; margin-bottom:4px;"><i class="fa-solid fa-satellite-dish"></i> TWO-LINE ELEMENT (TLE) ORBITAL EPHEMERIS</div>
+              <div class="tle-val" style="font-size:11.5px; opacity:0.95; letter-spacing:0.4px;">1 57320U 23098A   26248.11029481 +.00000210  00000-0  10000-4 0  9997</div>
+              <div class="tle-val" style="font-size:11.5px; opacity:0.95; letter-spacing:0.4px; margin-top:2px;">2 57320  89.9410 112.4410 0010410 270.1200  90.4100  0.08331400  8821</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Active Spacecraft Fleet Tracking Table -->
+        <div class="card" style="padding:18px 22px; margin-bottom:22px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
+            <div style="font-family:'Space Grotesk',sans-serif; font-size:15px; font-weight:800; color:#fff; display:flex; align-items:center; gap:8px;">
+              <i class="fa-solid fa-network-wired" style="color:var(--accent);"></i>
+              Active Spacecraft Fleet Telemetry &amp; Link Status
+            </div>
+            <span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:#94a3b8;">ISRO Ground Network &bull; MCF Hassan &amp; ISTRAC</span>
+          </div>
+          <table class="sat-table" style="margin-top:0;">
+            <thead>
+              <tr>
+                <th>Spacecraft</th>
+                <th>Mission Code</th>
+                <th>Orbit Profile</th>
+                <th>Downlink Freq</th>
+                <th>Subsystem Health</th>
+                <th>Primary Ground Station</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style="font-weight:700; color:#fff;">Chandrayaan-3 Propulsion</td>
+                <td style="font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--accent);">CH-3 / PR-01</td>
+                <td style="font-size:12.5px;">Lunar Polar &bull; 100 km</td>
+                <td style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#38bdf8;">8.400 GHz (X-Band)</td>
+                <td style="font-size:12px; color:var(--green);"><i class="fa-solid fa-circle-check"></i> Subsystems Nominal</td>
+                <td style="font-size:12px;">MCF Hassan Dish #2</td>
+                <td><span style="font-size:10px; font-family:'JetBrains Mono',monospace; background:rgba(16,185,129,0.15); border:1px solid rgba(16,185,129,0.4); color:var(--green); padding:2px 7px; border-radius:4px; font-weight:700;">TRACKING</span></td>
+              </tr>
+              <tr>
+                <td style="font-weight:700; color:#fff;">Gaganyaan Orbital Module</td>
+                <td style="font-family:'JetBrains Mono',monospace; font-size:11.5px; color:#a78bfa;">HSFC-GY-01</td>
+                <td style="font-size:12.5px;">400 km LEO (Target)</td>
+                <td style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#a78bfa;">S-Band Telemetry</td>
+                <td style="font-size:12px; color:#a78bfa;"><i class="fa-solid fa-shield-halved"></i> Pre-Flight HLVM3 Ready</td>
+                <td style="font-size:12px;">HSFC Bengaluru</td>
+                <td><span style="font-size:10px; font-family:'JetBrains Mono',monospace; background:rgba(167,139,250,0.15); border:1px solid rgba(167,139,250,0.4); color:#a78bfa; padding:2px 7px; border-radius:4px; font-weight:700;">DB6 READY</span></td>
+              </tr>
+              <tr>
+                <td style="font-weight:700; color:#fff;">NISAR (NASA-ISRO SAR)</td>
+                <td style="font-family:'JetBrains Mono',monospace; font-size:11.5px; color:#f59e0b;">NISAR-2025</td>
+                <td style="font-size:12.5px;">747 km Sun-Synchronous LEO</td>
+                <td style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#f59e0b;">X + L-Band Sweep</td>
+                <td style="font-size:12px; color:#cbd5e1;"><i class="fa-solid fa-satellite"></i> Dual SAR Staging</td>
+                <td style="font-size:12px;">ISTRAC Bengaluru</td>
+                <td><span style="font-size:10px; font-family:'JetBrains Mono',monospace; background:rgba(245,158,11,0.15); border:1px solid rgba(245,158,11,0.4); color:#f59e0b; padding:2px 7px; border-radius:4px; font-weight:700;">INTEGRATION</span></td>
+              </tr>
+              <tr>
+                <td style="font-weight:700; color:#fff;">NavIC IRNSS-1J</td>
+                <td style="font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--accent);">IRNSS-1J</td>
+                <td style="font-size:12.5px;">36,000 km Geosynchronous</td>
+                <td style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#38bdf8;">L5 / S-Band Carrier</td>
+                <td style="font-size:12px; color:var(--green);"><i class="fa-solid fa-circle-check"></i> Rubidium Clocks Synced</td>
+                <td style="font-size:12px;">MCF Hassan Dish #1</td>
+                <td><span style="font-size:10px; font-family:'JetBrains Mono',monospace; background:rgba(16,185,129,0.15); border:1px solid rgba(16,185,129,0.4); color:var(--green); padding:2px 7px; border-radius:4px; font-weight:700;">OPERATIONAL</span></td>
+              </tr>
+              <tr>
+                <td style="font-weight:700; color:#fff;">Aditya-L1 Solar Observatory</td>
+                <td style="font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--accent);">ADITYA-L1</td>
+                <td style="font-size:12.5px;">Halo Orbit &bull; Sun-Earth L1 (1.5M km)</td>
+                <td style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#38bdf8;">X-Band Deep Space</td>
+                <td style="font-size:12px; color:var(--green);"><i class="fa-solid fa-sun"></i> Primary Payloads Active</td>
+                <td style="font-size:12px;">IDSN Byalalu (32m)</td>
+                <td><span style="font-size:10px; font-family:'JetBrains Mono',monospace; background:rgba(16,185,129,0.15); border:1px solid rgba(16,185,129,0.4); color:var(--green); padding:2px 7px; border-radius:4px; font-weight:700;">SUN-LOCKED</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- AUTONOMOUS AGENT MISSION VECTORS (Compact, Sleek, Professional Runner) -->
+        <div class="card" id="demo-prompts-section" style="padding:22px 26px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:16px; border-bottom:1px solid rgba(255,255,255,0.08); padding-bottom:14px;">
+            <div>
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span style="background:rgba(0,229,255,0.12); border:1px solid rgba(0,229,255,0.35); color:var(--accent); font-size:11px; font-family:'JetBrains Mono',monospace; padding:3px 9px; border-radius:4px; font-weight:800;">AUTONOMOUS AGENT RUNNER</span>
+                <span style="font-size:12px; color:#94a3b8; font-family:'JetBrains Mono',monospace;">COPY PROMPT &bull; PASTE IN EXTENSION SIDE PANEL</span>
+              </div>
+              <div style="font-family:'Space Grotesk',sans-serif; font-size:18px; font-weight:800; color:#fff; margin-top:4px;">
+                Calibrated Evaluation Test Vectors
+              </div>
+            </div>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <button class="topbar-action" onclick="openSetupModal()" style="font-size:12px; border-color:rgba(56,189,248,0.35); background:rgba(56,189,248,0.08);">
+                <i class="fa-brands fa-chrome"></i> Extension Setup
+              </button>
+              <button class="topbar-action" onclick="clearEmployeeForms()" style="font-size:12px;">
+                <i class="fa-solid fa-rotate-left"></i> Reset Form Fields
+              </button>
+            </div>
+          </div>
+
+          <div style="display:flex; flex-direction:column; gap:10px;">
+            <!-- Vector 1: Database 3 Quick Fill from Vault -->
             <div class="prompt-box featured">
               <div style="display:flex; flex-direction:column; gap:4px; flex:1;">
                 <div style="display:flex; align-items:center; gap:8px;">
                   <span class="prompt-tag" style="color:var(--accent); border-color:rgba(0,229,255,0.4); background:rgba(0,229,255,0.12);">VAULT AUTO-FILL &bull; DATABASE 3 MISSION SYSTEMS</span>
-                  <span style="font-size:11px; color:#64748b; font-family:'JetBrains Mono',monospace;">Mission Telemetry Auto-Fill from Vault</span>
+                  <span style="font-size:11px; color:#64748b; font-family:'JetBrains Mono',monospace;">On-Device Zero-Pixel Telemetry Autofill</span>
                 </div>
                 <div id="prompt-p2" style="font-size:13px; color:#f8fafc; font-family:'Inter',sans-serif; font-weight:500; margin-top:2px;">
                   fill the database 3 with values from vault
@@ -2081,11 +2215,11 @@ body.mode-redacted .datablock {
               <button class="prompt-copy-btn" onclick="copyPromptText(this, 'prompt-p2')"><i class="fa-regular fa-copy"></i> Copy Prompt</button>
             </div>
 
-            <!-- Prompt 3: Cross-Site Sync -->
+            <!-- Vector 2: Gaganyaan Cross-Site Sync -->
             <div class="prompt-box featured" style="border-color:rgba(167,139,250,0.4); background:rgba(167,139,250,0.06);">
               <div style="display:flex; flex-direction:column; gap:4px; flex:1;">
                 <div style="display:flex; align-items:center; gap:8px;">
-                  <span class="prompt-tag" style="color:#a78bfa; border-color:rgba(167,139,250,0.4); background:rgba(167,139,250,0.12);">CROSS-SITE &bull; GAGANYAAN SYNC</span>
+                  <span class="prompt-tag" style="color:#a78bfa; border-color:rgba(167,139,250,0.4); background:rgba(167,139,250,0.12);">CROSS-SITE SYNC &bull; GAGANYAAN DATABASE 6</span>
                   <span style="font-size:11px; color:#64748b; font-family:'JetBrains Mono',monospace;">Cross-Tab Telemetry Synchronization</span>
                 </div>
                 <div id="prompt-p4" style="font-size:13px; color:#f8fafc; font-family:'Inter',sans-serif; font-weight:500; margin-top:2px;">
@@ -2095,7 +2229,7 @@ body.mode-redacted .datablock {
               <button class="prompt-copy-btn" onclick="copyPromptText(this, 'prompt-p4')"><i class="fa-regular fa-copy"></i> Copy Prompt</button>
             </div>
 
-            <!-- Prompt 4: Vault Ingestion -->
+            <!-- Vector 3: Vault Ingestion -->
             <div class="prompt-box">
               <div style="display:flex; flex-direction:column; gap:4px; flex:1;">
                 <div style="display:flex; align-items:center; gap:8px;">
@@ -2240,7 +2374,7 @@ body.mode-redacted .datablock {
     <!-- FORM 1: HR Personal Details -->
     <div class="page" id="page-form-hr">
       <div class="inner">
-        <div class="page-badge" style="background:rgba(0,180,216,.14);border:1px solid rgba(0,180,216,.35);color:var(--accent);">DATABASE 1 OF 5 — HR SYSTEM</div>
+        <div class="page-badge" style="background:rgba(0,180,216,.14);border:1px solid rgba(0,180,216,.35);color:var(--accent);">DATABASE 1 OF 6 — HR SYSTEM</div>
         <div class="page-title">Personal Records Database</div>
         <div class="page-sub">Employee Master Record Database — HR-ESS-01</div>
 
@@ -2280,7 +2414,7 @@ body.mode-redacted .datablock {
     <!-- FORM 2: ISRO Mission Payroll -->
     <div class="page" id="page-form-payroll">
       <div class="inner">
-        <div class="page-badge" style="background:rgba(6,214,160,.14);border:1px solid rgba(6,214,160,.35);color:var(--green);">DATABASE 2 OF 5 — ISRO MISSION PAYROLL</div>
+        <div class="page-badge" style="background:rgba(6,214,160,.14);border:1px solid rgba(6,214,160,.35);color:var(--green);">DATABASE 2 OF 6 — ISRO MISSION PAYROLL</div>
         <div class="page-title">Mission Payroll &amp; Banking Database</div>
         <div class="page-sub">Finance &amp; Accounts Directorate — PAY-SS-04</div>
 
@@ -2329,7 +2463,7 @@ body.mode-redacted .datablock {
     <!-- FORM 3: ISRO Mission Systems -->
     <div class="page" id="page-form-it">
       <div class="inner">
-        <div class="page-badge" style="background:rgba(255,209,102,.14);border:1px solid rgba(255,209,102,.35);color:var(--yellow);">DATABASE 3 OF 5 — ISRO MISSION SYSTEMS</div>
+        <div class="page-badge" style="background:rgba(255,209,102,.14);border:1px solid rgba(255,209,102,.35);color:var(--yellow);">DATABASE 3 OF 6 — ISRO MISSION SYSTEMS</div>
         <div class="page-title">Mission Systems &amp; Security Database</div>
         <div class="page-sub">ISRO Mission Operations Technology — ITAM-12 / SEC-04</div>
 
@@ -2385,7 +2519,7 @@ body.mode-redacted .datablock {
     <!-- FORM 4: ISRO Staff Quarters -->
     <div class="page" id="page-form-housing">
       <div class="inner">
-        <div class="page-badge" style="background:rgba(167,139,250,.14);border:1px solid rgba(167,139,250,.35);color:var(--violet);">DATABASE 4 OF 5 — ISRO STAFF QUARTERS</div>
+        <div class="page-badge" style="background:rgba(167,139,250,.14);border:1px solid rgba(167,139,250,.35);color:var(--violet);">DATABASE 4 OF 6 — ISRO STAFF QUARTERS</div>
         <div class="page-title">Staff Quarters &amp; Estate Database</div>
         <div class="page-sub">ISRO Estate Management Cell — HSG-07</div>
 
@@ -2426,7 +2560,7 @@ body.mode-redacted .datablock {
     <!-- FORM 5: ISRO Health & Welfare -->
     <div class="page" id="page-form-medical">
       <div class="inner">
-        <div class="page-badge" style="background:rgba(239,71,111,.14);border:1px solid rgba(239,71,111,.35);color:var(--red);">DATABASE 5 OF 5 — HEALTHCARE &amp; WELFARE</div>
+        <div class="page-badge" style="background:rgba(239,71,111,.14);border:1px solid rgba(239,71,111,.35);color:var(--red);">DATABASE 5 OF 6 — HEALTHCARE &amp; WELFARE</div>
         <div class="page-title">Healthcare, Dependents &amp; Insurance Database</div>
         <div class="page-sub">ISRO Health &amp; Welfare Cell — MED-03</div>
 
@@ -2457,7 +2591,7 @@ body.mode-redacted .datablock {
     <!-- FORM 6: Gaganyaan Human Spaceflight Database -->
     <div class="page" id="page-form-gaganyaan">
       <div class="inner">
-        <div class="page-badge" style="background:rgba(167,139,250,.14);border:1px solid rgba(167,139,250,.35);color:#a78bfa;">DATABASE 6 — GAGANYAAN HUMAN SPACEFLIGHT</div>
+        <div class="page-badge" style="background:rgba(167,139,250,.14);border:1px solid rgba(167,139,250,.35);color:#a78bfa;">DATABASE 6 OF 6 — GAGANYAAN HUMAN SPACEFLIGHT</div>
         <div class="page-title">Gaganyaan Mission Intelligence Database</div>
         <div class="page-sub">HSFC — Human Space Flight Centre, Bengaluru</div>
 
@@ -2740,6 +2874,14 @@ function applyActiveEmployeeUI() {
   if (ovEmail) ovEmail.textContent = e.email;
   const ovOrg = document.getElementById("ov-org");
   if (ovOrg) ovOrg.textContent = e.org;
+
+  // Stat Card Syncing
+  const statSat = document.getElementById("ov-stat-sat");
+  if (statSat) statSat.textContent = e.sat;
+  const statOrbit = document.getElementById("ov-stat-orbit");
+  if (statOrbit) statOrbit.textContent = e.orbit;
+  const statFreq = document.getElementById("ov-stat-freq");
+  if (statFreq) statFreq.textContent = `● ${e.freq}`;
 }
 
 // Navigation Handling
@@ -2988,6 +3130,12 @@ function updateProgress(){
     const t = document.getElementById("tick-" + f);
     if (t) t.style.display = localStorage.getItem(`isro_form_${currentEmp}_${f}`) ? "inline" : "none";
   });
+  const ovSync = document.getElementById("ov-sync-summary");
+  if (ovSync) ovSync.textContent = done > 0 ? `${done} of 6 Synced` : "Ready for Ingestion";
+}
+
+function resetAllPortalRecords() {
+  clearEmployeeForms();
 }
 
 function submitForm(id){
@@ -3150,6 +3298,69 @@ function closeDemoVideoModal() {
     const vid = document.getElementById("empPortalDemoVid");
     if (vid) vid.pause();
   }
+}
+
+// Extension Setup Guide Modal Handlers
+function openSetupModal() {
+  let modal = document.getElementById("setupGuideModal");
+  if (!modal) {
+    modal = document.createElement("div");
+    modal.id = "setupGuideModal";
+    modal.style.cssText = "position:fixed;inset:0;background:rgba(2,6,23,0.92);backdrop-filter:blur(14px);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;";
+    modal.innerHTML = `
+      <div style="width:100%;max-width:760px;background:#0c1427;border:1.5px solid var(--accent);border-radius:16px;box-shadow:0 0 40px rgba(0,229,255,0.25);overflow:hidden;position:relative;">
+        <div style="background:#070d1c;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);">
+          <div style="display:flex;align-items:center;gap:8px;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:15px;color:#fff;">
+            <i class="fa-brands fa-chrome" style="color:var(--accent);"></i> VisionVault Extension &bull; Quick Setup Guide
+          </div>
+          <button onclick="closeSetupModal()" style="background:transparent;border:none;color:#94a3b8;font-size:18px;cursor:pointer;line-height:1;padding:4px 8px;"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div style="padding:22px;display:flex;flex-direction:column;gap:14px;">
+          <div style="background:rgba(6,14,30,0.85);border:1px solid rgba(56,189,248,0.2);border-radius:10px;padding:14px 18px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+              <span style="font-weight:700;color:#fff;font-family:'Space Grotesk',sans-serif;">Step 1: Download or Locate Extension</span>
+              <span class="step-badge">STEP 01</span>
+            </div>
+            <div style="font-size:12.5px;color:#94a3b8;line-height:1.5;">Download the extension zip package, or use the existing <code class="code-inline">extension/</code> folder in the repository.</div>
+            <div style="margin-top:8px;">
+              <a href="visionvault-extension.zip" download class="btn-step-action" style="width:auto;display:inline-flex;padding:6px 14px;font-size:12px;">
+                <i class="fa-solid fa-download"></i> visionvault-extension.zip (10 MB)
+              </a>
+            </div>
+          </div>
+          <div style="background:rgba(6,14,30,0.85);border:1px solid rgba(56,189,248,0.2);border-radius:10px;padding:14px 18px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+              <span style="font-weight:700;color:#fff;font-family:'Space Grotesk',sans-serif;">Step 2: Load Unpacked in Chrome</span>
+              <span class="step-badge" style="color:#38bdf8;border-color:rgba(56,189,248,0.3);background:rgba(56,189,248,0.12);">STEP 02</span>
+            </div>
+            <div style="font-size:12.5px;color:#94a3b8;line-height:1.5;">Open <code class="code-inline">chrome://extensions</code>, enable <strong>Developer mode</strong> in top-right, click <strong>Load unpacked</strong>, and select the <code class="code-inline">extension</code> directory.</div>
+            <div style="margin-top:8px;">
+              <button class="btn-step-action" onclick="copyChromeExtensionsUrl(this)" style="width:auto;display:inline-flex;padding:6px 14px;font-size:12px;">
+                <i class="fa-regular fa-copy"></i> Copy chrome://extensions
+              </button>
+            </div>
+          </div>
+          <div style="background:rgba(6,14,30,0.85);border:1px solid rgba(56,189,248,0.2);border-radius:10px;padding:14px 18px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+              <span style="font-weight:700;color:#fff;font-family:'Space Grotesk',sans-serif;">Step 3: Open Side Panel &amp; Run Agent</span>
+              <span class="step-badge" style="color:var(--green);border-color:rgba(16,185,129,0.3);background:rgba(16,185,129,0.12);">STEP 03</span>
+            </div>
+            <div style="font-size:12.5px;color:#94a3b8;line-height:1.5;">Click the <strong>VisionVault</strong> icon in your browser toolbar to open the Side Panel, copy any prompt from the Mission Runner, and press Enter.</div>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    modal.addEventListener("click", e => { if (e.target === modal) closeSetupModal(); });
+    document.addEventListener("keydown", e => { if (e.key === "Escape") closeSetupModal(); });
+  } else {
+    modal.style.display = "flex";
+  }
+}
+
+function closeSetupModal() {
+  const modal = document.getElementById("setupGuideModal");
+  if (modal) modal.style.display = "none";
 }
 </script>
 </body>

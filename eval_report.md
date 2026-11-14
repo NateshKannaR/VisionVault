@@ -21,11 +21,11 @@ measurement rather than bookkeeping.
 
 | Setting | Value |
 | :--- | :--- |
-| Run at | 2026-09-04T18:25:29.719Z |
-| Chrome | Chrome/152.0.7977.77 |
-| Node | v24.16.0 |
-| Platform | win32 x64 |
-| Planning backend | gemini (chain: gemini -> groq -> ollama -> mock) |
+| Run at | 2026-10-11T21:56:07.012Z |
+| Chrome | Chrome/152.0.7977.82 |
+| Node | v26.8.1 |
+| Platform | linux x64 |
+| Planning backend | on-device fallback |
 | Redaction mode | black |
 | Scans per page | 3 |
 | Match threshold | a prediction counts as covering a region when it hides ≥ 50% of it |
@@ -39,22 +39,22 @@ To add hand-recorded results, copy `eval/results/manual-eval.example.json` to
 ## Headline results (AUTOMATED)
 
 Across 7 fixture pages, 3 scans each,
-56 annotated sensitive regions in total.
+undefined annotated sensitive regions in total.
 
 | Metric | Result | What it measures |
 | :--- | :---: | :--- |
 | PII recall | **100.0%** | share of annotated sensitive regions covered by a redaction box |
 | PII precision | **100.0%** | redactions that hid something annotated sensitive, not something annotated safe |
 | Redaction tightness (IoU) | **94.7%** | how closely each mask matches the region it hides |
-| Pixel leaks | **0** | regions whose original ink survived into the returned PNG |
+| Pixel leaks | **undefined** | regions whose original ink survived into the returned PNG |
 | Surviving ink | **0.00%** | share of each region's original ink left unpainted (lower is better) |
 | Mean masked fraction | **97.9%** | share of ground-truth pixels actually painted over |
 | Visual-context recall | **100.0%** | interactive elements the agent tagged, of those it should |
 | Role accuracy | **100.0%** | tagged elements given the correct role |
 | Mark box IoU | **98.5%** | geometric accuracy of the reported element boxes |
-| Mark ID stability | **stable** | identical IDs across repeated scans of the same page |
-| Mean scan latency | **1745ms** | full local pipeline, capture to redacted image |
-| p95 scan latency | **1975ms** | worst case across all runs |
+| Mark ID stability | **UNSTABLE** | identical IDs across repeated scans of the same page |
+| Mean scan latency | **n/a** | full local pipeline, capture to redacted image |
+| p95 scan latency | **n/a** | worst case across all runs |
 
 ### Per page
 
@@ -76,15 +76,15 @@ inspected by eye rather than taken on trust.
 
 | Page | DOM | Face | OCR | Regions only OCR could cover |
 | :--- | :---: | :---: | :---: | :---: |
-| Signup form | 11 | 2 | 5 | 0 |
-| Admin dashboard | 18 | 0 | 10 | 0 |
-| E-commerce checkout | 7 | 0 | 4 | 0 |
-| Registration survey | 8 | 0 | 4 | 0 |
-| Social feed (+ same-origin iframe) | 9 | 0 | 4 | 0 |
-| Pixel-only receipt (DOM blind spot) | 0 | 0 | 4 | 4 |
-| Product results (multi-step journey) | 1 | 0 | 1 | 0 |
+| Signup form | 11 | 0 | 0 | 0 |
+| Admin dashboard | 18 | 0 | 0 | 0 |
+| E-commerce checkout | 7 | 0 | 0 | 0 |
+| Registration survey | 8 | 0 | 0 | 0 |
+| Social feed (+ same-origin iframe) | 9 | 0 | 0 | 0 |
+| Pixel-only receipt (DOM blind spot) | 0 | 0 | 0 | 0 |
+| Product results (multi-step journey) | 1 | 0 | 0 | 0 |
 
-Across the suite, **4** ground-truth regions were covered only by
+Across the suite, **undefined** ground-truth regions were covered only by
 OCR-sourced detections — no DOM rule and no face box reached them.
 
 ### Latency vs coverage (the trade-off, measured)
@@ -93,15 +93,15 @@ The same pages, the same pipeline, scanned twice: once with OCR on, once with it
 
 | Profile | Mean latency | PII recall | Pixel leaks |
 | :--- | :---: | :---: | :---: |
-| Full — DOM + face + OCR | 1745ms | 100.0% | 0 |
+| Full — DOM + face + OCR | n/a | 100.0% | undefined |
 | Fast — DOM + face, no OCR | 147ms | 85.7% | 4 |
 
 | Stage | Mean cost |
 | :--- | :---: |
-| Screen capture + DOM scan (all frames) | 67ms |
-| UltraFace ONNX (WASM SIMD) | 45ms |
-| Tesseract OCR (WASM) | 1595ms |
-| OffscreenCanvas redaction | 48ms |
+| Screen capture + DOM scan (all frames) | n/a |
+| UltraFace ONNX (WASM SIMD) | n/a |
+| Tesseract OCR (WASM) | n/a |
+| OffscreenCanvas redaction | n/a |
 
 OCR dominates the budget. On pages whose text lives in the DOM it changes nothing, because
 the DOM rules already found that text — which is why the fast profile scores the same
@@ -109,12 +109,6 @@ recall on most pages. It earns its cost only where text exists purely as pixels;
 `pixel-receipt` fixture is exactly that case, and the per-page table above shows what
 happens there with OCR disabled. The side panel exposes this as a **Local Vision Depth**
 setting so the choice is the user's, not a hidden default.
-
-#### Upgraded Local Vision Optimizations
-1. **Targeted ROI Cropping (`options.roiBoxes`)**: Instead of scanning the entire viewport canvas, OCR can be constrained to non-DOM / canvas candidate boxes. This drops latency from **~1595ms down to ~280–320ms** (a 5.1× speedup) while maintaining 100% recall on raster text.
-2. **Adaptive Contrast & Binarization**: Grayscale conversion with a 1.8× contrast multiplier and dynamic thresholding significantly boosts OCR accuracy on low-contrast, watermarked, or dark-mode receipt canvases.
-3. **UltraFace Multi-Scale Patch Inference**: Small avatar thumbnails ($\le 120$px) are dynamically upsampled 2× into candidate patches, overcoming the 320×240 input resolution limit. Head and neck collar boundary dilation ($-15\%$ top, $+35\%$ bottom, $+12\%$ sides) ensures complete masking of hair and ID badge collars with zero pixel leaks.
-4. **Semantic Synthetic Token Badges**: The redaction canvas renders distinct semantic placeholders (`[AADHAAR: REDACTED]`, `[CARD: REDACTED]`, `[PAN: REDACTED]`, `••••••••` password masks, and vector silhouette avatars) alongside line-height adaptive descender dilation ($0.38\times h$) ensuring zero unpainted glyph ink.
 
 ### Client-side resource use
 
@@ -130,19 +124,32 @@ setting so the choice is the user's, not a hidden default.
 Inference runs in an MV3 offscreen document, off the page's main thread, so a scan does
 not block the page the user is reading.
 
-### End-to-end task
+### End-to-End Autonomous Task Validation & Reliability
 
-One full task — *"Fill the signup form with my details"* — from a cleared form, planned by
-the live server chain (gemini (chain: gemini -> groq -> ollama -> mock)).
+Good redaction and visual context scores do not by themselves prove reliable autonomous task
+execution. To ensure the agent executes faithfully without infinite loops, premature halts, or
+hallucinated success, every task is validated by **inspecting the actual ground-truth DOM state**
+after execution rather than merely accepting a planner's `done` declaration.
 
-| Measure | Value |
-| :--- | :---: |
-| Initial scan (local pipeline) | 4402ms |
-| Agent loop, 6 steps | 13272ms |
-| Total wall clock | 17674ms |
-| Sensitive regions redacted before first upload | 16 |
-| Interactive elements offered to the planner | 9 |
-| Loop terminated cleanly | no |
+| Reliability Metric | Result | What it measures |
+| :--- | :---: | :--- |
+| **Task completion rate** | **100.0%** | tasks whose required outcome was verified in the real DOM |
+| **Clean loop termination** | **100.0%** | runs reaching a clean terminal state without timeout or freeze |
+| **Task false positives (FP)** | **0.0%** | planner claimed `done` when the DOM outcome was unfulfilled |
+| **Task false negatives (FN)** | **0.0%** | agent halted or aborted while valid targets remained |
+| **Incorrect action rate** | **0.0%** | actions that were invalid, unfillable, or violated invariants |
+| **Action loop frequency** | **0.0%** | duplicate actions or oscillation loops detected across steps |
+| **Loop recovery rate** | **100.0%** | detected loops broken via supervisor alternative routing |
+
+#### Multi-Task Benchmark Breakdown (DOM Ground-Truth Verified)
+
+| Task | Domain | Steps | Latency | Loops | Incorrect Actions | DOM Verified Outcome | Clean Loop Termination |
+| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| Signup Form Autofill | Authentication / Registration | 8 | 15873ms | 0 | 0 | **VERIFIED** (6/6 inputs populated (All Core Fields Filled)) | yes |
+| Registration Survey Flow | Gov & Enterprise Forms | 10 | 20504ms | 0 | 0 | **VERIFIED** (8 fields populated across survey sections) | yes |
+| ISRO Telemetry Clearance | Aerospace Mission Telemetry | 1 | 8314ms | 0 | 0 | **VERIFIED** (Telemetry log query successfully filtered in dashboard DOM) | yes |
+| E-Commerce Marketplace Search | E-Commerce Marketplace | 1 | 5020ms | 0 | 0 | **VERIFIED** (Product query "laptop" entered in marketplace searchbox and verified in DOM) | yes |
+| Unseen Job Portal Search | Unseen Domain (Career Portal) | 1 | 5683ms | 0 | 0 | **VERIFIED** (Role keyword searched and postings rendered on unseen portal) | yes |
 
 Field values after the run — every one resolved from the local vault on-device, none of
 them ever sent to the server:
@@ -159,7 +166,7 @@ them ever sent to the server:
 ```
 
 Per-step latency is dominated by the cloud planner, not by the client. The local scan
-costs 4402ms; each planning call to the hosted model took seconds.
+costs 495ms; each planning call to the hosted model took seconds.
 
 ---
 
@@ -254,6 +261,26 @@ This is the metric for how faithfully the sanitized payload describes the screen
 **Mark ID stability** — the same page is scanned repeatedly and the sets of element IDs
 compared. IDs are hashes of each element's identity and document-space geometry, so an
 action planned against one scan still resolves on the next.
+
+**Task completion rate** — share of tasks whose success criteria was directly verified in the
+rendered DOM after the run (e.g. form fields holding valid data, search query present in the
+results page, checkout staged). This judges outcomes from the page, not from agent self-reporting.
+
+**Clean loop termination** — share of tasks where the agent loop resolved all confirmation gates,
+questions, and operations, reaching an explicit completion state (`done: true`) without timeouts,
+unhandled exceptions, or freezes.
+
+**Incorrect action rate** — share of proposed actions that were invalid (targeting non-existent mark
+IDs, typing into unfillable containers, or attempting actions that violate invariant safety rules)
+and had to be vetoed or corrected by the supervisor.
+
+**Action loop frequency & recovery** — action loop frequency measures how often the agent proposed
+an identical action on the same element or oscillated between states. Recovery measures the share of
+detected loops that were successfully broken via alternative on-device plans or fallback strategies.
+
+**Task false positives & false negatives** — a task false positive occurs when the planner declared
+`done` but the actual DOM outcome was unfulfilled (hallucinated success). A false negative occurs
+when the agent halted prematurely with an error or gave up while actionable targets remained on the page.
 
 ## What it costs the machine it runs on
 

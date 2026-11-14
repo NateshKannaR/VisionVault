@@ -138,14 +138,23 @@
     return { container, cursor: cursorEl, badge: cursorBadgeEl };
   }
 
+  let executorCursorX = typeof window !== "undefined" ? Math.round(window.innerWidth * 0.45) : 100;
+  let executorCursorY = typeof window !== "undefined" ? Math.round(window.innerHeight * 0.45) : 100;
+
   async function moveVisualCursor(targetX, targetY, label = "") {
+    if (global.CursorOverlay && typeof global.CursorOverlay.moveVisualCursor === "function") {
+      await global.CursorOverlay.moveVisualCursor(targetX, targetY, label);
+      executorCursorX = targetX;
+      executorCursorY = targetY;
+      return;
+    }
+
     try {
       const { cursor, badge } = ensureCursor();
       if (!cursor) return;
 
       clearTimeout(cursorHideTimer);
       cursor.classList.add("visible");
-      cursor.style.transform = `translate3d(${targetX}px, ${targetY}px, 0)`;
 
       if (badge) {
         if (label) {
@@ -156,8 +165,50 @@
         }
       }
 
-      // Smooth visual glide pause so the user perceives the cursor arrival
-      await delay(260);
+      const startX = executorCursorX;
+      const startY = executorCursorY;
+      const dx = targetX - startX;
+      const dy = targetY - startY;
+      const dist = Math.hypot(dx, dy);
+
+      if (dist < 5) {
+        cursor.style.transform = `translate3d(${targetX}px, ${targetY}px, 0)`;
+        executorCursorX = targetX;
+        executorCursorY = targetY;
+        return;
+      }
+
+      const steps = Math.min(22, Math.max(6, Math.round(dist / 30)));
+      const nx = -dy / dist;
+      const ny = dx / dist;
+      const lateral1 = (Math.random() * 0.3 - 0.15) * dist;
+      const lateral2 = (Math.random() * 0.3 - 0.15) * dist;
+      const cx1 = startX + dx * 0.3 + nx * lateral1;
+      const cy1 = startY + dy * 0.3 + ny * lateral1;
+      const cx2 = startX + dx * 0.7 + nx * lateral2;
+      const cy2 = startY + dy * 0.7 + ny * lateral2;
+
+      const duration = Math.min(300, Math.max(120, 80 + Math.log2(1 + dist / 25) * 35));
+      const stepDelay = duration / steps;
+
+      for (let i = 1; i <= steps; i++) {
+        const u = i / steps;
+        const t = u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2;
+        const omt = 1 - t;
+        let px = omt * omt * omt * startX + 3 * omt * omt * t * cx1 + 3 * omt * t * t * cx2 + t * t * t * targetX;
+        let py = omt * omt * omt * startY + 3 * omt * omt * t * cy1 + 3 * omt * t * t * cy2 + t * t * t * targetY;
+        if (i < steps) {
+          px += (Math.random() - 0.5) * 1.2;
+          py += (Math.random() - 0.5) * 1.2;
+        }
+        cursor.style.transform = `translate3d(${px}px, ${py}px, 0)`;
+        if (stepDelay >= 4) await delay(stepDelay);
+      }
+
+      executorCursorX = targetX;
+      executorCursorY = targetY;
+      cursor.style.transform = `translate3d(${targetX}px, ${targetY}px, 0)`;
+      await delay(35);
     } catch (_) {}
   }
 
@@ -988,10 +1039,17 @@
     if (!cdpSuccess) {
       const opts = { bubbles: true, cancelable: true, composed: true, clientX: x, clientY: y, button: 0 };
       try { el.focus({ preventScroll: true }); } catch (_) {}
-      for (const type of ["pointerover", "pointerenter", "pointerdown", "mousedown", "pointerup", "mouseup"]) {
-        const Ctor = type.startsWith("pointer") && typeof PointerEvent === "function" ? PointerEvent : MouseEvent;
-        try { el.dispatchEvent(new Ctor(type, opts)); } catch (_) {}
-      }
+      const PointerCtor = typeof PointerEvent === "function" ? PointerEvent : MouseEvent;
+      try { el.dispatchEvent(new PointerCtor("pointerover", opts)); } catch (_) {}
+      try { el.dispatchEvent(new PointerCtor("pointerenter", opts)); } catch (_) {}
+      try { el.dispatchEvent(new PointerCtor("pointerdown", opts)); } catch (_) {}
+      try { el.dispatchEvent(new MouseEvent("mousedown", opts)); } catch (_) {}
+
+      // Human mechanical hold duration (65 - 115ms) to defeat bot timing detection
+      await delay(65 + Math.random() * 50);
+
+      try { el.dispatchEvent(new PointerCtor("pointerup", opts)); } catch (_) {}
+      try { el.dispatchEvent(new MouseEvent("mouseup", opts)); } catch (_) {}
       el.click();
     }
 
@@ -1238,8 +1296,12 @@
         case "scroll_page": {
           const scrollAmount = Number(value) || 600;
           const before = window.scrollY;
-          window.scrollBy({ top: scrollAmount, behavior: "smooth" });
-          await delay(500);
+          if (global.CursorOverlay && typeof global.CursorOverlay.smoothMomentumScroll === "function") {
+            await global.CursorOverlay.smoothMomentumScroll(window, scrollAmount, 380);
+          } else {
+            window.scrollBy({ top: scrollAmount, behavior: "smooth" });
+            await delay(500);
+          }
           let moved = Math.abs(window.scrollY - before) > 4;
           if (!moved) {
             // Check for scrollable container on the page (like .page, .main, or active scroll container)
@@ -1249,8 +1311,12 @@
             });
             if (scrollable) {
               const elBefore = scrollable.scrollTop;
-              scrollable.scrollBy({ top: scrollAmount, behavior: "smooth" });
-              await delay(500);
+              if (global.CursorOverlay && typeof global.CursorOverlay.smoothMomentumScroll === "function") {
+                await global.CursorOverlay.smoothMomentumScroll(scrollable, scrollAmount, 380);
+              } else {
+                scrollable.scrollBy({ top: scrollAmount, behavior: "smooth" });
+                await delay(500);
+              }
               moved = Math.abs(scrollable.scrollTop - elBefore) > 4;
             }
           }

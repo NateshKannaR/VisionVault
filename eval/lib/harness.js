@@ -24,7 +24,9 @@ const CHROME_CANDIDATES = [
   'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe',
   path.join(process.env.LOCALAPPDATA || '', 'Google/Chrome/Application/chrome.exe'),
   '/usr/bin/google-chrome',
+  '/usr/bin/google-chrome-stable',
   '/usr/bin/chromium',
+  '/usr/bin/chromium-browser',
   '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
 ].filter(Boolean);
 
@@ -101,6 +103,8 @@ async function launchWithExtension({ headless = false, windowSize = '1280,900' }
       '--enable-unsafe-extension-debugging',
       '--no-first-run',
       '--no-default-browser-check',
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
       `--window-size=${windowSize}`,
     ],
   });

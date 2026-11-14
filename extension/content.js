@@ -1729,6 +1729,54 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 
+  // ── Cross-Tab Multi-Site Pipeline Handlers ──
+  if (msg.type === "EXTRACT_PAGE_DATA") {
+    try {
+      const data = {};
+      if (msg.markId != null) {
+        const el = resolveElementFromMarkId(msg.markId);
+        if (el) {
+          data.text = el.innerText || el.textContent || el.value || "";
+          data.tagName = el.tagName;
+          data.markId = msg.markId;
+        }
+      }
+      const inputs = document.querySelectorAll("input, select, textarea");
+      inputs.forEach(i => {
+        const k = i.getAttribute("data-vault-key") || i.name || i.id || i.placeholder;
+        if (k && i.value) data[k] = i.value;
+      });
+      data.pageTitle = document.title;
+      data.url = window.location.href;
+      sendResponse({ ok: true, data });
+    } catch (err) {
+      sendResponse({ ok: false, error: err.message });
+    }
+    return true;
+  }
+
+  if (msg.type === "FILL_PIPELINE_DATA") {
+    try {
+      let filled = 0;
+      const data = msg.data || {};
+      for (const [key, val] of Object.entries(data)) {
+        if (!val || typeof val !== "string") continue;
+        const selector = `input[name="${key}" i], input[id="${key}" i], input[placeholder*="${key}" i], textarea[name="${key}" i], [data-vault-key="${key}" i]`;
+        const el = document.querySelector(selector);
+        if (el) {
+          el.value = val;
+          el.dispatchEvent(new Event("input", { bubbles: true }));
+          el.dispatchEvent(new Event("change", { bubbles: true }));
+          filled++;
+        }
+      }
+      sendResponse({ ok: true, filled });
+    } catch (err) {
+      sendResponse({ ok: false, error: err.message });
+    }
+    return true;
+  }
+
   if (msg.type === "READ_VAULT_FIELDS") {
     const fields = {};
     const TELEMETRY_KEYS = new Set([
@@ -2386,12 +2434,14 @@ function initInPageShield() {
     if (!file || file.isVvSynthetic || file.__vvRedacted) return;
 
     const ext = (file.name || "").toLowerCase().split(".").pop();
+    const isEnv = (file.name || "").toLowerCase().startsWith(".env") || ext === "env";
     const isImage = file.type?.startsWith("image/") || ["png", "jpg", "jpeg", "webp", "bmp"].includes(ext);
-    const isDoc = file.type?.includes("pdf") || ["pdf", "txt", "csv", "json", "md", "py", "js", "ts", "log"].includes(ext);
+    const DOC_EXTS = ["pdf", "txt", "csv", "json", "md", "py", "js", "ts", "log", "yaml", "yml", "toml", "sql", "sh", "bash", "xml", "ini", "cfg", "conf", "jsx", "tsx", "html", "css", "dockerfile"];
+    const isDoc = isEnv || file.type?.includes("pdf") || file.type?.startsWith("text/") || DOC_EXTS.includes(ext);
 
     if (!isImage && !isDoc) return;
 
-    showProcessingOverlay(file.name, isImage ? "Image (Faces & PII)" : "Document (Secrets & PII)");
+    showProcessingOverlay(file.name, isImage ? "Image (Faces & PII)" : (isEnv ? "Environment Secrets (.env)" : "Document (Secrets & PII)"));
 
     if (isImage) {
       const reader = new FileReader();
@@ -2485,7 +2535,8 @@ function initInPageShield() {
       const files = Array.from(target.files);
       const hasInterceptable = files.some(f => {
         const ext = (f.name || "").toLowerCase().split(".").pop();
-        return ["pdf", "txt", "csv", "json", "md", "py", "js", "ts", "log", "png", "jpg", "jpeg", "webp", "bmp"].includes(ext);
+        const isEnv = (f.name || "").toLowerCase().startsWith(".env") || ext === "env";
+        return isEnv || ["pdf", "txt", "csv", "json", "md", "py", "js", "ts", "log", "yaml", "yml", "toml", "sql", "sh", "bash", "xml", "ini", "cfg", "conf", "jsx", "tsx", "html", "css", "dockerfile", "png", "jpg", "jpeg", "webp", "bmp"].includes(ext);
       });
       if (!hasInterceptable) return;
 
@@ -2702,29 +2753,103 @@ function initInPageShield() {
     }
   }
 
-  // ── In-Composer Pill & Floating Badge ──
+  // ── In-Composer Pill & Real-Time Threat Radar ──
+  let autoUnmaskEnabled = (function () {
+    try {
+      return localStorage.getItem("vv_auto_unmask") !== "false";
+    } catch (_) {
+      return true;
+    }
+  })();
+
   function updateComposerPillUI() {
     const pill = document.querySelector(".vv-composer-pill");
     const composer = findComposerElement();
     if (!composer || !window.PromptScrubber) return;
 
-    const text = composer.tagName === "TEXTAREA" || composer.tagName === "INPUT" ? composer.value : (composer.innerText || composer.textContent || "");
+    const text = composer.tagName === "TEXTAREA" || composer.tagName === "INPUT"
+      ? composer.value
+      : (composer.innerText || composer.textContent || "");
     const res = window.PromptScrubber.scrub(text || "");
     const count = res.matches?.length || 0;
 
+    const composerWrap = composer.closest('form:has(#prompt-textarea), #composer-background, [class*="composer-background"], div:has(> #prompt-textarea)') || composer.parentElement;
+
+    // ── Adversarial Prompt Injection Radar ──
+    const injectionCheck = window.PromptScrubber?.detectPromptInjection ? window.PromptScrubber.detectPromptInjection(text || "") : { isInjection: false };
+    let injectionBanner = document.getElementById("vv-injection-alert");
+    if (injectionCheck.isInjection) {
+      if (!injectionBanner) {
+        injectionBanner = document.createElement("div");
+        injectionBanner.id = "vv-injection-alert";
+        injectionBanner.className = "vv-injection-alert";
+        if (composerWrap && composerWrap.parentElement) {
+          composerWrap.parentElement.insertBefore(injectionBanner, composerWrap);
+        } else if (composer.parentElement) {
+          composer.parentElement.insertBefore(injectionBanner, composer);
+        }
+      }
+      injectionBanner.innerHTML = `
+        <div class="vv-injection-title">
+          <span>🚨</span>
+          <span>${injectionCheck.warning}</span>
+        </div>
+        <button type="button" class="vv-injection-btn" id="vv-dismiss-injection">Dismiss</button>
+      `;
+      injectionBanner.querySelector("#vv-dismiss-injection")?.addEventListener("click", () => injectionBanner.remove());
+    } else if (injectionBanner) {
+      injectionBanner.remove();
+    }
+
     if (pill) {
       if (count > 0) {
+        const labels = [...new Set(res.matches.map(m => m.label || m.token))];
+        pill.classList.add("has-threat");
         pill.classList.add("has-pii");
         pill.innerHTML = `
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-          <span>🛡️ ${count} PII</span>
+          <span class="vv-pulse-dot"></span>
+          <span>⚠️ ${count} Secret${count > 1 ? 's' : ''}</span>
         `;
+        pill.setAttribute("title", `VisionVault Alert: ${count} sensitive item(s) detected [${labels.join(", ")}]. Press Ctrl+Shift+S to scrub!`);
+
+        // Visual alert glow around ChatGPT prompt container
+        composer.classList.add("vv-composer-alert-glow");
+
+        // Live Ribbon above composer
+        let ribbon = document.getElementById("vv-live-ribbon");
+        if (!ribbon) {
+          ribbon = document.createElement("div");
+          ribbon.id = "vv-live-ribbon";
+          ribbon.className = "vv-live-ribbon";
+          if (composerWrap && composerWrap.parentElement) {
+            composerWrap.parentElement.insertBefore(ribbon, composerWrap);
+          } else if (composer.parentElement) {
+            composer.parentElement.insertBefore(ribbon, composer);
+          }
+        }
+        ribbon.innerHTML = `
+          <div class="vv-ribbon-content">
+            <span class="vv-ribbon-tag">⚠️ VISIONVAULT RADAR</span>
+            <span class="vv-ribbon-msg">Unmasked in draft: <strong>[${labels.slice(0, 3).join(", ")}${labels.length > 3 ? '...' : ''}]</strong></span>
+          </div>
+          <button type="button" class="vv-ribbon-btn" id="vv-ribbon-scrub-btn">🛡️ Scrub Now (Ctrl+Shift+S)</button>
+        `;
+        ribbon.querySelector("#vv-ribbon-scrub-btn")?.addEventListener("click", (ev) => {
+          ev.preventDefault();
+          ev.stopPropagation();
+          manualScrubActiveInput();
+        });
       } else {
+        pill.classList.remove("has-threat");
         pill.classList.remove("has-pii");
         pill.innerHTML = `
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
           <span>🛡️ VV Active</span>
         `;
+        pill.setAttribute("title", "VisionVault Shield Active (100% On-Device RAM Redaction)");
+        composer.classList.remove("vv-composer-alert-glow");
+        const ribbon = document.getElementById("vv-live-ribbon");
+        if (ribbon) ribbon.remove();
       }
     }
 
@@ -2759,6 +2884,8 @@ function initInPageShield() {
     anchor.classList.add("active");
     const popover = document.createElement("div");
     popover.className = "vv-shield-popover";
+    const mappedCount = Object.keys(globalSessionMap).length;
+
     popover.innerHTML = `
       <div class="vv-popover-header">
         <div class="vv-popover-title">
@@ -2769,11 +2896,11 @@ function initInPageShield() {
         </div>
         <div class="vv-popover-status">
           <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#10b981;"></span>
-          100% LOCAL
+          100% RAM ISOLATED
         </div>
       </div>
       <div class="vv-popover-desc">
-        Zero-trust local prompt, image, and document scrubber. Masks PII, Aadhaar numbers, and API keys before submission to cloud LLMs.
+        Zero-trust local prompt, image, and code scrubber. Replaces cloud API keys, secrets, and PII before transmission.
       </div>
       <div class="vv-popover-stats">
         <div class="vv-stat-item">
@@ -2781,24 +2908,119 @@ function initInPageShield() {
           <span class="vv-stat-lbl">Redacted Items</span>
         </div>
         <div class="vv-stat-item" style="text-align:right;">
-          <span class="vv-stat-val" style="color:#10b981;">0ms</span>
-          <span class="vv-stat-lbl">Network Latency</span>
+          <span class="vv-stat-val" style="color:#10b981;">0.0ms</span>
+          <span class="vv-stat-lbl">Network Exposure</span>
         </div>
       </div>
+
+      <div class="vv-popover-toggle-row">
+        <label class="vv-toggle-label" for="vv-auto-unmask-toggle">
+          <span>⚡ Auto De-Scrub Responses</span>
+          <input type="checkbox" id="vv-auto-unmask-toggle" ${autoUnmaskEnabled ? "checked" : ""}>
+        </label>
+      </div>
+
       <button type="button" class="vv-popover-btn" id="vv-scrub-input-btn">
-        Scrub Current Input Box Now
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        Scrub Active Prompt <span class="vv-kbd-hint">Ctrl+Shift+S</span>
       </button>
-      <button type="button" class="vv-popover-btn" id="vv-reveal-chat-btn" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);">
-        De-Scrub / Reveal Assistant Response
+
+      <div style="display:flex;gap:6px;">
+        <button type="button" class="vv-popover-btn vv-btn-secondary" id="vv-copy-clean-btn" style="flex:1;">
+          Copy Scrubbed
+        </button>
+        <button type="button" class="vv-popover-btn vv-btn-secondary" id="vv-reveal-chat-btn" style="flex:1;">
+          Unmask All Chat
+        </button>
+      </div>
+
+      <button type="button" class="vv-popover-btn vv-btn-secondary" id="vv-export-chat-btn" style="width:100%;">
+        📄 Export Sanitized Chat (Markdown)
+      </button>
+
+      <button type="button" class="vv-popover-btn" id="vv-dpdp-cert-btn" style="width:100%;background:linear-gradient(135deg, #059669 0%, #047857 100%);">
+        📜 DPDP Act 2023 Compliance Certificate
+      </button>
+
+      <button type="button" class="vv-popover-btn vv-btn-ghost" id="vv-clear-tokens-btn" style="color:#f43f5e;font-size:10px;">
+        Clear Session Tokens (${mappedCount})
       </button>
     `;
+
+    popover.querySelector("#vv-export-chat-btn")?.addEventListener("click", () => {
+      exportSanitizedChat();
+    });
+
+    popover.querySelector("#vv-dpdp-cert-btn")?.addEventListener("click", async () => {
+      try {
+        const cryptoModule = window.VaultCrypto || globalThis.VaultCrypto;
+        if (cryptoModule && cryptoModule.generateDpdpComplianceCertificate) {
+          const cert = await cryptoModule.generateDpdpComplianceCertificate({
+            task: "In-Page AI Chat Session (Zero-Trust RAM Scrubbing)",
+            url: window.location.href,
+            piiCount: sessionRedactions,
+            marksCount: Object.keys(globalSessionMap).length,
+            timings: { clientScan: 0, ocrMs: 0 },
+            actions: []
+          });
+          const win = window.open("", "_blank");
+          if (win) {
+            win.document.write(cert.htmlCertificate);
+            win.document.close();
+          }
+          showToast(`📜 Sovereign DPDP Certificate Generated! Hash: ${cert.auditReport.cryptographicIntegrity.sha256Hash.slice(0, 16)}...`);
+        } else {
+          showToast("Opening Sovereign Compliance Certificate from extension panel...");
+          chrome.runtime.sendMessage({ type: "OPEN_DPDP_CERTIFICATE" });
+        }
+      } catch (err) {
+        showToast("Certificate generation notice: " + err.message);
+      }
+    });
+
+    popover.querySelector("#vv-auto-unmask-toggle")?.addEventListener("change", (e) => {
+      autoUnmaskEnabled = !!e.target.checked;
+      try {
+        localStorage.setItem("vv_auto_unmask", autoUnmaskEnabled ? "true" : "false");
+      } catch (_) {}
+      showToast(autoUnmaskEnabled ? "⚡ Auto De-Scrub Enabled: ChatGPT responses will restore tokens locally!" : "Auto De-Scrub Disabled.");
+      if (autoUnmaskEnabled) revealTokensInChat(false);
+    });
 
     popover.querySelector("#vv-scrub-input-btn").addEventListener("click", () => {
       manualScrubActiveInput();
     });
 
+    popover.querySelector("#vv-copy-clean-btn")?.addEventListener("click", () => {
+      const input = findComposerElement();
+      const currentText = input ? (input.tagName === "TEXTAREA" || input.tagName === "INPUT" ? input.value : (input.innerText || input.textContent || "")) : "";
+      if (!currentText.trim()) {
+        showToast("Prompt box is empty.");
+        return;
+      }
+      const scrubRes = window.PromptScrubber ? window.PromptScrubber.scrub(currentText) : { cleanText: currentText };
+      navigator.clipboard.writeText(scrubRes.cleanText).then(() => {
+        showToast("🛡️ VisionVault: Clean scrubbed prompt copied to clipboard!");
+      }).catch(() => {});
+    });
+
     popover.querySelector("#vv-reveal-chat-btn").addEventListener("click", () => {
-      revealTokensInChat();
+      revealTokensInChat(true);
+    });
+
+    popover.querySelector("#vv-clear-tokens-btn")?.addEventListener("click", () => {
+      for (const k of Object.keys(globalSessionMap)) {
+        delete globalSessionMap[k];
+      }
+      sessionRedactions = 0;
+      updateComposerPillUI();
+      renderTokenChipsBar();
+      showToast("Session tokens cleared.");
+      if (activePopover) {
+        activePopover.remove();
+        activePopover = null;
+        anchor.classList.remove("active");
+      }
     });
 
     anchor.appendChild(popover);
@@ -2819,20 +3041,225 @@ function initInPageShield() {
     }, 10);
   }
 
-  function revealTokensInChat() {
-    const turns = document.querySelectorAll('[data-message-author-role="assistant"], .agent-turn, div.markdown.prose, [data-message-model-slug]');
+  function autoUnmaskElement(el) {
+    if (!autoUnmaskEnabled || !el || Object.keys(globalSessionMap).length === 0) return;
+    if (el.tagName === "TEXTAREA" || el.tagName === "INPUT" || el.isContentEditable || el.closest?.('#prompt-textarea, [data-testid="prompt-textarea"]')) return;
+
+    const txt = el.textContent || "";
+    let matchFound = false;
+    for (const token of Object.keys(globalSessionMap)) {
+      if (txt.includes(token)) {
+        matchFound = true;
+        break;
+      }
+    }
+    if (!matchFound) return;
+
+    function escapeHtml(str) {
+      if (!str) return "";
+      return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    function renderTokenPillHtml(token, original, isRevealed) {
+      const revealedClass = isRevealed ? "revealed" : "";
+      const displayText = isRevealed ? original : token;
+      const btnIcon = isRevealed ? "🔒" : "👁️";
+      const btnTitle = isRevealed ? "Mask this token" : "Reveal this token";
+      return `<span class="vv-token-pill ${revealedClass}" data-token="${escapeHtml(token)}" data-orig="${encodeURIComponent(original)}"><span class="vv-token-text">${escapeHtml(displayText)}</span><span class="vv-token-lens"><span class="vv-lens-title">🛡️ Privacy Lens</span>${escapeHtml(original)}</span><button type="button" class="vv-token-toggle" title="${btnTitle}">${btnIcon}</button></span>`;
+    }
+
+    let html = el.innerHTML;
+    for (const [token, original] of Object.entries(globalSessionMap)) {
+      if (html.includes(token) && !html.includes(`data-token="${token}"`)) {
+        html = html.split(token).join(renderTokenPillHtml(token, original, autoUnmaskEnabled));
+      }
+    }
+    el.innerHTML = html;
+  }
+
+  function setupAutoUnmaskObserver() {
+    const chatObserver = new MutationObserver((mutations) => {
+      if (!autoUnmaskEnabled || Object.keys(globalSessionMap).length === 0) return;
+      for (const m of mutations) {
+        for (const node of m.addedNodes) {
+          if (node.nodeType === 1) {
+            if (node.matches?.('[data-message-author-role="assistant"], .agent-turn, div.markdown.prose, [data-message-model-slug], pre, code')) {
+              autoUnmaskElement(node);
+            } else {
+              const targets = node.querySelectorAll?.('[data-message-author-role="assistant"], .agent-turn, div.markdown.prose, pre, code');
+              if (targets && targets.length > 0) {
+                targets.forEach(t => autoUnmaskElement(t));
+              }
+            }
+          }
+        }
+      }
+    });
+    chatObserver.observe(document.body, { childList: true, subtree: true });
+
+    // Intercept ChatGPT's code copy buttons so clipboard receives real unmasked code
+    document.addEventListener("click", function (e) {
+      const copyBtn = e.target.closest?.('button[class*="copy" i], button[aria-label*="copy" i], [data-testid*="copy" i]');
+      if (!copyBtn) return;
+      const block = copyBtn.closest?.('pre, .code-block, div:has(> pre)') || copyBtn.parentElement;
+      if (!block) return;
+      const codeEl = block.querySelector?.('code') || block;
+      let text = codeEl.innerText || codeEl.textContent || "";
+      let replaced = false;
+      for (const [token, orig] of Object.entries(globalSessionMap)) {
+        if (text.includes(token)) {
+          text = text.split(token).join(orig);
+          replaced = true;
+        }
+      }
+      if (replaced) {
+        try {
+          navigator.clipboard.writeText(text);
+          showToast("🛡️ VisionVault: Code copied with credentials unmasked locally!");
+        } catch (_) {}
+      }
+    }, true);
+
+    // Click delegation for 1-click Selective De-Scrubbing toggle
+    document.addEventListener("click", function (e) {
+      const toggleBtn = e.target.closest?.(".vv-token-toggle");
+      if (!toggleBtn) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const pill = toggleBtn.closest(".vv-token-pill");
+      if (!pill) return;
+      const token = pill.getAttribute("data-token");
+      let orig = globalSessionMap[token];
+      if (!orig && pill.getAttribute("data-orig")) {
+        try { orig = decodeURIComponent(pill.getAttribute("data-orig")); } catch (_) {}
+      }
+      if (!orig) return;
+
+      const isRevealed = pill.classList.toggle("revealed");
+      const textEl = pill.querySelector(".vv-token-text");
+      if (textEl) {
+        textEl.textContent = isRevealed ? orig : token;
+      }
+      toggleBtn.textContent = isRevealed ? "🔒" : "👁️";
+      toggleBtn.title = isRevealed ? "Mask this token" : "Reveal this token";
+    }, true);
+  }
+
+  function revealTokensInChat(showNotification = true) {
+    const turns = document.querySelectorAll('[data-message-author-role="assistant"], .agent-turn, div.markdown.prose, [data-message-model-slug], pre, code');
     let revealedCount = 0;
     for (const turn of turns) {
       let html = turn.innerHTML;
       for (const [token, original] of Object.entries(globalSessionMap)) {
-        if (html.includes(token)) {
-          html = html.split(token).join(`<span style="background:rgba(16,185,129,0.15);color:#10b981;padding:1px 4px;border-radius:4px;border:1px solid rgba(16,185,129,0.3);font-weight:600;" title="VisionVault Restored: ${token}">${original}</span>`);
+        if (html.includes(token) && !html.includes(`data-token="${token}"`)) {
+          html = html.split(token).join(renderTokenPillHtml(token, original, true));
           revealedCount++;
         }
       }
       turn.innerHTML = html;
+      const pills = turn.querySelectorAll('.vv-token-pill');
+      pills.forEach(p => {
+        if (!p.classList.contains("revealed")) {
+          p.classList.add("revealed");
+          const t = p.getAttribute("data-token");
+          let orig = globalSessionMap[t];
+          if (!orig && p.getAttribute("data-orig")) {
+            try { orig = decodeURIComponent(p.getAttribute("data-orig")); } catch (_) {}
+          }
+          if (orig) {
+            const txt = p.querySelector(".vv-token-text");
+            if (txt) txt.textContent = orig;
+            const btn = p.querySelector(".vv-token-toggle");
+            if (btn) {
+              btn.textContent = "🔒";
+              btn.title = "Mask this token";
+            }
+          }
+          revealedCount++;
+        }
+      });
     }
-    showToast(`🛡️ VisionVault: Restored ${revealedCount} token(s) locally in response!`);
+    if (showNotification) {
+      showToast(`🛡️ VisionVault: Restored ${revealedCount} token(s) locally in response!`);
+    }
+  }
+
+  function exportSanitizedChat() {
+    let markdown = `# 🛡️ VisionVault Sanitized Chat Export\n`;
+    markdown += `**Export Date:** ${new Date().toISOString()}\n`;
+    markdown += `**Origin URL:** ${window.location.origin}\n`;
+    markdown += `**Privacy Seal:** 🔒 100% Sanitized (Zero Raw Secrets / Client-Side Masked)\n\n---\n\n`;
+
+    const exportedMessages = [];
+
+    // Strategy 1: Modern ChatGPT turns
+    const chatGptTurns = document.querySelectorAll('article, [data-message-author-role], [data-testid*="conversation-turn"]');
+    if (chatGptTurns.length > 0) {
+      chatGptTurns.forEach((turn) => {
+        const isUser = turn.querySelector('[data-message-author-role="user"]') || turn.getAttribute('data-message-author-role') === 'user' || turn.innerText.includes('You said:') || turn.querySelector('img[alt*="User" i]');
+        const role = isUser ? "User" : "Assistant";
+        const contentEl = turn.querySelector('.markdown, div.markdown.prose, [data-message-model-slug], .whitespace-pre-wrap') || turn;
+        let text = contentEl.innerText || contentEl.textContent || "";
+        text = text.trim();
+        if (text) exportedMessages.push({ role, text });
+      });
+    }
+
+    // Strategy 2: Claude turns fallback
+    if (exportedMessages.length === 0) {
+      const claudeTurns = document.querySelectorAll('.font-user-message, .font-claude-message, [data-test-render-count]');
+      claudeTurns.forEach(turn => {
+        const isUser = turn.classList.contains('font-user-message');
+        const role = isUser ? "User" : "Claude";
+        exportedMessages.push({ role, text: turn.innerText || turn.textContent || "" });
+      });
+    }
+
+    // Strategy 3: Generic fallback
+    if (exportedMessages.length === 0) {
+      const blocks = document.querySelectorAll('main p, main pre');
+      let combined = "";
+      blocks.forEach(b => { combined += b.innerText + "\n\n"; });
+      if (combined.trim()) {
+        exportedMessages.push({ role: "Chat Session", text: combined.trim() });
+      }
+    }
+
+    if (exportedMessages.length === 0) {
+      showToast("No active conversation messages found to export.");
+      return;
+    }
+
+    // Permanently sanitize any raw secrets using PromptScrubber and ensure all session tokens remain masked
+    for (const msg of exportedMessages) {
+      let safeText = msg.text;
+      for (const [token, orig] of Object.entries(globalSessionMap)) {
+        if (safeText.includes(orig)) {
+          safeText = safeText.split(orig).join(token);
+        }
+      }
+      if (window.PromptScrubber && window.PromptScrubber.scrub) {
+        const scrubbed = window.PromptScrubber.scrub(safeText);
+        safeText = scrubbed.cleanText;
+      }
+      markdown += `### 💬 ${msg.role}\n\n${safeText}\n\n---\n\n`;
+    }
+
+    const blob = new Blob([markdown], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `sanitized-chat-${new Date().toISOString().slice(0, 10)}.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast("📄 Sanitized chat exported successfully!");
   }
 
   function manualScrubActiveInput() {
@@ -2856,6 +3283,7 @@ function initInPageShield() {
       updateComposerPillUI();
       renderTokenChipsBar();
       showToast(`🛡️ VisionVault: Sanitized ${res.matches.length} item(s) in prompt!`, true);
+      if (autoUnmaskEnabled) revealTokensInChat(false);
     } else {
       showToast("🛡️ VisionVault: No secrets or PII detected in prompt. Ready to send!", false);
     }
@@ -2864,9 +3292,19 @@ function initInPageShield() {
   function tryMountComposerPill() {
     if (document.querySelector(".vv-composer-pill")) return;
 
-    // Strategy 1: Modern ChatGPT composer action controls container
+    // Strategy 1: Modern ChatGPT trailing action buttons container (2025/2026 UI)
+    const chatGptContainer = document.querySelector(
+      'div[data-testid="composer-trailing-actions"], div[class*="composer-trailing"], div[class*="trailing-actions"]'
+    );
+    if (chatGptContainer) {
+      const pill = createComposerPill();
+      chatGptContainer.insertBefore(pill, chatGptContainer.firstChild);
+      return;
+    }
+
+    // Strategy 2: Beside speech, voice, or send buttons in ChatGPT
     const chatGptSend = document.querySelector(
-      'button[data-testid="send-button"], button[data-testid="composer-send-button"], button[data-testid="fruitjuice-send-button"], button[aria-label*="voice" i], button[aria-label*="speech" i], button[aria-label="Send prompt"], button[aria-label="Send message"], button[aria-label="Send"], form button[type="submit"], button[class*="send"][class*="button"]'
+      'button[data-testid="send-button"], button[data-testid="composer-send-button"], button[data-testid="fruitjuice-send-button"], button[data-testid="composer-speech-button"], button[aria-label*="voice" i], button[aria-label*="speech" i], button[aria-label="Send prompt"], button[aria-label="Send message"], button[aria-label="Send"], form button[type="submit"]'
     );
     if (chatGptSend && chatGptSend.parentElement) {
       const pill = createComposerPill();
@@ -2874,7 +3312,7 @@ function initInPageShield() {
       return;
     }
 
-    // Strategy 2: Claude controls
+    // Strategy 3: Claude controls
     const claudeSend = document.querySelector('button[aria-label="Send Message"], fieldset button:last-child');
     if (claudeSend && claudeSend.parentElement) {
       const pill = createComposerPill();
@@ -2882,7 +3320,7 @@ function initInPageShield() {
       return;
     }
 
-    // Strategy 3: Gemini controls
+    // Strategy 4: Gemini controls
     const geminiSend = document.querySelector('.send-button-container, button[aria-label*="Send prompt"]');
     if (geminiSend && geminiSend.parentElement) {
       const pill = createComposerPill();
@@ -2890,7 +3328,7 @@ function initInPageShield() {
       return;
     }
 
-    // Strategy 4: Relative / absolute positioning inside composer wrapper (PrivacyScrubber style fallback)
+    // Strategy 5: Composer background wrapper
     const composerWrapper = document.querySelector(
       'form:has(#prompt-textarea), #composer-background, [class*="composer-background"], div:has(> #prompt-textarea)'
     );
@@ -2898,14 +3336,14 @@ function initInPageShield() {
       const pill = createComposerPill();
       pill.style.position = "absolute";
       pill.style.bottom = "10px";
-      pill.style.right = "145px";
+      pill.style.right = "135px";
       pill.style.zIndex = "100";
       composerWrapper.style.position = composerWrapper.style.position || "relative";
       composerWrapper.appendChild(pill);
       return;
     }
 
-    // Strategy 5: Near #prompt-textarea or any textarea on LLM page
+    // Strategy 6: Near #prompt-textarea
     const promptArea = document.querySelector('#prompt-textarea, [data-testid="prompt-textarea"], form textarea');
     if (promptArea && promptArea.parentElement) {
       const pill = createComposerPill();
@@ -2914,8 +3352,20 @@ function initInPageShield() {
     }
   }
 
+  // Keyboard shortcut: Ctrl+Shift+S or Cmd+Shift+S
+  window.addEventListener("keydown", function (e) {
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === "S" || e.key === "s")) {
+      e.preventDefault();
+      e.stopPropagation();
+      manualScrubActiveInput();
+    }
+  }, true);
+
   // Initialize mid-flight prompt submit interceptors
   setupSubmitInterceptors();
+
+  // Initialize auto-unmask observer for streaming assistant responses
+  setupAutoUnmaskObserver();
 
   // Periodic poll & observer for dynamic SPA re-renders
   tryMountComposerPill();
@@ -2924,12 +3374,16 @@ function initInPageShield() {
   });
   obs.observe(document.body, { childList: true, subtree: true });
 
-  // Re-check on input, keyup, focusin (matching PrivacyScrubber ChatGPT fallback)
+  // Debounced real-time typing radar
+  let radarTimer = null;
   const onUserActivity = (e) => {
     const target = e.target;
     if (target && (target.closest?.('#prompt-textarea, [data-testid="prompt-textarea"]') || target.id === 'prompt-textarea' || target.closest?.('form'))) {
       tryMountComposerPill();
-      updateComposerPillUI();
+      if (radarTimer) clearTimeout(radarTimer);
+      radarTimer = setTimeout(() => {
+        updateComposerPillUI();
+      }, 160);
     }
   };
   document.addEventListener("input", onUserActivity, { capture: true, passive: true });

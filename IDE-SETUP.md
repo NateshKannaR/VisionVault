@@ -14,20 +14,23 @@ VisionVault injects an active shield badge directly into popular AI chat interfa
 - **Google Gemini** (`gemini.google.com`) — Embedded directly in the prompt input container.
 
 ### How It Works:
-1. **Real-Time Paste Interception**:
-   Whenever you paste code or text into ChatGPT, Claude, or Gemini, VisionVault's content script intercepts the paste event before it reaches the webpage or LLM server.
-2. **Instant Local Redaction**:
-   Any detected API keys (`sk-...`, `sk-ant-...`, `AKIA...`, GitHub tokens, DB connection URIs) or PII (emails, phone numbers, PAN, Aadhaar, SSN, credit cards) are immediately replaced with safe deterministic tokens (e.g. `[OPENAI_API_KEY_1]`).
-3. **On-Screen Toast Notification**:
-   A sleek toast alert pops up confirming the redaction:
+1. **Real-Time Live Typing Radar & Safety Ribbon**:
+   As you type into ChatGPT, VisionVault scans your draft in-memory with debounced zero-latency analysis. If secrets or PII are detected, the shield badge turns into a pulsing threat alert (`⚠️ 2 Secrets`), an alert glow outlines the prompt box, and an inline safety banner appears:
    ```
-   🛡️ VisionVault: Auto-redacted 2 secret(s) [OPENAI_API_KEY_1, EMAIL_1]
+   ⚠️ VISIONVAULT RADAR: Unmasked in draft: [OPENAI_API_KEY, EMAIL] · [🛡️ Scrub Now (Ctrl+Shift+S)]
    ```
-4. **Interactive Shield Badge & Popover**:
-   Click the shield icon next to the chatbox to view:
-   - Active protection status (**100% RAM Isolated**)
-   - Session redactions counter
-   - **"Scrub Current Input Box"** button to scrub text you've typed manually.
+2. **Instant Local Redaction & Shortcut (`Ctrl+Shift+S`)**:
+   Pressing `Ctrl+Shift+S` (or `Cmd+Shift+S`) or pasting text instantly scrubs detected API keys (`sk-...`, `sk-ant-...`, Stripe, AWS, GitHub PATs, JWTs, SSH private keys, DB connection strings, passwords, `.env` pairs) and PII (emails, phones, PAN, Aadhaar, SSN, IBAN, CVV) into safe typed tokens (e.g. `[OPENAI_API_KEY_1]`).
+3. **Auto De-Scrub & Live Unmask for Assistant Responses**:
+   When ChatGPT answers with code containing your tokens, VisionVault's streaming observer automatically restores the original values locally with a subtle green badge (`sk-... [Restored locally]`). When you click ChatGPT's **"Copy code"** button, the copied clipboard snippet automatically contains the restored, executable credentials!
+4. **Zero-Trust File & `.env` Interception**:
+   Dropping or attaching `.env`, `.env.local`, `.yaml`, `.sql`, code, or PDF documents instantly scrubs all credential lines in memory before the file reaches ChatGPT.
+5. **Interactive Shield Badge & Glassmorphism Popover**:
+   Click the shield icon next to the chatbox to:
+   - Toggle **⚡ Auto De-Scrub Responses** On/Off.
+   - View **Session Redacted Secrets** & 0.0ms network latency.
+   - 1-Click **"Copy Scrubbed"** or **"Unmask All Chat"**.
+   - Manage protected session tokens with hover-peek lens.
 
 ---
 

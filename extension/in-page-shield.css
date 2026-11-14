@@ -254,6 +254,187 @@
   50% { box-shadow: 0 0 18px rgba(244, 63, 94, 0.7); }
 }
 
+@keyframes vvPulseThreat {
+  0%, 100% { box-shadow: 0 0 8px rgba(244, 63, 94, 0.5); border-color: rgba(244, 63, 94, 0.5); }
+  50% { box-shadow: 0 0 20px rgba(244, 63, 94, 0.85); border-color: #f43f5e; }
+}
+
+.vv-composer-pill.has-threat {
+  background: rgba(244, 63, 94, 0.22) !important;
+  border-color: #f43f5e !important;
+  color: #fda4af !important;
+  animation: vvPulseThreat 1.2s infinite ease-in-out;
+}
+
+.vv-pulse-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #f43f5e;
+  box-shadow: 0 0 8px #f43f5e;
+  animation: vvBlink 0.8s infinite alternate;
+}
+
+@keyframes vvBlink {
+  from { opacity: 0.4; transform: scale(0.85); }
+  to { opacity: 1; transform: scale(1.15); }
+}
+
+.vv-composer-alert-glow {
+  box-shadow: 0 0 0 2px rgba(244, 63, 94, 0.4) !important;
+  transition: box-shadow 0.25s ease;
+}
+
+/* Live Threat Ribbon above ChatGPT composer */
+.vv-live-ribbon {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: rgba(15, 23, 42, 0.95);
+  border: 1px solid rgba(244, 63, 94, 0.45);
+  border-radius: 8px;
+  padding: 6px 12px;
+  margin-bottom: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4), 0 0 10px rgba(244, 63, 94, 0.2);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 11px;
+  color: #f8fafc;
+  z-index: 1000;
+  backdrop-filter: blur(8px);
+  animation: vvSlideUp 0.15s ease-out;
+}
+
+.vv-ribbon-content {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vv-ribbon-tag {
+  background: rgba(244, 63, 94, 0.2);
+  color: #fb7185;
+  border: 1px solid rgba(244, 63, 94, 0.4);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-weight: 800;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+}
+
+.vv-ribbon-msg {
+  color: #cbd5e1;
+}
+
+.vv-ribbon-btn {
+  background: linear-gradient(135deg, #e11d48 0%, #be123c 100%);
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+  box-shadow: 0 2px 6px rgba(190, 18, 60, 0.4);
+}
+
+.vv-ribbon-btn:hover {
+  background: linear-gradient(135deg, #f43f5e 0%, #e11d48 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(244, 63, 94, 0.5);
+}
+
+/* De-Scrubbed / Restored Tokens in Assistant Responses */
+.vv-restored-pill {
+  background: rgba(16, 185, 129, 0.15) !important;
+  color: #34d399 !important;
+  border: 1px solid rgba(16, 185, 129, 0.35) !important;
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+  font-size: 0.92em;
+  font-weight: 600;
+  cursor: help;
+  display: inline-block;
+  vertical-align: baseline;
+  transition: all 0.15s;
+}
+
+.vv-restored-pill:hover {
+  background: rgba(16, 185, 129, 0.28) !important;
+  border-color: #10b981 !important;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.35);
+}
+
+.vv-popover-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  margin: 2px 0;
+}
+
+.vv-toggle-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  font-size: 11px;
+  font-weight: 600;
+  color: #cbd5e1;
+  cursor: pointer;
+}
+
+.vv-toggle-label input[type="checkbox"] {
+  accent-color: #10b981;
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+}
+
+.vv-kbd-hint {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 9px;
+  font-family: monospace;
+  color: #94a3b8;
+  margin-left: 4px;
+}
+
+.vv-btn-secondary {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border: 1px solid rgba(255, 255, 255, 0.16) !important;
+  color: #cbd5e1 !important;
+}
+
+.vv-btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.16) !important;
+  color: #f8fafc !important;
+}
+
+.vv-btn-ghost {
+  background: transparent !important;
+  border: none !important;
+  cursor: pointer;
+  padding: 4px;
+  transition: opacity 0.2s;
+}
+
+.vv-btn-ghost:hover {
+  opacity: 0.8;
+  text-decoration: underline;
+}
+
 .vv-composer-pill svg {
   width: 14px;
   height: 14px;
@@ -504,3 +685,241 @@
 .vv-voice-close:hover {
   color: #f8fafc;
 }
+
+/* ── Interactive Token Pill & Selective Privacy Lens ── */
+.vv-token-pill {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(16, 185, 129, 0.14) !important;
+  color: #34d399 !important;
+  border: 1px solid rgba(16, 185, 129, 0.35) !important;
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+  font-size: 0.92em;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: text;
+  transition: all 0.15s ease;
+  vertical-align: baseline;
+}
+
+.vv-token-pill:hover {
+  background: rgba(16, 185, 129, 0.25) !important;
+  border-color: #10b981 !important;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.35);
+}
+
+.vv-token-pill.is-masked {
+  background: rgba(56, 189, 248, 0.15) !important;
+  color: #38bdf8 !important;
+  border-color: rgba(56, 189, 248, 0.35) !important;
+}
+
+.vv-token-pill.is-masked:hover {
+  background: rgba(56, 189, 248, 0.25) !important;
+  border-color: #38bdf8 !important;
+  box-shadow: 0 0 8px rgba(56, 189, 248, 0.35);
+}
+
+.vv-token-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  opacity: 0.75;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.15s;
+}
+
+.vv-token-pill:hover .vv-token-toggle {
+  opacity: 1;
+  transform: scale(1.15);
+}
+
+.vv-token-lens {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #020617;
+  color: #f8fafc;
+  border: 1px solid #10b981;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 11px;
+  white-space: nowrap;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.7), 0 0 12px rgba(16, 185, 129, 0.25);
+  z-index: 2147483647;
+  pointer-events: none;
+  animation: vvPopIn 0.15s ease-out;
+}
+
+.vv-token-pill:hover .vv-token-lens {
+  display: block;
+}
+
+.vv-lens-title {
+  font-size: 10px;
+  font-weight: 800;
+  color: #34d399;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.vv-lens-row {
+  display: flex;
+  gap: 6px;
+  margin: 2px 0;
+  font-size: 11px;
+}
+
+.vv-lens-row span {
+  color: #64748b;
+  font-weight: 500;
+}
+
+.vv-lens-row code {
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.1);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+.vv-lens-val {
+  color: #10b981;
+  font-family: monospace;
+}
+
+.vv-lens-note {
+  font-size: 9.5px;
+  color: #94a3b8;
+  margin-top: 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 3px;
+}
+
+/* ── Adversarial Prompt Injection Warning Banner ── */
+.vv-injection-alert {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: rgba(225, 29, 72, 0.15);
+  border: 1px solid #f43f5e;
+  border-radius: 8px;
+  padding: 8px 14px;
+  margin-bottom: 8px;
+  color: #ffe4e6;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 11.5px;
+  box-shadow: 0 4px 16px rgba(225, 29, 72, 0.3);
+  animation: vvSlideUp 0.2s ease-out, vvPulseThreat 1.2s infinite ease-in-out;
+  z-index: 1000;
+}
+
+.vv-injection-title {
+  font-weight: 700;
+  color: #fb7185;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.vv-injection-btn {
+  background: #be123c;
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  padding: 4px 8px;
+  font-size: 10.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.vv-injection-btn:hover {
+  background: #e11d48;
+}
+
+/* ── Sanitized Chat Export Modal ── */
+.vv-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(2, 6, 23, 0.75);
+  backdrop-filter: blur(6px);
+  z-index: 2147483647;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: vvPopIn 0.2s ease-out;
+}
+
+.vv-modal-box {
+  background: #0f172a;
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  border-radius: 14px;
+  width: 90vw;
+  max-width: 640px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8), 0 0 24px rgba(56, 189, 248, 0.2);
+  color: #f8fafc;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.vv-modal-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.vv-modal-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #38bdf8;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.vv-modal-body {
+  padding: 16px 20px;
+  overflow-y: auto;
+  font-size: 12px;
+  color: #cbd5e1;
+  line-height: 1.6;
+}
+
+.vv-modal-preview {
+  background: #020617;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 12px;
+  font-family: monospace;
+  font-size: 11px;
+  max-height: 280px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  color: #94a3b8;
+  margin-top: 10px;
+}
+
+.vv-modal-footer {
+  padding: 12px 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+

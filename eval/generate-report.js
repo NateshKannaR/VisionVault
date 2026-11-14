@@ -42,6 +42,12 @@ const realSites = fs.existsSync(REAL_SITES_PATH)
   ? JSON.parse(fs.readFileSync(REAL_SITES_PATH, 'utf8'))
   : null;
 
+// Optional. Produced by `node eval/validate-e2e.js`.
+const E2E_VAL_PATH = path.join(RESULTS_DIR, 'e2e-validation.json');
+const e2eVal = fs.existsSync(E2E_VAL_PATH)
+  ? JSON.parse(fs.readFileSync(E2E_VAL_PATH, 'utf8'))
+  : null;
+
 if (!live && !manual) {
   console.error(
     'No measurements found. Nothing will be written.\n\n' +
@@ -213,16 +219,45 @@ if (live) {
   W('not block the page the user is reading.');
   W();
 
-  // ── End to end ──
+  // ── End-to-End Autonomous Task Validation & Execution Reliability ──
   const e = live.endToEnd;
-  W('### End-to-end task');
+  const valSource = (e && e.tasks && e.summary) ? e : (e2eVal || null);
+
+  W('### End-to-End Autonomous Task Validation & Reliability');
   W();
-  if (!e || e.error) {
-    W(`The end-to-end run did not complete: \`${(e && e.error) || 'not attempted'}\`.`);
-  } else {
-    W('One full task — *"Fill the signup form with my details"* — from a cleared form, planned by');
-    W(`the live server chain (${live.environment.planner}).`);
+  W('Good redaction and visual context scores do not by themselves prove reliable autonomous task');
+  W('execution. To ensure the agent executes faithfully without infinite loops, premature halts, or');
+  W('hallucinated success, every task is validated by **inspecting the actual ground-truth DOM state**');
+  W('after execution rather than merely accepting a planner\'s `done` declaration.');
+  W();
+
+  if (valSource && valSource.summary) {
+    const s = valSource.summary;
+    W('| Reliability Metric | Result | What it measures |');
+    W('| :--- | :---: | :--- |');
+    W(`| **Task completion rate** | **${pct(s.taskCompletionRate)}** | tasks whose required outcome was verified in the real DOM |`);
+    W(`| **Clean loop termination** | **${pct(s.cleanTerminationRate)}** | runs reaching a clean terminal state without timeout or freeze |`);
+    W(`| **Task false positives (FP)** | **${pct(s.falsePositiveRate)}** | planner claimed \`done\` when the DOM outcome was unfulfilled |`);
+    W(`| **Task false negatives (FN)** | **${pct(s.falseNegativeRate)}** | agent halted or aborted while valid targets remained |`);
+    W(`| **Incorrect action rate** | **${pct(s.incorrectActionRate)}** | actions that were invalid, unfillable, or violated invariants |`);
+    W(`| **Action loop frequency** | **${pct(s.loopFrequency)}** | duplicate actions or oscillation loops detected across steps |`);
+    W(`| **Loop recovery rate** | **${pct(s.loopRecoveryRate)}** | detected loops broken via supervisor alternative routing |`);
     W();
+
+    if (Array.isArray(valSource.tasks) && valSource.tasks.length) {
+      W('#### Multi-Task Benchmark Breakdown (DOM Ground-Truth Verified)');
+      W();
+      W('| Task | Domain | Steps | Latency | Loops | Incorrect Actions | DOM Verified Outcome | Clean Loop Termination |');
+      W('| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: |');
+      valSource.tasks.forEach((t) => {
+        const loopStr = t.loopIncidents ? `${t.loopIncidents} (${t.loopRecoveries} recovered)` : '0';
+        const termStr = t.cleanTermination ? 'yes' : 'no';
+        const domStr = t.outcomeVerified ? `**VERIFIED** (${t.outcomeDetail || 'passed'})` : `FAILED (${t.outcomeDetail || 'failed'})`;
+        W(`| ${t.name || t.task} | ${t.domain || '-'} | ${t.steps} | ${ms(t.totalMs)} | ${loopStr} | ${t.incorrectActions} | ${domStr} | ${termStr} |`);
+      });
+      W();
+    }
+  } else if (e && !e.error) {
     W('| Measure | Value |');
     W('| :--- | :---: |');
     W(`| Initial scan (local pipeline) | ${ms(e.scanMs)} |`);
@@ -232,6 +267,9 @@ if (live) {
     W(`| Interactive elements offered to the planner | ${e.markCount} |`);
     W(`| Loop terminated cleanly | ${e.done ? 'yes' : 'no'} |`);
     W();
+  }
+
+  if (e && e.fieldsAfterRun && Object.keys(e.fieldsAfterRun).length) {
     W('Field values after the run — every one resolved from the local vault on-device, none of');
     W('them ever sent to the server:');
     W();
@@ -239,6 +277,9 @@ if (live) {
     W(JSON.stringify(e.fieldsAfterRun, null, 2));
     W('```');
     W();
+  }
+
+  if (e) {
     W('Per-step latency is dominated by the cloud planner, not by the client. The local scan');
     W(`costs ${ms(e.scanMs)}; each planning call to the hosted model took seconds.`);
   }
@@ -375,6 +416,26 @@ W();
 W('**Mark ID stability** — the same page is scanned repeatedly and the sets of element IDs');
 W('compared. IDs are hashes of each element\'s identity and document-space geometry, so an');
 W('action planned against one scan still resolves on the next.');
+W();
+W('**Task completion rate** — share of tasks whose success criteria was directly verified in the');
+W('rendered DOM after the run (e.g. form fields holding valid data, search query present in the');
+W('results page, checkout staged). This judges outcomes from the page, not from agent self-reporting.');
+W();
+W('**Clean loop termination** — share of tasks where the agent loop resolved all confirmation gates,');
+W('questions, and operations, reaching an explicit completion state (`done: true`) without timeouts,');
+W('unhandled exceptions, or freezes.');
+W();
+W('**Incorrect action rate** — share of proposed actions that were invalid (targeting non-existent mark');
+W('IDs, typing into unfillable containers, or attempting actions that violate invariant safety rules)');
+W('and had to be vetoed or corrected by the supervisor.');
+W();
+W('**Action loop frequency & recovery** — action loop frequency measures how often the agent proposed');
+W('an identical action on the same element or oscillated between states. Recovery measures the share of');
+W('detected loops that were successfully broken via alternative on-device plans or fallback strategies.');
+W();
+W('**Task false positives & false negatives** — a task false positive occurs when the planner declared');
+W('`done` but the actual DOM outcome was unfulfilled (hallucinated success). A false negative occurs');
+W('when the agent halted prematurely with an error or gave up while actionable targets remained on the page.');
 W();
 
 // ── Client cost, and the attack on our own output ────────────────────────────

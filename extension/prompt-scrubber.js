@@ -73,9 +73,42 @@
     },
     {
       type: "private_key",
-      label: "Private Key",
+      label: "Private Key (SSH / RSA / EC)",
       token: "PRIVATE_KEY",
       regex: /-----BEGIN (?:[A-Z0-9_-]+ )?PRIVATE KEY-----[\s\S]*?-----END (?:[A-Z0-9_-]+ )?PRIVATE KEY-----/g,
+    },
+    {
+      type: "stripe_key",
+      label: "Stripe API Key",
+      token: "STRIPE_API_KEY",
+      regex: /\b((?:sk|rk|pk)_(?:live|test)_[0-9a-zA-Z]{24,})\b/g,
+    },
+    {
+      type: "jwt_token",
+      label: "JSON Web Token (JWT)",
+      token: "JWT_TOKEN",
+      regex: /\b(eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,})\b/g,
+    },
+    {
+      type: "aws_session_token",
+      label: "AWS Session Token",
+      token: "AWS_SESSION_TOKEN",
+      regex: /\b(?:aws_session_token|security_token)\s*[:=]\s*["']?([A-Za-z0-9/+=]{100,})["']?/gi,
+      captureGroup: 1,
+    },
+    {
+      type: "env_secret",
+      label: ".env Secret Variable",
+      token: "ENV_SECRET",
+      regex: /(?:^|[\r\n])\s*(?:export\s+)?([A-Z0-9_]{3,40}_(?:KEY|SECRET|TOKEN|PASSWORD|PASSWD|AUTH|CREDENTIALS|APIKEY))\s*=\s*["']?([^\s"'\r\n]{8,})["']?/g,
+      captureGroup: 2,
+    },
+    {
+      type: "password_field",
+      label: "Password / Secret Value",
+      token: "PASSWORD",
+      regex: /(?:password|passwd|db_password|client_secret)\s*[:=]\s*["']([^"'\r\n]{6,})["']/gi,
+      captureGroup: 1,
     },
     {
       type: "generic_api_key",
@@ -101,6 +134,19 @@
       regex: /\b(?:\d{4}[- ]?){3}\d{4}\b/g,
     },
     {
+      type: "cvv",
+      label: "Card Security Code (CVV)",
+      token: "CARD_CVV",
+      regex: /\b(?:cvv|cvc|security_code)\s*[:=]?\s*(\d{3,4})\b/gi,
+      captureGroup: 1,
+    },
+    {
+      type: "iban",
+      label: "IBAN Bank Account",
+      token: "IBAN",
+      regex: /\b([A-Z]{2}\d{2}[A-Z0-9]{4}\d{7}(?:[A-Z0-9]?){0,16})\b/g,
+    },
+    {
       type: "aadhaar",
       label: "Aadhaar Number",
       token: "AADHAAR_NUMBER",
@@ -111,6 +157,18 @@
       label: "PAN Card Number",
       token: "PAN_NUMBER",
       regex: /\b([A-Z]{5}[0-9]{4}[A-Z]{1})\b/g,
+    },
+    {
+      type: "voter_id",
+      label: "Voter ID (EPIC)",
+      token: "VOTER_ID",
+      regex: /\b([A-Z]{3}[0-9]{7})\b/g,
+    },
+    {
+      type: "driving_license",
+      label: "Driving License",
+      token: "DRIVING_LICENSE",
+      regex: /\b([A-Z]{2}[0-9]{2}[0-9]{11})\b/g,
     },
     {
       type: "upi",
@@ -176,6 +234,7 @@
       for (const m of matches) {
         const rawMatch = p.captureGroup ? m[p.captureGroup] : m[0];
         if (!rawMatch || rawMatch.length < 8) continue;
+        if (rawMatch.startsWith("[") && rawMatch.endsWith("]")) continue;
 
         const token = getTokenForValue(rawMatch, p.token);
         cleanText = cleanText.split(rawMatch).join(token);
@@ -196,7 +255,7 @@
       const matches = [...cleanText.matchAll(p.regex)];
       for (const m of matches) {
         const rawMatch = p.captureGroup ? m[p.captureGroup] : m[0];
-        if (!rawMatch || rawMatch.length < 4) continue;
+        if (!rawMatch || rawMatch.length < 3) continue;
         // Skip if already a token
         if (rawMatch.startsWith("[") && rawMatch.endsWith("]")) continue;
 
@@ -205,10 +264,10 @@
         piiCount++;
         findings.push({
           type: p.type,
-          category: "pii",
+          category: p.category || (["card", "cvv", "iban", "upi"].includes(p.type) ? "financial" : "pii"),
           label: p.label,
           token,
-          maskedValue: rawMatch.slice(0, 3) + "***" + rawMatch.slice(-2),
+          maskedValue: rawMatch.length <= 4 ? "***" : rawMatch.slice(0, 3) + "***" + rawMatch.slice(-2),
         });
       }
     }
@@ -245,9 +304,78 @@
     return restored;
   }
 
+  /**
+   * Detects adversarial prompt injection attempts and jailbreak vectors.
+   *
+   * @param {string} text - User prompt or external text snippet.
+   * @returns {{ isInjection: boolean, riskLevel: string, matches: Array, warning: string }}
+   */
+  function detectPromptInjection(text) {
+    if (!text || typeof text !== "string") {
+      return { isInjection: false, riskLevel: "none", matches: [], warning: "" };
+    }
+
+    const INJECTION_PATTERNS = [
+      {
+        id: "override_rules",
+        label: "System Rule Override",
+        regex: /\b(?:ignore|disregard|forget|bypass)\s+(?:all\s+)?(?:previous|above|prior|system)?\s*(?:instructions|prompts|rules|directions|directives|guidelines|constraints|guardrails)\b/i,
+      },
+      {
+        id: "jailbreak_persona",
+        label: "Jailbreak Persona / Roleplay",
+        regex: /\b(?:you\s+are\s+now|act\s+as|pretend\s+to\s+be|behave\s+as|enable)\s+(?:DAN|unfiltered|jailbroken|an\s+evil|developer\s+mode|unrestricted|god\s+mode)\b/i,
+      },
+      {
+        id: "leak_system_prompt",
+        label: "System Prompt Extraction",
+        regex: /\b(?:reveal|show|display|print|repeat|output)\s+(?:your\s+)?(?:system\s+prompt|initial\s+instructions|instructions\s+above|hidden\s+prompt)\b/i,
+      },
+      {
+        id: "credential_exfil",
+        label: "Credential Exfiltration Attempt",
+        regex: /\b(?:exfiltrate|send\s+to|curl\s+https?:\/\/|fetch\s*\(["']https?:\/\/|webhook|output|reveal|dump|leak|print)\s+(?:all\s+)?(?:stored\s+)?(?:keys?|tokens?|secrets?|passwords?|credentials?|api[_\s-]?keys?)\b/i,
+      },
+      {
+        id: "delimiter_injection",
+        label: "Adversarial Delimiter Manipulation",
+        regex: /(?:<\|im_start\|>system|\[INST\]\s*<<SYS>>|---(?:BEGIN|END)\s+(?:SYSTEM|PROMPT|DIRECTIVE)---|<\/system>\s*<user>)/i,
+      },
+      {
+        id: "environment_dump",
+        label: "Environment Variable Extraction",
+        regex: /\b(?:print|echo|dump)\s+(?:all\s+)?(?:process\.env|env\s+vars?|environment\s+(?:variables|keys)|environment)\b/i,
+      }
+    ];
+
+    const matches = [];
+    for (const p of INJECTION_PATTERNS) {
+      if (p.regex.test(text)) {
+        matches.push({ id: p.id, label: p.label });
+      }
+    }
+
+    if (matches.length > 0) {
+      const riskLevel = matches.length >= 2 || matches.some(m => m.id === "override_rules" || m.id === "credential_exfil") ? "high" : "medium";
+      const labels = matches.map(m => m.label).join(", ");
+      return {
+        isInjection: true,
+        detected: true,
+        riskLevel,
+        severity: riskLevel,
+        matches,
+        reasons: matches.map(m => m.label),
+        warning: `⚠️ Adversarial Prompt Injection detected (${riskLevel.toUpperCase()} RISK): [${labels}]`
+      };
+    }
+
+    return { isInjection: false, detected: false, riskLevel: "none", severity: "none", matches: [], reasons: [], warning: "" };
+  }
+
   const PromptScrubber = {
     scrub,
     unmask,
+    detectPromptInjection,
     SECRET_PATTERNS,
     PII_PATTERNS,
   };

@@ -325,48 +325,55 @@ function checkPixels(gt, scan, vpW, vpH, mode, referenceImage) {
 }
 
 // ── End-to-end agent task ────────────────────────────────────────────────────
+const { runAndVerifyTask, getStandardTaskSuite, aggregateReliabilityMetrics } = require('./lib/task-validation');
+
 async function runEndToEnd(worker, page, baseUrl, serverUrl) {
-  await page.goto(`${baseUrl}/pages/signup-form.html`, { waitUntil: 'load' });
-  await new Promise((r) => setTimeout(r, 800));
-  await page.evaluate(() => window.scrollTo(0, 0));
+  const suite = getStandardTaskSuite(baseUrl);
+  const taskResults = [];
 
-  // Wipe the pre-filled fixture values so the agent has real work to do.
-  await page.evaluate(() => {
-    ['fullName', 'email', 'phone', 'username', 'password', 'address'].forEach((id) => {
-      const el = document.getElementById(id);
-      if (el) el.value = '';
+  for (const item of suite) {
+    const res = await runAndVerifyTask({
+      worker,
+      page,
+      task: item.task,
+      url: item.url,
+      prepare: item.prepare,
+      verifier: item.verifier,
     });
-  });
+    res.name = item.name;
+    res.domain = item.domain;
+    taskResults.push(res);
+  }
 
-  const t0 = Date.now();
-  const scanRes = await worker.evaluate((task) => phaseScan(task), 'Fill the signup form with my details');
-  const scanMs = Date.now() - t0;
+  const primary = taskResults[0] || {};
+  const summary = aggregateReliabilityMetrics(taskResults);
 
-  const t1 = Date.now();
-  const runRes = await worker.evaluate(() => phaseRun());
-  const runMs = Date.now() - t1;
-
+  // Read filled fields from the signup form for the primary task display
+  await page.goto(`${baseUrl}/pages/signup-form.html`, { waitUntil: 'load' });
   const filled = await page.evaluate(() => ({
-    fullName: document.getElementById('fullName').value,
-    email: document.getElementById('email').value,
-    phone: document.getElementById('phone').value,
-    username: document.getElementById('username').value,
-    password: document.getElementById('password').value ? '(non-empty)' : '',
-    address: document.getElementById('address').value,
+    fullName: document.getElementById('fullName')?.value || '',
+    email: document.getElementById('email')?.value || '',
+    phone: document.getElementById('phone')?.value || '',
+    username: document.getElementById('username')?.value || '',
+    password: document.getElementById('password')?.value ? '(non-empty)' : '',
+    address: document.getElementById('address')?.value || '',
   }));
 
   return {
     serverUrl,
-    scanMs, runMs, totalMs: scanMs + runMs,
-    piiCount: scanRes.piiCount,
-    markCount: scanRes.markCount,
-    scanTimings: scanRes.timings,
-    steps: (runRes.actionLog || []).length,
-    actionLog: runRes.actionLog || [],
-    needsConfirm: !!runRes.needsConfirm,
-    confirmReason: runRes.confirmReason || null,
-    done: !!runRes.done,
+    scanMs: primary.scanMs || 0,
+    runMs: primary.runMs || 0,
+    totalMs: primary.totalMs || 0,
+    piiCount: primary.piiCount || 0,
+    markCount: primary.markCount || 0,
+    steps: primary.steps || 0,
+    actionLog: primary.actionLog || [],
+    needsConfirm: primary.gatesApproved > 0,
+    confirmReason: null,
+    done: primary.cleanTermination && summary.cleanTerminationRate >= 1.0,
     fieldsAfterRun: filled,
+    tasks: taskResults,
+    summary,
   };
 }
 

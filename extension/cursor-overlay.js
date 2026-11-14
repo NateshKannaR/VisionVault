@@ -116,6 +116,56 @@
     return { container, cursor: cursorEl, badge: cursorBadgeEl };
   }
 
+  let currentCursorX = typeof window !== "undefined" ? Math.round(window.innerWidth * 0.45) : 100;
+  let currentCursorY = typeof window !== "undefined" ? Math.round(window.innerHeight * 0.45) : 100;
+
+  function generateCubicBezierPoints(x0, y0, x3, y3, steps = 20) {
+    const dx = x3 - x0;
+    const dy = y3 - y0;
+    const dist = Math.hypot(dx, dy);
+
+    if (dist < 5) return [{ x: x3, y: y3 }];
+
+    const nx = -dy / dist;
+    const ny = dx / dist;
+    const lateralFactor1 = (Math.random() * 0.35 - 0.175) * dist;
+    const lateralFactor2 = (Math.random() * 0.35 - 0.175) * dist;
+
+    const p1Dist = 0.25 + Math.random() * 0.15;
+    const cx1 = x0 + dx * p1Dist + nx * lateralFactor1;
+    const cy1 = y0 + dy * p1Dist + ny * lateralFactor1;
+
+    const p2Dist = 0.65 + Math.random() * 0.15;
+    const cx2 = x0 + dx * p2Dist + nx * lateralFactor2;
+    const cy2 = y0 + dy * p2Dist + ny * lateralFactor2;
+
+    const points = [];
+    for (let i = 1; i <= steps; i++) {
+      const u = i / steps;
+      const t = u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2;
+      const oneMinusT = 1 - t;
+
+      let bx =
+        Math.pow(oneMinusT, 3) * x0 +
+        3 * Math.pow(oneMinusT, 2) * t * cx1 +
+        3 * oneMinusT * Math.pow(t, 2) * cx2 +
+        Math.pow(t, 3) * x3;
+
+      let by =
+        Math.pow(oneMinusT, 3) * y0 +
+        3 * Math.pow(oneMinusT, 2) * t * cy1 +
+        3 * oneMinusT * Math.pow(t, 2) * cy2 +
+        Math.pow(t, 3) * y3;
+
+      if (i < steps) {
+        bx += (Math.random() - 0.5) * 1.4;
+        by += (Math.random() - 0.5) * 1.4;
+      }
+      points.push({ x: bx, y: by });
+    }
+    return points;
+  }
+
   async function moveVisualCursor(targetX, targetY, label = "") {
     try {
       const { cursor, badge } = ensureCursor();
@@ -123,7 +173,6 @@
 
       clearTimeout(cursorHideTimer);
       cursor.classList.add("visible");
-      cursor.style.transform = `translate3d(${targetX}px, ${targetY}px, 0)`;
 
       if (badge) {
         if (label) {
@@ -134,8 +183,90 @@
         }
       }
 
-      await delay(260);
+      const startX = currentCursorX;
+      const startY = currentCursorY;
+      const dist = Math.hypot(targetX - startX, targetY - startY);
+
+      // Fitts's law organic duration (120ms to 320ms)
+      const totalDuration = Math.min(320, Math.max(120, 80 + Math.log2(1 + dist / 25) * 40));
+      const steps = Math.min(24, Math.max(6, Math.round(dist / 30)));
+      const points = generateCubicBezierPoints(startX, startY, targetX, targetY, steps);
+      const stepDelay = totalDuration / steps;
+
+      for (let i = 0; i < points.length; i++) {
+        const pt = points[i];
+        cursor.style.transform = `translate3d(${pt.x}px, ${pt.y}px, 0)`;
+
+        if (i % 2 === 0 || i === points.length - 1) {
+          try {
+            const moveTarget = document.elementFromPoint(pt.x, pt.y) || document.body;
+            if (moveTarget) {
+              const moveOpts = {
+                bubbles: true,
+                cancelable: true,
+                composed: true,
+                clientX: pt.x,
+                clientY: pt.y,
+                screenX: pt.x + (window.screenX || 0),
+                screenY: pt.y + (window.screenY || 0)
+              };
+              if (typeof PointerEvent === "function") {
+                moveTarget.dispatchEvent(new PointerEvent("pointermove", moveOpts));
+              }
+              moveTarget.dispatchEvent(new MouseEvent("mousemove", moveOpts));
+            }
+          } catch (_) {}
+        }
+
+        if (stepDelay >= 4) {
+          await delay(stepDelay);
+        }
+      }
+
+      currentCursorX = targetX;
+      currentCursorY = targetY;
+      cursor.style.transform = `translate3d(${targetX}px, ${targetY}px, 0)`;
+      await delay(35);
     } catch (_) {}
+  }
+
+  async function smoothMomentumScroll(targetEl, deltaY, duration = 380) {
+    const scrollTarget = targetEl || (typeof window !== "undefined" ? window : null);
+    if (!scrollTarget) return;
+    const isWindow = scrollTarget === window;
+    const startScroll = isWindow ? window.scrollY : scrollTarget.scrollTop;
+    const startTime = performance.now();
+
+    return new Promise((resolve) => {
+      function step(now) {
+        const elapsed = now - startTime;
+        const progress = Math.min(1, elapsed / duration);
+        const ease = 1 - Math.pow(1 - progress, 4);
+        const currentPos = startScroll + deltaY * ease;
+
+        if (isWindow) {
+          window.scrollTo(0, currentPos);
+        } else {
+          scrollTarget.scrollTop = currentPos;
+        }
+
+        try {
+          const wheelEvent = new WheelEvent("wheel", {
+            deltaY: (deltaY / (duration / 16)),
+            bubbles: true,
+            cancelable: true
+          });
+          (isWindow ? document.body : scrollTarget).dispatchEvent(wheelEvent);
+        } catch (_) {}
+
+        if (progress < 1) {
+          requestAnimationFrame(step);
+        } else {
+          resolve();
+        }
+      }
+      requestAnimationFrame(step);
+    });
   }
 
   function playClickRipple(x, y) {
@@ -179,6 +310,8 @@
     ensureCursorStyles,
     ensureCursor,
     moveVisualCursor,
+    generateCubicBezierPoints,
+    smoothMomentumScroll,
     playClickRipple,
     highlightElement,
     scheduleCursorFade,

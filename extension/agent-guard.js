@@ -284,6 +284,11 @@
     let doneOverrides = 0;
     let staleSteps = 0;
     let lastFingerprint = null;
+    let incorrectActions = 0;
+    let loopIncidents = 0;
+    let loopRecoveries = 0;
+    let prematureDoneCount = 0;
+    let prematureHaltCount = 0;
 
     const maxRepeats = options.maxSignatureRepeats ?? MAX_SIGNATURE_REPEATS;
     const maxStale = options.maxStepsWithoutProgress ?? MAX_STEPS_WITHOUT_PROGRESS;
@@ -315,6 +320,7 @@
       lastFingerprint = fingerprint;
 
       if (staleSteps >= maxStale) {
+        prematureHaltCount++;
         return {
           action: { action: "done", reasoning: "" },
           stop: true,
@@ -345,6 +351,7 @@
       // "scroll down and show me more stories" is not permission to open a link whose text
       // happens to contain "down".
       if (type === "click" && isPureScrollTask(parsed)) {
+        incorrectActions++;
         if (progress.scrolled) {
           return {
             action: { action: "done", reasoning: "Scrolled as requested." },
@@ -375,6 +382,7 @@
         // The deterministic plan only proposes a type when it has a labelled field and a vault
         // key for it, so a click that genuinely reveals more of the form still goes through.
         if (remaining.length && alt && altType === "type") {
+          incorrectActions++;
           const submitish = target && SUBMIT_LABEL_RE.test(target.label || "");
           return {
             action: { ...alt, action: altType },
@@ -401,6 +409,7 @@
         const altType = normalizeType(alt);
 
         if ((isDistraction || (!isSearchBtn && !isDismiss)) && alt && altType === "type") {
+          incorrectActions++;
           return {
             action: { ...alt, action: altType },
             substituted: true,
@@ -445,6 +454,7 @@
           value.trim().toLowerCase() === wholeTask ||
           (value.length > parsed.query.length && value.toLowerCase().includes(parsed.query.toLowerCase()));
         if ((isSearchLikeMark(target) || !target) && looksLikeWholeTask) {
+          incorrectActions++;
           action = { ...action, value: parsed.query };
           substituted = true;
           reason = `Trimmed the typed value to the parsed query "${parsed.query}".`;
@@ -462,6 +472,12 @@
           !progress?.missionSubmitted &&
           !progress?.formSubmitted &&
           unfilledFields(marks, ctx.filledIds).length > 0;
+
+        const isPremature = fillIncomplete || !goalSatisfied(parsed, progress);
+        if (isPremature && doneOverrides < MAX_DONE_OVERRIDES) {
+          prematureDoneCount++;
+          incorrectActions++;
+        }
 
         if ((goalSatisfied(parsed, progress) && !fillIncomplete) || doneOverrides >= MAX_DONE_OVERRIDES) {
           const unmet = describeRemaining(parsed, progress);
@@ -503,10 +519,13 @@
       const seen = Math.max(seenExact, seenSem);
 
       if (seen >= maxRepeats) {
+        loopIncidents++;
+        incorrectActions++;
         const alt = ctx.deterministic;
         const altType = normalizeType(alt);
         const altSig = alt ? signatureOf(altType, alt.mark_id, alt.value) : null;
         if (alt && altType && altType !== "done" && (signatureCounts.get(altSig) || 0) < maxRepeats) {
+          loopRecoveries++;
           return {
             action: { ...alt, action: altType },
             substituted: true,
@@ -558,7 +577,18 @@
       record,
       resetStall,
       get history() { return history.slice(); },
-      get stats() { return { steps: history.length, doneOverrides, staleSteps }; },
+      get stats() {
+        return {
+          steps: history.length,
+          doneOverrides,
+          staleSteps,
+          incorrectActions,
+          loopIncidents,
+          loopRecoveries,
+          prematureDoneCount,
+          prematureHaltCount,
+        };
+      },
     };
   }
 

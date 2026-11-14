@@ -1,0 +1,287 @@
+{
+  "generatedAt": "2026-10-11T21:55:08.905Z",
+  "environment": {
+    "chrome": "Chrome/152.0.7977.82",
+    "planner": "on-device fallback",
+    "platform": "linux x64"
+  },
+  "summary": {
+    "totalTasks": 5,
+    "taskCompletionRate": 1,
+    "cleanTerminationRate": 1,
+    "falsePositiveRate": 0,
+    "falseNegativeRate": 0,
+    "totalSteps": 21,
+    "totalIncorrectActions": 0,
+    "incorrectActionRate": 0,
+    "loopIncidents": 0,
+    "loopFrequency": 0,
+    "loopRecoveries": 0,
+    "loopRecoveryRate": 1,
+    "meanScanMs": 515,
+    "meanRunMs": 10564,
+    "meanTotalMs": 11079
+  },
+  "tasks": [
+    {
+      "task": "Fill the signup form with my details",
+      "url": "http://127.0.0.1:40781/pages/signup-form.html",
+      "scanMs": 495,
+      "runMs": 15378,
+      "totalMs": 15873,
+      "piiCount": 12,
+      "markCount": 17,
+      "steps": 8,
+      "gatesApproved": 1,
+      "questionsAnswered": 1,
+      "cleanTermination": true,
+      "outcomeVerified": true,
+      "outcomeDetail": "6/6 inputs populated (All Core Fields Filled)",
+      "isFalsePositive": false,
+      "incorrectActions": 0,
+      "loopIncidents": 0,
+      "loopRecoveries": 0,
+      "guardStats": {
+        "incorrectActions": 0,
+        "loopIncidents": 0,
+        "loopRecoveries": 0,
+        "prematureDoneCount": 0,
+        "prematureHaltCount": 0,
+        "doneOverrides": 0
+      },
+      "actionLog": [
+        {
+          "action": "type",
+          "mark_id": 3371181,
+          "ok": true
+        },
+        {
+          "action": "type",
+          "mark_id": 8332024,
+          "ok": true
+        },
+        {
+          "action": "type",
+          "mark_id": 7498383,
+          "ok": true
+        },
+        {
+          "action": "type",
+          "mark_id": 6425923,
+          "ok": true
+        },
+        {
+          "action": "type",
+          "mark_id": 4346777,
+          "ok": true
+        },
+        {
+          "action": "type",
+          "mark_id": 4765340,
+          "ok": true
+        },
+        {
+          "action": "type",
+          "mark_id": 8179742,
+          "ok": true
+        },
+        {
+          "action": "click",
+          "mark_id": 4978133,
+          "ok": true
+        }
+      ],
+      "name": "Signup Form Autofill",
+      "domain": "Authentication / Registration"
+    },
+    {
+      "task": "Fill the registration survey with my details",
+      "url": "http://127.0.0.1:40781/pages/survey-form.html",
+      "scanMs": 467,
+      "runMs": 20037,
+      "totalMs": 20504,
+      "piiCount": 7,
+      "markCount": 20,
+      "steps": 10,
+      "gatesApproved": 1,
+      "questionsAnswered": 7,
+      "cleanTermination": true,
+      "outcomeVerified": true,
+      "outcomeDetail": "8 fields populated across survey sections",
+      "isFalsePositive": false,
+      "incorrectActions": 0,
+      "loopIncidents": 0,
+      "loopRecoveries": 0,
+      "guardStats": {
+        "incorrectActions": 0,
+        "loopIncidents": 0,
+        "loopRecoveries": 0,
+        "prematureDoneCount": 0,
+        "prematureHaltCount": 0,
+        "doneOverrides": 0
+      },
+      "actionLog": [
+        {
+          "action": "type",
+          "mark_id": 6007172,
+          "ok": true
+        },
+        {
+          "action": "type",
+          "mark_id": 8774191,
+          "ok": true
+        },
+        {
+          "action": "type",
+          "mark_id": 5235041,
+          "ok": true
+        },
+        {
+          "action": "type",
+          "mark_id": 999833,
+          "ok": true
+        },
+        {
+          "action": "type",
+          "mark_id": 5048956,
+          "ok": true
+        },
+        {
+          "action": "type",
+          "mark_id": 1124014,
+          "ok": true
+        },
+        {
+          "action": "type",
+          "mark_id": 298564,
+          "ok": true
+        },
+        {
+          "action": "type",
+          "mark_id": 8104611,
+          "ok": true
+        },
+        {
+          "action": "type",
+          "mark_id": 3216732,
+          "ok": true
+        },
+        {
+          "action": "click",
+          "mark_id": 8816875,
+          "ok": true
+        }
+      ],
+      "name": "Registration Survey Flow",
+      "domain": "Gov & Enterprise Forms"
+    },
+    {
+      "task": "search for telemetry and review operational logs",
+      "url": "http://127.0.0.1:40781/pages/admin-dashboard.html",
+      "scanMs": 448,
+      "runMs": 7866,
+      "totalMs": 8314,
+      "piiCount": 28,
+      "markCount": 10,
+      "steps": 1,
+      "gatesApproved": 0,
+      "questionsAnswered": 0,
+      "cleanTermination": true,
+      "outcomeVerified": true,
+      "outcomeDetail": "Telemetry log query successfully filtered in dashboard DOM",
+      "isFalsePositive": false,
+      "incorrectActions": 0,
+      "loopIncidents": 0,
+      "loopRecoveries": 0,
+      "guardStats": {
+        "incorrectActions": 0,
+        "loopIncidents": 0,
+        "loopRecoveries": 0,
+        "prematureDoneCount": 0,
+        "prematureHaltCount": 0,
+        "doneOverrides": 0
+      },
+      "actionLog": [
+        {
+          "action": "type",
+          "mark_id": 4984468,
+          "ok": true
+        }
+      ],
+      "name": "ISRO Telemetry Clearance",
+      "domain": "Aerospace Mission Telemetry"
+    },
+    {
+      "task": "search for laptop and show me",
+      "url": "http://127.0.0.1:40781/pages/laptop-compare.html",
+      "scanMs": 560,
+      "runMs": 4460,
+      "totalMs": 5020,
+      "piiCount": 11,
+      "markCount": 33,
+      "steps": 1,
+      "gatesApproved": 0,
+      "questionsAnswered": 0,
+      "cleanTermination": true,
+      "outcomeVerified": true,
+      "outcomeDetail": "Product query \"laptop\" entered in marketplace searchbox and verified in DOM",
+      "isFalsePositive": false,
+      "incorrectActions": 0,
+      "loopIncidents": 0,
+      "loopRecoveries": 0,
+      "guardStats": {
+        "incorrectActions": 0,
+        "loopIncidents": 0,
+        "loopRecoveries": 0,
+        "prematureDoneCount": 0,
+        "prematureHaltCount": 0,
+        "doneOverrides": 0
+      },
+      "actionLog": [
+        {
+          "action": "type",
+          "mark_id": 7904818,
+          "ok": true
+        }
+      ],
+      "name": "E-Commerce Marketplace Search",
+      "domain": "E-Commerce Marketplace"
+    },
+    {
+      "task": "search for developer jobs and review postings",
+      "url": "http://127.0.0.1:40781/pages/jobs-portal.html",
+      "scanMs": 603,
+      "runMs": 5080,
+      "totalMs": 5683,
+      "piiCount": 7,
+      "markCount": 34,
+      "steps": 1,
+      "gatesApproved": 0,
+      "questionsAnswered": 0,
+      "cleanTermination": true,
+      "outcomeVerified": true,
+      "outcomeDetail": "Role keyword searched and postings rendered on unseen portal",
+      "isFalsePositive": false,
+      "incorrectActions": 0,
+      "loopIncidents": 0,
+      "loopRecoveries": 0,
+      "guardStats": {
+        "incorrectActions": 0,
+        "loopIncidents": 0,
+        "loopRecoveries": 0,
+        "prematureDoneCount": 0,
+        "prematureHaltCount": 0,
+        "doneOverrides": 0
+      },
+      "actionLog": [
+        {
+          "action": "type",
+          "mark_id": 3278368,
+          "ok": true
+        }
+      ],
+      "name": "Unseen Job Portal Search",
+      "domain": "Unseen Domain (Career Portal)"
+    }
+  ]
+}

@@ -5,6 +5,7 @@
   "description": "Privacy-preserving browser vision agent — local PII detection and redaction, cloud planning over a sanitized view (SIH PS 26171).",
   "scripts": {
     "build": "node scripts/build-site.js",
+    "build:vercel": "node scripts/build-site.js --update-public",
     "test": "node eval/test-source-hygiene.js && node eval/test-panel-wiring.js && node eval/test-prompt-scrubber.js && node eval/test-pdf-scrubber.js && node eval/test-screen-classifier.js && node eval/test-batch-automation.js && node eval/test-advanced-features.js && node eval/test-checklist-grounding.js && node eval/test-mcp-server.js && node eval/test-vision-pipeline.js && node eval/test-coordinate-mapping.js && node eval/test-task-planner.js && node eval/test-agent-guard.js && node eval/test-privacy-firewall.js && node eval/test-vault-lock.js && node eval/test-pii-patterns.js && node eval/test-demo-portal.js",
     "mcp": "node server/mcp-server.js",
     "eval": "node eval/run-full-eval.js --repeats 3",

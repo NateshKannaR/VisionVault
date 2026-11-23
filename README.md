@@ -98,7 +98,9 @@ See [known limits and the evaluation methodology](LIMITATIONS.md) and the [archi
 
 ### Static web build
 
-Deploy `dist/site` using `npm ci` and `npm run build`. The repository includes [Vercel configuration](vercel.json) for the output directory, security headers, and historical download redirects. The build allowlist publishes the site assets and extension packages. The fixture portal and its runtime state stay outside the build.
+Vercel serves the checked-in `public/` directory directly. Configure the project from the repository root. The [Vercel configuration](vercel.json) publishes the static files, applies security headers, and redirects historical download URLs.
+
+When updating the site or extension, run `npm ci` and `npm run build:vercel`, then commit the changed files in `public/` with the source changes. CI compares the checked-in files with the generated site. The local fixture portal and its runtime state stay outside the public directory.
 
 ### Planner service
 
@@ -129,7 +131,7 @@ The Chromium harness needs a browser that permits testing unpacked extensions. P
 ```text
 extension/       Manifest V3 extension, side panel, vision assets, local planners
 server/          FastAPI planner and local stdio MCP integration
-public/          Public site source and historical static fixture copies
+public/          Public site and generated browser downloads
 isro-panel/      Local-only employee and HR fixtures
 eval/            Automated checks, synthetic pages, and archived measurements
 scripts/         Static site build, browser packaging, and local preview

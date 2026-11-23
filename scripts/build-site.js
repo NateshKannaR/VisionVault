@@ -8,6 +8,7 @@ const { zipSync } = require("fflate");
 const repo = path.resolve(__dirname, "..");
 const extension = path.join(repo, "extension");
 const dist = path.join(repo, "dist", "site");
+const publicRoot = path.join(repo, "public");
 const date = new Date(2000, 0, 1);
 
 function browserFiles(directory, relative = "") {
@@ -30,7 +31,7 @@ fs.rmSync(dist, { recursive: true, force: true });
 fs.mkdirSync(path.join(dist, "assets"), { recursive: true });
 fs.mkdirSync(path.join(dist, "downloads"), { recursive: true });
 for (const name of ["index.html", "assets/site.css", "assets/site.js"]) {
-  fs.copyFileSync(path.join(repo, "public", name), path.join(dist, name));
+  fs.copyFileSync(path.join(publicRoot, name), path.join(dist, name));
 }
 for (const name of ["icon32.png", "prompt-scrubber.js"]) {
   fs.copyFileSync(path.join(extension, name), path.join(dist, "assets", name));
@@ -49,3 +50,10 @@ for (const browser of ["chromium", "firefox"]) {
 }
 fs.writeFileSync(path.join(dist, "downloads", "SHA256SUMS"), hashes.join("\n") + "\n");
 console.log("Built static site and Chromium/Firefox packages in dist/site.");
+
+if (process.argv.includes("--update-public")) {
+  for (const directory of ["assets", "downloads"]) {
+    fs.cpSync(path.join(dist, directory), path.join(publicRoot, directory), { recursive: true });
+  }
+  console.log("Updated the checked-in Vercel site in public.");
+}

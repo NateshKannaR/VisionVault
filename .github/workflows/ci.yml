@@ -21,7 +21,12 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
-      - run: npm run build
+      - name: Verify the checked-in Vercel release
+        run: |
+          npm run build:vercel
+          diff -qr dist/site public
+          git diff --exit-code -- public
+          test -z "$(git ls-files --others --exclude-standard -- public)"
       - name: Install Chrome for Testing
         run: |
           npm exec -- browsers install chrome@stable --path "$RUNNER_TEMP/chrome"

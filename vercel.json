@@ -1,9 +1,9 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
-  "installCommand": "npm ci --omit=dev",
-  "buildCommand": "node scripts/build-site.js",
-  "outputDirectory": "dist/site",
+  "installCommand": "true",
+  "buildCommand": "true",
+  "outputDirectory": "public",
   "redirects": [
     {
       "source": "/visionvault-extension.zip",
@@ -47,6 +47,26 @@
     },
     {
       "source": "/isro-intranet-demo.html",
+      "destination": "/#lab",
+      "permanent": false
+    },
+    {
+      "source": "/employee-portal/index.html",
+      "destination": "/#lab",
+      "permanent": false
+    },
+    {
+      "source": "/hr-portal/index.html",
+      "destination": "/#lab",
+      "permanent": false
+    },
+    {
+      "source": "/login/index.html",
+      "destination": "/#lab",
+      "permanent": false
+    },
+    {
+      "source": "/isro-intranet-demo/index.html",
       "destination": "/#lab",
       "permanent": false
     }

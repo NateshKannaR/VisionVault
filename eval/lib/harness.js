@@ -91,6 +91,7 @@ async function launchWithExtension({ headless = false, windowSize = '1280,900' }
   const browser = await puppeteer.launch({
     executablePath: chromePath,
     headless,
+    pipe: true,
     userDataDir: profile,
     // A single agent step can wait on a cloud VLM; the whole loop can run for minutes. The
     // default 180s protocol timeout aborts that mid-run and looks like an agent failure.
@@ -109,39 +110,45 @@ async function launchWithExtension({ headless = false, windowSize = '1280,900' }
     ],
   });
 
-  const cdp = await browser.target().createCDPSession();
-  const { id: extensionId } = await cdp.send('Extensions.loadUnpacked', { path: EXT_DIR });
-
-  // The MV3 service worker starts on install; wait for its target to appear.
-  let swTarget = null;
-  for (let i = 0; i < 60; i++) {
-    swTarget = (await browser.targets()).find(
-      (t) => t.type() === 'service_worker' && t.url().includes(extensionId)
-    );
-    if (swTarget) break;
-    await new Promise((r) => setTimeout(r, 250));
+  async function close() {
+    await browser.close().catch(() => {});
+    fs.rmSync(profile, { recursive: true, force: true });
   }
-  if (!swTarget) {
-    await browser.close();
-    throw new Error('Extension service worker never started — cannot evaluate.');
+
+  try {
+    const cdp = await browser.target().createCDPSession();
+    const { id: extensionId } = await cdp.send('Extensions.loadUnpacked', { path: EXT_DIR });
+
+    // The MV3 service worker starts on install; wait for its target to appear.
+    let swTarget = null;
+    for (let i = 0; i < 60; i++) {
+      swTarget = (await browser.targets()).find(
+        (t) => t.type() === 'service_worker' && t.url().includes(extensionId)
+      );
+      if (swTarget) break;
+      await new Promise((r) => setTimeout(r, 250));
+    }
+    if (!swTarget) {
+      throw new Error('Extension service worker never started — cannot evaluate.');
+    }
+    const worker = await swTarget.worker();
+
+    // Give the offscreen host time to compile the ONNX graph and the Tesseract core.
+    await worker.evaluate(() => (typeof ensureOffscreenDocument === 'function' ? ensureOffscreenDocument() : null));
+    await new Promise((r) => setTimeout(r, 3000));
+
+    return {
+      browser,
+      worker,
+      extensionId,
+      chromePath,
+      chromeVersion: await browser.version(),
+      close,
+    };
+  } catch (error) {
+    await close();
+    throw error;
   }
-  const worker = await swTarget.worker();
-
-  // Give the offscreen host time to compile the ONNX graph and the Tesseract core.
-  await worker.evaluate(() => (typeof ensureOffscreenDocument === 'function' ? ensureOffscreenDocument() : null));
-  await new Promise((r) => setTimeout(r, 3000));
-
-  return {
-    browser,
-    worker,
-    extensionId,
-    chromePath,
-    chromeVersion: await browser.version(),
-    async close() {
-      await browser.close().catch(() => {});
-      try { fs.rmSync(profile, { recursive: true, force: true }); } catch (_) {}
-    },
-  };
 }
 
 /** Resolves the extension's tabId for a puppeteer Page (matched by URL). */

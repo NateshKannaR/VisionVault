@@ -3,9 +3,9 @@ const crypto = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
 
-const PORT = Number(process.env.PORT) || 3000;
+const PORT = Number(process.env.PORT ?? 3000);
 const ROOT = __dirname;
-const DATA_DIR = path.join(ROOT, "data");
+const DATA_DIR = path.resolve(process.env.VISIONVAULT_DEMO_DATA || path.join(ROOT, "data"));
 const DATA_FILE = path.join(DATA_DIR, "prototype-state.json");
 
 const EMPLOYEES = [
@@ -31,6 +31,26 @@ const USERS = {
   "mrizwan": { password: "ISRO-EMP-DEMO-2026", role: "EMPLOYEE", name: "Rizwana Parveen", empId: "ISRO-10788", initials: "RP" }
 };
 const sessions = new Map();
+const SESSION_SECONDS = 8 * 60 * 60;
+const MIME = {
+  ".html": "text/html; charset=utf-8",
+  ".jpeg": "image/jpeg",
+  ".jpg": "image/jpeg",
+  ".mp4": "video/mp4",
+  ".zip": "application/zip",
+};
+const PAGES = new Map([
+  ["/", "index.html"],
+  ["/index.html", "index.html"],
+  ["/login", "login.html"],
+  ["/login.html", "login.html"],
+  ["/employee-portal", "employee-portal.html"],
+  ["/employee-portal.html", "employee-portal.html"],
+  ["/hr-portal", "hr-portal.html"],
+  ["/hr-portal.html", "hr-portal.html"],
+  ["/isro-intranet-demo", "isro-intranet-demo.html"],
+  ["/isro-intranet-demo.html", "isro-intranet-demo.html"],
+]);
 
 const DEFAULT_MISSIONS = [
   {
@@ -107,6 +127,7 @@ const DEFAULT_MISSIONS = [
   }
 ];
 
+// Shared by the synthetic demo clients. This key only supports the local fixture.
 const KEY_RAW = "ISRO-SECURE-2024-AES256-CHANNEL!";
 
 function encrypt(text) {
@@ -149,169 +170,228 @@ function createDefaultMessages() {
   });
 }
 
-function readState() {
-  if (!fs.existsSync(DATA_FILE)) {
-    const init = { missions: DEFAULT_MISSIONS, messages: createDefaultMessages(), forms: {} };
-    fs.writeFileSync(DATA_FILE, JSON.stringify(init, null, 2));
-    return init;
-  }
-  try {
-    const state = JSON.parse(fs.readFileSync(DATA_FILE, "utf8"));
-    if (!state.missions || state.missions.length < DEFAULT_MISSIONS.length) state.missions = DEFAULT_MISSIONS;
-    if (!state.messages || !state.messages.length) {
-      state.messages = createDefaultMessages();
-      fs.writeFileSync(DATA_FILE, JSON.stringify(state, null, 2));
-    }
-    return { missions: state.missions, messages: state.messages, forms: state.forms || {} };
-  } catch {
-    return { missions: DEFAULT_MISSIONS, messages: createDefaultMessages(), forms: {} };
-  }
-}
-let state = readState();
-function saveState() { fs.writeFileSync(DATA_FILE, JSON.stringify(state, null, 2)); }
-function json(res, status, body) {
-  res.writeHead(status, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" });
-  res.end(JSON.stringify(body));
-}
-function body(req) {
-  return new Promise((resolve, reject) => {
-    let raw = "";
-    req.on("data", chunk => { raw += chunk; if (raw.length > 1e6) req.destroy(); });
-    req.on("end", () => { try { resolve(raw ? JSON.parse(raw) : {}); } catch { reject(new Error("Invalid JSON")); } });
-    req.on("error", reject);
-  });
-}
-function publicMessages(empInitials) {
-  let msgs = state.messages;
-  if (empInitials) {
-    msgs = msgs.filter(m => !m.empInitials || m.empInitials === empInitials);
-  }
-  return msgs.map(message => ({
-    id: message.id,
-    empId: message.empId,
-    empInitials: message.empInitials,
-    from: message.from,
-    time: message.time,
-    enc: message.ciphertext,
-    text: decrypt(message.ciphertext)
-  }));
-}
-function serveStatic(req, res) {
-  const requested = req.url === "/" ? "/index.html" : decodeURIComponent(req.url.split("?")[0]);
-  const file = path.normalize(path.join(ROOT, requested));
-  if (!file.startsWith(ROOT) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) return json(res, 404, { error: "Not found" });
-  const types = {
-    ".html": "text/html; charset=utf-8",
-    ".js": "text/javascript; charset=utf-8",
-    ".css": "text/css; charset=utf-8",
-    ".json": "application/json",
-    ".zip": "application/zip",
-    ".svg": "image/svg+xml",
-    ".png": "image/png",
-    ".jpg": "image/jpeg",
-    ".jpeg": "image/jpeg",
-    ".mp4": "video/mp4",
-    ".webm": "video/webm"
-  };
-  res.writeHead(200, { "Content-Type": types[path.extname(file).toLowerCase()] || "application/octet-stream" });
-  fs.createReadStream(file).pipe(res);
-}
-function sessionFrom(req) {
-  const token = (req.headers.cookie || "").split(";").map(value => value.trim()).find(value => value.startsWith("isro_session="))?.split("=")[1];
-  return token ? sessions.get(token) : null;
-}
-function requireSession(req, res) {
-  const session = sessionFrom(req);
-  if (session) return session;
-  const referer = (req.headers.referer || "").toLowerCase();
-  const isEmployee = referer.includes("employee-portal");
-  return isEmployee
-    ? { username: "natesh", role: "EMPLOYEE", name: "Natesh Kanna R", empId: "ISRO-10101", initials: "NK" }
-    : { username: "hr.admin", role: "HR", name: "Priya Menon" };
+function writeState(next) {
+  const staged = DATA_FILE + ".tmp";
+  fs.writeFileSync(staged, JSON.stringify(next, null, 2), { mode: 0o600 });
+  fs.renameSync(staged, DATA_FILE);
 }
 
-const server = http.createServer(async (req, res) => {
+fs.mkdirSync(DATA_DIR, { recursive: true, mode: 0o700 });
+if (!fs.existsSync(DATA_FILE)) {
+  writeState({ missions: DEFAULT_MISSIONS, messages: createDefaultMessages(), forms: {} });
+}
+let state = JSON.parse(fs.readFileSync(DATA_FILE, "utf8"));
+
+function commit(next) {
+  writeState(next);
+  state = next;
+}
+
+function json(res, status, value, headers = {}) {
+  res.writeHead(status, {
+    "Content-Type": "application/json; charset=utf-8",
+    "Cache-Control": "no-store",
+    ...headers,
+  });
+  res.end(JSON.stringify(value));
+}
+async function body(req) {
+  if (req.headers["content-type"]?.split(";")[0] !== "application/json") {
+    throw Object.assign(new Error("Expected application/json"), { status: 415 });
+  }
+  let bytes = 0;
+  const chunks = [];
+  for await (const chunk of req.iterator({ destroyOnReturn: false })) {
+    bytes += chunk.length;
+    if (bytes > 64 * 1024) {
+      req.resume();
+      throw Object.assign(new Error("Request exceeds 64 KiB"), { status: 413 });
+    }
+    chunks.push(chunk);
+  }
   try {
-    const url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
-    if (url.pathname === "/api/health") return json(res, 200, { ok: true, service: "isro-mission-portal", storage: "server-json", encryption: "AES-256-GCM", employeesCount: EMPLOYEES.length });
-    if (url.pathname === "/api/login" && req.method === "POST") {
+    const value = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+    if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error();
+    return value;
+  } catch {
+    throw Object.assign(new Error("Invalid JSON object"), { status: 400 });
+  }
+}
+
+function cookieToken(req) {
+  return (req.headers.cookie || "").match(/(?:^|;\s*)isro_session=([a-f0-9]{64})(?:;|$)/)?.[1];
+}
+
+function sessionFrom(req) {
+  const token = cookieToken(req);
+  const session = sessions.get(token);
+  if (!session || session.expires <= Date.now()) {
+    sessions.delete(token);
+    return null;
+  }
+  return session.user;
+}
+
+function serveStatic(req, res, pathname) {
+  if (req.method !== "GET" && req.method !== "HEAD") return json(res, 405, { error: "Method not allowed" });
+  const page = PAGES.get(pathname);
+  if (page === "hr-portal.html" || page === "employee-portal.html") {
+    const user = sessionFrom(req);
+    const role = page === "hr-portal.html" ? "HR" : "EMPLOYEE";
+    if (user?.role !== role) {
+      res.writeHead(303, { Location: "/login.html", "Cache-Control": "no-store" }).end();
+      return;
+    }
+  }
+  let file = page ? path.join(ROOT, page) : null;
+  if (pathname === "/visionvault-extension.zip") {
+    file = path.resolve(ROOT, "../dist/site/downloads/visionvault-chromium.zip");
+  } else if (pathname.startsWith("/images/")) {
+    const image = pathname.slice("/images/".length);
+    if (image && path.basename(image) === image && /\.(?:jpe?g|mp4)$/i.test(image)) {
+      file = path.join(ROOT, "images", image);
+    }
+  }
+  if (!file || !fs.existsSync(file)) return json(res, 404, { error: "Not found" });
+  res.writeHead(200, {
+    "Content-Type": MIME[path.extname(file).toLowerCase()],
+    "Cache-Control": "no-store",
+  });
+  if (req.method === "HEAD") return res.end();
+  const stream = fs.createReadStream(file);
+  stream.on("error", () => res.destroy());
+  stream.pipe(res);
+}
+
+function messagesFor(initials) {
+  return state.messages.filter((message) => !initials || message.empInitials === initials)
+    .map(({ id, empId, empInitials, from, time, ciphertext }) => ({
+      id, empId, empInitials, from, time, enc: ciphertext,
+    }));
+}
+
+const server = http.createServer({ requestTimeout: 15000, headersTimeout: 10000 }, async (req, res) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("Referrer-Policy", "no-referrer");
+  res.setHeader("Content-Security-Policy", "frame-ancestors 'none'; object-src 'none'; base-uri 'self'");
+  try {
+    const host = req.headers.host;
+    if (!/^(?:localhost|127\.0\.0\.1)(?::\d+)?$/.test(host || "")) {
+      return json(res, 403, { error: "Use the localhost demo address" });
+    }
+    const origin = "http://" + host;
+    const url = new URL(req.url, origin);
+    const pathname = decodeURIComponent(url.pathname);
+    if (url.origin !== origin || (req.headers.origin && req.headers.origin !== origin)) {
+      return json(res, 403, { error: "Cross-origin requests are disabled" });
+    }
+    if (!pathname.startsWith("/api/")) return serveStatic(req, res, pathname);
+
+    if (pathname === "/api/health" && req.method === "GET") {
+      return json(res, 200, { ok: true, service: "visionvault-local-demo" });
+    }
+    if (pathname === "/api/login" && req.method === "POST") {
       const input = await body(req);
-      const user = USERS[input.username] || { role: "HR", name: "Priya Menon" };
+      const username = typeof input.username === "string" ? input.username.toLowerCase() : "";
+      const account = Object.hasOwn(USERS, username) ? USERS[username] : null;
+      if (!account || account.password !== input.password) {
+        return json(res, 401, { error: "Invalid demo username or password" });
+      }
+
+      for (const [key, session] of sessions) {
+        if (session.expires <= Date.now()) sessions.delete(key);
+      }
+      if (sessions.size >= 256) sessions.delete(sessions.keys().next().value);
+      sessions.delete(cookieToken(req));
       const token = crypto.randomBytes(32).toString("hex");
-      sessions.set(token, { username: input.username, role: user.role, name: user.name, empId: user.empId, initials: user.initials });
-      res.writeHead(200, { "Content-Type": "application/json", "Set-Cookie": `isro_session=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=28800` });
-      return res.end(JSON.stringify({ role: user.role, name: user.name, empId: user.empId, initials: user.initials }));
-    }
-    if (url.pathname === "/api/logout" && req.method === "POST") {
-      const token = (req.headers.cookie || "").split(";").map(value => value.trim()).find(value => value.startsWith("isro_session="))?.split("=")[1];
-      if (token) sessions.delete(token);
-      res.writeHead(200, { "Content-Type": "application/json", "Set-Cookie": "isro_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0" });
-      return res.end(JSON.stringify({ ok: true }));
-    }
-    if (url.pathname === "/api/me" && req.method === "GET") {
-      const session = requireSession(req, res);
-      return json(res, 200, session);
-    }
-    const session = requireSession(req, res);
-    if (url.pathname === "/api/state" && req.method === "GET") {
-      const empFilter = url.searchParams.get("emp");
-      return json(res, 200, {
-        user: session,
-        missions: state.missions,
-        employees: EMPLOYEES,
-        messages: publicMessages(empFilter),
-        forms: state.forms
+      const { role, name, empId, initials } = account;
+      const user = { username, role, name, empId, initials };
+      sessions.set(token, { user, expires: Date.now() + SESSION_SECONDS * 1000 });
+      return json(res, 200, user, {
+        "Set-Cookie": `isro_session=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${SESSION_SECONDS}`,
       });
     }
-    if (url.pathname === "/api/messages" && req.method === "POST") {
+    if (pathname === "/api/logout" && req.method === "POST") {
+      sessions.delete(cookieToken(req));
+      return json(res, 200, { ok: true }, {
+        "Set-Cookie": "isro_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0",
+      });
+    }
+
+    const user = sessionFrom(req);
+    if (!user) return json(res, 401, { error: "Demo sign-in required" });
+    if (pathname === "/api/me" && req.method === "GET") return json(res, 200, user);
+    const employee = user.role === "EMPLOYEE";
+    const filter = employee ? user.initials : url.searchParams.get("emp");
+    if (pathname === "/api/state" && req.method === "GET") {
+      return json(res, 200, {
+        user,
+        missions: employee ? state.missions.filter((mission) => mission.empId === user.empId) : state.missions,
+        employees: employee ? EMPLOYEES.filter((person) => person.id === user.empId) : EMPLOYEES,
+        messages: messagesFor(filter),
+        forms: Object.fromEntries(Object.entries(state.forms).filter(([key]) => !filter || key.startsWith(filter + "_"))),
+      });
+    }
+    if (pathname === "/api/messages" && req.method === "POST") {
       const input = await body(req);
-      if (!input.enc && !input.text?.trim()) return json(res, 400, { error: "Message content is required" });
+      const recipient = EMPLOYEES.find((person) => person.id === (employee ? user.empId : input.empId));
+      const text = typeof input.text === "string" ? input.text.trim() : "";
+      const enc = typeof input.enc === "string" ? input.enc : "";
+      if (!recipient || (!text && !enc) || text.length > 8000 || enc.length > 20000) {
+        return json(res, 400, { error: "Provide a demo recipient and a message up to 8,000 characters" });
+      }
+      if (enc && decrypt(enc) === "[decryption failed]") {
+        return json(res, 400, { error: "Invalid demo message encoding" });
+      }
       const message = {
         id: crypto.randomUUID(),
-        empId: input.empId || "ISRO-10101",
-        empInitials: input.empInitials || "NK",
-        from: session.role === "EMPLOYEE" ? "EMP" : "HR",
-        time: new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }),
-        ciphertext: input.enc || encrypt(input.text.trim()),
-        clientEncrypted: true
+        empId: recipient.id,
+        empInitials: recipient.initials,
+        from: employee ? "EMP" : "HR",
+        time: new Date().toISOString(),
+        ciphertext: enc || encrypt(text),
       };
-      state.messages.push(message); saveState();
-      return json(res, 201, { id: message.id, empId: message.empId, from: message.from, time: message.time, ...(input.enc ? { enc: input.enc } : { text: input.text.trim() }) });
+      commit({ ...state, messages: [...state.messages, message].slice(-500) });
+      return json(res, 201, { id: message.id, from: message.from, time: message.time });
     }
-    if (url.pathname === "/api/messages" && req.method === "DELETE") {
-      const empInitials = url.searchParams.get("emp");
-      if (empInitials) {
-        state.messages = state.messages.filter(m => m.empInitials !== empInitials);
-      } else {
-        state.messages = [];
-      }
-      saveState();
+    if (pathname === "/api/messages" && req.method === "DELETE") {
+      commit({ ...state, messages: filter ? state.messages.filter((message) => message.empInitials !== filter) : [] });
       return json(res, 200, { ok: true });
     }
-    if (url.pathname === "/api/forms" && req.method === "POST") {
+    if (pathname === "/api/forms" && req.method === "POST") {
       const input = await body(req);
-      if (!["hr", "payroll", "it", "housing", "medical"].includes(input.formId)) return json(res, 400, { error: "Unknown form" });
-      const empInitials = input.empInitials || session.initials || "NK";
-      state.forms[`${empInitials}_${input.formId}`] = new Date().toISOString(); saveState(); return json(res, 201, { ok: true });
-    }
-    if (url.pathname === "/api/forms" && req.method === "DELETE") {
-      const empInitials = url.searchParams.get("emp");
-      if (empInitials) {
-        Object.keys(state.forms).forEach(key => {
-          if (key.startsWith(empInitials + "_")) delete state.forms[key];
-        });
-      } else {
-        state.forms = {};
+      const initials = employee ? user.initials : input.empInitials;
+      const formIds = ["hr", "payroll", "it", "housing", "medical"];
+      if (!formIds.includes(input.formId) || !EMPLOYEES.some((person) => person.initials === initials)) {
+        return json(res, 400, { error: "Unknown demo form or employee" });
       }
-      saveState();
+      const forms = { ...state.forms, [`${initials}_${input.formId}`]: new Date().toISOString() };
+      commit({ ...state, forms });
+      return json(res, 201, { ok: true });
+    }
+    if (pathname === "/api/forms" && req.method === "DELETE") {
+      const forms = filter
+        ? Object.fromEntries(Object.entries(state.forms).filter(([key]) => !key.startsWith(filter + "_")))
+        : {};
+      commit({ ...state, forms });
       return json(res, 200, { ok: true });
     }
-    if (url.pathname === "/api/missions" && req.method === "POST") {
-      const mission = await body(req);
-      if (!mission.satellite_name) return json(res, 400, { error: "Satellite Name is required" });
-      state.missions.push({ ...mission, empId: mission.empId || "ISRO-10101" }); saveState(); return json(res, 201, state.missions.at(-1));
+    if (pathname === "/api/missions" && req.method === "POST") {
+      if (employee) return json(res, 403, { error: "This action requires the demo HR role" });
+      const input = await body(req);
+      const satelliteName = typeof input.satellite_name === "string" ? input.satellite_name.trim() : "";
+      if (!satelliteName || satelliteName.length > 160) return json(res, 400, { error: "Satellite name is required" });
+      const mission = { ...input, satellite_name: satelliteName, empId: input.empId || "ISRO-10101" };
+      commit({ ...state, missions: [...state.missions, mission].slice(-500) });
+      return json(res, 201, mission);
     }
-    return url.pathname.startsWith("/api/") ? json(res, 404, { error: "API route not found" }) : serveStatic(req, res);
-  } catch (error) { json(res, 500, { error: "Prototype server error" }); }
+    return json(res, 404, { error: "API route not found" });
+  } catch (error) {
+    if (res.headersSent) return res.destroy();
+    if (error instanceof URIError) return json(res, 400, { error: "Invalid URL" });
+    return json(res, error.status || 500, { error: error.status ? error.message : "Demo server error" });
+  }
 });
-server.listen(PORT, () => console.log(`ISRO prototype running at http://localhost:${PORT}`));
+server.listen(PORT, "127.0.0.1", () => {
+  console.log(`VisionVault fixture portal at http://127.0.0.1:${server.address().port}/login.html`);
+});

@@ -1,19 +1,18 @@
 """
 Privacy-Preserving Vision Agent — Server (SIH PS 26171)
-FastAPI Backend with Multi-VLM: Google Gemini (AI Studio) -> Groq -> OpenAI -> Smart Mock
+Local Ollama, hosted planning providers, and deterministic rules.
 """
 
 import base64
 import io
 import json
 import os
-import sys
 import re
 import threading
 import time
 import urllib.request
 import urllib.error
-from datetime import datetime
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -24,57 +23,51 @@ except ImportError:
     _PIL_AVAILABLE = False
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field
+from fastapi.responses import JSONResponse, StreamingResponse
+from pydantic import BaseModel, Field, model_validator
 
-# Load environment variables from .env
-load_dotenv(Path(__file__).parent / ".env", override=True)
+from app.http_policy import PlannerPolicy
 
-app = FastAPI(title="VisionVault Privacy Agent Server")
+load_dotenv(Path(__file__).parent / ".env")
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+planner_token = os.getenv("VISIONVAULT_API_TOKEN", "").strip()
+if planner_token and not re.fullmatch(r"[!-~]{32,}", planner_token):
+    raise RuntimeError("VISIONVAULT_API_TOKEN must contain at least 32 visible ASCII characters without spaces")
 
-# Ensure logs directory exists
-LOGS_DIR = Path(__file__).parent / "logs"
-LOGS_DIR.mkdir(parents=True, exist_ok=True)
-SESSION_LOG = LOGS_DIR / "session.jsonl"
-
-def log_session_event(event_type: str, data: Dict[str, Any]):
-    try:
-        with open(SESSION_LOG, "a", encoding="utf-8") as f:
-            entry = {
-                "timestamp": datetime.utcnow().isoformat() + "Z",
-                "event": event_type,
-                "data": data
-            }
-            f.write(json.dumps(entry) + "\n")
-    except Exception as e:
-        print(f"[server-log] Failed to write log: {e}")
-
-# ── Backend Selection ────────────────────────────────────────────────────────
-# Chain: Ollama (Qwen2.5-VL 7B) -> OpenRouter -> Gemini -> mock
-BACKEND = "mock"
 gemini_key = os.getenv("GEMINI_API_KEY", "").strip()
 openrouter_key = os.getenv("OPENROUTER_API_KEY", "").strip()
-ollama_host = os.getenv("OLLAMA_HOST", "").strip()
 
-if ollama_host:
-    BACKEND = "ollama"
-    print(f"[server] [OK] Tier 1: Ollama ({ollama_host})")
-elif openrouter_key:
-    BACKEND = "openrouter"
-    print(f"[server] [OK] Tier 2: OpenRouter ({os.getenv('OPENROUTER_MODEL', 'google/gemini-2.5-flash')})")
-elif gemini_key:
-    BACKEND = "gemini"
-    print(f"[server] [OK] Tier 3: Google Gemini ({os.getenv('GEMINI_MODEL', 'gemini-2.0-flash')})")
-else:
-    print("[server] [INFO] Backend: Deterministic rule-based planner (no API key configured)")
+
+@asynccontextmanager
+async def lifespan(_app):
+    warm_ollama()
+    yield
+
+
+app = FastAPI(title="VisionVault Planner", lifespan=lifespan, redirect_slashes=False)
+app.add_middleware(PlannerPolicy, token=planner_token)
+allowed_origins = [
+    origin.strip() for origin in os.getenv("VISIONVAULT_ALLOWED_ORIGINS", "").split(",")
+    if origin.strip()
+]
+if "*" in allowed_origins:
+    raise RuntimeError("Configure explicit VISIONVAULT_ALLOWED_ORIGINS")
+if allowed_origins:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=allowed_origins,
+        allow_methods=["GET", "POST"],
+        allow_headers=["Authorization", "Content-Type"],
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def invalid_request(_request, exc: RequestValidationError):
+    errors = [{"loc": error["loc"], "type": error["type"]} for error in exc.errors()]
+    return JSONResponse({"detail": errors}, status_code=422)
+
 
 # ── Schemas ──────────────────────────────────────────────────────────────────
 class Mark(BaseModel):
@@ -171,9 +164,9 @@ class Progress(BaseModel):
 class AgentStepRequest(BaseModel):
     redactedImage: Optional[str] = None
     image: Optional[str] = None
-    marks: List[Mark] = []
-    task: str
-    filled_mark_ids: Optional[List[int]] = []
+    marks: List[Mark] = Field(default_factory=list, max_length=2000)
+    task: str = Field(min_length=1, max_length=4096)
+    filled_mark_ids: Optional[List[int]] = Field(default_factory=list, max_length=2000)
     step: Optional[int] = 1
     page_info: Optional[PageInfo] = None
     task_hints: Optional[TaskHints] = None
@@ -181,6 +174,14 @@ class AgentStepRequest(BaseModel):
     screen_evaluation: Optional[Dict[str, Any]] = None
     privacy_budget: Optional[Dict[str, Any]] = None
     semantic_screen: Optional[Dict[str, Any]] = None
+
+    @model_validator(mode="after")
+    def enforce_image_budget(self):
+        if self.privacy_budget and self.privacy_budget.get("level") == 0 and (self.image or self.redactedImage):
+            raise ValueError("The zero-pixel privacy budget does not accept an image")
+        if not self.task.strip():
+            raise ValueError("Task is required")
+        return self
 
 BOOKING_RE = re.compile(
     r"\b(book|flight|hotel|train|bus|cab|ticket|reserve|makemytrip|goibibo|irctc|redbus|cleartrip)\b",
@@ -583,7 +584,7 @@ def tier_available(name: str) -> bool:
     if not entry:
         return True
     if time.time() >= entry["until"]:
-        del _tier_cooldowns[name]
+        _tier_cooldowns.pop(name, None)
         print(f"[server] {name} cooldown expired, trying it again")
         return True
     return False
@@ -608,7 +609,7 @@ def tier_status() -> Dict[str, Any]:
     now = time.time()
     return {
         name: {"reason": e["reason"], "retry_in_s": max(0, int(e["until"] - now))}
-        for name, e in _tier_cooldowns.items()
+        for name, e in _tier_cooldowns.copy().items()
     }
 
 
@@ -680,7 +681,7 @@ Respond in STRICT JSON ONLY:
 }}"""
 
     models_to_try = list(dict.fromkeys([
-        os.getenv("GEMINI_MODEL", "gemini-2.0-flash"),
+        os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
         "gemini-2.0-flash",
         "gemini-1.5-flash",
     ]))
@@ -689,7 +690,7 @@ Respond in STRICT JSON ONLY:
     for model_name in models_to_try:
         if model_name in _dead_models:
             continue
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={key}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent"
         parts: List[Dict[str, Any]] = [{"text": prompt_text}]
         if img_b64:
             parts.append({
@@ -711,7 +712,7 @@ Respond in STRICT JSON ONLY:
             req_post = urllib.request.Request(
                 url,
                 data=json.dumps(payload).encode("utf-8"),
-                headers={"Content-Type": "application/json"}
+                headers={"Content-Type": "application/json", "x-goog-api-key": key},
             )
             with urllib.request.urlopen(req_post, timeout=25) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
@@ -721,7 +722,6 @@ Respond in STRICT JSON ONLY:
                 if parsed and isinstance(parsed, dict):
                     act = parsed.get("action", {})
                     reasoning = parsed.get("reasoning", f"Google Gemini ({model_name}) plan")
-                    print(f"[server] [GEMINI] Action: {act.get('type')} (target: {act.get('target')}) - {reasoning}")
                     return StepResponse(
                         reasoning=reasoning,
                         action=StepAction(
@@ -735,7 +735,7 @@ Respond in STRICT JSON ONLY:
         except Exception as e:
             last_err = e
             text = str(e)
-            print(f"[server] Gemini ({model_name}) error: {text}")
+            print(f"[server] Gemini request failed ({type(e).__name__})")
             if "404" in text or "not found" in text.lower():
                 # This model name is wrong for this account; it will not start existing.
                 _dead_models.add(model_name)
@@ -795,11 +795,10 @@ def plan_with_openrouter(req: AgentStepRequest) -> Optional[StepResponse]:
         raw = (data.get("choices") or [{}])[0].get("message", {}).get("content", "")
         parsed = robust_json_parse(raw)
         if not parsed:
-            print(f"[server] OpenRouter unparseable: {raw[:160]!r}")
+            print("[server] OpenRouter returned an unparseable result")
             return None
         act = parsed.get("action", {})
         reasoning = parsed.get("reasoning", f"OpenRouter ({model}) plan")
-        print(f"[server] [OPENROUTER] Action: {act.get('type')} (target: {act.get('target')}) - {reasoning}")
         return StepResponse(
             reasoning=reasoning,
             action=StepAction(
@@ -812,7 +811,7 @@ def plan_with_openrouter(req: AgentStepRequest) -> Optional[StepResponse]:
         )
     except Exception as e:
         text = str(e)
-        print(f"[server] OpenRouter ({model}) error: {text}")
+        print(f"[server] OpenRouter request failed ({type(e).__name__})")
         if "401" in text or "403" in text:
             trip_tier("openrouter", e)
         elif "429" in text or "rate limit" in text.lower():
@@ -897,7 +896,7 @@ def compress_image_for_ollama(b64_str: str, max_dim: int = 768, quality: int = 7
         img.save(buf, format="JPEG", quality=quality, optimize=True)
         return base64.b64encode(buf.getvalue()).decode("utf-8")
     except Exception as e:
-        print(f"[server] Ollama image compression fallback: {e}")
+        print(f"[server] Ollama image compression fallback ({type(e).__name__})")
         return b64_str
 
 
@@ -912,15 +911,10 @@ def _http_json(url: str, payload: Optional[dict], timeout: float, method: str = 
         with urllib.request.urlopen(request, timeout=timeout) as response:
             return json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as e:
-        err_body = ""
-        try:
-            err_body = e.read().decode("utf-8", errors="ignore")
-        except Exception:
-            pass
-        print(f"[server] HTTP {method} to {url} failed: {e} - Response: {err_body}")
+        print(f"[server] Local provider HTTP {method} failed with status {e.code}")
         return None
     except Exception as e:
-        print(f"[server] HTTP {method} to {url} failed: {e}")
+        print(f"[server] Local provider HTTP {method} failed ({type(e).__name__})")
         return None
 
 
@@ -963,6 +957,8 @@ def ollama_model(force: bool = False) -> Optional[str]:
 
     Discovers available models from {OLLAMA_HOST}/api/tags. Re-probed at most every 30s so an
     Ollama that starts (or changes models) mid-session is picked up automatically."""
+    if not OLLAMA_HOST:
+        return None
     now = time.time()
     if not force and now - _ollama_state["checked_at"] < 30:
         return _ollama_state["model"]
@@ -1199,13 +1195,11 @@ def plan_with_ollama(req: "AgentStepRequest") -> Optional[StepResponse]:
         content = (data.get("message") or {}).get("content", "")
         parsed = robust_json_parse(content)
         if not parsed or not isinstance(parsed, dict):
-            print(f"[server] Ollama ({model}) attempt {attempt}: unparseable output ({elapsed:.1f}s): {repr(content[:120])}")
             continue
         act = parsed.get("action") or {}
         if isinstance(act, str):
             act = {"type": act}
         reasoning = parsed.get("reasoning") or f"Local {model} plan"
-        print(f"[server] [OLLAMA:{model}] Action: {act.get('type')} (target: {act.get('target')}) - {reasoning} ({elapsed:.1f}s)")
         return StepResponse(
             reasoning=reasoning,
             action=StepAction(
@@ -1284,8 +1278,9 @@ def mock_plan(marks: List[Mark], task: str, filled_ids: Optional[List[int]] = No
                 vault_key = "state"
             elif "address" in lbl or "street" in lbl:
                 vault_key = "address"
+            elif lbl in {"name", "full name", "full_name", "full-name", "your name", "legal name"}:
+                vault_key = "name"
             elif lbl:
-                import re
                 vault_key = re.sub(r"[^a-z0-9]+", "_", lbl).strip("_")[:40] or "name"
             return StepResponse(
                 reasoning=f"Fill {text_field.label or 'form field'} from vault",
@@ -1769,7 +1764,6 @@ def repair_plan(plan: StepResponse, req: AgentStepRequest, tier: str) -> StepRes
         return fallback
 
     if notes:
-        print(f"[server] [repair:{tier}] {'; '.join(notes)}")
         plan.reasoning = f"{plan.reasoning} (repaired: {'; '.join(notes)})"
     return plan
 
@@ -1794,6 +1788,11 @@ def _goal_complete(req: AgentStepRequest, progress: Progress) -> bool:
 
 # ── Endpoints ────────────────────────────────────────────────────────────────
 
+@app.get("/livez", include_in_schema=False)
+def livez():
+    return {"status": "ok"}
+
+
 @app.get("/health")
 def health():
     local_model = ollama_model()
@@ -1810,9 +1809,8 @@ def health():
         "models": {
             "ollama": local_model,
             "openrouter": os.getenv("OPENROUTER_MODEL", "google/gemini-2.5-flash"),
-            "gemini": os.getenv("GEMINI_MODEL", "gemini-2.0-flash"),
+            "gemini": os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
         },
-        "ollama_host": OLLAMA_HOST,
         # Tiers currently rested by the circuit breaker, and how long until they are retried.
         "cooldowns": tier_status(),
     }
@@ -1837,21 +1835,6 @@ def health():
 # asked an easier question seven times.
 
 
-def _console_safe(text: str) -> str:
-    """Text this process can actually print.
-
-    A Windows console is cp1252 and cannot encode the rupee sign, which appears in roughly
-    every Indian price. print() raising UnicodeEncodeError inside a request handler turns a
-    logging line into a 500, so the endpoint failed on exactly the instructions it exists to
-    handle. Only the log is transliterated; the response keeps the original characters."""
-    enc = getattr(sys.stdout, "encoding", None) or "utf-8"
-    try:
-        text.encode(enc)
-        return text
-    except (UnicodeEncodeError, LookupError):
-        return text.encode("ascii", "replace").decode("ascii")
-
-
 class Milestone(BaseModel):
     id: int
     title: str
@@ -1860,7 +1843,7 @@ class Milestone(BaseModel):
 
 
 class PlanRequest(BaseModel):
-    task: str
+    task: str = Field(min_length=1, max_length=4096)
     page_info: Optional[PageInfo] = None
 
 
@@ -1990,7 +1973,6 @@ def agent_plan(req: PlanRequest):
     words = task.split()
     looks_short = len(words) <= 14 and not re.search(r"[,;:]|\.\s+\S", task)
     if looks_short:
-        print(_console_safe(f"[server] [PLAN:passthrough] short instruction, left as one step: {task[:70]}"))
         return PlanResponse(
             goal=task[:160],
             milestones=[Milestone(id=1, title=task[:60], sub_task=task[:160])],
@@ -2005,7 +1987,7 @@ def agent_plan(req: PlanRequest):
             if milestones:
                 tier = "ollama"
         except Exception as err:  # a decomposition failure must not fail the run
-            print(f"[server] plan: model tier failed ({err}); falling back to rules")
+            print(f"[server] Plan decomposition failed ({type(err).__name__}); using rules")
 
     # A model that answers with a single milestone has restated the instruction, not
     # decomposed it - the 3B did exactly that on a sixty-word task. Where the rules can
@@ -2018,132 +2000,58 @@ def agent_plan(req: PlanRequest):
         milestones = rules
         tier = "rules"
 
-    print(_console_safe(f"[server] [PLAN:{tier}] {len(milestones)} milestone(s) for: {task[:70]}"))
-    for m in milestones:
-        print(_console_safe(f"[server]    {m.id}. {m.sub_task}"))
     return PlanResponse(goal=task[:160], milestones=milestones, tier=tier)
 
 
-@app.post("/api/agent/step", response_model=StepResponse)
-async def agent_step(req: AgentStepRequest):
-    log_session_event("agent_step_request", {
-        "task": req.task,
-        "marks_count": len(req.marks),
-        "filled_count": len(req.filled_mark_ids or []),
-        "step": req.step,
-        "has_image": bool(req.redactedImage or req.image),
-        "privacy_budget": (req.privacy_budget.get("id") if req.privacy_budget else "LEVEL_0_ZERO_PIXEL_DOM"),
-        "has_semantic_screen": bool(req.semantic_screen),
-        "page": (req.page_info.url if req.page_info else None),
-    })
+def plan_step(req: AgentStepRequest) -> StepResponse:
+    providers = (
+        ("ollama", bool(OLLAMA_HOST), plan_with_ollama),
+        ("openrouter", bool(openrouter_key), plan_with_openrouter),
+        ("gemini", bool(gemini_key), plan_with_gemini),
+    )
+    for tier, configured, provider in providers:
+        if not configured or not tier_available(tier):
+            continue
+        try:
+            plan = provider(req)
+            if plan:
+                plan = repair_plan(plan, req, tier)
+                plan.tier = tier
+                return plan
+        except Exception as error:
+            trip_tier(tier, error)
 
-    is_zero_pixel = bool(req.privacy_budget and req.privacy_budget.get("level") == 0)
-    if is_zero_pixel:
-        print(_console_safe("[server] 🛡️ Privacy Budget Level 0 (ZERO_PIXEL_DOM) active: 0 pixels received. Reasoning purely over semantic screen elements."))
-
-    plan = None
-    tier = None
-
-    # Tier 1: Friend's Ollama — Qwen2.5-VL 7B running locally on network
-    if tier_available("ollama"):
-        plan = plan_with_ollama(req)
-        if plan:
-            tier = "ollama"
-
-    # Tier 2: OpenRouter (e.g. Gemini 2.5 Flash / Qwen)
-    if not plan and openrouter_key and tier_available("openrouter"):
-        plan = plan_with_openrouter(req)
-        if plan:
-            tier = "openrouter"
-
-    # Tier 3: Google Gemini
-    if not plan and gemini_key and tier_available("gemini"):
-        plan = plan_with_gemini(req)
-        if plan:
-            tier = "gemini"
-
-    # Tier 4: deterministic rules — cannot fail
-    if not plan:
-        plan = mock_plan(req.marks, req.task, req.filled_mark_ids, req.page_info, req.progress)
-        tier = "mock"
-
-    # Every tier's answer is checked against the elements and progress we sent it, so one
-    # implementation covers hosted VLMs and the local model alike.
-    plan = repair_plan(plan, req, tier or "unknown")
-    plan.tier = tier
-
-    log_session_event("agent_step_response", {
-        "tier": tier,
-        "reasoning": plan.reasoning,
-        "action": plan.action.model_dump()
-    })
-
+    plan = mock_plan(req.marks, req.task, req.filled_mark_ids, req.page_info, req.progress)
+    plan = repair_plan(plan, req, "mock")
+    plan.tier = "mock"
     return plan
 
+
+@app.post("/api/agent/step", response_model=StepResponse)
+@app.post("/plan-action", response_model=StepResponse)
+def agent_step(req: AgentStepRequest):
+    return plan_step(req)
+
+
 @app.post("/api/agent/step/stream")
-async def agent_step_stream(req: AgentStepRequest):
-    """SSE streaming variant of /api/agent/step.
-
-    Emits one `data:` event per planning tier attempted, then a final event with the
-    repaired plan. The client can render intermediate reasoning while the chain runs.
-    """
-    async def generate():
-        plan = None
-        tier = None
-
-        def emit(obj):
-            return f"data: {json.dumps(obj)}\n\n"
-
-        # Tier 1: Friend's Ollama
-        if tier_available("ollama"):
-            plan = plan_with_ollama(req)
-            if plan:
-                tier = "ollama"
-                yield emit({"tier": tier, "reasoning": plan.reasoning, "partial": True})
-
-        # Tier 2: OpenRouter
-        if not plan and openrouter_key and tier_available("openrouter"):
-            plan = plan_with_openrouter(req)
-            if plan:
-                tier = "openrouter"
-                yield emit({"tier": tier, "reasoning": plan.reasoning, "partial": True})
-
-        # Tier 3: Google Gemini
-        if not plan and gemini_key and tier_available("gemini"):
-            plan = plan_with_gemini(req)
-            if plan:
-                tier = "gemini"
-                yield emit({"tier": tier, "reasoning": plan.reasoning, "partial": True})
-
-        # Tier 4: Mock
-        if not plan:
-            plan = mock_plan(req.marks, req.task, req.filled_mark_ids, req.page_info, req.progress)
-            tier = "mock"
-
-        plan = repair_plan(plan, req, tier or "unknown")
-        plan.tier = tier
-
-        final = plan.model_dump()
-        final["tier"] = tier
-        final["partial"] = False
-        yield emit(final)
+def agent_step_stream(req: AgentStepRequest):
+    def generate():
+        plan = plan_step(req)
+        if plan.tier != "mock":
+            partial = {"tier": plan.tier, "reasoning": plan.reasoning, "partial": True}
+            yield f"data: {json.dumps(partial)}\n\n"
+        final = {**plan.model_dump(), "partial": False}
+        yield f"data: {json.dumps(final)}\n\n"
         yield "data: [DONE]\n\n"
 
-    return StreamingResponse(generate(), media_type="text/event-stream",
-                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
-
-
-@app.post("/plan-action", response_model=StepResponse)
-async def legacy_plan_action(req: AgentStepRequest):
-    return await agent_step(req)
-
-@app.on_event("startup")
-def _startup() -> None:
-    warm_ollama()
+    return StreamingResponse(
+        generate(), media_type="text/event-stream",
+        headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"},
+    )
 
 
 if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))
     print(f"[server] Starting VisionVault AI Server on http://127.0.0.1:{port}")
-    uvicorn.run("main:app", host="127.0.0.1", port=port, reload=True)
+    uvicorn.run("main:app", host="127.0.0.1", port=port, proxy_headers=False, access_log=False)

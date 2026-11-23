@@ -1,27 +1,26 @@
 services:
   server:
-    build:
-      context: ./server
-      dockerfile: Dockerfile
-    container_name: visionvault-server
+    build: ./server
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     environment:
-      - OLLAMA_HOST=http://ollama:11434
-      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
-      - GROQ_API_KEY=${GROQ_API_KEY:-}
-      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
-    volumes:
-      - ./server/logs:/app/logs
-    depends_on:
-      - ollama
+      VISIONVAULT_API_TOKEN: ${VISIONVAULT_API_TOKEN:?Set a planner token with at least 32 characters}
+      VISIONVAULT_ALLOWED_ORIGINS: ${VISIONVAULT_ALLOWED_ORIGINS:-}
+      OLLAMA_HOST: ${OLLAMA_HOST:-}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:3b-instruct}
+      OLLAMA_TIMEOUT: ${OLLAMA_TIMEOUT:-20}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-google/gemini-2.5-flash}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
     restart: unless-stopped
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
 
   ollama:
     image: ollama/ollama:latest
-    container_name: visionvault-ollama
-    ports:
-      - "11434:11434"
+    profiles: [ollama]
     volumes:
       - ollama_data:/root/.ollama
     restart: unless-stopped

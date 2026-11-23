@@ -73,7 +73,7 @@ function section(title) {
 (async () => {
   fs.mkdirSync(RESULTS_DIR, { recursive: true });
   const { server, baseUrl } = await startFixtureServer();
-  const h = await launchWithExtension({ headless: false });
+  const h = await launchWithExtension({ headless: process.env.VV_HEADLESS === "1" });
 
   console.log('VisionVault — live verification');
   console.log('===============================');
@@ -310,18 +310,19 @@ function section(title) {
 
   // ── 5. Click confirmation ──────────────────────────────────────────────────
   section('5. Risky click halts for human approval');
-  await h.worker.evaluate(() => {
-    // Drive the gate directly with a synthetic plan, so the check does not depend on what the
-    // cloud model happens to choose on this run.
-    const submit = (session.marks || []).find((m) => (m.label || '').includes('create free account'))
-      || (session.marks || []).find((m) => m.role === 'button');
-    session.lastAction = { action: 'click', mark_id: submit && submit.id, reasoning: 'Submit the completed form' };
-    return submit;
+  await page.$eval("#submitBtn", (node) => {
+    node.scrollIntoView({ block: "center" });
+    const link = document.createElement("a");
+    link.href = "#fixture-help";
+    link.textContent = "Help";
+    link.style.cssText = "position:fixed;left:24px;top:40px;z-index:10000";
+    document.body.appendChild(link);
   });
+  await h.worker.evaluate(() => phaseScan("Fill the signup form with my details"));
   const risky = await h.worker.evaluate(() => {
-    const submit = (session.marks || []).find((m) => (m.label || '').includes('create free account'))
-      || (session.marks || []).find((m) => m.role === 'button');
-    return assessClickRisk({ action: 'click', mark_id: submit && submit.id, reasoning: 'Submit the completed form' }, session);
+    const submit = (session.marks || []).find((m) => /create free account/i.test(m.label || ""));
+    if (!submit) return { error: "No Create Free Account control on the current scan" };
+    return assessClickRisk({ action: 'click', mark_id: submit.id }, session);
   });
   console.log(`  observed: assessClickRisk -> ${JSON.stringify(risky)}`);
   check(risky.needsConfirm === true, 'a submit-style click requires confirmation', JSON.stringify(risky));
@@ -329,7 +330,7 @@ function section(title) {
   const benign = await h.worker.evaluate(() => {
     // A labelled, non-consequential link. Fail loudly if the page has none, rather than
     // silently testing an undefined target (which would be gated as unknown risk).
-    const link = (session.marks || []).find((m) => m.role === 'link' && m.label);
+    const link = (session.marks || []).find((m) => m.role === 'link' && m.label === 'help');
     if (!link) return { error: 'no labelled link on the page to test with' };
     return Object.assign(
       { label: link.label },
@@ -432,22 +433,23 @@ function section(title) {
     marks: session.marks.length,
     preview: (session.redacted || '').length,
   }));
-  const piiBeforeChange = scan.piiCount;
-
-  // Mutate the page the way a single-page app would: inject new fields carrying PII.
-  await page.evaluate(() => {
-    const host = document.querySelector('form') || document.body;
+  // Insert sensitive controls in the visible viewport and compare their locations with the
+  // final mask geometry. OCR can produce a different number of regions on adjacent frames.
+  const injected = await page.evaluate(() => {
     const block = document.createElement('div');
+    block.style.cssText = 'position:fixed;z-index:10000;left:24px;top:90px;display:grid;gap:16px;background:white;padding:16px';
     block.innerHTML = `
       <label for="latePan">Billing PAN</label>
       <input type="text" id="latePan" name="pan" value="AXKPR4471J" />
       <label for="lateIfsc">Bank IFSC</label>
-      <input type="text" id="lateIfsc" name="ifsc" value="HDFC0004471" />
-      <p id="lateContact">Escalations: late.contact@examplemail.com</p>`;
-    host.appendChild(block);
+      <input type="text" id="lateIfsc" name="ifsc" value="HDFC0004471" />`;
+    document.body.appendChild(block);
+    return ['latePan', 'lateIfsc'].map(id => {
+      const box = document.getElementById(id).getBoundingClientRect();
+      return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+    });
   });
 
-  // MutationObserver debounce (700ms) + service-worker debounce (900ms) + a scan.
   await new Promise((r) => setTimeout(r, 7000));
 
   const afterChange = await h.worker.evaluate(() => ({
@@ -467,39 +469,27 @@ function section(title) {
     console.log(`  observed: latest -> marks=${n.markCount} pii=${n.piiCount} preview=${(n.preview || '').length} bytes`);
   }
 
-  const latestPii = domRescans.length ? domRescans[domRescans.length - 1].piiCount : null;
-  console.log(`  observed: PII count ${piiBeforeChange} -> ${latestPii}`);
+  const latest = domRescans.at(-1);
+  const masks = latest?.regions || [];
+  const covered = injected.every(({ x, y }) => masks.some(
+    (region) => region.x <= x && region.x + region.w >= x && region.y <= y && region.y + region.h >= y
+  ));
 
   check(domRescans.length > 0, 'a DOM change produced a dom_change re-scan');
-  check(latestPii !== null && latestPii > piiBeforeChange,
-        `the re-scan detected the newly injected PII (${piiBeforeChange} -> ${latestPii} regions)`);
+  check(covered, 'the re-scan masked both dynamically inserted sensitive fields');
   check(afterChange.preview > 0 && afterChange.preview !== beforeChange.preview,
         'session.redacted was refreshed by the re-scan');
   check(domRescans.length > 0 && !!domRescans[domRescans.length - 1].preview,
         'the panel was pushed a fresh preview and stats, exactly as a manual scan does');
 
-  // Mark count is deliberately NOT asserted to grow: tagging is viewport-only, and the
-  // injected fields land below the fold on this page. session.marks is still replaced
-  // wholesale by the re-scan, which is what the loop reads on its next step.
-  console.log(`  note:     marks ${beforeChange.marks} -> ${afterChange.marks} ` +
-              '(tagging is viewport-only; the injected fields are below the fold)');
-
-  // ── 8. A value the vault does not have ─────────────────────────────────────
+  // Use a fresh fixture so previous submissions or prefilled values cannot affect the result.
   section('8. A field with no vault value pauses and asks, rather than inventing one');
-
-  // Empty one field and leave the rest. The agent should reach that field, stop, and name it.
-  await h.worker.evaluate(async (vault) => {
-    await chrome.storage.local.set({ vault });
-  }, { ...VAULT, phone: '' });
+  await page.goto(`${baseUrl}/mock-apps/demo-page.html`, { waitUntil: 'load' });
+  await page.evaluate(() => { document.getElementById('phone').value = ''; });
+  await h.worker.evaluate((vault) => VaultManager.saveVault(vault), { ...VAULT, phone: '' });
 
   const askBefore = sentBodies.length;
   await h.worker.evaluate((task) => phaseScan(task), 'Fill the signup form with my details');
-
-  // Point the session at a dead port so the on-device planner drives this section. That makes
-  // the field order deterministic — a hosted model might reach the empty field on step two or
-  // step five, or propose a gated click first — and it exercises the offline path at the same
-  // time, which is the state the extension is in whenever the server is not running.
-  await h.worker.evaluate(() => { session.serverUrl = 'http://127.0.0.1:9/dead'; });
 
   const askRun = await h.worker.evaluate(() => phaseRun());
 
@@ -524,8 +514,8 @@ function section(title) {
     : { ok: false, error: 'the run never asked, so there was nothing to answer' };
 
   const storedPhone = await h.worker.evaluate(async () => {
-    const { vault } = await chrome.storage.local.get('vault');
-    return vault?.phone || '';
+    const vault = await VaultManager.getVault();
+    return vault.phone || '';
   });
 
   console.log(`  observed: resume -> ${JSON.stringify(provided && provided.ok)}  vault.phone now ${JSON.stringify(storedPhone)}`);
@@ -538,9 +528,7 @@ function section(title) {
         `${askLeaks.length} request(s) contained it`);
 
   // Restore the full vault for anything that runs after this.
-  await h.worker.evaluate(async (vault) => {
-    await chrome.storage.local.set({ vault });
-  }, VAULT);
+  await h.worker.evaluate((vault) => VaultManager.saveVault(vault), VAULT);
 
   // ── Summary ────────────────────────────────────────────────────────────────
   console.log(`\n${'='.repeat(70)}`);

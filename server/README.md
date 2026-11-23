@@ -1,104 +1,58 @@
-# VisionVault planning server
+# VisionVault planner
 
-A small FastAPI service that turns a **sanitized** view of the user's screen into one browser
-action at a time. It is deliberately the least-trusted component in the system: it never sees
-personal data, and it cannot ask for any.
+The FastAPI service turns browser context into structured action suggestions. One dispatch path serves standard JSON, the legacy route, and server-sent events.
 
-## The contract
+## Run locally
 
-**Receives** (`POST /api/agent/step`):
+Install dependencies with Python 3.12, copy `.env.example` to `.env`, and run `npm run server` from the repository root. The process binds to `127.0.0.1:8000`. The example leaves all model providers disabled, which selects deterministic rules.
 
-```jsonc
-{
-  "task": "Fill the signup form with my details",
-  "redactedImage": "data:image/png;base64,...",   // already redacted, on the client
-  "marks": [                                       // Set-of-Marks: what is clickable/typeable
-    { "id": 4148216, "role": "input:email", "label": "email address",
-      "box": { "x": 45, "y": 222, "w": 858, "h": 38 } }
-  ],
-  "filled_mark_ids": [4148216],
-  "step": 3,
-  "page_info": { "title": "...", "url": "https://host/path", "viewport_width": 1200, ... }
-}
+| Variable | Purpose |
+| --- | --- |
+| `VISIONVAULT_API_TOKEN` | Bearer token of at least 32 characters. Without a token, the API accepts only loopback clients |
+| `VISIONVAULT_ALLOWED_ORIGINS` | Optional comma-separated CORS origins for browser integrations, with exact schemes and hosts |
+| `OLLAMA_HOST`, `OLLAMA_MODEL`, `OLLAMA_TIMEOUT` | Enable or configure self-hosted model inference. An explicitly empty host skips discovery |
+| `OPENROUTER_API_KEY`, `OPENROUTER_MODEL` | Enable OpenRouter and select its model |
+| `GEMINI_API_KEY`, `GEMINI_MODEL` | Enable Gemini and select its model |
+
+Process environment values take precedence over `.env`. Provider keys belong on the server. The extension uses only the planner token.
+
+## Run in Docker
+
+Generate a token and set it in your current shell before starting Compose:
+
+```sh
+export VISIONVAULT_API_TOKEN="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')"
+docker compose up --build -d
+curl -fsS http://127.0.0.1:8000/livez
+curl -fsS -H "Authorization: Bearer $VISIONVAULT_API_TOKEN" http://127.0.0.1:8000/health
 ```
 
-Note what is *absent*: no page text, no input values, no query string, no fragment. `label` is
-a field's own name ("email address"), never its contents — the client's `safeLabel()` refuses
-to use an input's `value` and drops any candidate matching a PII pattern.
+Use the same token in the extension under **Settings → Planner token**. Compose publishes the API to the host loopback only, runs it as an unprivileged user, and checks liveness.
 
-**Returns** exactly one action:
+To enable the optional Ollama container, set `OLLAMA_HOST=http://ollama:11434`, start Compose with `--profile ollama`, and install a model with `docker compose exec ollama ollama pull qwen2.5:3b-instruct`. A local model requires enough RAM or accelerator capacity for the selected weights.
 
-```jsonc
-{
-  "reasoning": "Fill the email field from the local vault",
-  "action": { "type": "type", "target": 5615249, "use_vault_field": "email", "value": null }
-}
+For remote deployments, terminate TLS at the reverse proxy, keep the planner port internal, and configure the extension with the HTTPS service URL and token. Configure corresponding request size, rate, and timeout limits at the proxy. Keep proxy buffering disabled for the SSE route and monitor provider cooldowns and HTTP failures. Settings and upstream capacity should be validated in the target environment before opening the service to users.
+
+## HTTP API
+
+| Method and path | Response |
+| --- | --- |
+| `GET /livez` | Unauthenticated process liveness |
+| `GET /health` | Authenticated provider order, models, and cooldowns |
+| `POST /api/agent/plan` | Decomposes a task into short milestones |
+| `POST /api/agent/step` | One suggested action as JSON |
+| `POST /api/agent/step/stream` | An SSE action result followed by `[DONE]` |
+| `POST /plan-action` | Compatibility route for JSON action planning |
+
+Example request with the rules backend:
+
+```sh
+curl -fsS http://127.0.0.1:8000/api/agent/step \
+  -H "Authorization: Bearer $VISIONVAULT_API_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"task":"search for optics","marks":[{"id":2,"role":"input:search","label":"search"}],"privacy_budget":{"level":0}}'
 ```
 
-For anything personal the server sets `use_vault_field` and leaves `value` null. It names the
-*kind* of data; the client resolves the actual value from `chrome.storage.local` on-device.
-Valid keys: `name`, `username`, `email`, `phone`, `address`, `company`, `about`, `password`.
+Planner requests are bounded to 12 MiB. A zero-pixel request carrying either image field is rejected. Direct users of the API are responsible for masking their input. The server can validate the request shape and declared budget, and the client performs detection and masking.
 
-Action types: `click`, `type`, `press_key`, `select`, `scroll_page`, `scroll`, `clear`,
-`hover`, `focus`, `wait`, `navigate`, `open_tab`, `done`. The client stops the loop immediately
-on `done`.
-
-## Planning chain
-
-The actual runtime chain is a strict fallback order:
-
-1. **Google Gemini** — active when `GEMINI_API_KEY` is configured.
-2. **Groq** — used next when available.
-3. **Ollama** — optional local VLM route when `OLLAMA_HOST` is active.
-4. **Deterministic rule-based planner** — always available, no network, no key.
-
-This is intentionally resilient: a quota issue, key issue, or unreachable hosted service does not
-break the loop. The local extension always keeps the real personal data on-device and only sends
-symbolic targets and a redacted view upstream.
-
-`GET /health` reports the live chain:
-
-```json
-{"status":"ok","backend":"gemini","chain":["gemini","groq","ollama","mock"]}
-```
-
-The server is intentionally model-agnostic. Hosted providers can be swapped in or out without
-changing the client-side contract, and the request layout remains compatible with local or remote
-open-weight VLMs.
-
-## Running
-
-```bash
-cd server
-pip install -r requirements.txt
-cp .env.example .env  # optional, only if you want to add API keys
-python main.py         # http://127.0.0.1:8000
-```
-
-Common environment variables:
-
-| Variable | Meaning |
-| :--- | :--- |
-| `GEMINI_API_KEY` / `GEMINI_MODEL` | tier 1 |
-| `GROQ_API_KEY` / `GROQ_MODEL` | tier 2 |
-| `OLLAMA_HOST` / `OLLAMA_MODEL` | optional local tier |
-| `PORT` | listen port, default 8000 |
-
-## Testing it
-
-```bash
-python eval/test-server-contract.py
-```
-
-This exercises the HTTP endpoint and checks the server-side portion of the privacy contract:
-well-formed responses, valid mark ids, no invented personal values, graceful missing-image
-handling, and clean termination semantics.
-
-It does **not** test detection or redaction — those are client-side and are measured by
-`node eval/run-full-eval.js` against a live Chrome session.
-
-## Logs
-
-Requests and responses are appended to `server/logs/session.jsonl`. Only metadata is recorded —
-task text, mark counts, step number, whether an image was present, and the origin+path of the
-page. No image bytes and no personal values, because none are received.
+Run `python eval/test-planner-http.py` and `python eval/test-fallback-chain.py` for isolated verification. See the [project README](../README.md) for the rest of the verification matrix.

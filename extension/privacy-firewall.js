@@ -261,17 +261,14 @@
     assertSafeTransmission(payload) {
       if (!payload) throw new Error("[ExfiltrationGuard] Transmission rejected: empty payload.");
 
-      // Check 1: In Zero-Pixel DOM mode, image MUST be empty/omitted
-      if (payload.privacy_budget?.level === 0 || this.currentBudget.level === 0) {
-        if (payload.image && payload.image.length > 0 && !payload.allowVisualOverride) {
-          payload.image = null;
-          payload.redactedImage = null;
-        }
+      if ((payload.image || payload.redactedImage) && !payload.redactionVerified) {
+        throw new Error("[ExfiltrationGuard] BLOCKED: Attempted to transmit unverified pixels to server.");
       }
 
-      // Check 2: If an image is transmitted, it MUST be redactionVerified
-      if (payload.image && !payload.redactionVerified) {
-        throw new Error("[ExfiltrationGuard] BLOCKED: Attempted to transmit unverified pixels to server.");
+      const level = payload.privacy_budget?.level ?? this.currentBudget.level;
+      if (level < 3) {
+        if (payload.image) payload.image = null;
+        if (payload.redactedImage) payload.redactedImage = null;
       }
 
       // Check 3: Raw PII pattern inspection on the serialised payload

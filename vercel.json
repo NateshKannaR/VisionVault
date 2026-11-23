@@ -1,14 +1,75 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "outputDirectory": "public",
-  "rewrites": [
-    { "source": "/employee-portal", "destination": "/employee-portal.html" },
-    { "source": "/employee-portal.html", "destination": "/employee-portal.html" },
-    { "source": "/hr-portal", "destination": "/hr-portal.html" },
-    { "source": "/hr-portal.html", "destination": "/hr-portal.html" },
-    { "source": "/login", "destination": "/login.html" },
-    { "source": "/login.html", "destination": "/login.html" },
-    { "source": "/isro-intranet-demo", "destination": "/isro-intranet-demo.html" },
-    { "source": "/isro-intranet-demo.html", "destination": "/isro-intranet-demo.html" }
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist/site",
+  "redirects": [
+    {
+      "source": "/visionvault-extension.zip",
+      "destination": "/downloads/visionvault-chromium.zip",
+      "permanent": false
+    },
+    {
+      "source": "/employee-portal",
+      "destination": "/#lab",
+      "permanent": false
+    },
+    {
+      "source": "/employee-portal.html",
+      "destination": "/#lab",
+      "permanent": false
+    },
+    {
+      "source": "/hr-portal",
+      "destination": "/#lab",
+      "permanent": false
+    },
+    {
+      "source": "/hr-portal.html",
+      "destination": "/#lab",
+      "permanent": false
+    },
+    {
+      "source": "/login",
+      "destination": "/#lab",
+      "permanent": false
+    },
+    {
+      "source": "/login.html",
+      "destination": "/#lab",
+      "permanent": false
+    },
+    {
+      "source": "/isro-intranet-demo",
+      "destination": "/#lab",
+      "permanent": false
+    },
+    {
+      "source": "/isro-intranet-demo.html",
+      "destination": "/#lab",
+      "permanent": false
+    }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "no-referrer"
+        },
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=(), microphone=(), geolocation=()"
+        }
+      ]
+    }
   ]
 }

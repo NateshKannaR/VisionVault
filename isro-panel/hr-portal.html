@@ -869,6 +869,7 @@ textarea { resize: vertical; min-height: 65px; }
 </style>
 </head>
 <body>
+<aside style="position:relative;z-index:10;padding:6px 12px;background:#17261f;color:#c9efa5;font:600 12px system-ui;text-align:center">VisionVault local fixture · Use synthetic data · <button type="button" id="fixture-logout">Sign out</button></aside>
 
 <!-- Header Top Bar -->
 <div class="topbar">
@@ -1387,6 +1388,16 @@ function addMission() {
 }
 
 // Chat Functions
+function escapeMessageHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, char => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  })[char]);
+}
+document.getElementById("fixture-logout").addEventListener("click", async () => {
+  await fetch("/api/logout", { method: "POST" });
+  location.assign("/login.html");
+});
+
 let lastHrMsgsJson = "";
 async function loadHrMessages(){
   const key = "isro_chat_hr_" + currentContact.initials;
@@ -1409,22 +1420,22 @@ async function loadHrMessages(){
   box.innerHTML = "";
   for (const m of msgs) {
     const plain = m.text || await decryptMsg(m.enc);
-    let content = plain;
+    let content = escapeMessageHtml(plain);
     try {
       const obj = JSON.parse(plain);
       if (obj.type === "VAULT_MISSION") {
         const v = obj.vault;
         content = `<div style="display:flex;align-items:center;gap:8px;color:var(--accent);font-size:14px;font-weight:800;font-family:'Space Grotesk',sans-serif;margin-bottom:8px;">
-<i class="fa-solid fa-satellite" style="color:var(--accent);"></i> Mission Vault Transmission (${v.satellite_name})
+<i class="fa-solid fa-satellite" style="color:var(--accent);"></i> Mission Vault Transmission (${escapeMessageHtml(v.satellite_name)})
 </div>
 <div class="datablock-hr">
   <div class="db-grid-hr">
-    <div class="db-field-hr"><span class="db-lbl-hr">Satellite:</span> <strong>${v.satellite_name||""}</strong></div>
-    <div class="db-field-hr"><span class="db-lbl-hr">Mission ID:</span> <span>${v.mission_id||""}</span></div>
-    <div class="db-field-hr"><span class="db-lbl-hr">Operator:</span> <span>${v.operator||""} (${v.empId||""})</span></div>
-    <div class="db-field-hr"><span class="db-lbl-hr">Orbit:</span> <span>${v.orbit_type||""}</span></div>
-    <div class="db-field-hr"><span class="db-lbl-hr">Downlink:</span> <span style="color:var(--green);font-weight:700;">${v.ground_station_freq||""}</span></div>
-    <div class="db-field-hr"><span class="db-lbl-hr">Key Ref:</span> <span style="color:var(--yellow);font-weight:700;">${v.encryption_key_ref||""}</span></div>
+    <div class="db-field-hr"><span class="db-lbl-hr">Satellite:</span> <strong>${escapeMessageHtml(v.satellite_name)}</strong></div>
+    <div class="db-field-hr"><span class="db-lbl-hr">Mission ID:</span> <span>${escapeMessageHtml(v.mission_id)}</span></div>
+    <div class="db-field-hr"><span class="db-lbl-hr">Operator:</span> <span>${escapeMessageHtml(v.operator)} (${escapeMessageHtml(v.empId)})</span></div>
+    <div class="db-field-hr"><span class="db-lbl-hr">Orbit:</span> <span>${escapeMessageHtml(v.orbit_type)}</span></div>
+    <div class="db-field-hr"><span class="db-lbl-hr">Downlink:</span> <span style="color:var(--green);font-weight:700;">${escapeMessageHtml(v.ground_station_freq)}</span></div>
+    <div class="db-field-hr"><span class="db-lbl-hr">Key Ref:</span> <span style="color:var(--yellow);font-weight:700;">${escapeMessageHtml(v.encryption_key_ref)}</span></div>
   </div>
 </div>`;
       }
@@ -1433,7 +1444,7 @@ async function loadHrMessages(){
     const isOut = m.from === "HR";
     row.className = "msg-row" + (isOut ? " out" : "");
     row.innerHTML = `<div class="bubble ${isOut ? "out" : "in"}">${content}
-<div class="meta">${m.time}<span class="enc-tag">AES-256-GCM</span></div></div>`;
+<div class="meta">${escapeMessageHtml(m.time)}<span class="enc-tag">AES-256-GCM</span></div></div>`;
     box.appendChild(row);
   }
   box.scrollTop = box.scrollHeight;

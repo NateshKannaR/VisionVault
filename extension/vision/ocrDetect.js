@@ -79,7 +79,7 @@
   const CARD_RE     = /\b(?:\d{4}[- ]?){3}\d{4}\b/g;
   const SSN_RE      = /\b\d{3}[-\s]?\d{2}[-\s]?\d{4}\b/g;
   // Separators are whatever the site chose, plus the wider gaps OCR tends to read out of printed cards.
-  const AADHAAR_RE  = /\b[1-9]\d{3}[\s-]{0,2}\d{4}[\s-]{0,2}\d{4}\b/g;
+  const AADHAAR_RE  = /\b[2-9]\d{3}[\s-]{0,2}\d{4}[\s-]{0,2}\d{4}\b/g;
   // The 16-digit virtual ID stands in for the Aadhaar itself and is exactly as sensitive.
   const VID_RE      = /\b\d{4}[\s-]{0,2}\d{4}[\s-]{0,2}\d{4}[\s-]{0,2}\d{4}\b/g;
   const PAN_RE      = /\b[A-Z]{5}[0-9]{4}[A-Z]{1}\b/g;

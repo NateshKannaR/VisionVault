@@ -15,21 +15,33 @@ const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (c) =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
 // ── Tabs ──────────────────────────────────────────────────────────────────────
-document.querySelectorAll(".tab").forEach((btn) => {
-  btn.addEventListener("click", () => {
-    document.querySelectorAll(".tab").forEach((b) => {
-      const on = b === btn;
-      b.classList.toggle("active", on);
-      b.setAttribute("aria-selected", String(on));
-    });
-    document.querySelectorAll(".panel").forEach((p) => {
-      p.classList.toggle("active", p.id === "panel-" + btn.dataset.tab);
-    });
-    if (btn.dataset.tab === "vault" && typeof updateVaultUI === "function") {
-      updateVaultUI();
+const tabs = [...document.querySelectorAll('[role="tab"]')];
+for (const [index, tab] of tabs.entries()) {
+  $(tab.getAttribute("aria-controls")).setAttribute("aria-labelledby", tab.id);
+  tab.tabIndex = tab.classList.contains("active") ? 0 : -1;
+  tab.addEventListener("click", () => {
+    for (const item of tabs) {
+      const selected = item === tab;
+      item.classList.toggle("active", selected);
+      item.setAttribute("aria-selected", String(selected));
+      item.tabIndex = selected ? 0 : -1;
+      $(item.getAttribute("aria-controls")).classList.toggle("active", selected);
     }
+    if (tab.dataset.tab === "vault") updateVaultUI();
   });
-});
+  tab.addEventListener("keydown", (event) => {
+    const next = {
+      ArrowRight: (index + 1) % tabs.length,
+      ArrowLeft: (index + tabs.length - 1) % tabs.length,
+      Home: 0,
+      End: tabs.length - 1,
+    }[event.key];
+    if (next === undefined) return;
+    event.preventDefault();
+    tabs[next].click();
+    tabs[next].focus();
+  });
+}
 
 // ── Task box ──────────────────────────────────────────────────────────────────
 const taskEl = $("task");
@@ -55,7 +67,7 @@ taskEl.addEventListener("keydown", (e) => {
 document.querySelectorAll(".quick-chip").forEach((chip) => {
   chip.addEventListener("click", () => {
     taskEl.value = chip.dataset.template || "";
-    $("charCount").textContent = taskEl.value.length;
+    taskEl.dispatchEvent(new Event("input"));
     taskEl.focus();
   });
 });
@@ -63,11 +75,14 @@ document.querySelectorAll(".quick-chip").forEach((chip) => {
 // ── Toasts ────────────────────────────────────────────────────────────────────
 const TOAST_ICON = { info: "info", success: "check", warn: "alert", error: "slash" };
 
-function showStatus(id, type, html) {
+function showStatus(id, type, message) {
   const el = $(id);
   if (!el) return;
   el.className = "toast " + type;
-  el.innerHTML = `${icon(TOAST_ICON[type] || "info")}<span>${html}</span>`;
+  el.innerHTML = icon(TOAST_ICON[type] || "info");
+  const text = document.createElement("span");
+  text.textContent = message;
+  el.append(text);
 }
 function hideStatus(id) {
   const el = $(id);
@@ -75,59 +90,53 @@ function hideStatus(id) {
 }
 
 // ── Server health ─────────────────────────────────────────────────────────────
-async function checkServer() {
-  const raw = $("s-serverUrl").value.trim();
-  const base = raw.replace(/\/(api\/agent\/step|plan-action)\/?$/, "").replace(/\/+$/, "");
+let healthCheckId = 0;
+async function checkServer(manual = false) {
+  const checkId = ++healthCheckId;
   const dot = $("serverDot");
   const badge = $("backendBadge");
   const info = $("serverInfo");
-
-  try {
-    const res = await fetch(base + "/health", { signal: AbortSignal.timeout(3000) });
-    const data = await res.json();
+  const mode = $("s-plannerMode").value;
+  if (mode === "air_gapped" || (mode === "fast" && !manual)) {
     dot.className = "status-dot";
-    badge.textContent = data.backend || "mock";
-
-    // Show the chain with each tier's model, and say plainly which tiers are currently
-    // resting. A hosted provider running out of quota is the normal case, not an emergency —
-    // but it explains why planning feels different, so it should be visible rather than felt.
-    const cooldowns = data.cooldowns || {};
-    const models = data.models || {};
-    const chain = (data.chain || []).map((t) => {
-      const model = models[t];
-      const rest = cooldowns[t];
-      const label = model ? `${t} (${model})` : t;
-      return rest ? `<s title="${esc(rest.reason)}">${esc(label)}</s>` : `<strong>${esc(label)}</strong>`;
-    }).join(" → ") || esc(data.backend || "mock");
-
-    const rested = Object.entries(cooldowns);
-    const note = rested.length
-      ? `<br><span style="color:var(--text-muted)">Resting: ` +
-        rested.map(([t, c]) => `${esc(t)} — ${esc(c.reason)}, retrying in ${Math.ceil(c.retry_in_s / 60)} min`).join("; ") +
-        `. The next tier answers meanwhile.</span>`
-      : "";
-    info.innerHTML = `Connected. Planning chain: ${chain}.${note}`;
-  } catch (err) {
+    badge.textContent = "On-device";
+    info.textContent = "The local rules planner is selected.";
+    return;
+  }
+  dot.className = "status-dot pending";
+  badge.textContent = "Checking…";
+  info.textContent = "Checking the configured planner…";
+  try {
+    const connection = PlannerConnection.resolve($("s-serverUrl").value.trim(), $("s-serverToken").value.trim());
+    const response = await fetch(connection.health, {
+      headers: connection.authorization,
+      credentials: "omit",
+      redirect: "error",
+      signal: AbortSignal.timeout(6500),
+    });
+    if (response.status === 401) throw new Error("The server rejected the planner token.");
+    if (!response.ok) throw new Error("The planner returned HTTP " + response.status + ".");
+    const data = await response.json();
+    if (data.status !== "ok" || !Array.isArray(data.chain)) throw new Error("Unexpected planner health response.");
+    if (checkId !== healthCheckId) return;
+    const labels = { mock: "Rules", ollama: "Ollama", gemini: "Gemini", openrouter: "OpenRouter" };
+    const chain = data.chain.map((tier) => {
+      const model = data.models?.[tier];
+      const cooldown = data.cooldowns?.[tier];
+      return (labels[tier] || tier) + (model ? ` (${model})` : "") + (cooldown ? " (cooldown)" : "");
+    }).join(" → ");
+    dot.className = "status-dot";
+    badge.textContent = mode === "fast" ? "On-device" : labels[data.backend] || "Connected";
+    info.textContent = "Connected. Planning order " + chain + ".";
+  } catch (error) {
+    if (checkId !== healthCheckId) return;
     dot.className = "status-dot error";
-    badge.textContent = "on-device";
-    info.textContent =
-      "No planning server reachable. The extension plans on-device instead — detection and " +
-      "redaction are unaffected, since both already run locally.";
+    badge.textContent = "On-device";
+    info.textContent = `Planner unavailable. ${error.message} The extension can use local rules.`;
   }
 }
-checkServer();
-if ($("checkServer")) $("checkServer").addEventListener("click", checkServer);
-
-async function checkEngine() {
-  const badge = $("engineBadge");
-  const dot = $("engineDot");
-  if (!badge) return;
-
-  if (dot) dot.className = "engine-dot wasm";
-  badge.textContent = "⚡ WASM SIMD";
-  badge.title = "Multi-threaded WebAssembly SIMD pipeline active (1.27MB UltraFace + Tesseract)";
-}
-checkEngine();
+$("checkServer").addEventListener("click", () => checkServer(true));
+$("engineBadge").textContent = "Bundled WASM";
 
 // ── Vault ─────────────────────────────────────────────────────────────────────
 const VAULT_KEYS = [
@@ -577,28 +586,49 @@ $("togglePassword").addEventListener("click", (e) => {
 async function loadSettings() {
   const { settings } = await chrome.storage.local.get("settings");
   const s = settings || {};
-  if ($("s-plannerMode")) $("s-plannerMode").value = s.plannerMode || "fast";
+  if ($("s-plannerMode")) $("s-plannerMode").value = (s.airGapped ? "air_gapped" : s.plannerMode) || "fast";
   $("s-redactMode").value = s.redactMode || "black";
   $("s-confirmPolicy").value = s.confirmPolicy || "risky";
-  $("s-serverUrl").value = s.serverUrl || "http://127.0.0.1:8000/api/agent/step";
+  $("s-serverUrl").value = s.serverUrl || PlannerConnection.defaultUrl;
+  $("s-serverToken").value = s.serverToken || "";
+  $("s-autoAgent").checked = s.autoAgent === true;
   const ocrOn = s.enableOCR === true; // Default fast (OCR false) unless explicitly enabled
   const faceOn = s.enableFaceDetection !== false;
   $("s-visionDepth").value = ocrOn ? "full" : (faceOn ? "fast" : "dom");
   $("s-dismissOverlays").checked = s.dismissOverlays !== false;
+  checkServer();
 }
 loadSettings();
 
+$("s-autoAgent").addEventListener("change", async () => {
+  const { settings } = await chrome.storage.local.get("settings");
+  await chrome.storage.local.set({ settings: { ...settings, autoAgent: autoAgentMode() } });
+});
+
 $("saveSettings").addEventListener("click", async () => {
   const depth = $("s-visionDepth").value;
+  const serverUrl = $("s-serverUrl").value.trim() || PlannerConnection.defaultUrl;
+  const serverToken = $("s-serverToken").value.trim();
+  try {
+    PlannerConnection.resolve(serverUrl, serverToken);
+  } catch (error) {
+    showStatus("settingsStatus", "error", error.message);
+    return;
+  }
+  const previous = await chrome.storage.local.get("settings");
   const settings = {
+    ...previous.settings,
     plannerMode: $("s-plannerMode") ? $("s-plannerMode").value : "fast",
     redactMode: $("s-redactMode").value,
     confirmPolicy: $("s-confirmPolicy").value,
-    serverUrl: $("s-serverUrl").value.trim(),
+    serverUrl,
+    serverToken,
+    autoAgent: autoAgentMode(),
     enableOCR: depth === "full",
     enableFaceDetection: depth === "full" || depth === "fast",
     dismissOverlays: $("s-dismissOverlays").checked,
   };
+  delete settings.airGapped;
   await chrome.storage.local.set({ settings });
   showStatus("settingsStatus", "success", "Settings saved.");
   setTimeout(() => hideStatus("settingsStatus"), 2600);
@@ -626,8 +656,8 @@ let currentMissingField = null;
 let currentMissingMarkId = null;
 let liveStepRow = null;
 
-const SCAN_LABEL = `${icon("scan")}<span>Run agent</span>`;
-const RUN_LABEL = `${icon("play")}<span>Continue — run the agent</span>`;
+const SCAN_LABEL = `${icon("scan")}<span>Scan active tab</span>`;
+const RUN_LABEL = `${icon("play")}<span>Run reviewed task</span>`;
 
 function setStat(id, val) { const el = $(id); if (el) el.textContent = val; }
 
@@ -1036,48 +1066,32 @@ if ($("exportVisualAuditBtn")) {
   });
 }
 
-// ── DPDP Act 2023 & GDPR Art 25 Sovereign Compliance Certificate ─────────────
-async function handleGenerateDpdpCertificate() {
-  if (typeof VaultCrypto === "undefined" || !VaultCrypto.generateDpdpComplianceCertificate) {
-    showStatus("statusMsg", "error", "VaultCrypto module not loaded.");
+async function downloadScanSummary(statusId) {
+  if (!currentScanData) {
+    showStatus(statusId, "info", "Scan an active tab to generate a summary.");
     return;
   }
-
-  const sessionData = {
-    task: taskEl?.value || "Vision Agent Autonomous Workflow",
-    url: currentScanData?.pageUrl || (typeof window !== "undefined" ? window.location?.href : "active-tab"),
-    piiCount: currentScanData?.piiCount || 0,
-    marksCount: currentScanData?.markCount || 0,
-    timings: currentScanData?.timings || {},
-    actions: visualAuditEvents
-  };
-
-  showStatus("statusMsg", "info", "Generating DPDP Act 2023 & GDPR Compliance Certificate...");
-  const cert = await VaultCrypto.generateDpdpComplianceCertificate(sessionData);
-
-  const win = window.open("", "_blank");
-  if (win) {
-    win.document.write(cert.htmlCertificate);
-    win.document.close();
+  try {
+    const report = await VaultCrypto.generateSessionReport({
+      piiCount: currentScanData.piiCount,
+      marksCount: currentScanData.markCount,
+      timings: currentScanData.timings,
+    });
+    const blob = new Blob([JSON.stringify(report.json, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "visionvault-scan-" + Date.now() + ".json";
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    showStatus(statusId, "success", "Scan summary downloaded.");
+  } catch {
+    showStatus(statusId, "error", "Unable to generate the scan summary.");
   }
-
-  const blob = new Blob([JSON.stringify(cert.auditReport, null, 2)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `visionvault-dpdp-audit-${Date.now()}.json`;
-  a.click();
-  URL.revokeObjectURL(url);
-
-  showStatus("statusMsg", "success", `Sovereign certificate generated! Hash: ${cert.auditReport.cryptographicIntegrity.sha256Hash.slice(0, 16)}...`);
 }
 
-if ($("generateDpdpBtn")) {
-  $("generateDpdpBtn").addEventListener("click", handleGenerateDpdpCertificate);
-}
-if ($("scoreCertBtn")) {
-  $("scoreCertBtn").addEventListener("click", handleGenerateDpdpCertificate);
-}
+$("generateDpdpBtn").addEventListener("click", () => downloadScanSummary("sessionReportStatus"));
+$("scoreCertBtn").addEventListener("click", () => downloadScanSummary("statusMsg"));
 
 // ── Zero-Knowledge AES-256-GCM Vault Backup ──────────────────────────────────
 if ($("exportVaultBackupBtn")) {
@@ -1273,7 +1287,7 @@ scanBtn.addEventListener("click", async () => {
       scanBtn.disabled = false;
       scanBtn.innerHTML = SCAN_LABEL;
       if (!res || !res.ok) {
-        showStatus("statusMsg", "error", esc(res?.error || "No vault fields found on this page."));
+        showStatus("statusMsg", "error", res?.error || "No vault fields found on this page.");
         return;
       }
       const n = res.count || Object.keys(res.stored || {}).length;
@@ -1311,7 +1325,7 @@ scanBtn.addEventListener("click", async () => {
       scanBtn.disabled = false;
       scanBtn.innerHTML = SCAN_LABEL;
       if (!res || !res.ok) {
-        showStatus("statusMsg", "error", esc(res?.error || "Vault is empty — navigate to the dashboard first."));
+        showStatus("statusMsg", "error", res?.error || "Vault is empty — navigate to the dashboard first.");
         return;
       }
       const n = res.filled || 0;
@@ -1364,7 +1378,7 @@ scanBtn.addEventListener("click", async () => {
     if (chrome.runtime.lastError || !res || !res.ok) {
       idleState.hidden = false;
       const err = chrome.runtime.lastError?.message || res?.error || "Scan failed. Open a normal web page and try again.";
-      showStatus("statusMsg", "error", esc(err));
+      showStatus("statusMsg", "error", err);
       return;
     }
 
@@ -1400,17 +1414,6 @@ function autoAgentMode() {
   return !el || el.checked;
 }
 
-/**
- * The privacy scorecard for the scan that just ran.
- *
- * Every figure is a count from this scan. The headline is 100% for a structural reason rather
- * than a measured one, and the note says so: redaction is fail-closed, so a frame carrying an
- * unmasked detection is never transmitted. The alternative to 100% is not a lower percentage,
- * it is a request that did not happen - which is what the blocked state shows instead.
- *
- * Deliberately not a rating out of a hundred invented for a demo. A figure nobody can
- * reproduce is worse than no figure, because it invites trust it has not earned.
- */
 function renderScorecard(d) {
   const card = $("scoreCard");
   if (!card) return;
@@ -1421,11 +1424,11 @@ function renderScorecard(d) {
 
   const badge = $("scoreBadge");
   badge.classList.toggle("is-blocked", blocked);
-  badge.textContent = blocked ? "blocked" : "100%";
+  badge.textContent = blocked ? "Blocked" : "Scan complete";
 
   $("score-found").textContent = found;
-  $("score-masked").textContent = blocked ? "0" : found;
-  $("score-sent").textContent = "0";
+  $("score-masked").textContent = blocked ? "Unavailable" : (d.redacted ? found : "—");
+  $("score-sent").textContent = d.redacted && !blocked ? "Available" : "Unavailable";
 
   // Which detector found what. Worth showing because the three disagree usefully: OCR finding
   // regions the DOM did not is the case for its cost, and a face count of zero on a page full
@@ -1438,15 +1441,11 @@ function renderScorecard(d) {
   ].filter((c) => c.n > 0);
   $("scoreSources").innerHTML = chips.length
     ? chips.map((c) => `<span class="score-src ${c.cls}"><b>${c.n}</b> ${esc(c.label)}</span>`).join("")
-    : '<span class="score-src">nothing sensitive on this screen</span>';
+    : '<span class="score-src">No matches from active detectors</span>';
 
   $("scoreNote").textContent = blocked
-    ? "Redaction could not be verified, so nothing was transmitted at all."
-    : found > 0
-      ? "Masked on this device before anything left it. Redaction is fail-closed: a frame with "
-        + "an unmasked detection is not sent, so the alternative to 100% is no request at all."
-      : "Nothing sensitive was detected on this screen. The same pipeline still ran.";
-
+    ? "This frame is blocked because redaction could not be verified."
+    : "Detection coverage depends on the page and the selected vision depth.";
 
 }
 
@@ -1489,8 +1488,7 @@ function renderScan(d, announce) {
   showStatus(
     "statusMsg",
     "success",
-    `<strong>${d.piiCount}</strong> sensitive region${d.piiCount === 1 ? "" : "s"} masked on this device${frameNote}. ` +
-    `The image above is exactly what would be sent.`
+    `${d.piiCount} sensitive region${d.piiCount === 1 ? "" : "s"} detected${frameNote}. Review the masked preview before continuing.`
   );
 }
 
@@ -1587,7 +1585,7 @@ function finishRun(res) {
   runBtn.innerHTML = RUN_LABEL;
   setRunning(false);
   if (!res || !res.ok) {
-    showStatus("statusMsg", "error", esc(res?.error || "The agent could not run."));
+    showStatus("statusMsg", "error", res?.error || "The agent could not run.");
     return;
   }
   handleStepResult(res.result);
@@ -1688,7 +1686,7 @@ function handleStepResult(r) {
   }
 
   if (r.error) {
-    showStatus("statusMsg", "error", esc(r.error));
+    showStatus("statusMsg", "error", r.error);
     return;
   }
 
@@ -1704,7 +1702,7 @@ function handleStepResult(r) {
     const achieved = describeProgress(r.progress);
     const counts = `${ok} action${ok === 1 ? "" : "s"}${failed ? `, ${failed} failed` : ""}`;
     showStatus("statusMsg", failed ? "warn" : "success",
-      achieved ? `${achieved} <span style="opacity:.7">(${counts})</span>` : `Finished — ${counts}.`);
+      achieved ? `${achieved} (${counts})` : `Finished — ${counts}.`);
   } else {
     showStatus("statusMsg", "info", "Nothing to do for this task on this page.");
   }
@@ -1748,7 +1746,7 @@ $("inputPromptSubmit").addEventListener("click", () => {
   }, (res) => {
     setRunning(false);
     if (!res || !res.ok) {
-      showStatus("statusMsg", "error", esc(res?.error || "Could not fill that value."));
+      showStatus("statusMsg", "error", res?.error || "Could not fill that value.");
       return;
     }
     if (saveToVault) loadVault();
@@ -1795,7 +1793,7 @@ $("confirmEdit").addEventListener("click", () => {
   chrome.runtime.sendMessage({ type: "CONFIRM", payload: { value } }, (res) => {
     setRunning(false);
     if (!res || !res.ok) {
-      showStatus("statusMsg", "error", esc(res?.error || "The modified action failed."));
+      showStatus("statusMsg", "error", res?.error || "The modified action failed.");
       return;
     }
     handleStepResult(res.result);
@@ -1810,7 +1808,7 @@ $("confirmYes").addEventListener("click", () => {
   chrome.runtime.sendMessage({ type: "CONFIRM" }, (res) => {
     setRunning(false);
     if (!res || !res.ok) {
-      showStatus("statusMsg", "error", esc(res?.error || "The approved action failed."));
+      showStatus("statusMsg", "error", res?.error || "The approved action failed.");
       return;
     }
     handleStepResult(res.result);
@@ -1915,20 +1913,20 @@ function resetPipeline() {
 function setProtection(state, detail) {
   const el = $("protectBanner");
   if (!el) return;
-  el.classList.toggle("is-running", state === "running");
-  el.classList.toggle("is-breach", state === "breach");
+  el.classList.toggle("running", state === "running");
+  el.classList.toggle("breach", state === "breach");
   const title = $("protectTitle");
   const sub = $("protectState");
   if (title) {
     title.textContent = state === "breach" ? "Transmission blocked"
       : state === "running" ? "Protecting this run"
-      : "Protection Active";
+      : "Local detection";
   }
   if (sub) {
     sub.textContent = detail || (
-      state === "breach" ? "Redaction could not be verified — nothing was sent"
-      : state === "running" ? "Masking every frame before it leaves"
-      : "Your data stays on this device");
+      state === "breach" ? "This frame was blocked"
+      : state === "running" ? "Checking this page for sensitive content"
+      : "Review the scan before running actions");
   }
 }
 
@@ -2060,7 +2058,7 @@ function startLocalDictation() {
           : err === "network"
             ? "Speech recognition needs a network connection or active web page."
             : `Dictation stopped (${err}).`;
-      showStatus("statusMsg", err === "no-speech" ? "info" : "warn", esc(message));
+      showStatus("statusMsg", err === "no-speech" ? "info" : "warn", message);
     }
     setMicLive(false);
   };
@@ -2214,7 +2212,7 @@ function renderAudit(entries, summary) {
         </dl>
         ${vault}
         ${img}
-        <p class="audit-caption">The complete request body, as transmitted:</p>
+        <p class="audit-caption">Recorded request body:</p>
         <pre class="audit-payload">${esc(e.body || "")}</pre>
       </div>
     </details>`;
@@ -2287,7 +2285,7 @@ chrome.runtime.onMessage.addListener((msg) => {
       setProtection("breach");
       setPipelineStage("redact");
     }
-    showStatus("statusMsg", "error", esc(d.message));
+    showStatus("statusMsg", "error", d.message);
   }
   if (d.type === "rescanned") {
     $("preview").src = d.preview;
@@ -2555,98 +2553,32 @@ if ($("sendDocToChatBtn")) {
   });
 }
 
-// ── Benchmarks & Evaluation Rubrics Logic (SIH PS 26171) ─────────────────────
-if ($("btnGoToBenchmarks")) {
-  $("btnGoToBenchmarks").addEventListener("click", () => {
-    const tabBtn = document.querySelector(".tab[data-tab='benchmarks']");
-    if (tabBtn) tabBtn.click();
-  });
-}
-
-async function updateBenchmarkTelemetry() {
+async function updateDiagnostics() {
+  let adapter = null;
   try {
-    const runtimeBadge = $("benchRuntimeBadge");
-    const runtimeDetail = $("benchRuntimeDetail");
-    if (typeof navigator !== "undefined" && navigator.gpu) {
-      try {
-        const adapter = await navigator.gpu.requestAdapter();
-        if (adapter) {
-          if (runtimeBadge) runtimeBadge.textContent = "WebGPU Accelerated";
-          if (runtimeDetail) runtimeDetail.textContent = "Hardware Direct / WASM-SIMD";
-        } else {
-          if (runtimeBadge) runtimeBadge.textContent = "WASM SIMD Active";
-          if (runtimeDetail) runtimeDetail.textContent = "ONNX WebAssembly Engine";
-        }
-      } catch (_) {
-        if (runtimeBadge) runtimeBadge.textContent = "WASM SIMD Active";
-        if (runtimeDetail) runtimeDetail.textContent = "ONNX WebAssembly Engine";
-      }
-    } else {
-      if (runtimeBadge) runtimeBadge.textContent = "WASM SIMD Active";
-      if (runtimeDetail) runtimeDetail.textContent = "ONNX WebAssembly Engine";
-    }
-
-    const heapBadge = $("benchHeapBadge");
-    if (typeof performance !== "undefined" && performance.memory) {
-      const usedMb = (performance.memory.usedJSHeapSize / (1024 * 1024)).toFixed(1);
-      if (heapBadge) heapBadge.textContent = `${usedMb} MB Active`;
-    } else {
-      if (heapBadge) heapBadge.textContent = "7.5 MB Active";
-    }
-  } catch (_) {}
+    adapter = await navigator.gpu?.requestAdapter();
+  } catch {
+    // A browser can expose WebGPU without providing an adapter.
+  }
+  $("benchRuntimeBadge").textContent = adapter ? "Available" : "Unavailable";
+  const heap = performance.memory?.usedJSHeapSize;
+  $("benchHeapBadge").textContent = heap ? `${(heap / 1048576).toFixed(1)} MiB` : "Unavailable";
 }
 
-document.querySelectorAll(".tab").forEach((btn) => {
-  if (btn.dataset.tab === "benchmarks") {
-    btn.addEventListener("click", updateBenchmarkTelemetry);
+$("tab-benchmarks").addEventListener("click", updateDiagnostics);
+$("btnRunLiveVerification").addEventListener("click", () => {
+  const result = $("benchVerificationResult");
+  const started = performance.now();
+  try {
+    const email = "fixture@example.test";
+    const scrubbed = PromptScrubber.scrub("Contact: " + email);
+    const masked = scrubbed.matches.some((match) => match.type === "email") &&
+      !scrubbed.sanitized.includes(email);
+    const payload = { image: "synthetic", redactionVerified: true, privacy_budget: { level: 0 } };
+    VisionVaultPrivacyFirewall.assertSafeTransmission(payload);
+    if (!masked || payload.image) throw new Error("a synthetic check did not pass");
+    result.textContent = `Passed in ${(performance.now() - started).toFixed(1)} ms. Email masking and zero-pixel filtering passed.`;
+  } catch {
+    result.textContent = "Self-check failed. Reload the extension and rerun the check.";
   }
 });
-
-if ($("btnRunLiveVerification")) {
-  $("btnRunLiveVerification").addEventListener("click", async () => {
-    const btn = $("btnRunLiveVerification");
-    const res = $("benchVerificationResult");
-    const origText = btn.innerHTML;
-    btn.disabled = true;
-    btn.innerHTML = `<svg class="ic" style="animation:spin 1s linear infinite;" viewBox="0 0 24 24"><use href="#i-refresh"/></svg> <span>Verifying System Invariants...</span>`;
-
-    const t0 = performance.now();
-
-    // 1. Live Destructive Blackout 0-Entropy Verification on Canvas Buffer
-    const canvas = document.createElement("canvas");
-    canvas.width = 64;
-    canvas.height = 32;
-    const ctx = canvas.getContext("2d", { willReadFrequently: true });
-    ctx.fillStyle = "#000000";
-    ctx.fillRect(0, 0, 64, 32);
-    const imgData = ctx.getImageData(0, 0, 64, 32).data;
-    let variance = 0;
-    for (let i = 0; i < imgData.length; i += 4) {
-      variance += imgData[i] + imgData[i + 1] + imgData[i + 2];
-    }
-
-    // 2. Symbolic Vault Substitution Invariant
-    const testText = "Mission Controller: R. Sharma, Email: r.sharma@isro.gov.in";
-    const scrubbed = testText.replace(/R\.\s*Sharma/g, "«PERSON_1»").replace(/r\.sharma@isro\.gov\.in/g, "«EMAIL_1»");
-    const tokenInvariants = (!scrubbed.includes("Sharma") && scrubbed.includes("«PERSON_1»"));
-
-    const elapsed = Math.max(9, Math.round(performance.now() - t0));
-    const seed = Math.abs(Math.sin(Date.now()) * 1000000).toString(16).slice(0, 6);
-
-    setTimeout(() => {
-      btn.disabled = false;
-      btn.innerHTML = origText;
-      if (res) {
-        res.style.display = "block";
-        res.innerHTML = `✓ Live verification passed in <strong>${elapsed}ms</strong> &bull; 0 Pixel Leaks (H=0.0000) &bull; Token Invariants Passed &bull; Hash: <span style="color:#38bdf8;">0x${seed.toUpperCase()}</span>`;
-      }
-    }, 280);
-  });
-}
-
-// Initial probe
-updateBenchmarkTelemetry();
-
-
-
-

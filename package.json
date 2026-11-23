@@ -2,10 +2,10 @@
   "name": "visionvault",
   "version": "1.0.0",
   "private": true,
-  "description": "Privacy-preserving browser vision agent \u2014 local PII detection and redaction, cloud planning over a sanitized view (SIH PS 26171).",
+  "description": "Privacy-preserving browser vision agent — local PII detection and redaction, cloud planning over a sanitized view (SIH PS 26171).",
   "scripts": {
-    "build": "echo 'Vercel static build: assets served from public/'",
-    "test": "node eval/test-source-hygiene.js && node eval/test-panel-wiring.js && node eval/test-prompt-scrubber.js && node eval/test-pdf-scrubber.js && node eval/test-screen-classifier.js && node eval/test-batch-automation.js && node eval/test-advanced-features.js && node eval/test-checklist-grounding.js && node eval/test-mcp-server.js && node eval/test-vision-pipeline.js && node eval/test-coordinate-mapping.js && node eval/test-task-planner.js && node eval/test-agent-guard.js && node eval/test-privacy-firewall.js",
+    "build": "node scripts/build-site.js",
+    "test": "node eval/test-source-hygiene.js && node eval/test-panel-wiring.js && node eval/test-prompt-scrubber.js && node eval/test-pdf-scrubber.js && node eval/test-screen-classifier.js && node eval/test-batch-automation.js && node eval/test-advanced-features.js && node eval/test-checklist-grounding.js && node eval/test-mcp-server.js && node eval/test-vision-pipeline.js && node eval/test-coordinate-mapping.js && node eval/test-task-planner.js && node eval/test-agent-guard.js && node eval/test-privacy-firewall.js && node eval/test-vault-lock.js && node eval/test-pii-patterns.js && node eval/test-demo-portal.js",
     "mcp": "node server/mcp-server.js",
     "eval": "node eval/run-full-eval.js --repeats 3",
     "report": "node eval/generate-report.js",
@@ -13,20 +13,26 @@
     "diagnose": "node eval/diagnose.js",
     "ocr-tuning": "node eval/ocr-tuning.js",
     "real-sites": "node eval/real-sites.js --budget 75",
-    "test:chain": "node -e \"const fs = require('fs'); const py = fs.existsSync('server/.venv/bin/python') ? 'server/.venv/bin/python' : (fs.existsSync('server/venv/Scripts/python.exe') ? 'server/venv/Scripts/python.exe' : 'python3'); require('child_process').execSync(py + ' eval/test-fallback-chain.py', {stdio:'inherit'})\"",
+    "test:chain": "python eval/test-fallback-chain.py",
     "probe": "node eval/probe-search-dom.js",
     "server": "node -e \"process.platform === 'win32' ? require('child_process').execSync('powershell -ExecutionPolicy Bypass -File server/restart.ps1', {stdio:'inherit'}) : require('child_process').execSync('bash server/restart.sh', {stdio:'inherit'})\"",
     "server:linux": "bash server/restart.sh",
     "server:win": "powershell -ExecutionPolicy Bypass -File server/restart.ps1",
     "build:firefox": "node -e \"const fs = require('fs'); fs.cpSync('extension', 'extension-firefox', { recursive: true }); fs.copyFileSync('extension/manifest.firefox.json', 'extension-firefox/manifest.json'); console.log('[OK] Firefox extension prepared in extension-firefox/ (load via about:debugging)')\"",
     "demo": "node -e \"console.log('VisionVault demo workflow: 1) npm run server 2) Load extension/ in Chrome or npm run build:firefox 3) open a form page and run a task 4) review the redacted preview before execution'); console.log('For full setup see START-HERE.md and SIH-READY.md');\"",
-    "sih:setup": "npm run build:firefox && npm run server"
+    "sih:setup": "npm run build:firefox && npm run server",
+    "test:browser": "node eval/test-browser-smoke.js",
+    "demo:portal": "node isro-panel/server.js",
+    "preview": "node scripts/preview-site.js"
   },
   "devDependencies": {
-    "puppeteer-core": "^23.0.0"
+    "puppeteer-core": "^25.18.1"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=22.12.0"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "fflate": "^0.8.3"
+  }
 }

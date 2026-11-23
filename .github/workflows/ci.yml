@@ -60,4 +60,4 @@ jobs:
         run: |
           container_id=$(docker run -d --read-only -e OLLAMA_HOST= -p 127.0.0.1:18000:8000 visionvault-planner:ci)
           trap 'docker rm -f "$container_id" >/dev/null' EXIT
-          curl --fail --retry 10 --retry-connrefused --silent http://127.0.0.1:18000/livez
+          curl --fail --retry 8 --retry-all-errors --retry-delay 1 --max-time 3 --silent --show-error http://127.0.0.1:18000/livez

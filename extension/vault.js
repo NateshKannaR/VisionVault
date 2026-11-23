@@ -448,8 +448,7 @@
    * Saves the vault object into chrome.storage.local encrypted with AES-GCM-256.
    */
   async function saveVault(vaultData, optionalPin) {
-    const merged = Object.assign({}, vaultData || {});
-    sessionDecryptedVault = merged;
+    const merged = { ...(vaultData || {}) };
 
     if (typeof chrome === "undefined" || !chrome.storage || !chrome.storage.local) {
       return false;
@@ -466,8 +465,9 @@
 
     const envelope = await encryptVaultData(merged, passphrase);
     await chrome.storage.local.set({ vaultEncrypted: envelope });
-    // Ensure plaintext vault is permanently removed from disk
+    // Ensure the legacy plaintext copy is removed from storage.
     await chrome.storage.local.remove("vault");
+    sessionDecryptedVault = merged;
     return true;
   }
 

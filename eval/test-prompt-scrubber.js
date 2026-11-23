@@ -159,4 +159,13 @@ test("Detects override instructions and prompt injection jailbreaks", () => {
   assert.strictEqual(safeCheck.reasons.length, 0);
 });
 
+test("Literal and previously assigned tokens are preserved", () => {
+  const first = PromptScrubber.scrub("Preserve literal [EMAIL_1] and contact jordan@example.test.");
+  assert.strictEqual(first.tokenMap["[EMAIL_2]"], "jordan@example.test");
+  assert.ok(first.cleanText.includes("[EMAIL_1]"));
+  const second = PromptScrubber.scrub("New contact casey@example.test.", first.tokenMap);
+  assert.strictEqual(second.tokenMap["[EMAIL_2]"], "jordan@example.test");
+  assert.strictEqual(second.tokenMap["[EMAIL_1]"], "casey@example.test");
+});
+
 console.log(`\nAll ${passed} PromptScrubber tests passed.\n`);

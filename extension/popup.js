@@ -15,33 +15,41 @@ const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (c) =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
 // ── Tabs ──────────────────────────────────────────────────────────────────────
-const tabs = [...document.querySelectorAll('[role="tab"]')];
-for (const [index, tab] of tabs.entries()) {
-  $(tab.getAttribute("aria-controls")).setAttribute("aria-labelledby", tab.id);
-  tab.tabIndex = tab.classList.contains("active") ? 0 : -1;
-  tab.addEventListener("click", () => {
-    for (const item of tabs) {
-      const selected = item === tab;
-      item.classList.toggle("active", selected);
-      item.setAttribute("aria-selected", String(selected));
-      item.tabIndex = selected ? 0 : -1;
-      $(item.getAttribute("aria-controls")).classList.toggle("active", selected);
-    }
-    if (tab.dataset.tab === "vault") updateVaultUI();
-  });
-  tab.addEventListener("keydown", (event) => {
-    const next = {
-      ArrowRight: (index + 1) % tabs.length,
-      ArrowLeft: (index + tabs.length - 1) % tabs.length,
-      Home: 0,
-      End: tabs.length - 1,
-    }[event.key];
-    if (next === undefined) return;
-    event.preventDefault();
-    tabs[next].click();
-    tabs[next].focus();
-  });
+function bindTabs(tabList) {
+  const tabs = [...tabList.querySelectorAll('[role="tab"]')];
+  for (const [index, tab] of tabs.entries()) {
+    $(tab.getAttribute("aria-controls")).setAttribute("aria-labelledby", tab.id);
+    tab.tabIndex = tab.classList.contains("active") ? 0 : -1;
+    tab.addEventListener("click", () => {
+      for (const item of tabs) {
+        const selected = item === tab;
+        item.classList.toggle("active", selected);
+        item.setAttribute("aria-selected", String(selected));
+        item.tabIndex = selected ? 0 : -1;
+        $(item.getAttribute("aria-controls")).classList.toggle("active", selected);
+      }
+    });
+    tab.addEventListener("keydown", (event) => {
+      const next = {
+        ArrowRight: (index + 1) % tabs.length,
+        ArrowLeft: (index + tabs.length - 1) % tabs.length,
+        Home: 0,
+        End: tabs.length - 1,
+      }[event.key];
+      if (next === undefined) return;
+      event.preventDefault();
+      tabs[next].click();
+      tabs[next].focus();
+    });
+  }
 }
+
+bindTabs($("workspaceTabs"));
+$("tab-vault").addEventListener("click", updateVaultUI);
+$("openShield").addEventListener("click", () => {
+  $("tab-shield").click();
+  $("tab-shield").focus();
+});
 
 // ── Task box ──────────────────────────────────────────────────────────────────
 const taskEl = $("task");
@@ -49,11 +57,13 @@ const taskEl = $("task");
 // The task the current scan was taken for. Editing the instruction after scanning would
 // otherwise run the new words against the old snapshot of the page, silently.
 let scannedTask = null;
+let reviewedScanId = null;
 
 taskEl.addEventListener("input", () => {
   $("charCount").textContent = taskEl.value.length;
   if (scannedTask !== null && taskEl.value.trim() !== scannedTask) {
     scannedTask = null;
+    reviewedScanId = null;
     if (!runBtn.hidden) {
       runBtn.hidden = true;
       showStatus("statusMsg", "info", "Instruction changed — scan again so the agent sees the current page.");
@@ -594,7 +604,15 @@ async function loadSettings() {
   $("s-autoAgent").checked = s.autoAgent === true;
   const ocrOn = s.enableOCR === true; // Default fast (OCR false) unless explicitly enabled
   const faceOn = s.enableFaceDetection !== false;
-  $("s-visionDepth").value = ocrOn ? "full" : (faceOn ? "fast" : "dom");
+  const visionDepth = $("s-visionDepth");
+  if (chrome.offscreen) {
+    visionDepth.value = ocrOn ? "full" : (faceOn ? "fast" : "dom");
+  } else {
+    visionDepth.value = "dom";
+    for (const option of visionDepth.options) option.disabled = option.value !== "dom";
+    $("visionDepthHint").textContent = "This browser uses DOM detection. Face detection and OCR require Chromium’s vision host.";
+    $("engineBadge").textContent = "DOM detection";
+  }
   $("s-dismissOverlays").checked = s.dismissOverlays !== false;
   checkServer();
 }
@@ -900,6 +918,7 @@ if ($("modelInspectorToggle")) {
 // ── Visual Privacy X-Ray Split Lens ──────────────────────────────────────────
 let currentScanData = null;
 let isXRayActive = false;
+let xrayRenderId = 0;
 
 function updateXRaySplit() {
   if (!currentScanData || !isXRayActive) return;
@@ -907,8 +926,8 @@ function updateXRaySplit() {
   if (!canvas) return;
 
   const sliderVal = Number($("xraySlider")?.value || 50);
-  const rawSrc = currentScanData.rawImage || currentScanData.preview;
-  const redSrc = currentScanData.preview;
+  const drawId = ++xrayRenderId;
+  const { rawImage: rawSrc, preview: redSrc, regions, viewport } = currentScanData;
   if (!rawSrc || !redSrc) return;
 
   const rawImg = new Image();
@@ -917,7 +936,7 @@ function updateXRaySplit() {
 
   const onLoaded = () => {
     loaded++;
-    if (loaded < 2) return;
+    if (loaded < 2 || !isXRayActive || drawId !== xrayRenderId) return;
 
     canvas.width = redImg.naturalWidth || 600;
     canvas.height = redImg.naturalHeight || 400;
@@ -936,13 +955,13 @@ function updateXRaySplit() {
     ctx.drawImage(rawImg, 0, 0, w, h);
 
     // Highlight sensitive boxes in raw side
-    if (currentScanData.regions && currentScanData.viewport) {
-      const sx = w / (currentScanData.viewport.w || w);
-      const sy = h / (currentScanData.viewport.h || h);
+    if (regions && viewport) {
+      const sx = w / (viewport.w || w);
+      const sy = h / (viewport.h || h);
       ctx.strokeStyle = "rgba(239, 68, 68, 0.9)";
       ctx.lineWidth = 2;
       ctx.fillStyle = "rgba(239, 68, 68, 0.18)";
-      for (const r of currentScanData.regions) {
+      for (const r of regions) {
         const rx = r.x * sx;
         const ry = r.y * sy;
         const rw = r.w * sx;
@@ -1093,81 +1112,77 @@ async function downloadScanSummary(statusId) {
 $("generateDpdpBtn").addEventListener("click", () => downloadScanSummary("sessionReportStatus"));
 $("scoreCertBtn").addEventListener("click", () => downloadScanSummary("statusMsg"));
 
-// ── Zero-Knowledge AES-256-GCM Vault Backup ──────────────────────────────────
-if ($("exportVaultBackupBtn")) {
-  $("exportVaultBackupBtn").addEventListener("click", async () => {
-    if (typeof VaultCrypto === "undefined" || !VaultCrypto.exportEncryptedVaultBackup) {
-      showStatus("vaultStatus", "error", "VaultCrypto module not available.");
-      return;
-    }
-    const password = prompt("Enter a master password / passphrase to encrypt your vault backup (AES-256-GCM + PBKDF2 100k rounds):");
-    if (!password) {
-      showStatus("vaultStatus", "info", "Backup export cancelled.");
-      return;
-    }
+// The backup is encrypted with a separate passphrase. Restores go through the same
+// encrypted browser storage path as a normal save.
+const backupDialog = $("vaultBackupDialog");
+let backupFile = null;
 
-    try {
-      let v = {};
-      if (typeof getVault === "function") v = await getVault();
-      else {
-        const { vault } = await chrome.storage.local.get("vault");
-        v = vault || {};
-      }
-
-      const backup = await VaultCrypto.exportEncryptedVaultBackup(v, password);
-      const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `visionvault-encrypted-backup-${Date.now()}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
-
-      showStatus("vaultStatus", "success", "Encrypted vault backup exported successfully.");
-    } catch (err) {
-      showStatus("vaultStatus", "error", "Backup export failed: " + err.message);
-    }
-  });
+function openVaultBackup(file) {
+  backupFile = file;
+  $("vaultBackupTitle").textContent = file ? "Restore vault backup" : "Export vault backup";
+  $("vaultBackupHelp").textContent = file
+    ? "Enter the backup passphrase. Restoring replaces the saved vault fields."
+    : "Choose a passphrase for the backup. You’ll need it to restore this file.";
+  $("vaultBackupConfirm").textContent = file ? "Restore backup" : "Download backup";
+  $("vaultBackupPassphrase").autocomplete = file ? "current-password" : "new-password";
+  hideStatus("vaultBackupStatus");
+  backupDialog.showModal();
+  $("vaultBackupPassphrase").focus();
 }
 
-if ($("importVaultBackupBtn")) {
-  $("importVaultBackupBtn").addEventListener("click", () => {
-    const fileInput = $("vaultBackupFileInput");
-    if (fileInput) fileInput.click();
-  });
-}
+$("exportVaultBackupBtn").addEventListener("click", () => openVaultBackup(null));
+$("importVaultBackupBtn").addEventListener("click", () => $("vaultBackupFileInput").click());
+$("vaultBackupFileInput").addEventListener("change", (event) => {
+  const file = event.currentTarget.files[0];
+  event.currentTarget.value = "";
+  if (file) openVaultBackup(file);
+});
+$("vaultBackupCancel").addEventListener("click", () => backupDialog.close());
+backupDialog.addEventListener("cancel", (event) => {
+  if ($("vaultBackupConfirm").disabled) event.preventDefault();
+});
+backupDialog.addEventListener("close", () => {
+  $("vaultBackupForm").reset();
+  backupFile = null;
+});
 
-if ($("vaultBackupFileInput")) {
-  $("vaultBackupFileInput").addEventListener("change", async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const password = prompt("Enter the master password / passphrase to decrypt and restore this backup:");
-    if (!password) {
-      showStatus("vaultStatus", "info", "Import cancelled.");
-      e.target.value = "";
-      return;
-    }
-
-    try {
-      const text = await file.text();
-      const restored = await VaultCrypto.importEncryptedVaultBackup(text, password);
-      
-      if (typeof saveVaultData === "function") {
-        await saveVaultData(restored);
-      } else {
-        await chrome.storage.local.set({ vault: restored });
+$("vaultBackupForm").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const confirmButton = $("vaultBackupConfirm");
+  const passphrase = $("vaultBackupPassphrase").value;
+  const file = backupFile;
+  confirmButton.disabled = true;
+  $("vaultBackupCancel").disabled = true;
+  hideStatus("vaultBackupStatus");
+  let url;
+  try {
+    if (file) {
+      const restored = await VaultCrypto.decryptVault(JSON.parse(await file.text()), passphrase);
+      if (!restored || typeof restored !== "object" || Array.isArray(restored)) {
+        throw new Error("The backup does not contain vault fields.");
       }
-
+      await saveVault(restored);
       await loadVault();
-      showStatus("vaultStatus", "success", "Vault restored and decrypted successfully!");
-    } catch (err) {
-      showStatus("vaultStatus", "error", "Backup restoration failed: " + err.message);
-    } finally {
-      e.target.value = "";
+      showStatus("vaultStatus", "success", "Backup restored to the encrypted vault.");
+    } else {
+      const envelope = await VaultCrypto.encryptVault(await getVault(), passphrase);
+      url = URL.createObjectURL(new Blob([JSON.stringify(envelope, null, 2)], { type: "application/json" }));
+      await chrome.downloads.download({
+        url,
+        filename: `visionvault-backup-${Date.now()}.json`,
+      });
+      showStatus("vaultStatus", "success", "Encrypted backup download started.");
     }
-  });
-}
+    backupDialog.close();
+  } catch (error) {
+    showStatus("vaultBackupStatus", "error", error.message || "The backup operation failed.");
+    $("vaultBackupPassphrase").focus();
+  } finally {
+    confirmButton.disabled = false;
+    $("vaultBackupCancel").disabled = false;
+    if (url) setTimeout(() => URL.revokeObjectURL(url), 60000);
+  }
+});
 
 // ── Timing bar ────────────────────────────────────────────────────────────────
 function renderTimings(t) {
@@ -1269,12 +1284,20 @@ scanBtn.addEventListener("click", async () => {
     return;
   }
 
-  // Resolve current active tab in this side panel window
-  const tabs = await new Promise(r => chrome.tabs.query({ active: true, currentWindow: true }, r));
-  const currentTab = (tabs && tabs[0]) ? tabs[0] : null;
-  const tabId = currentTab?.id || null;
+  busy(scanBtn, "Finding the active tab…");
+  const [currentTab] = await chrome.tabs.query({ active: true, currentWindow: true }).catch(() => []);
+  if (!currentTab?.id || !/^(https?:|file:)/i.test(currentTab.url || "")) {
+    scanBtn.disabled = false;
+    scanBtn.innerHTML = SCAN_LABEL;
+    showStatus("statusMsg", "error", "Select a website in this window before scanning.");
+    return;
+  }
+  const tabId = currentTab.id;
 
   resetPipeline();
+  reviewedScanId = null;
+  scannedTask = null;
+  runBtn.hidden = true;
   setProtection("running", "Reading the screen locally");
   setPipelineStage("observe");
 
@@ -1297,7 +1320,7 @@ scanBtn.addEventListener("click", async () => {
       // Background scan to update preview without blocking UI
       chrome.runtime.sendMessage({ type: "SCAN", task, tabId }, (scanRes) => {
         if (scanRes && scanRes.ok && scanRes.result) {
-          renderScan(scanRes.result, false);
+          renderScan(scanRes.result, false, task);
         }
       });
     });
@@ -1335,9 +1358,9 @@ scanBtn.addEventListener("click", async () => {
         promptMissingFields(missing, 0);
       } else {
         showStatus("statusMsg", "success", `Filled ${n} field${n===1?"":"s"} from vault.`);
-        chrome.runtime.sendMessage({ type: "SCAN", task }, (postScan) => {
+        chrome.runtime.sendMessage({ type: "SCAN", task, tabId }, (postScan) => {
           if (postScan && postScan.ok && postScan.result) {
-            renderScan(postScan.result, false);
+            renderScan(postScan.result, false, task);
           }
         });
       }
@@ -1362,11 +1385,7 @@ scanBtn.addEventListener("click", async () => {
   actionCount = 0;
   renderedLogCount = 0;
   const scanWatchdog = setTimeout(() => {
-    scanBtn.disabled = false;
-    scanBtn.innerHTML = SCAN_LABEL;
-    scanSkeleton.hidden = true;
-    idleState.hidden = false;
-    showStatus("statusMsg", "warn", "Scan is taking longer than expected. Check if the active tab is loading, or click 'Run agent' again.");
+    showStatus("statusMsg", "warn", "The scan is still running. Wait for the preview or switch back to the page if it is loading.");
   }, 35000);
 
   chrome.runtime.sendMessage({ type: "SCAN", task, tabId }, (res) => {
@@ -1382,33 +1401,16 @@ scanBtn.addEventListener("click", async () => {
       return;
     }
 
-    renderScan(res.result, true);
-
-    // One mode, and it is automatic.
-    //
-    // Scan and Run used to be two buttons the user pressed in order, which made the privacy
-    // step look like a separate feature they could skip — and made the product feel like a
-    // tool rather than an agent. It is one flow: the scan IS the redaction, and nothing can
-    // be transmitted until it has succeeded, so pausing between them protects nobody.
-    //
-    // The pause is kept for exactly one case: a scan that found nothing to act on. Running
-    // then would just burn steps against a page the agent cannot see.
-    if (autoAgentMode()) {
+    renderScan(res.result, true, task);
+    if (autoAgentMode() && reviewedScanId) {
       setPipelineStage("reason");
       setRunning(true);
-      runBtn.hidden = true;
       setLiveStep("Planning the first step…");
-      startRun(true);
+      startRun();
     }
   });
 });
 
-/**
- * Whether the agent carries straight on from the scan into the run.
- *
- * On by default. The toggle exists because a demo sometimes wants to stop on the redacted
- * frame and talk about it before anything moves.
- */
 function autoAgentMode() {
   const el = $("s-autoAgent");
   return !el || el.checked;
@@ -1427,8 +1429,8 @@ function renderScorecard(d) {
   badge.textContent = blocked ? "Blocked" : "Scan complete";
 
   $("score-found").textContent = found;
-  $("score-masked").textContent = blocked ? "Unavailable" : (d.redacted ? found : "—");
-  $("score-sent").textContent = d.redacted && !blocked ? "Available" : "Unavailable";
+  $("score-masked").textContent = blocked ? "Unavailable" : (d.preview ? found : "—");
+  $("score-sent").textContent = d.preview && !blocked ? "Available" : "Unavailable";
 
   // Which detector found what. Worth showing because the three disagree usefully: OCR finding
   // regions the DOM did not is the case for its cost, and a face count of zero on a page full
@@ -1449,40 +1451,44 @@ function renderScorecard(d) {
 
 }
 
-/** Paints a scan result into the panel. Shared by the Scan button and the run-time recovery. */
-function renderScan(d, announce) {
-  if (!d) return;
+function paintPreview(d) {
   currentScanData = d;
+  $("xrayToggle").hidden = !d.rawImage;
+  if (!d.rawImage && isXRayActive) $("xrayToggle").click();
+  let site = "";
+  try { site = new URL(d.pageUrl).hostname; } catch (_) {}
+  $("previewContext").textContent = [d.pageTitle, site].filter(Boolean).join(" · ");
   $("preview").src = d.preview;
   previewWrap.hidden = false;
   statsGrid.hidden = false;
   idleState.hidden = true;
 
-  if (isXRayActive && typeof updateXRaySplit === "function") {
-    updateXRaySplit();
-  }
-
-  renderRegions(d.regions, d.viewport);
+  if (isXRayActive) updateXRaySplit();
+  if (d.regions) renderRegions(d.regions, d.viewport);
   renderModelInspector(d);
-
   renderScorecard(d);
   setStat("s-pii", d.piiCount);
   setStat("s-marks", d.markCount);
   setStat("s-total", (d.timings?.total || 0) + "ms");
-  setStat("s-actions", 0);
   renderTimings(d.timings);
+}
 
-
-
-  // Only offered when the agent is NOT continuing on its own; otherwise two primary actions
-  // are on screen at once and neither reads as the thing to press.
-  runBtn.hidden = autoAgentMode();
+function renderScan(d, announce, task) {
+  if (!d) return;
+  paintPreview(d);
+  setStat("s-actions", 0);
+  const matchesInstruction = task === taskEl.value.trim();
+  scannedTask = matchesInstruction ? task : null;
+  reviewedScanId = matchesInstruction ? d.scanId : null;
+  runBtn.hidden = autoAgentMode() || !reviewedScanId;
   runBtn.innerHTML = RUN_LABEL;
-  // The scan is the privacy review step; Run is what the user is being asked to approve next.
-  scannedTask = taskEl.value.trim();
-  if (announce) runBtn.focus();
+  if (announce && !runBtn.hidden) runBtn.focus();
 
   if (!announce) return;
+  if (!matchesInstruction) {
+    showStatus("statusMsg", "info", "Instruction changed while scanning. Scan again for the new task.");
+    return;
+  }
   const fs = d.frameStats || {};
   const frameNote = (fs.total > 1) ? ` across ${fs.merged}/${fs.total} frames` : "";
   showStatus(
@@ -1502,16 +1508,9 @@ runBtn.addEventListener("click", () => {
   // A rail carrying the previous run's marks would claim work this run has not done.
   resetPipeline();
   setProtection("running");
-  startRun(true);
+  startRun();
 });
 
-/**
- * Sends RUN, and recovers from the one failure the user should never have to think about.
- *
- * Chrome tears down an idle MV3 service worker after about 30 seconds. If that happens between
- * scanning and pressing Run, the scan state is gone and the loop has nothing to work from.
- * Silently re-scanning and trying once more is exactly what the user would do by hand.
- */
 // ── Prompt user for missing vault fields one by one ──────────────────────────
 function promptMissingFields(missing, index) {
   if (index >= missing.length) {
@@ -1561,22 +1560,17 @@ function promptMissingFields(missing, index) {
   $("inputPromptSkip").addEventListener("click", onSkip);
 }
 
-function startRun(allowRescan) {
-  chrome.runtime.sendMessage({ type: "RUN" }, (res) => {
-    const expired = !res?.ok && /run scan first/i.test(res?.error || "");
-    if (expired && allowRescan) {
-      setLiveStep("Re-reading the page…");
-      chrome.runtime.sendMessage({ type: "SCAN", task: taskEl.value.trim() }, (scanRes) => {
-        if (!scanRes || !scanRes.ok) {
-          finishRun({ ok: false, error: scanRes?.error || "Could not re-read the page." });
-          return;
-        }
-        renderScan(scanRes.result, false);
-        startRun(false);
-      });
-      return;
-    }
-    finishRun(res);
+function startRun() {
+  const scanId = reviewedScanId;
+  reviewedScanId = null;
+  runBtn.hidden = true;
+  if (!scanId) {
+    finishRun({ ok: false, error: "Scan the current tab before starting this task." });
+    return;
+  }
+  chrome.runtime.sendMessage({ type: "RUN", scanId }, (res) => {
+    const error = chrome.runtime.lastError;
+    finishRun(error ? { ok: false, error: error.message } : res);
   });
 }
 
@@ -1824,36 +1818,47 @@ $("confirmNo").addEventListener("click", () => {
 });
 
 // ── Task history ─────────────────────────────────────────────────────────────
-function renderHistory(history) {
-  const el = $("historyList");
-  if (!el) return;
-  $("clearHistory").disabled = !history?.length;
-  if (!history?.length) {
-    el.innerHTML = '<div class="history-empty"><strong>No tasks run yet</strong><p class="hint">Completed and stopped tasks will appear here.</p></div>';
+let taskHistory = [];
+
+function renderHistory() {
+  const list = $("historyList");
+  const query = $("historySearch").value.trim().toLowerCase();
+  const filter = $("historyOutcome").value;
+  $("clearHistory").disabled = !taskHistory.length;
+  $("historyFilters").hidden = !taskHistory.length;
+
+  const outcome = (entry) => entry.stopped ? "stopped" : entry.ok ? "done" : "error";
+  const matching = taskHistory.filter((entry) =>
+    (filter === "all" || outcome(entry) === filter) && String(entry.task || "").toLowerCase().includes(query));
+  $("historyCount").textContent = taskHistory.length ? `${matching.length} of ${taskHistory.length} tasks` : "";
+  if (!matching.length) {
+    const heading = taskHistory.length ? "No matching tasks" : "No tasks run yet";
+    const detail = taskHistory.length ? "Try a different search or outcome." : "Finished tasks will appear here.";
+    list.innerHTML = `<div class="history-empty"><strong>${heading}</strong><p class="hint">${detail}</p></div>`;
     return;
   }
-  el.innerHTML = history.map((h) => {
-    const ago = formatAgo(h.ts);
-    const badge = h.ok
-      ? `<span class="history-status is-success">${icon("check")}<span>Completed</span></span>`
-      : `<span class="history-status">${icon("alert")}<span>Stopped</span></span>`;
-    return `<button class="history-item" type="button" data-task="${esc(h.task)}">
-      ${badge}
-      <strong>${esc(h.task)}</strong>
-      <span class="history-item-meta">${esc(ago)} · ${h.steps} step${h.steps === 1 ? "" : "s"}${
-        h.error ? " · " + esc(h.error.slice(0, 60)) : ""}</span>
+
+  const labels = { done: "Completed", stopped: "Stopped", error: "Failed" };
+  list.innerHTML = matching.map((entry) => {
+    const status = outcome(entry);
+    const steps = entry.steps || 0;
+    return `<button class="history-item" type="button" data-task="${esc(entry.task)}">
+      <span class="history-status ${status}">${icon(status === "done" ? "check" : "alert")}<span>${labels[status]}</span></span>
+      <strong>${esc(entry.task)}</strong>
+      <span class="history-item-meta">${esc(formatAgo(entry.ts))} · ${steps} step${steps === 1 ? "" : "s"}${entry.error ? " · " + esc(entry.error.slice(0, 90)) : ""}</span>
     </button>`;
   }).join("");
-  // Click a history entry to pre-fill the task box
-  el.querySelectorAll("[data-task]").forEach((row) => {
-    row.addEventListener("click", () => {
-      taskEl.value = row.dataset.task;
-      taskEl.dispatchEvent(new Event("input"));
-      document.querySelector(".tab[data-tab='run']").click();
-      taskEl.focus();
-    });
-  });
 }
+$("historyList").addEventListener("click", (event) => {
+  const row = event.target.closest("[data-task]");
+  if (!row) return;
+  taskEl.value = row.dataset.task;
+  taskEl.dispatchEvent(new Event("input"));
+  $("tab-run").click();
+  taskEl.focus();
+});
+$("historySearch").addEventListener("input", renderHistory);
+$("historyOutcome").addEventListener("change", renderHistory);
 
 function formatAgo(ts) {
   const s = Math.round((Date.now() - ts) / 1000);
@@ -1864,23 +1869,28 @@ function formatAgo(ts) {
 }
 
 async function loadHistory() {
-  chrome.runtime.sendMessage({ type: "GET_TASK_HISTORY" }, (res) => {
-    renderHistory(res?.history || []);
-  });
-}
-
-// Load history when the History tab is opened
-document.querySelectorAll(".tab").forEach((btn) => {
-  if (btn.dataset.tab === "history") {
-    btn.addEventListener("click", loadHistory);
+  try {
+    const response = await chrome.runtime.sendMessage({ type: "GET_TASK_HISTORY" });
+    if (!response?.ok) throw new Error();
+    taskHistory = response.history || [];
+    renderHistory();
+  } catch (_) {
+    $("historyCount").textContent = "Task history is currently unavailable.";
   }
-});
-
-$("clearHistory")?.addEventListener("click", () => {
-  chrome.runtime.sendMessage({ type: "CLEAR_TASK_HISTORY" }, () => {
-    renderHistory([]);
-    $("historyHeading").focus();
-  });
+}
+$("tab-history").addEventListener("click", loadHistory);
+$("clearHistory").addEventListener("click", async () => {
+  try {
+    const response = await chrome.runtime.sendMessage({ type: "CLEAR_TASK_HISTORY" });
+    if (!response?.ok) throw new Error();
+    $("historySearch").value = "";
+    $("historyOutcome").value = "all";
+    taskHistory = [];
+    renderHistory();
+    if ($("tab-history").getAttribute("aria-selected") === "true") $("historyHeading").focus();
+  } catch (_) {
+    $("historyCount").textContent = "Task history could not be cleared.";
+  }
 });
 
 // ── Pipeline rail and protection banner ──────────────────────────────────────
@@ -2154,25 +2164,34 @@ function fmtClock(iso) {
   } catch (_) { return ""; }
 }
 
-function renderAudit(entries, summary) {
+let auditEntries = [];
+let auditSummary = {};
+
+function renderAudit() {
   const listEl = $("auditList");
-  if (!listEl) return;
+  $("auditCount").textContent = auditSummary.count || 0;
+  $("auditBytes").textContent = fmtBytes(auditSummary.bytes || 0);
+  const hosts = [...new Set((auditSummary.destinations || []).map((destination) => {
+    try { return new URL(destination).host; } catch (_) { return destination; }
+  }))];
+  $("auditDest").textContent = hosts.length > 1 ? `${hosts.length} hosts` : hosts[0] || "None";
+  $("auditDest").title = hosts.join("\n");
 
-  $("auditCount").textContent = summary.count || 0;
-  $("auditBytes").textContent = fmtBytes(summary.bytes || 0);
-  const dests = summary.destinations || [];
-  let destLabel = "none";
-  if (dests.length === 1) {
-    try { destLabel = new URL(dests[0]).host; } catch (_) { destLabel = dests[0]; }
-  } else if (dests.length > 1) {
-    destLabel = `${dests.length} hosts`;
-  }
-  $("auditDest").textContent = destLabel;
-  $("auditDest").title = dests.join("\n") || "nothing transmitted";
-
+  $("auditFilters").hidden = !auditEntries.length;
+  $("exportAudit").disabled = !auditEntries.length;
+  $("clearAudit").disabled = !auditEntries.length;
+  const query = $("auditSearch").value.trim().toLowerCase();
+  const payload = $("auditPayload").value;
+  const entries = auditEntries.filter((entry) => {
+    const hasImage = Boolean(entry.imageBytes || entry.image || entry.imageDropped);
+    const matchesPayload = payload === "all" || (payload === "image" ? hasImage : !hasImage);
+    return matchesPayload && [entry.task, entry.url].some((value) => String(value || "").toLowerCase().includes(query));
+  });
+  $("auditCountVisible").textContent = auditEntries.length ? `${entries.length} of ${auditEntries.length} requests` : "";
   if (!entries.length) {
-    listEl.innerHTML = '<p class="hint" style="padding:12px 0">' +
-      "Nothing has been transmitted yet. Run a task and every request will appear here.</p>";
+    listEl.innerHTML = auditEntries.length
+      ? '<div class="history-empty"><strong>No matching requests</strong><p class="hint">Try a different search or payload type.</p></div>'
+      : '<div class="history-empty"><strong>No planner requests</strong><p class="hint">Requests appear here when a remote planner is used.</p></div>';
     return;
   }
 
@@ -2198,7 +2217,7 @@ function renderAudit(entries, summary) {
       <summary class="audit-head">
         <span class="audit-when">${esc(fmtClock(e.at))}</span>
         <span class="audit-task">${esc(e.task || "(no task)")}</span>
-        <span class="audit-size">${esc(fmtBytes(e.bytes))}</span>
+        <span class="audit-size">${e.imageBytes || e.image || e.imageDropped ? "Image" : "Text"} · ${esc(fmtBytes(e.bytes))}</span>
         <svg class="ic audit-caret" viewBox="0 0 24 24"><use href="#i-arrow-down"/></svg>
       </summary>
       <div class="audit-body">
@@ -2221,34 +2240,53 @@ function renderAudit(entries, summary) {
 }
 
 async function loadAudit() {
-  chrome.runtime.sendMessage({ type: "GET_AUDIT_LOG" }, (res) => {
-    renderAudit(res?.entries || [], res?.summary || {});
-  });
+  hideStatus("auditStatus");
+  try {
+    const response = await chrome.runtime.sendMessage({ type: "GET_AUDIT_LOG" });
+    if (!response?.ok) throw new Error();
+    auditEntries = response.entries || [];
+    auditSummary = response.summary || {};
+    renderAudit();
+  } catch (_) {
+    showStatus("auditStatus", "error", "The transmission log could not be loaded.");
+  }
 }
 
-document.querySelectorAll(".tab").forEach((btn) => {
-  if (btn.dataset.tab === "privacy") btn.addEventListener("click", loadAudit);
+$("tab-privacy").addEventListener("click", loadAudit);
+$("auditSearch").addEventListener("input", renderAudit);
+$("auditPayload").addEventListener("change", renderAudit);
+$("exportAudit").title = "Export the full transmission log";
+$("clearAudit").addEventListener("click", async () => {
+  try {
+    const response = await chrome.runtime.sendMessage({ type: "CLEAR_AUDIT_LOG" });
+    if (!response?.ok) throw new Error();
+    $("auditSearch").value = "";
+    $("auditPayload").value = "all";
+    auditEntries = [];
+    auditSummary = {};
+    renderAudit();
+    showStatus("auditStatus", "success", "Transmission log cleared.");
+  } catch (_) {
+    showStatus("auditStatus", "error", "The transmission log could not be cleared.");
+  }
 });
 
-$("clearAudit")?.addEventListener("click", () => {
-  chrome.runtime.sendMessage({ type: "CLEAR_AUDIT_LOG" }, () => {
-    renderAudit([], { count: 0, bytes: 0, destinations: [] });
-  });
-});
-
-$("exportAudit")?.addEventListener("click", () => {
-  chrome.runtime.sendMessage({ type: "EXPORT_AUDIT_LOG" }, (res) => {
-    if (!res?.json) return;
-    // A blob URL rather than a data: URL: the log can run to megabytes, and a data: URL that
-    // size is refused by the downloads API.
-    const blob = new Blob([res.json], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    chrome.downloads.download({
+$("exportAudit").addEventListener("click", async () => {
+  let url;
+  try {
+    const response = await chrome.runtime.sendMessage({ type: "EXPORT_AUDIT_LOG" });
+    if (!response?.json) throw new Error();
+    url = URL.createObjectURL(new Blob([response.json], { type: "application/json" }));
+    await chrome.downloads.download({
       url,
       filename: `visionvault-transmission-log-${new Date().toISOString().slice(0, 10)}.json`,
-      saveAs: true,
-    }, () => setTimeout(() => URL.revokeObjectURL(url), 60000));
-  });
+    });
+    showStatus("auditStatus", "success", "Full transmission log download started.");
+  } catch (_) {
+    showStatus("auditStatus", "error", "The transmission log download did not start.");
+  } finally {
+    if (url) setTimeout(() => URL.revokeObjectURL(url), 60000);
+  }
 });
 
 // ── Live updates from the service worker ──────────────────────────────────────
@@ -2289,14 +2327,7 @@ chrome.runtime.onMessage.addListener((msg) => {
     showStatus("statusMsg", "error", d.message);
   }
   if (d.type === "rescanned") {
-    $("preview").src = d.preview;
-    previewWrap.hidden = false;
-    statsGrid.hidden = false;
-    idleState.hidden = true;
-    setStat("s-pii", d.piiCount);
-    setStat("s-marks", d.markCount);
-    if (d.regions) renderRegions(d.regions, d.viewport);
-    if (d.timings) renderTimings(d.timings);
+    paintPreview(d);
     const label = d.reason === "dom_change" ? "Page changed — re-scanned" : "Re-scanned the page";
     addLogEntry("refresh", `${label} (${d.markCount} elements, ${d.piiCount} masked)`, d.timings?.total || null);
   }
@@ -2319,239 +2350,6 @@ function renderTaskChecklist(items) {
     li.appendChild(text);
     list.appendChild(li);
   }
-}
-
-// ── Prompt Privacy Shield ───────────────────────────────────────────────────
-let activeTokenMap = {};
-
-function checkActiveAiChat() {
-  if (typeof chrome === "undefined" || !chrome.tabs) return;
-  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-    const tab = tabs?.[0];
-    const url = tab?.url || "";
-    const card = $("chatDetectedCard");
-    const badge = $("activeChatBadge");
-    const btnLabel = $("scrubActiveChatBtnLabel");
-    if (!card) return;
-
-    if (/chatgpt\.com|chat\.openai\.com/i.test(url)) {
-      card.hidden = false;
-      if (badge) badge.textContent = "ChatGPT";
-      if (btnLabel) btnLabel.textContent = "Scrub Active ChatGPT Input";
-    } else if (/claude\.ai/i.test(url)) {
-      card.hidden = false;
-      if (badge) badge.textContent = "Claude";
-      if (btnLabel) btnLabel.textContent = "Scrub Active Claude Input";
-    } else if (/gemini\.google\.com/i.test(url)) {
-      card.hidden = false;
-      if (badge) badge.textContent = "Gemini";
-      if (btnLabel) btnLabel.textContent = "Scrub Active Gemini Input";
-    } else {
-      card.hidden = true;
-    }
-  });
-}
-checkActiveAiChat();
-
-// Scrub active chat input directly on the webpage
-if ($("scrubActiveChatBtn")) {
-  $("scrubActiveChatBtn").addEventListener("click", () => {
-    if (typeof chrome === "undefined" || !chrome.tabs) return;
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      const tabId = tabs?.[0]?.id;
-      if (!tabId) return;
-
-      chrome.tabs.sendMessage(tabId, { type: "SCRUB_CHAT_INPUT" }, (res) => {
-        if (chrome.runtime.lastError || !res || !res.ok) {
-          showStatus("chatScrubStatus", "error", res?.error || "Could not access chat input on this tab.");
-          setTimeout(() => hideStatus("chatScrubStatus"), 3000);
-          return;
-        }
-
-        if (res.tokenMap) {
-          activeTokenMap = { ...activeTokenMap, ...res.tokenMap };
-        }
-
-        const msg = res.stats.total > 0
-          ? `Scrubbed ${res.stats.secrets} secret(s) and ${res.stats.pii} PII item(s) in-place!`
-          : "No secrets or PII detected in chat input.";
-        showStatus("chatScrubStatus", "success", msg);
-        setTimeout(() => hideStatus("chatScrubStatus"), 3500);
-      });
-    });
-  });
-}
-
-// Interactive Prompt Scrubber
-if ($("scrubPromptBtn")) {
-  $("scrubPromptBtn").addEventListener("click", () => {
-    const raw = $("rawPromptInput")?.value || "";
-    if (!raw.trim()) return;
-
-    const res = globalThis.PromptScrubber ? globalThis.PromptScrubber.scrub(raw, activeTokenMap) : { cleanText: raw, findings: [], tokenMap: {}, stats: { total: 0, secrets: 0, pii: 0 } };
-    activeTokenMap = { ...activeTokenMap, ...res.tokenMap };
-
-    $("scrubbedPromptOutput").value = res.cleanText;
-    $("scrubFindingsCount").textContent = String(res.stats.total);
-
-    const list = $("scrubFindingsList");
-    list.innerHTML = "";
-    if (res.findings.length === 0) {
-      list.innerHTML = '<span style="font-size:11px;color:var(--ok,#4ade80);">No secrets or PII detected — prompt is safe!</span>';
-    } else {
-      res.findings.forEach((f) => {
-        const span = document.createElement("span");
-        span.className = "badge";
-        span.style.background = f.category === "secret" ? "rgba(244,63,94,0.2)" : "rgba(234,179,8,0.2)";
-        span.style.color = f.category === "secret" ? "#f43f5e" : "#eab308";
-        span.style.border = "1px solid currentColor";
-        span.textContent = `${f.label}: ${f.token}`;
-        list.appendChild(span);
-      });
-    }
-
-    $("scrubFindingsWrap").hidden = false;
-  });
-}
-
-if ($("clearPromptBtn")) {
-  $("clearPromptBtn").addEventListener("click", () => {
-    if ($("rawPromptInput")) $("rawPromptInput").value = "";
-    if ($("scrubFindingsWrap")) $("scrubFindingsWrap").hidden = true;
-    if ($("scrubbedPromptOutput")) $("scrubbedPromptOutput").value = "";
-  });
-}
-
-if ($("copyCleanPromptBtn")) {
-  $("copyCleanPromptBtn").addEventListener("click", async () => {
-    const text = $("scrubbedPromptOutput")?.value || "";
-    if (!text) return;
-    try {
-      await navigator.clipboard.writeText(text);
-      const span = $("copyCleanPromptBtn").querySelector("span");
-      if (span) {
-        const originalText = span.textContent;
-        span.textContent = "Copied to clipboard!";
-        setTimeout(() => { span.textContent = originalText; }, 2000);
-      }
-    } catch (_) {}
-  });
-}
-
-// De-Scrub / Unmask
-if ($("unmaskBtn")) {
-  $("unmaskBtn").addEventListener("click", () => {
-    const resp = $("llmResponseInput")?.value || "";
-    if (!resp.trim()) return;
-
-    const restored = globalThis.PromptScrubber ? globalThis.PromptScrubber.unmask(resp, activeTokenMap) : resp;
-    $("unmaskedOutput").value = restored;
-    $("unmaskedWrap").hidden = false;
-  });
-}
-
-// ── Offline Document & PDF Redactor ──────────────────────────────────────────
-async function handleProcessDocFile(file) {
-  if (!globalThis.PdfScrubber) return;
-  const dropTitle = $("pdfDropZoneTitle");
-  if (dropTitle) dropTitle.textContent = `Processing "${file.name}" locally in RAM...`;
-
-  try {
-    const res = await globalThis.PdfScrubber.redactDocument(file, file.name);
-    activeTokenMap = { ...activeTokenMap, ...res.tokenMap };
-
-    if ($("pdfFileNameDisplay")) $("pdfFileNameDisplay").textContent = file.name;
-    if ($("pdfFindingsCount")) $("pdfFindingsCount").textContent = String(res.stats?.total || res.findings?.length || 0);
-    if ($("pdfSanitizedOutput")) $("pdfSanitizedOutput").value = res.sanitizedText;
-
-    const list = $("pdfFindingsList");
-    if (list) {
-      list.innerHTML = "";
-      if (!res.findings || res.findings.length === 0) {
-        list.innerHTML = '<span style="font-size:11px;color:var(--ok,#4ade80);">Clean document — 0 secrets or PII detected.</span>';
-      } else {
-        res.findings.forEach((f) => {
-          const span = document.createElement("span");
-          span.className = "badge";
-          span.style.background = f.category === "secret" ? "rgba(244,63,94,0.2)" : "rgba(234,179,8,0.2)";
-          span.style.color = f.category === "secret" ? "#f43f5e" : "#eab308";
-          span.style.border = "1px solid currentColor";
-          span.textContent = `${f.label}: ${f.token}`;
-          list.appendChild(span);
-        });
-      }
-    }
-
-    if ($("pdfResultWrap")) $("pdfResultWrap").hidden = false;
-    if (dropTitle) dropTitle.textContent = `Ready: "${file.name}" sanitized`;
-  } catch (err) {
-    if (dropTitle) dropTitle.textContent = `Error: ${err.message}`;
-  }
-}
-
-if ($("pdfDropZone") && $("pdfFileInput")) {
-  $("pdfDropZone").addEventListener("click", () => {
-    $("pdfFileInput").click();
-  });
-
-  $("pdfDropZone").addEventListener("dragover", (e) => {
-    e.preventDefault();
-    $("pdfDropZone").style.borderColor = "#38bdf8";
-    $("pdfDropZone").style.background = "rgba(14, 165, 233, 0.12)";
-  });
-
-  $("pdfDropZone").addEventListener("dragleave", () => {
-    $("pdfDropZone").style.borderColor = "rgba(56, 189, 248, 0.4)";
-    $("pdfDropZone").style.background = "rgba(14, 165, 233, 0.05)";
-  });
-
-  $("pdfDropZone").addEventListener("drop", (e) => {
-    e.preventDefault();
-    $("pdfDropZone").style.borderColor = "rgba(56, 189, 248, 0.4)";
-    $("pdfDropZone").style.background = "rgba(14, 165, 233, 0.05)";
-    const file = e.dataTransfer?.files?.[0];
-    if (file) handleProcessDocFile(file);
-  });
-
-  $("pdfFileInput").addEventListener("change", (e) => {
-    const file = e.target?.files?.[0];
-    if (file) handleProcessDocFile(file);
-  });
-}
-
-if ($("copyCleanDocBtn")) {
-  $("copyCleanDocBtn").addEventListener("click", async () => {
-    const text = $("pdfSanitizedOutput")?.value || "";
-    if (!text) return;
-    try {
-      await navigator.clipboard.writeText(text);
-      const span = $("copyCleanDocBtn").querySelector("span");
-      if (span) {
-        const orig = span.textContent;
-        span.textContent = "Copied!";
-        setTimeout(() => { span.textContent = orig; }, 2000);
-      }
-    } catch (_) {}
-  });
-}
-
-if ($("sendDocToChatBtn")) {
-  $("sendDocToChatBtn").addEventListener("click", () => {
-    const text = $("pdfSanitizedOutput")?.value;
-    if (!text || typeof chrome === "undefined" || !chrome.tabs) return;
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      const tabId = tabs?.[0]?.id;
-      if (!tabId) return;
-      chrome.tabs.sendMessage(tabId, { type: "INSERT_TEXT_TO_INPUT", text: text }, (res) => {
-        const span = $("sendDocToChatBtn").querySelector("span");
-        if (span) {
-          const orig = span.textContent;
-          span.textContent = (res && res.ok) ? "Inserted to Chat!" : "Sent!";
-          setTimeout(() => { span.textContent = orig; }, 2000);
-        }
-      });
-    });
-  });
 }
 
 async function updateDiagnostics() {

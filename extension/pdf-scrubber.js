@@ -168,14 +168,6 @@
       fullText = extractTextFromPdfStream(latin1);
     }
 
-    // Final fallback: Look for printable character sequences (> 4 chars)
-    if (!fullText.trim()) {
-      const textMatches = latin1.match(/[A-Za-z0-9@._:\-\/]{4,}/g);
-      if (textMatches) {
-        fullText = textMatches.join(" ");
-      }
-    }
-
     return fullText.trim();
   }
 
@@ -186,7 +178,7 @@
    * @param {string} fileName - Name of the file (e.g. 'resume.pdf')
    * @returns {Promise<{ sanitizedText: string, originalText: string, findings: Array, tokenMap: Object, stats: Object, fileName: string }>}
    */
-  async function redactDocument(input, fileName = "document.pdf") {
+  async function redactDocument(input, fileName = "document.pdf", { maxTextLength = Infinity } = {}) {
     const Scrubber = (typeof PromptScrubber !== "undefined")
       ? PromptScrubber
       : (typeof require !== "undefined" ? require("./prompt-scrubber.js") : null);
@@ -199,7 +191,7 @@
 
     const ext = (fileName || "").toLowerCase().split(".").pop();
 
-    if (ext === "pdf" || (input.type && input.type.includes("pdf"))) {
+    if (ext === "pdf" || input?.type?.includes("pdf")) {
       let arrayBuffer;
       if (typeof File !== "undefined" && input instanceof File) {
         arrayBuffer = await input.arrayBuffer();
@@ -212,7 +204,10 @@
       } else {
         throw new Error("Unsupported PDF input type.");
       }
+      const header = new TextDecoder("latin1").decode(new Uint8Array(arrayBuffer, 0, Math.min(arrayBuffer.byteLength, 1024)));
+      if (!header.includes("%PDF-")) throw new Error("This file does not contain a PDF header.");
       rawText = await extractTextFromPdfBytes(arrayBuffer);
+      if (!rawText.trim()) throw new Error("No readable PDF text was found. Scanned PDFs require a text layer.");
     } else {
       // Plain text, markdown, CSV, JSON, code files
       if (typeof File !== "undefined" && input instanceof File) {
@@ -226,6 +221,9 @@
       }
     }
 
+    if (rawText.length > maxTextLength) {
+      throw new Error(`Extracted text exceeds ${maxTextLength.toLocaleString()} characters. Split the file and try again.`);
+    }
     const scrubResult = Scrubber.scrub(rawText);
 
     return {

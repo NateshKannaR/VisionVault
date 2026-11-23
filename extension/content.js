@@ -1654,7 +1654,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
       const scrubRes = scrubber.scrub(rawText);
 
-      // Update the input field with the sanitized text
+      if (!scrubRes.stats.total) {
+        sendResponse({ ok: true, stats: scrubRes.stats });
+        return true;
+      }
+
+      // Update the composer draft without submitting it.
       if (isContentEditable) {
         chatInput.focus();
         const selection = window.getSelection();
@@ -1662,7 +1667,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         range.selectNodeContents(chatInput);
         selection.removeAllRanges();
         selection.addRange(range);
-        document.execCommand("insertText", false, scrubRes.cleanText);
+        if (!document.execCommand("insertText", false, scrubRes.cleanText)) {
+          throw new Error("The chat editor did not accept the masked draft.");
+        }
         chatInput.dispatchEvent(new Event("input", { bubbles: true }));
       } else {
         const proto = chatInput.tagName === "TEXTAREA" ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
@@ -1700,7 +1707,15 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       chatInput.focus();
       const isContentEditable = chatInput.isContentEditable;
       if (isContentEditable) {
-        document.execCommand("insertText", false, (chatInput.innerText?.trim() ? "\n\n" : "") + msg.text);
+        const range = document.createRange();
+        range.selectNodeContents(chatInput);
+        range.collapse(false);
+        const selection = window.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+        if (!document.execCommand("insertText", false, (chatInput.innerText?.trim() ? "\n\n" : "") + msg.text)) {
+          throw new Error("The chat editor did not accept the masked text.");
+        }
         chatInput.dispatchEvent(new Event("input", { bubbles: true }));
       } else {
         const proto = chatInput.tagName === "TEXTAREA" ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;

@@ -3,6 +3,10 @@
 const assert = require("node:assert/strict");
 const { spawn } = require("node:child_process");
 const { once } = require("node:events");
+const { mkdtemp, readdir, readFile, rm } = require("node:fs/promises");
+const { tmpdir } = require("node:os");
+const path = require("node:path");
+const { setTimeout: delay } = require("node:timers/promises");
 const http = require("node:http");
 const { randomBytes } = require("node:crypto");
 const { unzipSync } = require("fflate");
@@ -165,7 +169,9 @@ async function main() {
       const files = unzipSync(new Uint8Array(await response.arrayBuffer()));
       const manifest = JSON.parse(Buffer.from(files["manifest.json"]).toString());
       assert.equal(manifest.manifest_version, 3);
-      assert.ok(files["popup.html"] && files["planner/connection.js"]);
+      assert.equal(manifest.version, "1.1.0");
+      assert.ok(files["popup.html"] && files["shield-panel.js"] && files["planner/connection.js"]);
+      for (const script of manifest.background.scripts || []) assert.ok(files[script], script);
       assert.equal(Boolean(manifest.background.service_worker), browser === "chromium");
     }
 
@@ -185,10 +191,20 @@ async function main() {
       assert.equal(await panel.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, tab);
     }
     await h.worker.evaluate(() => chrome.storage.local.set({
-      taskHistory: [{ task: "Find the sample form", ts: Date.now(), steps: 1, ok: true }],
+      taskHistory: [
+        { task: "Find the sample form", ts: Date.now(), steps: 1, ok: true },
+        { task: "Stopped fixture task", ts: Date.now(), stopped: true, ok: false },
+        { task: "Failed fixture task", ts: Date.now(), error: "Fixture error", ok: false },
+      ],
     }));
     await panel.click("#tab-history");
     await panel.waitForSelector("button.history-item");
+    await panel.select("#historyOutcome", "stopped");
+    assert.match(await panel.$eval("#historyList", (node) => node.textContent), /Stopped fixture task/);
+    assert.equal((await panel.$$("button.history-item")).length, 1);
+    await panel.select("#historyOutcome", "all");
+    await panel.type("#historySearch", "sample");
+    assert.equal(await panel.$eval("#historyCount", (node) => node.textContent), "1 of 3 tasks");
     await panel.focus("button.history-item");
     await panel.keyboard.press("Enter");
     assert.equal(await panel.$eval("#task", (node) => node.value), "Find the sample form");
@@ -201,6 +217,47 @@ async function main() {
     await panel.click("#btnRunLiveVerification");
     assert.match(await panel.$eval("#benchVerificationResult", (node) => node.textContent), /^Passed/);
 
+    await testVaultBackup(h.browser, panel);
+
+    await panel.click("#tab-shield");
+    await panel.click("#loadPromptSample");
+    await panel.click("#scrubPromptBtn");
+    assert.match(await panel.$eval("#scrubbedPromptOutput", (node) => node.value), /\[EMAIL_1\]/);
+    assert.match(await panel.$eval("#scrubFindingsList", (node) => node.textContent), /Email Address/);
+    await panel.click("#permanentMasks");
+    assert.match(await panel.$eval("#scrubbedPromptOutput", (node) => node.value), /\[REDACTED\]/);
+    assert.doesNotMatch(await panel.$eval("#scrubbedPromptOutput", (node) => node.value), /jordan@|\[EMAIL_1\]/);
+    await panel.click("#permanentMasks");
+
+    await panel.focus("#tool-text");
+    await panel.keyboard.press("ArrowRight");
+    assert.equal(await panel.$eval("#tool-file", (el) => el.getAttribute("aria-selected")), "true");
+    await dropShieldFile(panel, "fixture.txt", "Document email: casey@example.test");
+    await panel.waitForSelector("#pdfResultWrap", { visible: true });
+    assert.equal(await panel.$eval("#pdfSanitizedOutput", (el) => el.value), "Document email: [EMAIL_1]");
+
+    await panel.click("#tool-restore");
+    await panel.type("#llmResponseInput", "Reply to [EMAIL_1]");
+    assert.equal(await panel.$eval("#unmaskBtn", (el) => el.disabled), true);
+    await panel.select("#restoreSource", "text");
+    await panel.click("#unmaskBtn");
+    assert.equal(await panel.$eval("#unmaskedOutput", (el) => el.value), "Reply to jordan@example.test");
+    await panel.select("#restoreSource", "file");
+    await panel.click("#unmaskBtn");
+    assert.equal(await panel.$eval("#unmaskedOutput", (el) => el.value), "Reply to casey@example.test");
+    await panel.click("#tool-file");
+    await dropShieldFile(panel, "fixture.pdf", "%PDF-1.4\n1 0 obj <</Type /Page>> endobj\n%%EOF");
+    await panel.waitForSelector("#fileStatus.error");
+    assert.equal(await panel.$eval("#pdfResultWrap", (el) => el.hidden), true);
+    await panel.click("#tool-text");
+    await panel.type("#rawPromptInput", " Edited.");
+    assert.equal(await panel.$eval("#scrubFindingsWrap", (el) => el.hidden), true);
+    await panel.click("#tool-restore");
+    assert.equal(await panel.$eval("#unmaskBtn", (el) => el.disabled), true);
+    await panel.click("#clearShieldSession");
+    assert.equal(await panel.$eval("#llmResponseInput", (el) => el.value), "");
+    await testActiveChatMasking(h.browser, panel);
+
     const sample = await h.browser.newPage();
     await sample.goto(fixture.baseUrl + "/pages/signup-form.html");
     await sample.bringToFront();
@@ -209,6 +266,27 @@ async function main() {
     assert.ok(scanned.piiCount > 0, "scan detects regions on the signup fixture");
     assert.ok(scanned.markCount > 0, "scan detects interactive controls");
     assert.match(scanned.preview, /^data:image\/png/);
+    // Open the workspace as an extension tab and leave the fixture foreground for capture.
+    await panel.evaluate(() => {
+      document.getElementById("tab-run").click();
+      document.getElementById("scanBtn").click();
+    });
+    await panel.waitForFunction(() => !document.getElementById("runBtn").hidden ||
+      document.getElementById("statusMsg").classList.contains("error"), { polling: 100, timeout: 35000 });
+    assert.equal(await panel.$eval("#runBtn", (el) => el.hidden), false,
+      await panel.$eval("#statusMsg", (el) => el.textContent));
+    assert.match(await panel.$eval("#previewContext", (node) => node.textContent), /127\.0\.0\.1/);
+    const otherTab = await h.browser.newPage();
+    await otherTab.goto(fixture.baseUrl + "/pages/signup-form.html");
+    await otherTab.bringToFront();
+    await panel.evaluate(() => document.getElementById("runBtn").click());
+    await panel.waitForFunction(() => /reviewed tab changed/.test(document.getElementById("statusMsg").textContent),
+      { polling: 100 });
+    await otherTab.close();
+    await sample.bringToFront();
+    const wrongReview = await panel.evaluate(() => chrome.runtime.sendMessage({ type: "RUN", scanId: "expired-review" }));
+    assert.match(wrongReview.error, /review has expired/);
+
     const plannerUrl = "http://127.0.0.1:" + planner.address().port;
     const response = await h.worker.evaluate(
       (url, key) => callServer({ task: "Find the address field", privacy_budget: { level: 0 } }, url, key),
@@ -225,6 +303,22 @@ async function main() {
       /blocked sensitive text/,
     );
     assert.equal(plannerRequests.length, 1, "blocked prompts never reach the planner");
+    await h.worker.evaluate(() => AuditLog.record({
+      task: "Inspect image fixture", url: "http://127.0.0.1:8000/api/agent/step",
+      body: "{}", image: "data:image/png;base64,iVBORw0KGgo=", outcome: "ok",
+    }));
+    await panel.bringToFront();
+    await panel.click("#tab-privacy");
+    await panel.waitForSelector("#auditList details");
+    assert.equal(await panel.$eval("#auditCount", (el) => el.textContent), "2");
+    await panel.select("#auditPayload", "image");
+    assert.equal(await panel.$eval("#auditCountVisible", (el) => el.textContent), "1 of 2 requests");
+    assert.match(await panel.$eval("#auditList summary", (el) => el.textContent), /Inspect image fixture/);
+    await panel.type("#auditSearch", "does not match");
+    assert.match(await panel.$eval("#auditList", (el) => el.textContent), /No matching requests/);
+    await panel.click("#clearAudit");
+    await panel.waitForSelector("#auditStatus.success");
+    assert.equal(await panel.$eval("#auditCount", (el) => el.textContent), "0");
     assert.deepEqual(errors, []);
     console.log("Chromium smoke passed for the built site, package downloads, panel, and local scan.");
   } finally {
@@ -233,6 +327,99 @@ async function main() {
     planner.close();
     preview.kill();
   }
+}
+
+async function testActiveChatMasking(browser, panel) {
+  const chat = await browser.newPage();
+  try {
+    const fixtureUrl = "https://chatgpt.com/visionvault-local-test";
+    await chat.setRequestInterception(true);
+    chat.on("request", (request) => {
+      if (request.url() === fixtureUrl) {
+        void request.respond({ status: 200, contentType: "text/html", body: '<textarea id="prompt-textarea"></textarea>' });
+      } else {
+        void request.abort();
+      }
+    });
+    await chat.goto(fixtureUrl);
+    await chat.bringToFront();
+    await panel.evaluate(() => {
+      document.getElementById("tab-shield").click();
+      document.getElementById("tool-text").click();
+    });
+    await panel.waitForFunction(() => !document.getElementById("chatDetectedCard").hidden, { polling: 100 });
+    await panel.evaluate(() => document.getElementById("scrubActiveChatBtn").click());
+    await panel.waitForFunction(() => document.getElementById("chatScrubStatus").classList.contains("error"), { polling: 100 });
+    assert.match(await panel.$eval("#chatScrubStatus", (node) => node.textContent), /empty/);
+
+    await chat.$eval("#prompt-textarea", (node) => { node.value = "Tell jordan@example.test about the update."; });
+    await panel.evaluate(() => document.getElementById("scrubActiveChatBtn").click());
+    await panel.waitForFunction(() => document.getElementById("chatScrubStatus").classList.contains("success"), { polling: 100 });
+    assert.equal(await chat.$eval("#prompt-textarea", (node) => node.value), "Tell [EMAIL_1] about the update.");
+  } finally {
+    await chat.close();
+  }
+}
+
+async function testVaultBackup(browser, panel) {
+  const directory = await mkdtemp(path.join(tmpdir(), "visionvault-test-download-"));
+  try {
+    const cdp = await browser.target().createCDPSession();
+    await cdp.send("Browser.setDownloadBehavior", { behavior: "allow", downloadPath: directory });
+    await panel.click("#tab-vault");
+    await panel.type("#v-email", "vault-fixture@example.test");
+    await panel.click("#saveVault");
+    await panel.waitForSelector("#vaultStatus.success");
+    await panel.click("#exportVaultBackupBtn");
+    await panel.type("#vaultBackupPassphrase", "fixture-backup-passphrase");
+    await panel.click("#vaultBackupConfirm");
+    await panel.waitForFunction(() => !document.getElementById("vaultBackupDialog").open ||
+      document.getElementById("vaultBackupStatus").classList.contains("error"));
+    assert.equal(await panel.$eval("#vaultBackupDialog", node => node.open), false,
+      await panel.$eval("#vaultBackupStatus", node => node.textContent));
+    let filename;
+    for (let attempt = 0; attempt < 30 && !filename; attempt++) {
+      filename = (await readdir(directory)).find((name) => name.endsWith(".json"));
+      if (!filename) await delay(150);
+    }
+    assert.ok(filename, "encrypted backup reached the browser download directory");
+    const backup = await readFile(path.join(directory, filename), "utf8");
+    assert.equal(JSON.parse(backup).algorithm, "AES-256-GCM");
+    assert.doesNotMatch(backup, /vault-fixture@example/);
+
+    await panel.$eval("#v-email", (node) => { node.value = ""; });
+    await panel.type("#v-email", "temporary@example.test");
+    await panel.click("#saveVault");
+    await panel.waitForSelector("#vaultStatus.success");
+    await panel.$eval("#vaultBackupFileInput", (node, data) => {
+      const transfer = new DataTransfer();
+      transfer.items.add(new File([data], "fixture-backup.json"));
+      node.files = transfer.files;
+      node.dispatchEvent(new Event("change"));
+    }, backup);
+    await panel.type("#vaultBackupPassphrase", "wrong-fixture-passphrase");
+    await panel.click("#vaultBackupConfirm");
+    await panel.waitForSelector("#vaultBackupStatus.error");
+    assert.equal(await panel.$eval("#v-email", (node) => node.value), "temporary@example.test");
+    await panel.$eval("#vaultBackupPassphrase", (node) => { node.value = ""; });
+    await panel.type("#vaultBackupPassphrase", "fixture-backup-passphrase");
+    await panel.click("#vaultBackupConfirm");
+    await panel.waitForFunction(() => !document.getElementById("vaultBackupDialog").open);
+    assert.equal(await panel.$eval("#v-email", (node) => node.value), "vault-fixture@example.test");
+    const stored = await panel.evaluate(() => chrome.storage.local.get(["vault", "vaultEncrypted"]));
+    assert.ok(stored.vaultEncrypted);
+    assert.equal(stored.vault, undefined);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+}
+
+async function dropShieldFile(panel, name, content) {
+  await panel.$eval("#pdfDropZone", (drop, fileName, data) => {
+    const transfer = new DataTransfer();
+    transfer.items.add(new File([data], fileName));
+    drop.dispatchEvent(new DragEvent("drop", { dataTransfer: transfer, bubbles: true }));
+  }, name, content);
 }
 
 main().catch((error) => {

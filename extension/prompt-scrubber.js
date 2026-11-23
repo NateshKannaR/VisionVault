@@ -221,8 +221,11 @@
           return t;
         }
       }
-      counts[tokenPrefix] = (counts[tokenPrefix] || 0) + 1;
-      const token = `[${tokenPrefix}_${counts[tokenPrefix]}]`;
+      let token;
+      do {
+        counts[tokenPrefix] = (counts[tokenPrefix] || 0) + 1;
+        token = `[${tokenPrefix}_${counts[tokenPrefix]}]`;
+      } while (Object.hasOwn(tokenMap, token) || cleanText.includes(token));
       tokenMap[token] = val;
       return token;
     }

@@ -53,6 +53,10 @@ async function runTests() {
   assert(!res2.sanitizedText.includes("ABCDE1234F"), "PAN must be scrubbed");
   console.log("✓ Plain text document sanitized successfully\n");
 
+  await assert.rejects(PdfScrubber.redactDocument(Buffer.from("not a PDF"), "fixture.pdf"), /PDF header/);
+  await assert.rejects(PdfScrubber.redactDocument(Buffer.from("%PDF-1.4\n%%EOF"), "fixture.pdf"), /No readable PDF text/);
+  await assert.rejects(PdfScrubber.redactDocument("long content", "fixture.txt", { maxTextLength: 4 }), /exceeds 4 characters/);
+
   console.log("🎉 ALL PDF & DOCUMENT SCRUBBER TESTS PASSED!\n");
 }
 

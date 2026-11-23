@@ -44,9 +44,21 @@ The homepage links to the redaction lab, interactive workflow, sample privacy au
 
 To try a local signup fixture, run `python -m http.server 8081 --bind 127.0.0.1 --directory eval` and open [the sample signup page](http://127.0.0.1:8081/pages/signup-form.html). To try messaging and mission forms, start the [local fixture portal](isro-panel/README.md).
 
-The side panel also provides **Vault** for saved fields, **History** for reopening recent tasks, **Privacy** for reviewing planner requests, and **Shield** for scrubbing prompt text. Use **Diagnostics** for the local self-check and **Settings** for scan and planner options.
+### Use the side panel
 
-For Firefox development, run `npm run build:firefox` and load `extension-firefox/manifest.json` in `about:debugging#/runtime/this-firefox`. The Firefox package is unsigned and has different browser capabilities. Chromium is the browser covered by CI runtime tests.
+| Panel | What you can do |
+| --- | --- |
+| Run | Review the masked screenshot and its source page before starting. Rescan after changing tabs or reloading the page. |
+| Shield | Mask prompts or extract masked text from UTF-8 files and text-based PDFs. Copy the output or save a text file. |
+| Restore in Shield | Select the prompt, document, or chat draft that produced the placeholders. Clear Shield to discard the in-memory mappings and inputs. |
+| Vault | Manage saved fields, set a PIN, and import or export backups. |
+| History | Search finished tasks by instruction or filter by outcome. Open an entry to prefill Run. |
+| Privacy | Search logged requests by task or destination and filter by text or image payload. Export saves the full log. |
+| Diagnostics and Settings | Run the local self-check and configure redaction, vision depth, approval, and planner options. |
+
+Shield scans for known patterns. Review the masked output before sharing it. Choose **Replace tokens with [REDACTED] in this output** to share a copy without reversible placeholders. For scanned PDFs, add a text layer before importing the file. The file tool exports text and discards PDF layout and images.
+
+For Firefox development, run `npm run build:firefox` and load `extension-firefox/manifest.json` in `about:debugging#/runtime/this-firefox`. The Firefox package is unsigned. It supports DOM-based scans and local Shield tools. Chromium provides the face and OCR vision host and is covered by CI runtime tests.
 
 ### Optional planner server
 
@@ -123,7 +135,7 @@ The sample Docker Compose setup publishes only a loopback port and requires a pl
 | Command | Coverage |
 | --- | --- |
 | `npm test` | Extension contracts, planning, prompt and document masking, vault, MCP, and local fixture portal API |
-| `npm run build && npm run test:browser` | Real Chromium smoke test for the built site, ZIP downloads, narrow layouts, portal deep links, keyboard navigation, task history, diagnostics, and scanning |
+| `npm run build && npm run test:browser` | Chromium smoke test for the site, downloads, portal links, panel navigation, Shield workflows, log filters, and scan review |
 | `python eval/test-fallback-chain.py` | Production planner dispatch and cooldown behavior using deterministic provider doubles |
 | `python eval/test-planner-http.py` | Auth, explicit CORS, request bounds, zero-pixel validation, and streaming parity over HTTP |
 | `python eval/test-server-contract.py` | Planner response contract with the default rules server running on port 8000 |

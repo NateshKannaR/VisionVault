@@ -12,7 +12,7 @@
 // detection-orchestrator.js -> capture + local ML + fail-closed redaction
 // NOTE: action-executor.js is deliberately NOT imported here. It is a content script
 // (see manifest.json) because it needs a DOM; the service worker has none.
-importScripts(
+if (typeof importScripts === "function") importScripts(
   "./vault.js",
   "./vault-crypto.js",
   "./planner/connection.js",
@@ -152,7 +152,8 @@ async function appendTaskHistory(task, result) {
   history.unshift({
     task,
     ts: Date.now(),
-    ok: !result?.error,
+    ok: !result?.error && !result?.stopped,
+    stopped: Boolean(result?.stopped),
     steps: result?.actionLog?.length || 0,
     error: result?.error || null,
   });
@@ -172,6 +173,12 @@ let inFlightPlanRequest = null;
 // True while phaseRun()/phaseConfirm() is driving the page. Used to suppress DOM_CHANGED
 // re-scans, which would otherwise race the loop's own re-scans.
 let agentBusy = false;
+let panelScanBusy = false;
+
+// A reload can replace the document while retaining the same URL and tab ID.
+chrome.tabs.onUpdated.addListener((tabId, change) => {
+  if (session?.tabId === tabId && (change.status === "loading" || change.url)) session.scanId = null;
+});
 
 /**
  * Requests that the run stop at the next safe point, and cuts short a planning call already in
@@ -758,6 +765,7 @@ async function getTargetTab(preferredTabId = null) {
       const t = await new Promise(r => chrome.tabs.get(preferredTabId, tab => r(chrome.runtime.lastError ? null : tab)));
       if (t && t.url && !t.url.startsWith("chrome-extension://")) return t;
     } catch (_) {}
+    return null;
   }
   const focusedTabs = (await chrome.tabs.query({ active: true, lastFocusedWindow: true })).filter(t => t.url && !t.url.startsWith("chrome-extension://"));
   const allTabs = (await chrome.tabs.query({ active: true })).filter(t => t.url && !t.url.startsWith("chrome-extension://"));
@@ -829,6 +837,8 @@ async function phaseScan(task, preferredTabId = null, navigateBeforeScan = true)
     : [];
 
   session = {
+    scanId: crypto.randomUUID(),
+    scanUrl: tab.url,
     task,
     parsedTask,
     checklist,
@@ -888,6 +898,7 @@ async function phaseScan(task, preferredTabId = null, navigateBeforeScan = true)
   };
 
   return {
+    scanId: session.scanId,
     preview: scan.redacted,
     redactedImagePreview: scan.redacted,
     rawImage: scan.rawImage || null,
@@ -1236,10 +1247,14 @@ async function phaseRun() {
   session.guard = session.guard || AgentGuard.createGuard(session.parsedTask);
   const guard = session.guard;
 
-  const finish = (extra = {}) => ({
-    done: true, needsConfirm: false, actionLog: session.actionLog,
-    progress: session.progress, ...extra,
-  });
+  let terminalResult;
+  const finish = (extra = {}) => {
+    terminalResult = {
+      done: true, needsConfirm: false, actionLog: session.actionLog,
+      progress: session.progress, ...extra,
+    };
+    return terminalResult;
+  };
 
   agentBusy = true;
   const stopKeepAlive = startKeepAlive();
@@ -2019,15 +2034,17 @@ async function phaseRun() {
 
     const left = AgentGuard.describeRemaining(session.parsedTask, session.progress);
     return finish({ error: left ? `Reached the ${MAX_STEPS}-step limit. Not completed: ${left}.` : undefined });
+  } catch (error) {
+    terminalResult = { actionLog: session.actionLog, error: error.message || String(error) };
+    throw error;
   } finally {
-    agentBusy = false;
     stopKeepAlive();
-    // Persist task history when the run ends
-    if (session?.task) {
-      appendTaskHistory(session.task, {
-        actionLog: session.actionLog,
-        error: null,
-      }).catch(() => {});
+    try {
+      if (terminalResult && session?.task) await appendTaskHistory(session.task, terminalResult);
+    } catch (error) {
+      console.warn("[agent] Could not save task history:", error.message);
+    } finally {
+      agentBusy = false;
     }
   }
 }
@@ -2122,6 +2139,9 @@ async function rescanCurrentTab(resetFilled = false, reason = "agent") {
       piiCount: scan.piiCount,
       markCount: scan.safeMarks.length,
       preview: scan.redacted,
+      pageTitle: scan.pageInfo?.title,
+      pageUrl: scan.pageInfo?.url,
+      screenEvaluation: scan.screenEvaluation,
       regions: scan.previewRegions || [],
       viewport: {
         w: scan.pageInfo?.viewport_width || 0,
@@ -2420,20 +2440,35 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
   if (msg.type === "SCAN") {
+    if (agentBusy || panelScanBusy) {
+      sendResponse({ ok: false, error: "Another scan or task is in progress." });
+      return true;
+    }
+    panelScanBusy = true;
     phaseScan(msg.task, msg.tabId, false)
-      .then(r => sendResponse({ ok: true, result: r }))
-      .catch(e => sendResponse({ ok: false, error: e.message }));
+      .then(r => ({ ok: true, result: r }), e => ({ ok: false, error: e.message }))
+      .then(response => {
+        panelScanBusy = false;
+        sendResponse(response);
+      });
     return true;
   }
   if (msg.type === "RUN") {
-    // Re-entrancy guard. Two concurrent loops would drive the same tab against each other:
-    // both re-scan, both act on marks the other has invalidated, and the action log
-    // interleaves into nonsense. One run per session, always.
-    if (agentBusy) {
-      sendResponse({ ok: false, error: "The agent is already running. Stop it first." });
-      return true;
-    }
-    phaseRun()
+    (async () => {
+      const reviewedSession = session;
+      if (!reviewedSession?.scanId || msg.scanId !== reviewedSession.scanId) {
+        throw new Error("This review has expired. Scan the active tab again.");
+      }
+      const tab = await chrome.tabs.get(reviewedSession.tabId).catch(() => null);
+      if (!tab?.active || tab.url !== reviewedSession.scanUrl || tab.pendingUrl) {
+        throw new Error("The reviewed tab changed. Scan the current page again.");
+      }
+      if (agentBusy || panelScanBusy || session !== reviewedSession || reviewedSession.scanId !== msg.scanId) {
+        throw new Error("The review is no longer current. Scan the active tab again.");
+      }
+      reviewedSession.scanId = null;
+      return phaseRun();
+    })()
       .then(r => sendResponse({ ok: true, result: r }))
       .catch(e => sendResponse({ ok: false, error: e.message }));
     return true;

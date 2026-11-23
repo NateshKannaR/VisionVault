@@ -1,73 +1,22 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "cleanUrls": true,
   "outputDirectory": "public",
   "redirects": [
     {
       "source": "/visionvault-extension.zip",
       "destination": "/downloads/visionvault-chromium.zip",
       "permanent": false
-    },
-    {
-      "source": "/employee-portal",
-      "destination": "/#inspector",
-      "permanent": false
-    },
-    {
-      "source": "/employee-portal.html",
-      "destination": "/#inspector",
-      "permanent": false
-    },
-    {
-      "source": "/hr-portal",
-      "destination": "/#inspector",
-      "permanent": false
-    },
-    {
-      "source": "/hr-portal.html",
-      "destination": "/#inspector",
-      "permanent": false
-    },
-    {
-      "source": "/login",
-      "destination": "/#inspector",
-      "permanent": false
-    },
-    {
-      "source": "/login.html",
-      "destination": "/#inspector",
-      "permanent": false
-    },
-    {
-      "source": "/isro-intranet-demo",
-      "destination": "/#inspector",
-      "permanent": false
-    },
-    {
-      "source": "/isro-intranet-demo.html",
-      "destination": "/#inspector",
-      "permanent": false
-    },
-    {
-      "source": "/employee-portal/index.html",
-      "destination": "/#inspector",
-      "permanent": false
-    },
-    {
-      "source": "/hr-portal/index.html",
-      "destination": "/#inspector",
-      "permanent": false
-    },
-    {
-      "source": "/login/index.html",
-      "destination": "/#inspector",
-      "permanent": false
-    },
-    {
-      "source": "/isro-intranet-demo/index.html",
-      "destination": "/#inspector",
-      "permanent": false
     }
+  ],
+  "rewrites": [
+    { "source": "/employee-portal", "destination": "/employee-portal.html" },
+    { "source": "/employee-portal.html", "destination": "/employee-portal.html" },
+    { "source": "/hr-portal", "destination": "/hr-portal.html" },
+    { "source": "/hr-portal.html", "destination": "/hr-portal.html" },
+    { "source": "/login", "destination": "/login.html" },
+    { "source": "/login.html", "destination": "/login.html" },
+    { "source": "/isro-intranet-demo", "destination": "/isro-intranet-demo.html" },
+    { "source": "/isro-intranet-demo.html", "destination": "/isro-intranet-demo.html" }
   ],
   "headers": [
     {

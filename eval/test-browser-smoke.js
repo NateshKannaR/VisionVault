@@ -43,8 +43,16 @@ async function main() {
     await page.setViewport({ width: 1350, height: 960 });
     await page.goto(base, { waitUntil: "networkidle0" });
     assert.match(await page.$eval("#preview", (node) => node.textContent), /\[EMAIL_1\]/);
+    assert.match(await page.$eval("#preview", (node) => node.textContent), /\[PHONE_NUMBER_1\]/);
+    assert.match(await page.$eval("#lab-findings", (node) => node.textContent), /Email Address/);
     await page.click('[data-example="config"]');
     assert.match(await page.$eval("#preview", (node) => node.textContent), /\[EMAIL_1\]/);
+    assert.match(await page.$eval("#lab-findings", (node) => node.textContent), /Database Connection URI/);
+
+    await page.click("#clear-lab");
+    assert.equal(await page.$eval("#source", (node) => node.value), "");
+    assert.equal(await page.$eval("#copy", (node) => node.disabled), true);
+    assert.equal(await page.$eval("#lab-findings", (node) => node.hidden), true);
     await page.$eval("#source", (node) => {
       node.value = "<b>fixture</b> jordan@example.test";
       node.dispatchEvent(new Event("input"));
@@ -52,10 +60,41 @@ async function main() {
     assert.match(await page.$eval("#preview", (node) => node.textContent), /<b>fixture<\/b> \[EMAIL_1\]/);
     assert.equal(await page.$("#preview b"), null);
     await page.click('[data-example="support"]');
+    await page.click("#copy");
+    await page.waitForFunction(() => document.getElementById("lab-status").textContent === "Redacted output copied.");
+    await page.$eval("#lab-status", (node) => { node.hidden = true; });
     if (process.env.VV_SCREENSHOT) await page.screenshot({ path: process.env.VV_SCREENSHOT, fullPage: false });
 
-    await page.setViewport({ width: 360, height: 800 });
-    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+    for (const width of [320, 360]) {
+      await page.setViewport({ width, height: 800, isMobile: true, hasTouch: true });
+      await page.reload({ waitUntil: "domcontentloaded" });
+      assert.ok(await page.evaluate((limit) => document.documentElement.scrollWidth <= limit, width));
+    }
+    await page.click("#site-menu");
+    assert.equal(await page.$eval("#site-menu", (node) => node.getAttribute("aria-expanded")), "true");
+    await page.keyboard.press("Escape");
+    assert.equal(await page.$eval("#site-menu", (node) => node.getAttribute("aria-expanded")), "false");
+    assert.equal(await page.evaluate(() => document.activeElement.id), "site-menu");
+    await page.click("#site-menu");
+    await page.click('#site-navigation a[href="#lab"]');
+    assert.equal(new URL(page.url()).hash, "#lab");
+    assert.equal(await page.$eval("#site-menu", (node) => node.getAttribute("aria-expanded")), "false");
+
+    for (const portal of ["employee-portal/", "hr-portal/"]) {
+      assert.equal((await fetch(base + "/" + portal, { method: "HEAD" })).status, 200);
+    }
+    const video = await fetch(base + "/images/ProtoType%20VisionVault.mp4", { method: "HEAD" });
+    assert.equal(video.status, 200);
+    assert.equal(video.headers.get("content-type"), "video/mp4");
+    await page.waitForFunction(() => document.getElementById("demoVideoPlayer").readyState >= 1);
+    await page.focus('[data-seek="12"]');
+    await page.keyboard.press("Enter");
+    await page.waitForFunction(() => {
+      const video = document.getElementById("demoVideoPlayer");
+      return !video.seeking && video.currentTime >= 11.99 &&
+        document.querySelector('[data-seek="12"]').getAttribute("aria-current") === "true";
+    });
+    await page.$eval("#demoVideoPlayer", (node) => node.pause());
     assert.equal((await fetch(base + "/data/prototype-state.json")).status, 404);
     for (const browser of ["chromium", "firefox"]) {
       const response = await fetch(base + `/downloads/visionvault-${browser}.zip`);

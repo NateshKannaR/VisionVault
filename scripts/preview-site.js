@@ -11,6 +11,9 @@ const mimeTypes = {
   ".js": "text/javascript; charset=utf-8",
   ".css": "text/css; charset=utf-8",
   ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".mp4": "video/mp4",
   ".zip": "application/zip",
 };
 
@@ -28,14 +31,18 @@ const server = http.createServer((request, response) => {
   } catch {
     return respond(400);
   }
-  const file = path.resolve(root, "." + (pathname === "/" ? "/index.html" : pathname));
-  if (!file.startsWith(root + path.sep)) return respond(404);
-  if (!fs.statSync(file, { throwIfNoEntry: false })?.isFile()) return respond(404);
+  const requested = path.resolve(root, "." + pathname);
+  if (requested !== root && !requested.startsWith(root + path.sep)) return respond(404);
+  const isDirectory = fs.statSync(requested, { throwIfNoEntry: false })?.isDirectory();
+  const file = isDirectory ? path.join(requested, "index.html") : requested;
+  const stats = fs.statSync(file, { throwIfNoEntry: false });
+  if (!stats?.isFile()) return respond(404);
   const stream = fs.createReadStream(file);
   stream.once("error", () => respond(404));
   stream.once("open", () => {
     response.writeHead(200, {
-      "Content-Type": mimeTypes[path.extname(file)] || "text/plain; charset=utf-8",
+      "Content-Type": mimeTypes[path.extname(file).toLowerCase()] || "text/plain; charset=utf-8",
+      "Content-Length": stats.size,
       "X-Content-Type-Options": "nosniff",
     });
     if (request.method === "HEAD") {

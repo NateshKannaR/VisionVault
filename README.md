@@ -100,7 +100,7 @@ See [known limits and the evaluation methodology](LIMITATIONS.md) and the [archi
 
 Vercel serves the checked-in `public/` directory directly. Configure the project from the repository root. The [Vercel configuration](vercel.json) publishes the static files, applies security headers, and redirects historical download URLs.
 
-When updating the site or extension, run `npm ci` and `npm run build:vercel`, then commit the changed files in `public/` with the source changes. CI compares the checked-in files with the generated site. The local fixture portal and its runtime state stay outside the public directory.
+When updating the site or extension, run `npm ci` and `npm run build:vercel`, then commit the changed files in `public/` with the source changes. CI compares the checked-in files with the generated site. The public directory includes the static portal demos. The local portal server keeps its runtime state outside the public directory.
 
 ### Planner service
 

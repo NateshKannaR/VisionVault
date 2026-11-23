@@ -9,6 +9,7 @@ const repo = path.resolve(__dirname, "..");
 const extension = path.join(repo, "extension");
 const dist = path.join(repo, "dist", "site");
 const publicRoot = path.join(repo, "public");
+const imagesDir = path.join(repo, "images");
 const date = new Date(2000, 0, 1);
 
 function browserFiles(directory, relative = "") {
@@ -30,13 +31,30 @@ const files = browserFiles(extension);
 fs.rmSync(dist, { recursive: true, force: true });
 fs.mkdirSync(path.join(dist, "assets"), { recursive: true });
 fs.mkdirSync(path.join(dist, "downloads"), { recursive: true });
+
+// Copy static site files
 for (const name of ["index.html", "assets/site.css", "assets/site.js"]) {
-  fs.copyFileSync(path.join(publicRoot, name), path.join(dist, name));
+  if (fs.existsSync(path.join(publicRoot, name))) {
+    fs.copyFileSync(path.join(publicRoot, name), path.join(dist, name));
+  }
 }
 for (const name of ["icon32.png", "prompt-scrubber.js"]) {
-  fs.copyFileSync(path.join(extension, name), path.join(dist, "assets", name));
+  if (fs.existsSync(path.join(extension, name))) {
+    fs.copyFileSync(path.join(extension, name), path.join(dist, "assets", name));
+  }
 }
 
+// Copy images
+if (fs.existsSync(imagesDir)) {
+  fs.mkdirSync(path.join(dist, "images"), { recursive: true });
+  for (const file of fs.readdirSync(imagesDir)) {
+    if (!file.startsWith(".")) {
+      fs.copyFileSync(path.join(imagesDir, file), path.join(dist, "images", file));
+    }
+  }
+}
+
+// Generate chromium & firefox zip packages
 const hashes = [];
 for (const browser of ["chromium", "firefox"]) {
   const manifest = browser === "firefox" ? "manifest.firefox.json" : "manifest.json";
@@ -52,8 +70,10 @@ fs.writeFileSync(path.join(dist, "downloads", "SHA256SUMS"), hashes.join("\n") +
 console.log("Built static site and Chromium/Firefox packages in dist/site.");
 
 if (process.argv.includes("--update-public")) {
-  for (const directory of ["assets", "downloads"]) {
-    fs.cpSync(path.join(dist, directory), path.join(publicRoot, directory), { recursive: true });
+  for (const directory of ["assets", "downloads", "images"]) {
+    if (fs.existsSync(path.join(dist, directory))) {
+      fs.cpSync(path.join(dist, directory), path.join(publicRoot, directory), { recursive: true });
+    }
   }
   console.log("Updated the checked-in Vercel site in public.");
 }

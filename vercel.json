@@ -10,12 +10,16 @@
   ],
   "rewrites": [
     { "source": "/employee-portal", "destination": "/employee-portal.html" },
+    { "source": "/employee-portal/", "destination": "/employee-portal.html" },
     { "source": "/employee-portal.html", "destination": "/employee-portal.html" },
     { "source": "/hr-portal", "destination": "/hr-portal.html" },
+    { "source": "/hr-portal/", "destination": "/hr-portal.html" },
     { "source": "/hr-portal.html", "destination": "/hr-portal.html" },
     { "source": "/login", "destination": "/login.html" },
+    { "source": "/login/", "destination": "/login.html" },
     { "source": "/login.html", "destination": "/login.html" },
     { "source": "/isro-intranet-demo", "destination": "/isro-intranet-demo.html" },
+    { "source": "/isro-intranet-demo/", "destination": "/isro-intranet-demo.html" },
     { "source": "/isro-intranet-demo.html", "destination": "/isro-intranet-demo.html" }
   ],
   "headers": [

@@ -26,6 +26,18 @@ async function main() {
     });
     const login = (username, password) => post("/api/login", { username, password });
 
+    const homepage = await get("/");
+    assert.match(await homepage.text(), /id="lab-title"/);
+    for (const [route, type] of [
+      ["/assets/site.css", "text/css; charset=utf-8"],
+      ["/assets/site.js", "text/javascript; charset=utf-8"],
+      ["/assets/prompt-scrubber.js", "text/javascript; charset=utf-8"],
+      ["/downloads/visionvault-chromium.zip", "application/zip"],
+    ]) {
+      const response = await fetch(base + route, { method: "HEAD" });
+      assert.equal(response.status, 200);
+      assert.equal(response.headers.get("content-type"), type);
+    }
     assert.equal((await get("/login.html")).status, 200);
     assert.equal((await get("/employee-portal.html")).status, 303);
     assert.equal((await get("/api/state")).status, 401);

@@ -9,6 +9,7 @@ const repo = path.resolve(__dirname, "..");
 const extension = path.join(repo, "extension");
 const dist = path.join(repo, "dist", "site");
 const publicRoot = path.join(repo, "public");
+const portalRoot = path.join(repo, "isro-panel");
 const imagesDir = path.join(repo, "images");
 const date = new Date(2000, 0, 1);
 
@@ -98,5 +99,8 @@ console.log("Built static site and Chromium/Firefox packages in dist/site.");
 
 if (process.argv.includes("--update-public")) {
   fs.cpSync(dist, publicRoot, { recursive: true });
-  console.log("Updated the checked-in Vercel site in public.");
+  for (const name of ["index.html", "assets", "downloads"]) {
+    fs.cpSync(path.join(dist, name), path.join(portalRoot, name), { recursive: true });
+  }
+  console.log("Updated the checked-in site in public and isro-panel.");
 }

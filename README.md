@@ -98,9 +98,9 @@ See [known limits and the evaluation methodology](LIMITATIONS.md) and the [archi
 
 ### Static web build
 
-Vercel serves the checked-in `public/` directory directly. Configure the project from the repository root. The [Vercel configuration](vercel.json) publishes the static files, applies security headers, and redirects historical download URLs.
+The live Vercel project serves the checked-in homepage under `isro-panel/`. The repository-root [Vercel configuration](vercel.json) can also publish the complete static site from `public/`.
 
-When updating the site or extension, run `npm ci` and `npm run build:vercel`, then commit the changed files in `public/` with the source changes. CI compares the checked-in files with the generated site. The public directory includes the static portal demos. The local portal server keeps its runtime state outside the public directory.
+When updating the site or extension, run `npm ci` and `npm run build:vercel`. Commit the refreshed files in `public/` and `isro-panel/` with the source changes. CI verifies that the site files and browser downloads match the generated release.
 
 ### Planner service
 

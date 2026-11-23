@@ -1832,8 +1832,8 @@ footer {
       </div>
       <div class="vv-portal-shortcuts">
         <span>Try a demo</span>
-        <a href="employee-portal/">Employee portal <span class="vv-arrow external" aria-hidden="true"></span></a>
-        <a href="hr-portal/">HR portal <span class="vv-arrow external" aria-hidden="true"></span></a>
+        <a href="employee-portal.html">Employee portal <span class="vv-arrow external" aria-hidden="true"></span></a>
+        <a href="hr-portal.html">HR portal <span class="vv-arrow external" aria-hidden="true"></span></a>
       </div>
     </div>
 
@@ -4082,7 +4082,7 @@ async function generateAuditCertificate() {
   const officerId = document.getElementById("auditOfficerId")?.value.trim() || "ISRO-OFFICER-10101";
   const missionSector = document.getElementById("auditMissionSector")?.value || "ISRO-ISTRAC-TELEMETRY";
   const standard = document.getElementById("auditStandard")?.value || "DPDP_ACT_2023_SEC8";
-  
+
   const now = new Date();
   const serial = "CERT-VV-" + now.getFullYear() + "-" + Math.random().toString(16).substring(2, 8).toUpperCase();
   const timestamp = now.toISOString().replace("T", " ").substring(0, 19) + " UTC";

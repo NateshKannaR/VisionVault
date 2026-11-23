@@ -33,10 +33,14 @@ const USERS = {
 const sessions = new Map();
 const SESSION_SECONDS = 8 * 60 * 60;
 const MIME = {
+  "": "text/plain; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
   ".html": "text/html; charset=utf-8",
   ".jpeg": "image/jpeg",
   ".jpg": "image/jpeg",
+  ".js": "text/javascript; charset=utf-8",
   ".mp4": "video/mp4",
+  ".png": "image/png",
   ".zip": "application/zip",
 };
 const PAGES = new Map([
@@ -50,6 +54,16 @@ const PAGES = new Map([
   ["/hr-portal.html", "hr-portal.html"],
   ["/isro-intranet-demo", "isro-intranet-demo.html"],
   ["/isro-intranet-demo.html", "isro-intranet-demo.html"],
+]);
+
+const SITE_FILES = new Set([
+  "/assets/icon32.png",
+  "/assets/site.css",
+  "/assets/site.js",
+  "/assets/prompt-scrubber.js",
+  "/downloads/SHA256SUMS",
+  "/downloads/visionvault-chromium.zip",
+  "/downloads/visionvault-firefox.zip",
 ]);
 
 const DEFAULT_MISSIONS = [
@@ -245,7 +259,9 @@ function serveStatic(req, res, pathname) {
   }
   let file = page ? path.join(ROOT, page) : null;
   if (pathname === "/visionvault-extension.zip") {
-    file = path.resolve(ROOT, "../dist/site/downloads/visionvault-chromium.zip");
+    file = path.join(ROOT, "downloads", "visionvault-chromium.zip");
+  } else if (SITE_FILES.has(pathname)) {
+    file = path.join(ROOT, pathname.slice(1));
   } else if (pathname.startsWith("/images/")) {
     const image = pathname.slice("/images/".length);
     if (image && path.basename(image) === image && /\.(?:jpe?g|mp4)$/i.test(image)) {

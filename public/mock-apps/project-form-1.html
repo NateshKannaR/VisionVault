@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Project Form 1 — Mission Registration</title>
+  <style>
+    :root { --bg:#050a14; --card:#0d1b2a; --accent:#00b4d8; --text:#e0f2fe; --muted:#7ea8be; --border:#1a3a5c; --input:#0a1628; }
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; background:var(--bg); color:var(--text); min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px; }
+    .container { width:100%; max-width:560px; background:var(--card); border:1px solid var(--border); border-radius:14px; padding:32px; }
+    .badge { display:inline-flex; align-items:center; gap:6px; padding:4px 10px; background:rgba(0,180,216,0.12); border:1px solid rgba(0,180,216,0.3); border-radius:20px; font-size:11px; font-weight:700; color:var(--accent); margin-bottom:14px; }
+    h1 { font-size:20px; font-weight:700; margin-bottom:6px; }
+    .sub { font-size:12px; color:var(--muted); margin-bottom:24px; }
+    .section { font-size:10px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase; color:var(--accent); margin:20px 0 12px; display:flex; align-items:center; gap:8px; }
+    .section::after { content:""; flex:1; height:1px; background:var(--border); }
+    .fg { margin-bottom:14px; }
+    label { display:block; font-size:12px; font-weight:500; color:#b0c4d8; margin-bottom:5px; }
+    input, textarea, select { width:100%; padding:10px 13px; background:var(--input); border:1px solid var(--border); border-radius:7px; color:var(--text); font-size:13px; outline:none; transition:border-color .15s; }
+    input:focus, textarea:focus, select:focus { border-color:var(--accent); }
+    .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    .btn { width:100%; padding:12px; background:linear-gradient(135deg,#00b4d8,#0077b6); color:#fff; border:none; border-radius:8px; font-size:14px; font-weight:700; cursor:pointer; margin-top:8px; }
+    .btn:hover { opacity:.88; }
+    .toast { display:none; margin-top:12px; padding:11px 14px; background:rgba(6,214,160,.12); border:1px solid rgba(6,214,160,.3); border-radius:7px; color:#06d6a0; font-size:13px; text-align:center; }
+    .back { display:inline-block; margin-bottom:16px; font-size:12px; color:var(--accent); text-decoration:none; }
+    .back:hover { text-decoration:underline; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <a class="back" href="isro-dashboard.html">← Back to Dashboard</a>
+  <div class="badge">📄 Form 1 of 5</div>
+  <h1>Mission Registration</h1>
+  <p class="sub">Register a new satellite mission with ISRO Mission Control.</p>
+
+  <form onsubmit="handleSubmit(event)">
+    <div class="section">Mission Details</div>
+    <div class="fg">
+      <label for="f1_sat">Satellite Name</label>
+      <input type="text" id="f1_sat" name="satellite_name" autocomplete="off" placeholder="e.g. INSAT-4B" data-vault-key="satellite_name" />
+    </div>
+    <div class="grid2">
+      <div class="fg">
+        <label for="f1_mid">Mission ID</label>
+        <input type="text" id="f1_mid" name="mission_id" autocomplete="off" placeholder="e.g. INSAT-4B / M-201" data-vault-key="mission_id" />
+      </div>
+      <div class="fg">
+        <label for="f1_ld">Launch Date</label>
+        <input type="text" id="f1_ld" name="launch_date" autocomplete="off" placeholder="YYYY-MM-DD" data-vault-key="launch_date" />
+      </div>
+    </div>
+    <div class="grid2">
+      <div class="fg">
+        <label for="f1_orbit">Orbit Type</label>
+        <input type="text" id="f1_orbit" name="orbit_type" autocomplete="off" placeholder="e.g. Geostationary" data-vault-key="orbit_type" />
+      </div>
+      <div class="fg">
+        <label for="f1_inc">Orbital Inclination</label>
+        <input type="text" id="f1_inc" name="orbital_inclination" autocomplete="off" placeholder="e.g. 0.05°" data-vault-key="orbital_inclination" />
+      </div>
+    </div>
+    <div class="grid2">
+      <div class="fg">
+        <label for="f1_apo">Apogee</label>
+        <input type="text" id="f1_apo" name="apogee" autocomplete="off" placeholder="km" data-vault-key="apogee" />
+      </div>
+      <div class="fg">
+        <label for="f1_per">Perigee</label>
+        <input type="text" id="f1_per" name="perigee" autocomplete="off" placeholder="km" data-vault-key="perigee" />
+      </div>
+    </div>
+
+    <div class="section">Operator</div>
+    <div class="fg">
+      <label for="f1_op">Operator Name</label>
+      <input type="text" id="f1_op" name="operator" autocomplete="name" placeholder="Full name" data-vault-key="operator" />
+    </div>
+    <div class="fg">
+      <label for="f1_org">Organisation</label>
+      <input type="text" id="f1_org" name="company" autocomplete="organization" placeholder="Organisation" data-vault-key="company" />
+    </div>
+
+    <button type="submit" class="btn">Submit Mission Registration</button>
+    <div class="toast" id="toast">✓ Mission registration submitted successfully!</div>
+  </form>
+</div>
+<script>
+  function handleSubmit(e) {
+    e.preventDefault();
+    const t = document.getElementById('toast');
+    t.style.display = 'block';
+    setTimeout(() => t.style.display = 'none', 4000);
+  }
+</script>
+</body>
+</html>

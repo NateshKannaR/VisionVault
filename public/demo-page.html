@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>VisionVault — Autonomous AI Agent Verification Sandbox</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"/>
+<style>
+  :root {
+    --bg-1: #030712;
+    --bg-2: #0b1329;
+    --panel: rgba(13, 24, 45, 0.82);
+    --panel-strong: rgba(17, 28, 54, 0.95);
+    --line: rgba(56, 189, 248, 0.2);
+    --line-glow: rgba(0, 229, 255, 0.4);
+    --text: #f8fafc;
+    --muted: #94a3b8;
+    --accent: #00e5ff;
+    --primary: #38bdf8;
+    --success: #10b981;
+    --warning: #f59e0b;
+    --danger: #f43f5e;
+    --shadow: 0 24px 80px rgba(0, 0, 0, 0.7);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    min-height: 100vh;
+    font-family: 'Inter', system-ui, sans-serif;
+    background:
+      radial-gradient(circle at top left, rgba(0, 229, 255, 0.12), transparent 30%),
+      radial-gradient(circle at bottom right, rgba(99, 102, 241, 0.14), transparent 35%),
+      linear-gradient(135deg, var(--bg-1), var(--bg-2));
+    color: var(--text);
+    padding: 36px 20px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .shell {
+    max-width: 1080px;
+    margin: 0 auto;
+  }
+
+  /* Executive Header */
+  .hero {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    margin-bottom: 28px;
+    background: rgba(8, 15, 30, 0.85);
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    padding: 22px 28px;
+    backdrop-filter: blur(16px);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .brand-mark {
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+    display: grid;
+    place-items: center;
+    font-size: 22px;
+    background: linear-gradient(135deg, var(--accent), #0284c7);
+    color: #fff;
+    box-shadow: 0 0 24px rgba(0, 229, 255, 0.4);
+    flex-shrink: 0;
+  }
+
+  h2 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 1.45rem;
+    font-weight: 800;
+    color: #fff;
+    letter-spacing: -0.02em;
+  }
+
+  .subtitle {
+    margin-top: 4px;
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.45;
+  }
+
+  .badge-enclave {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border: 1px solid rgba(16, 185, 129, 0.35);
+    background: rgba(16, 185, 129, 0.12);
+    color: #a7f3d0;
+    padding: 8px 16px;
+    border-radius: 9999px;
+    font-size: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+  }
+  .sdot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #10b981;
+    box-shadow: 0 0 8px #10b981;
+  }
+
+  /* Two Column Symmetrical Layout */
+  .layout {
+    display: grid;
+    grid-template-columns: 1.5fr 1fr;
+    gap: 24px;
+    align-items: start;
+  }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    box-shadow: var(--shadow);
+    backdrop-filter: blur(16px);
+  }
+
+  form {
+    padding: 26px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  fieldset {
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 18px 20px 14px;
+    background: rgba(6, 15, 30, 0.65);
+  }
+
+  legend {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 12px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--accent);
+    padding: 0 8px;
+    font-weight: 800;
+  }
+
+  .form-grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  @media (max-width: 580px) {
+    .form-grid-2 { grid-template-columns: 1fr; }
+  }
+
+  .field-group {
+    display: flex;
+    flex-direction: column;
+    margin-top: 10px;
+  }
+
+  label {
+    font-size: 12.5px;
+    color: #cbd5e1;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+
+  input, select, textarea {
+    width: 100%;
+    border: 1px solid rgba(56, 189, 248, 0.25);
+    border-radius: 10px;
+    background: rgba(3, 7, 18, 0.85);
+    color: var(--text);
+    padding: 10px 14px;
+    font-size: 13.5px;
+    font-family: inherit;
+    transition: all 0.2s ease;
+  }
+
+  input:focus, select:focus, textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(0, 229, 255, 0.2);
+  }
+
+  textarea {
+    height: 80px;
+    resize: vertical;
+  }
+
+  button[type=submit] {
+    width: 100%;
+    padding: 14px 20px;
+    border: none;
+    border-radius: 12px;
+    font-size: 14.5px;
+    font-weight: 800;
+    font-family: 'Space Grotesk', sans-serif;
+    color: #fff;
+    cursor: pointer;
+    background: linear-gradient(135deg, var(--accent), #0284c7);
+    box-shadow: 0 10px 24px rgba(0, 229, 255, 0.3);
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  button[type=submit]:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 14px 30px rgba(0, 229, 255, 0.4);
+  }
+
+  /* Right Sidebar Telemetry & Security Enclave */
+  .sidebar {
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .sidebar-section-title {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 13px;
+    font-weight: 800;
+    color: #fff;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  /* Live Firewall HUD Card */
+  .firewall-hud-card {
+    background: rgba(3, 7, 18, 0.9);
+    border: 1.5px solid rgba(56, 189, 248, 0.35);
+    border-radius: 14px;
+    padding: 16px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  }
+
+  .hud-stat-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 12px;
+  }
+  .hud-stat-box {
+    background: rgba(13, 24, 45, 0.8);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 10px;
+  }
+  .hud-stat-lbl {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+  .hud-stat-val {
+    font-size: 14px;
+    font-weight: 800;
+    color: var(--success);
+    margin-top: 2px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .pii-card {
+    padding: 14px 16px;
+    border: 1px solid rgba(245, 158, 11, 0.35);
+    border-radius: 12px;
+    font-size: 12px;
+    line-height: 1.65;
+    color: #fef3c7;
+    background: rgba(120, 53, 15, 0.22);
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .pii-card strong { color: #fca5a5; }
+
+  /* Avatar Card */
+  .avatar-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    background: rgba(8, 16, 32, 0.7);
+    border: 1px solid var(--line);
+  }
+
+  #result {
+    padding: 12px 16px;
+    background: rgba(16, 185, 129, 0.15);
+    border: 1.5px solid var(--success);
+    border-radius: 10px;
+    font-size: 13px;
+    color: #a7f3d0;
+    display: none;
+    font-weight: 700;
+    text-align: center;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  @media (max-width: 860px) {
+    .layout { grid-template-columns: 1fr; }
+    .hero { flex-direction: column; align-items: flex-start; }
+  }
+</style>
+</head>
+<body>
+  <div class="shell">
+    
+    <!-- Top Hero Bar -->
+    <header class="hero">
+      <div class="brand">
+        <div class="brand-mark">
+          <i class="fa-solid fa-shield-halved"></i>
+        </div>
+        <div>
+          <h2>VisionVault Verification Sandbox</h2>
+          <div class="subtitle">Autonomous browser agent evaluation sandbox with fail-closed on-device PII masking.</div>
+        </div>
+      </div>
+      <div class="badge-enclave">
+        <span class="sdot"></span>
+        <span>PRIVACY FIREWALL ACTIVE</span>
+      </div>
+    </header>
+
+    <div class="layout">
+      
+      <!-- Left Panel: Interactive Form -->
+      <main class="panel">
+        <form id="signup" onsubmit="handleSubmit(event)">
+          
+          <fieldset>
+            <legend><i class="fa-solid fa-user"></i> Personal Identity</legend>
+            <div class="form-grid-2">
+              <div class="field-group">
+                <label>Full Name</label>
+                <input type="text" name="fullname" placeholder="e.g. Vikram Sarabhai" autocomplete="name" />
+              </div>
+              <div class="field-group">
+                <label>Official Email</label>
+                <input type="email" name="email" placeholder="scientist@isro.gov.in" autocomplete="email" />
+              </div>
+            </div>
+
+            <div class="form-grid-2">
+              <div class="field-group">
+                <label>Phone Number</label>
+                <input type="tel" name="phone" placeholder="+91 94440 12890" autocomplete="tel" />
+              </div>
+              <div class="field-group">
+                <label>Date of Birth</label>
+                <input type="text" name="dob" placeholder="12/08/1919" />
+              </div>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend><i class="fa-solid fa-id-badge"></i> Account &amp; Clearance</legend>
+            <div class="form-grid-2">
+              <div class="field-group">
+                <label>Operator Handle</label>
+                <input type="text" name="username" placeholder="operator_flight_lead" />
+              </div>
+              <div class="field-group">
+                <label>Clearance KMS Key</label>
+                <input type="password" name="password" placeholder="Min 8 characters" />
+              </div>
+            </div>
+
+            <div class="field-group">
+              <label>Station Country</label>
+              <select name="country">
+                <option value="IN" selected>India (ISRO Telemetry &amp; MCF)</option>
+                <option value="US">United States (NASA DSN)</option>
+                <option value="EU">Europe (ESA ESTRACK)</option>
+                <option value="AU">Australia (Canberra Deep Space)</option>
+              </select>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend><i class="fa-solid fa-location-dot"></i> Telemetry Quarters</legend>
+            <div class="field-group">
+              <label>Colony Address</label>
+              <input type="text" name="address" placeholder="Quarter Type-IV, MCF Complex" autocomplete="street-address" />
+            </div>
+
+            <div class="form-grid-2">
+              <div class="field-group">
+                <label>Station City</label>
+                <input type="text" name="city" placeholder="Hassan / Bengaluru" />
+              </div>
+              <div class="field-group">
+                <label>Postal Code</label>
+                <input type="text" name="zip" placeholder="573201" autocomplete="postal-code" />
+              </div>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend><i class="fa-solid fa-file-waveform"></i> Mission Mission Objectives</legend>
+            <div class="field-group">
+              <textarea name="bio" placeholder="State operational duty and flight software mandate…"></textarea>
+            </div>
+          </fieldset>
+
+          <button type="submit">
+            <i class="fa-solid fa-lock"></i> Submit Mission Records (Zero Cloud Leak)
+          </button>
+        </form>
+      </main>
+
+      <!-- Right Panel: Privacy Firewall & Security Monitor -->
+      <aside class="panel sidebar">
+        
+        <div class="sidebar-section-title">
+          <i class="fa-solid fa-shield-halved" style="color:var(--accent);"></i>
+          <span>Privacy Firewall™ HUD</span>
+        </div>
+
+        <!-- Telemetry Card -->
+        <div class="firewall-hud-card">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-family:'Space Grotesk',sans-serif; font-size:12px; font-weight:800; color:#fff;">TELEMETRY AUDIT</span>
+            <span style="font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--success); background:rgba(16,185,129,0.15); padding:2px 8px; border-radius:4px; font-weight:700;">SAFE TO TRANSMIT</span>
+          </div>
+
+          <div class="hud-stat-grid">
+            <div class="hud-stat-box">
+              <div class="hud-stat-lbl">Raw Pixels</div>
+              <div class="hud-stat-val">0 KB</div>
+            </div>
+            <div class="hud-stat-box">
+              <div class="hud-stat-lbl">PII Egress</div>
+              <div class="hud-stat-val">0 bytes</div>
+            </div>
+            <div class="hud-stat-box">
+              <div class="hud-stat-lbl">Privacy Budget</div>
+              <div class="hud-stat-val" style="color:var(--accent); font-size:11px;">LEVEL 0</div>
+            </div>
+            <div class="hud-stat-box">
+              <div class="hud-stat-lbl">Algorithm</div>
+              <div class="hud-stat-val" style="color:var(--primary); font-size:11px;">Verhoeff+Luhn</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- PII ground truth test block for automated evaluators -->
+        <div class="pii-card">
+          <strong>⚠ PII Ground Truth Adversarial Block</strong><br />
+          Email: <strong>support@example.com</strong><br />
+          Phone: <strong>+91 98765 43210</strong><br />
+          Card (Luhn): <strong>4532 0151 1283 0366</strong><br />
+          Aadhaar (Verhoeff): <strong>9999 9999 9991</strong><br />
+          PAN: <strong>ABCDE1234F</strong>
+        </div>
+
+        <!-- Biometric Avatar Test Item -->
+        <div class="avatar-card">
+          <svg width="38" height="38" viewBox="0 0 48 48" style="border-radius:50%; background:#0284c7; flex-shrink:0;" aria-label="Profile Avatar Face">
+            <circle cx="24" cy="18" r="8" fill="#f8fafc"/>
+            <path d="M10 38c0-7.7 6.3-14 14-14s14 6.3 14 14" fill="#f8fafc"/>
+          </svg>
+          <div style="font-size:11px; line-height:1.45;">
+            <strong style="color:#fff;">Biometric Photo Badge</strong><br />
+            <span style="color:var(--muted);">UltraFace-RFB-320 ONNX Local Enclave</span>
+          </div>
+        </div>
+
+        <!-- Obstacle & CAPTCHA Simulator -->
+        <div style="padding:14px; border-radius:12px; background:rgba(239, 68, 68, 0.08); border:1px solid rgba(239, 68, 68, 0.25); font-size:11.5px;">
+          <strong style="color:#fca5a5;"><i class="fa-solid fa-triangle-exclamation"></i> Obstacle &amp; Self-Healing Test</strong>
+          <p style="margin:4px 0 10px 0; color:var(--muted); font-size:11px;">
+            Simulate a Cloudflare or CAPTCHA modal to test the agent's autonomous pause and resume capabilities.
+          </p>
+          <button type="button" id="triggerObstacleBtn" style="width:100%; padding:9px; font-size:11px; background:#dc2626; color:white; border:none; border-radius:8px; cursor:pointer; font-weight:700; font-family:'Space Grotesk',sans-serif;">
+            Trigger Cloudflare / CAPTCHA Modal
+          </button>
+        </div>
+
+        <!-- Obstacle Modal Structure -->
+        <div id="obstacleModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.8); backdrop-filter:blur(6px); z-index:99999; align-items:center; justify-content:center;">
+          <div style="background:#0f172a; border:1px solid rgba(56,189,248,0.3); padding:24px; border-radius:16px; max-width:360px; text-align:center; box-shadow:0 20px 50px rgba(0,0,0,0.7);">
+            <div style="font-size:32px; margin-bottom:8px;">🛡️</div>
+            <h3 style="margin:0 0 8px 0; color:#f8fafc; font-family:'Space Grotesk',sans-serif;">Security Verification</h3>
+            <p style="font-size:12px; color:#94a3b8; margin:0 0 16px 0;">Verify human presence before accessing flight systems.</p>
+            <div style="padding:12px; background:#020617; border-radius:8px; border:1px solid #1e293b; margin-bottom:16px;">
+              <label style="display:flex; align-items:center; justify-content:center; gap:8px; cursor:pointer; font-size:13px;">
+                <input type="checkbox" id="cfCheck" style="width:18px; height:18px; margin:0;" />
+                <span>I am human</span>
+              </label>
+            </div>
+            <button type="button" id="closeObstacleBtn" style="padding:6px 14px; background:transparent; border:1px solid #64748b; color:#cbd5e1; border-radius:6px; cursor:pointer; font-size:11px;">Dismiss Modal</button>
+          </div>
+        </div>
+
+        <div id="result">✓ Form committed locally! (Zero raw values transmitted)</div>
+      </aside>
+
+    </div>
+  </div>
+
+  <script>
+    function handleSubmit(e) {
+      e.preventDefault();
+      document.getElementById("result").style.display = "block";
+    }
+
+    const obsBtn = document.getElementById("triggerObstacleBtn");
+    const obsModal = document.getElementById("obstacleModal");
+    const closeObsBtn = document.getElementById("closeObstacleBtn");
+    const cfCheck = document.getElementById("cfCheck");
+
+    if (obsBtn && obsModal) {
+      obsBtn.addEventListener("click", () => {
+        obsModal.style.display = "flex";
+      });
+    }
+    if (closeObsBtn && obsModal) {
+      closeObsBtn.addEventListener("click", () => {
+        obsModal.style.display = "none";
+      });
+    }
+    if (cfCheck && obsModal) {
+      cfCheck.addEventListener("change", (e) => {
+        if (e.target.checked) {
+          setTimeout(() => {
+            obsModal.style.display = "none";
+            e.target.checked = false;
+          }, 400);
+        }
+      });
+    }
+  </script>
+</body>
+</html>

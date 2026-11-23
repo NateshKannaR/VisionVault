@@ -44,6 +44,33 @@ for (const name of ["icon32.png", "prompt-scrubber.js"]) {
   }
 }
 
+// Copy portals & demo pages to dist
+const portalPages = [
+  "employee-portal.html",
+  "hr-portal.html",
+  "login.html",
+  "isro-intranet-demo.html",
+  "demo-page.html",
+];
+for (const page of portalPages) {
+  const src = path.join(repo, page);
+  if (fs.existsSync(src)) {
+    fs.copyFileSync(src, path.join(dist, page));
+    // Also support clean URL routes /<page>/ without .html
+    const baseName = page.replace(/\.html$/, "");
+    if (baseName !== "index" && baseName !== "demo-page") {
+      fs.mkdirSync(path.join(dist, baseName), { recursive: true });
+      fs.copyFileSync(src, path.join(dist, baseName, "index.html"));
+    }
+  }
+}
+
+// Copy mock-apps directory if present
+const mockAppsDir = path.join(repo, "mock-apps");
+if (fs.existsSync(mockAppsDir)) {
+  fs.cpSync(mockAppsDir, path.join(dist, "mock-apps"), { recursive: true });
+}
+
 // Copy images
 if (fs.existsSync(imagesDir)) {
   fs.mkdirSync(path.join(dist, "images"), { recursive: true });
@@ -70,10 +97,6 @@ fs.writeFileSync(path.join(dist, "downloads", "SHA256SUMS"), hashes.join("\n") +
 console.log("Built static site and Chromium/Firefox packages in dist/site.");
 
 if (process.argv.includes("--update-public")) {
-  for (const directory of ["assets", "downloads", "images"]) {
-    if (fs.existsSync(path.join(dist, directory))) {
-      fs.cpSync(path.join(dist, directory), path.join(publicRoot, directory), { recursive: true });
-    }
-  }
+  fs.cpSync(dist, publicRoot, { recursive: true });
   console.log("Updated the checked-in Vercel site in public.");
 }

@@ -96,16 +96,67 @@ async function main() {
     });
     await page.$eval("#demoVideoPlayer", (node) => node.pause());
     assert.equal(await page.$('a[href="login.html"]'), null);
+    await page.focus('#stagesGrid button[data-stage="2"]');
+    await page.keyboard.press("Enter");
+    assert.equal(await page.$eval('#stagesGrid [aria-pressed="true"]', (node) => node.dataset.stage), "2");
+    const firefoxSetup = "#install details:nth-of-type(2)";
+    await page.click(firefoxSetup + " summary");
+    assert.equal(await page.$eval(firefoxSetup, (node) => node.open), true);
     const hostedDemo = await h.browser.newPage();
     for (const route of ["login.html", "login/index.html"]) {
       await hostedDemo.goto(fixture.baseUrl + "/isro-panel/" + route);
       await hostedDemo.waitForFunction(() => location.pathname === "/employee-portal.html");
       assert.equal(await hostedDemo.$("#login-form"), null);
     }
-    for (const portal of ["employee-portal.html", "hr-portal.html"]) {
-      await hostedDemo.goto(fixture.baseUrl + "/isro-panel/" + portal);
-      assert.equal(await hostedDemo.$eval("#local-session-bar", (node) => getComputedStyle(node).display), "none");
+    hostedDemo.on("pageerror", (error) => errors.push(error.message));
+    await hostedDemo.setViewport({ width: 320, height: 800, isMobile: true, hasTouch: true });
+    for (const [portal, initial, target] of [
+      ["employee-portal.html", "overview", "form-hr"],
+      ["hr-portal.html", "missions", "emp-list"],
+      ["isro-intranet-demo.html", "messages", "form-housing"],
+    ]) {
+      const url = fixture.baseUrl + "/isro-panel/" + portal;
+      await hostedDemo.goto(url, { waitUntil: "domcontentloaded" });
+      await hostedDemo.waitForSelector("body[data-navigation-ready]");
+      if (portal !== "isro-intranet-demo.html") {
+        assert.equal(await hostedDemo.$eval("#local-session-bar", (node) => getComputedStyle(node).display), "none");
+      }
+      assert.equal(await hostedDemo.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, portal);
+      await hostedDemo.click(".workspace-menu");
+      assert.equal(await hostedDemo.$eval(".workspace-menu", (node) => node.getAttribute("aria-expanded")), "true");
+      await hostedDemo.keyboard.press("Escape");
+      assert.equal(await hostedDemo.evaluate(() => document.activeElement.className), "workspace-menu");
+      await hostedDemo.click(".workspace-menu");
+      await hostedDemo.focus(`.nav-item[data-page="${target}"]`);
+      await hostedDemo.keyboard.press("Enter");
+      assert.equal(new URL(hostedDemo.url()).hash, "#page-" + target);
+      assert.equal(await hostedDemo.$eval(".nav-item[aria-current='page']", (node) => node.dataset.page), target);
+      assert.equal(await hostedDemo.evaluate(() => document.activeElement.closest(".page").id), "page-" + target);
+      assert.equal(await hostedDemo.$eval(".workspace-menu", (node) => node.getAttribute("aria-expanded")), "false");
+      await hostedDemo.goBack();
+      await hostedDemo.waitForSelector("#page-" + initial + ".active");
+      await hostedDemo.goto(url + "#page-" + target);
+      await hostedDemo.waitForSelector("#page-" + target + ".active");
+      assert.equal(await hostedDemo.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, target);
+      if (portal === "hr-portal.html") {
+        assert.equal(await hostedDemo.$eval("#emp-tbody", (node) => node.rows.length), 6);
+        assert.equal(await hostedDemo.$eval("#emp-tbody tr", (node) => getComputedStyle(node).display), "grid");
+        await hostedDemo.type("#emp-search", "no such fixture");
+        assert.match(await hostedDemo.$eval("#personnel-results", (node) => node.textContent), /No matching personnel/);
+        await hostedDemo.$eval("#emp-search", (node) => {
+          node.value = "Natesh";
+          node.dispatchEvent(new Event("input"));
+        });
+        assert.equal(await hostedDemo.$eval("#personnel-results", (node) => node.textContent), "1 person");
+        await hostedDemo.click("#emp-tbody .topbar-action");
+        await hostedDemo.waitForSelector("#page-messages.active");
+      }
     }
+    await hostedDemo.goto(base + "/employee-portal/");
+    await hostedDemo.click('[data-open-page="mission-log"]');
+    assert.equal(new URL(hostedDemo.url()).pathname, "/employee-portal/");
+    assert.equal(new URL(hostedDemo.url()).hash, "#page-mission-log");
+    await hostedDemo.waitForSelector("#page-mission-log.active");
     await hostedDemo.close();
     assert.equal((await fetch(base + "/data/prototype-state.json")).status, 404);
     for (const browser of ["chromium", "firefox"]) {
@@ -128,6 +179,24 @@ async function main() {
     await panel.focus("#tab-run");
     await panel.keyboard.press("ArrowRight");
     assert.equal(await panel.$eval("#tab-vault", (node) => node.getAttribute("aria-selected")), "true");
+    for (const tab of ["run", "vault", "history", "privacy", "benchmarks", "shield", "settings"]) {
+      await panel.click("#tab-" + tab);
+      await panel.waitForSelector("#panel-" + tab + ".active h1");
+      assert.equal(await panel.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, tab);
+    }
+    await h.worker.evaluate(() => chrome.storage.local.set({
+      taskHistory: [{ task: "Find the sample form", ts: Date.now(), steps: 1, ok: true }],
+    }));
+    await panel.click("#tab-history");
+    await panel.waitForSelector("button.history-item");
+    await panel.focus("button.history-item");
+    await panel.keyboard.press("Enter");
+    assert.equal(await panel.$eval("#task", (node) => node.value), "Find the sample form");
+    assert.equal(await panel.evaluate(() => document.activeElement.id), "task");
+    await panel.click("#tab-history");
+    await panel.click("#clearHistory");
+    await panel.waitForSelector(".history-empty");
+    assert.equal(await panel.$eval("#clearHistory", (node) => node.disabled), true);
     await panel.click("#tab-benchmarks");
     await panel.click("#btnRunLiveVerification");
     assert.match(await panel.$eval("#benchVerificationResult", (node) => node.textContent), /^Passed/);

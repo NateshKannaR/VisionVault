@@ -34,7 +34,7 @@ fs.mkdirSync(path.join(dist, "assets"), { recursive: true });
 fs.mkdirSync(path.join(dist, "downloads"), { recursive: true });
 
 // Copy static site files
-for (const name of ["index.html", "assets/site.css", "assets/site.js"]) {
+for (const name of ["index.html", "assets/site.css", "assets/site.js", "assets/workspace.css", "assets/workspace.js"]) {
   if (fs.existsSync(path.join(publicRoot, name))) {
     fs.copyFileSync(path.join(publicRoot, name), path.join(dist, name));
   }
@@ -61,7 +61,9 @@ for (const page of portalPages) {
     const baseName = page.replace(/\.html$/, "");
     if (baseName !== "index" && baseName !== "demo-page") {
       fs.mkdirSync(path.join(dist, baseName), { recursive: true });
-      fs.copyFileSync(src, path.join(dist, baseName, "index.html"));
+      const cleanPage = fs.readFileSync(src, "utf8");
+      const nestedPage = baseName === "login" ? cleanPage : cleanPage.replace("<head>", '<head>\n<base href="../">');
+      fs.writeFileSync(path.join(dist, baseName, "index.html"), nestedPage);
     }
   }
 }

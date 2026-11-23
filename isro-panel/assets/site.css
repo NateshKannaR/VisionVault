@@ -377,3 +377,106 @@ nav.vv-navigation {
   html { scroll-behavior: auto; }
   .vv-button { transition: none; }
 }
+
+.vv-explore { padding-block: clamp(32px, 5vw, 76px) 0; }
+.vv-explore-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.vv-explore-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: clamp(16px, 2.3vw, 26px);
+  border: 1px solid var(--vv-border);
+  border-radius: 14px;
+  background: var(--vv-panel);
+}
+.vv-explore-card > i {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  color: var(--vv-accent);
+  background: #1b3642;
+  border-radius: 10px;
+}
+.vv-explore-card h3 { font: 700 1.35rem/1.25 var(--vv-display); }
+.vv-explore-card p { flex: 1; color: var(--vv-muted); font-size: .92rem; line-height: 1.55; }
+.vv-explore-card a, .vv-install-guide > a {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+  color: var(--vv-accent);
+  font-size: .9rem;
+  font-weight: 650;
+  text-underline-offset: 4px;
+}
+.vv-explore-card a:hover, .vv-install-guide a:hover { text-decoration: underline; }
+
+main > section.container {
+  width: min(1280px, 100% - 88px);
+  padding: clamp(40px, 6vw, 82px) 0 0;
+  scroll-margin-top: 70px;
+}
+main > section.container .section-header { margin: 0 0 22px; text-align: left; }
+main > section.container .section-title {
+  color: var(--vv-ink);
+  font-size: clamp(1.85rem, 3.75vw, 3.2rem);
+  letter-spacing: -.05em;
+  line-height: 1.12;
+}
+main > section.container .section-desc { max-width: 64ch; margin-inline: 0; color: var(--vv-muted); }
+main > section.container .section-tag { color: var(--vv-accent); }
+:where(.inspector-container, .defense-card, .budget-card, .stage-card, .db-card, .audit-card, .install-card) {
+  min-width: 0;
+}
+:is(.inspector-container, .defense-card, .budget-card, .stage-card, .db-card, .audit-card, .install-card) {
+  border-color: var(--vv-border);
+  background-color: var(--vv-panel);
+  box-shadow: none;
+}
+:is(.defense-card, .budget-card, .stage-card, .db-card, .install-card):hover {
+  border-color: #547387;
+  box-shadow: none;
+  transform: none;
+}
+.stage-card { color: inherit; text-align: start; font: inherit; }
+.stage-card.active { border-color: var(--vv-accent); }
+.table-wrapper { overflow-x: auto; border-color: var(--vv-border); box-shadow: none; }
+.benchmark-table { min-width: 580px; }
+.benchmark-table :is(th, td) { padding: 12px clamp(12px, 2vw, 24px); }
+.vv-install-guide {
+  display: grid;
+  gap: 10px;
+  padding: clamp(16px, 2.5vw, 28px);
+  margin-top: 18px;
+  border: 1px solid var(--vv-border);
+  border-radius: 14px;
+  background: var(--vv-panel);
+}
+.vv-install-guide summary {
+  padding: 12px;
+  background: var(--vv-editor);
+  border: 1px solid var(--vv-border);
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 650;
+}
+.vv-install-guide ol { padding: 12px 10px 0 32px; color: var(--vv-muted); }
+.vv-install-guide li { padding-bottom: 7px; overflow-wrap: anywhere; }
+.cta-box { box-shadow: none; border-color: var(--vv-border); background: var(--vv-panel); }
+main .cta-banner { padding-bottom: clamp(32px, 5vw, 60px); }
+main :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible, footer a:focus-visible {
+  outline: 2px solid var(--vv-accent);
+  outline-offset: 3px;
+}
+@media (max-width: 1050px) {
+  main > section.container { width: calc(100% - 56px); }
+}
+@media (max-width: 760px) {
+  .vv-explore-grid { grid-template-columns: 1fr; }
+  .vv-explore-card p { max-width: 55ch; }
+}
+@media (max-width: 525px) {
+  main > section.container { width: calc(100% - 34px); }
+  .benchmark-table :is(th, td) { font-size: .82rem; }
+}

@@ -61,6 +61,8 @@ const SITE_FILES = new Set([
   "/assets/icon32.png",
   "/assets/site.css",
   "/assets/site.js",
+  "/assets/workspace.css",
+  "/assets/workspace.js",
   "/assets/prompt-scrubber.js",
   "/downloads/SHA256SUMS",
   "/downloads/visionvault-chromium.zip",

@@ -1827,28 +1827,28 @@ $("confirmNo").addEventListener("click", () => {
 function renderHistory(history) {
   const el = $("historyList");
   if (!el) return;
-  if (!history || !history.length) {
-    el.innerHTML = '<p class="hint" style="padding:12px 0">No tasks run yet.</p>';
+  $("clearHistory").disabled = !history?.length;
+  if (!history?.length) {
+    el.innerHTML = '<div class="history-empty"><strong>No tasks run yet</strong><p class="hint">Completed and stopped tasks will appear here.</p></div>';
     return;
   }
   el.innerHTML = history.map((h) => {
     const ago = formatAgo(h.ts);
     const badge = h.ok
-      ? `<span style="color:var(--success)">${icon("check")}</span>`
-      : `<span style="color:var(--danger)">${icon("alert")}</span>`;
-    return `<div class="log-entry" style="cursor:pointer" data-task="${esc(h.task)}">
-      <span class="log-icon">${badge}</span>
-      <span class="log-msg"><strong>${esc(h.task)}</strong><br>
-        <span style="opacity:.65;font-size:.8em">${esc(ago)} · ${h.steps} step${h.steps === 1 ? "" : "s"}${
-          h.error ? " · " + esc(h.error.slice(0, 60)) : ""}</span>
-      </span>
-    </div>`;
+      ? `<span class="history-status is-success">${icon("check")}<span>Completed</span></span>`
+      : `<span class="history-status">${icon("alert")}<span>Stopped</span></span>`;
+    return `<button class="history-item" type="button" data-task="${esc(h.task)}">
+      ${badge}
+      <strong>${esc(h.task)}</strong>
+      <span class="history-item-meta">${esc(ago)} · ${h.steps} step${h.steps === 1 ? "" : "s"}${
+        h.error ? " · " + esc(h.error.slice(0, 60)) : ""}</span>
+    </button>`;
   }).join("");
   // Click a history entry to pre-fill the task box
   el.querySelectorAll("[data-task]").forEach((row) => {
     row.addEventListener("click", () => {
       taskEl.value = row.dataset.task;
-      $("charCount").textContent = taskEl.value.length;
+      taskEl.dispatchEvent(new Event("input"));
       document.querySelector(".tab[data-tab='run']").click();
       taskEl.focus();
     });
@@ -1879,6 +1879,7 @@ document.querySelectorAll(".tab").forEach((btn) => {
 $("clearHistory")?.addEventListener("click", () => {
   chrome.runtime.sendMessage({ type: "CLEAR_TASK_HISTORY" }, () => {
     renderHistory([]);
+    $("historyHeading").focus();
   });
 });
 

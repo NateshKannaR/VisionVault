@@ -1967,8 +1967,11 @@ body.mode-redacted .datablock {
   .sim-play-chip { font-size: 11.5px; padding: 5px 10px; }
 }
 </style>
+  <link rel="stylesheet" href="assets/workspace.css">
+  <script src="assets/workspace.js" defer></script>
 </head>
-<body>
+<body class="workspace" data-workspace="employee-portal" data-start-page="overview">
+<a class="workspace-skip" href="#workspace-content">Skip to content</a>
 <aside id="local-session-bar" hidden style="position:relative;z-index:10;padding:6px 12px;background:#17261f;color:#c9efa5;font:600 12px system-ui;text-align:center">VisionVault local fixture · Use synthetic data · <button type="button" id="fixture-logout">Sign out</button></aside>
 
 <!-- Header Top Bar -->
@@ -1979,7 +1982,7 @@ body.mode-redacted .datablock {
   <div class="topbar-branding">
     <div class="brand-row">
       <div class="topbar-title">ISRO VISION VAULT</div>
-      <div class="enclave-badge"><span class="pulse-dot"></span> ENCLAVE ACTIVE</div>
+      <div class="enclave-badge"><span class="pulse-dot"></span> EMPLOYEE DEMO</div>
     </div>
     <div class="operator-chip">
       <i class="fa-solid fa-user-astronaut op-icon"></i>
@@ -2024,55 +2027,62 @@ body.mode-redacted .datablock {
 
 <div class="layout">
   <!-- Sidebar Navigation -->
-  <nav class="sidebar">
-    <div class="prog-wrap">
-      <div class="prog-label">
-        <span>Multi-Database Sync Progress</span>
-        <span id="prog-pct">0%</span>
+  <div class="workspace-rail">
+    <button class="workspace-menu" type="button" aria-expanded="false" aria-controls="workspace-navigation">
+      <span>Employee workspace</span>
+      <strong data-current-section>Mission overview</strong>
+    </button>
+    <nav class="sidebar" id="workspace-navigation" aria-label="Employee workspace">
+      <div class="workspace-nav-title">Employee workspace</div>
+      <div class="prog-wrap">
+        <div class="prog-label">
+          <span>Multi-Database Sync Progress</span>
+          <span id="prog-pct">0%</span>
+        </div>
+        <div class="prog-track"><div class="prog-fill" id="prog-fill" style="width:0%"></div></div>
+        <div class="prog-count" id="prog-count">0 / 6 Synchronized</div>
       </div>
-      <div class="prog-track"><div class="prog-fill" id="prog-fill" style="width:0%"></div></div>
-      <div class="prog-count" id="prog-count">0 / 6 Synchronized</div>
-    </div>
 
-    <div class="nav-section">Mission Operations &amp; Comms</div>
-    <div class="nav-item active" data-page="overview">
-      <span class="ni"><i class="fa-solid fa-gauge-high"></i></span>
-      Flight Operations Hub
-    </div>
-    <div class="nav-item" data-page="messages">
-      <span class="ni"><i class="fa-solid fa-satellite-dish"></i></span>
-      Secure Comms Terminal
-    </div>
+      <div class="nav-section">Mission Operations &amp; Comms</div>
+      <button type="button" class="nav-item active" data-page="overview" aria-controls="page-overview" aria-current="page">
+        <span class="ni"><i class="fa-solid fa-gauge-high"></i></span>
+        <span class="workspace-link-label">Flight Operations Hub</span>
+      </button>
+      <button type="button" class="nav-item" data-page="messages" aria-controls="page-messages">
+        <span class="ni"><i class="fa-solid fa-satellite-dish"></i></span>
+        <span class="workspace-link-label">Secure Comms Terminal</span>
+      </button>
 
-    <div class="nav-section">Personnel &amp; Security Databases</div>
-    <div class="nav-item" data-page="form-hr">
-      <span class="ni"><i class="fa-solid fa-user-check"></i></span>
-      Database 1 — HR Personnel <span class="tick" id="tick-hr">✓</span>
-    </div>
-    <div class="nav-item" data-page="form-payroll">
-      <span class="ni"><i class="fa-solid fa-money-check-dollar"></i></span>
-      Database 2 — Mission Payroll <span class="tick" id="tick-payroll">✓</span>
-    </div>
-    <div class="nav-item" data-page="form-it">
-      <span class="ni"><i class="fa-solid fa-microchip"></i></span>
-      Database 3 — Mission Systems <span class="tick" id="tick-it">✓</span>
-    </div>
-    <div class="nav-item" data-page="form-housing">
-      <span class="ni"><i class="fa-solid fa-building-user"></i></span>
-      Database 4 — Staff Quarters <span class="tick" id="tick-housing">✓</span>
-    </div>
-    <div class="nav-item" data-page="form-medical">
-      <span class="ni"><i class="fa-solid fa-heart-pulse"></i></span>
-      Database 5 — Health &amp; Welfare <span class="tick" id="tick-medical">✓</span>
-    </div>
-    <div class="nav-item" data-page="form-gaganyaan">
-      <span class="ni"><i class="fa-solid fa-user-astronaut"></i></span>
-      Database 6 — Gaganyaan Registry <span class="tick" id="tick-gaganyaan">✓</span>
-    </div>
-  </nav>
+      <div class="nav-section">Personnel &amp; Security Databases</div>
+      <button type="button" class="nav-item" data-page="form-hr" aria-controls="page-form-hr">
+        <span class="ni"><i class="fa-solid fa-user-check"></i></span>
+        <span class="workspace-link-label">Database 1 — HR Personnel</span> <span class="tick" id="tick-hr">✓</span>
+      </button>
+      <button type="button" class="nav-item" data-page="form-payroll" aria-controls="page-form-payroll">
+        <span class="ni"><i class="fa-solid fa-money-check-dollar"></i></span>
+        <span class="workspace-link-label">Database 2 — Mission Payroll</span> <span class="tick" id="tick-payroll">✓</span>
+      </button>
+      <button type="button" class="nav-item" data-page="form-it" aria-controls="page-form-it">
+        <span class="ni"><i class="fa-solid fa-microchip"></i></span>
+        <span class="workspace-link-label">Database 3 — Mission Systems</span> <span class="tick" id="tick-it">✓</span>
+      </button>
+      <button type="button" class="nav-item" data-page="form-housing" aria-controls="page-form-housing">
+        <span class="ni"><i class="fa-solid fa-building-user"></i></span>
+        <span class="workspace-link-label">Database 4 — Staff Quarters</span> <span class="tick" id="tick-housing">✓</span>
+      </button>
+      <button type="button" class="nav-item" data-page="form-medical" aria-controls="page-form-medical">
+        <span class="ni"><i class="fa-solid fa-heart-pulse"></i></span>
+        <span class="workspace-link-label">Database 5 — Health &amp; Welfare</span> <span class="tick" id="tick-medical">✓</span>
+      </button>
+      <button type="button" class="nav-item" data-page="form-gaganyaan" aria-controls="page-form-gaganyaan">
+        <span class="ni"><i class="fa-solid fa-user-astronaut"></i></span>
+        <span class="workspace-link-label">Database 6 — Gaganyaan Registry</span> <span class="tick" id="tick-gaganyaan">✓</span>
+      </button>
+    </nav>
+  </div>
 
   <!-- Main Content Area -->
-  <main class="main">
+  <main class="main" id="workspace-content" tabindex="-1">
 
     <!-- Overview / Mission Operations Console Tab -->
     <div class="page active" id="page-overview">
@@ -2084,7 +2094,7 @@ body.mode-redacted .datablock {
             <div class="page-badge" style="background:rgba(56,189,248,0.08); border:1px solid rgba(56,189,248,0.25); color:#38bdf8;">
               <i class="fa-solid fa-satellite-dish"></i> MASTER CONTROL FACILITY (MCF) &bull; HASSAN &amp; BENGALURU
             </div>
-            <div class="page-title">Flight Operations &amp; Mission Telemetry Hub</div>
+            <h1 class="page-title" tabindex="-1">Flight Operations &amp; Mission Telemetry Hub</h1>
             <div class="page-sub">Central command console for real-time spacecraft tracking, multi-database sync, and on-device privacy enclave.</div>
           </div>
           <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
@@ -2098,6 +2108,12 @@ body.mode-redacted .datablock {
               <i class="fa-solid fa-circle-info" style="color:#a78bfa;"></i> Setup Guide
             </button>
           </div>
+        </div>
+
+        <div class="workspace-shortcuts" role="group" aria-label="Employee shortcuts">
+          <button type="button" data-open-page="messages"><i class="fa-solid fa-comments" aria-hidden="true"></i> Open mission chat <span aria-hidden="true">→</span></button>
+          <button type="button" data-open-page="form-hr"><i class="fa-solid fa-address-card" aria-hidden="true"></i> Update personnel records <span aria-hidden="true">→</span></button>
+          <button type="button" data-open-page="mission-log"><i class="fa-solid fa-satellite" aria-hidden="true"></i> View mission log <span aria-hidden="true">→</span></button>
         </div>
 
         <!-- Real-Time Telemetry & Systems Status Strip (4 Sleek Metric Cards) -->
@@ -2198,66 +2214,68 @@ body.mode-redacted .datablock {
             </div>
             <span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:#94a3b8;">ISRO Ground Network &bull; MCF Hassan &amp; ISTRAC</span>
           </div>
-          <table class="sat-table" style="margin-top:0;">
-            <thead>
-              <tr>
-                <th>Spacecraft</th>
-                <th>Mission Code</th>
-                <th>Orbit Profile</th>
-                <th>Downlink Freq</th>
-                <th>Subsystem Health</th>
-                <th>Primary Ground Station</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td style="font-weight:700; color:#fff;">Chandrayaan-3 Propulsion</td>
-                <td style="font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--accent);">CH-3 / PR-01</td>
-                <td style="font-size:12.5px;">Lunar Polar &bull; 100 km</td>
-                <td style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#38bdf8;">8.400 GHz (X-Band)</td>
-                <td style="font-size:12px; color:var(--green);"><i class="fa-solid fa-circle-check"></i> Subsystems Nominal</td>
-                <td style="font-size:12px;">MCF Hassan Dish #2</td>
-                <td><span style="font-size:10px; font-family:'JetBrains Mono',monospace; background:rgba(16,185,129,0.15); border:1px solid rgba(16,185,129,0.4); color:var(--green); padding:2px 7px; border-radius:4px; font-weight:700;">TRACKING</span></td>
-              </tr>
-              <tr>
-                <td style="font-weight:700; color:#fff;">Gaganyaan Orbital Module</td>
-                <td style="font-family:'JetBrains Mono',monospace; font-size:11.5px; color:#a78bfa;">HSFC-GY-01</td>
-                <td style="font-size:12.5px;">400 km LEO (Target)</td>
-                <td style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#a78bfa;">S-Band Telemetry</td>
-                <td style="font-size:12px; color:#a78bfa;"><i class="fa-solid fa-shield-halved"></i> Pre-Flight HLVM3 Ready</td>
-                <td style="font-size:12px;">HSFC Bengaluru</td>
-                <td><span style="font-size:10px; font-family:'JetBrains Mono',monospace; background:rgba(167,139,250,0.15); border:1px solid rgba(167,139,250,0.4); color:#a78bfa; padding:2px 7px; border-radius:4px; font-weight:700;">DB6 READY</span></td>
-              </tr>
-              <tr>
-                <td style="font-weight:700; color:#fff;">NISAR (NASA-ISRO SAR)</td>
-                <td style="font-family:'JetBrains Mono',monospace; font-size:11.5px; color:#f59e0b;">NISAR-2025</td>
-                <td style="font-size:12.5px;">747 km Sun-Synchronous LEO</td>
-                <td style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#f59e0b;">X + L-Band Sweep</td>
-                <td style="font-size:12px; color:#cbd5e1;"><i class="fa-solid fa-satellite"></i> Dual SAR Staging</td>
-                <td style="font-size:12px;">ISTRAC Bengaluru</td>
-                <td><span style="font-size:10px; font-family:'JetBrains Mono',monospace; background:rgba(245,158,11,0.15); border:1px solid rgba(245,158,11,0.4); color:#f59e0b; padding:2px 7px; border-radius:4px; font-weight:700;">INTEGRATION</span></td>
-              </tr>
-              <tr>
-                <td style="font-weight:700; color:#fff;">NavIC IRNSS-1J</td>
-                <td style="font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--accent);">IRNSS-1J</td>
-                <td style="font-size:12.5px;">36,000 km Geosynchronous</td>
-                <td style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#38bdf8;">L5 / S-Band Carrier</td>
-                <td style="font-size:12px; color:var(--green);"><i class="fa-solid fa-circle-check"></i> Rubidium Clocks Synced</td>
-                <td style="font-size:12px;">MCF Hassan Dish #1</td>
-                <td><span style="font-size:10px; font-family:'JetBrains Mono',monospace; background:rgba(16,185,129,0.15); border:1px solid rgba(16,185,129,0.4); color:var(--green); padding:2px 7px; border-radius:4px; font-weight:700;">OPERATIONAL</span></td>
-              </tr>
-              <tr>
-                <td style="font-weight:700; color:#fff;">Aditya-L1 Solar Observatory</td>
-                <td style="font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--accent);">ADITYA-L1</td>
-                <td style="font-size:12.5px;">Halo Orbit &bull; Sun-Earth L1 (1.5M km)</td>
-                <td style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#38bdf8;">X-Band Deep Space</td>
-                <td style="font-size:12px; color:var(--green);"><i class="fa-solid fa-sun"></i> Primary Payloads Active</td>
-                <td style="font-size:12px;">IDSN Byalalu (32m)</td>
-                <td><span style="font-size:10px; font-family:'JetBrains Mono',monospace; background:rgba(16,185,129,0.15); border:1px solid rgba(16,185,129,0.4); color:var(--green); padding:2px 7px; border-radius:4px; font-weight:700;">SUN-LOCKED</span></td>
-              </tr>
-            </tbody>
-          </table>
+          <div class="workspace-table" role="region" aria-label="Spacecraft telemetry" tabindex="0">
+            <table class="sat-table" style="margin-top:0;">
+              <thead>
+                <tr>
+                  <th>Spacecraft</th>
+                  <th>Mission Code</th>
+                  <th>Orbit Profile</th>
+                  <th>Downlink Freq</th>
+                  <th>Subsystem Health</th>
+                  <th>Primary Ground Station</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td style="font-weight:700; color:#fff;">Chandrayaan-3 Propulsion</td>
+                  <td style="font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--accent);">CH-3 / PR-01</td>
+                  <td style="font-size:12.5px;">Lunar Polar &bull; 100 km</td>
+                  <td style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#38bdf8;">8.400 GHz (X-Band)</td>
+                  <td style="font-size:12px; color:var(--green);"><i class="fa-solid fa-circle-check"></i> Subsystems Nominal</td>
+                  <td style="font-size:12px;">MCF Hassan Dish #2</td>
+                  <td><span style="font-size:10px; font-family:'JetBrains Mono',monospace; background:rgba(16,185,129,0.15); border:1px solid rgba(16,185,129,0.4); color:var(--green); padding:2px 7px; border-radius:4px; font-weight:700;">TRACKING</span></td>
+                </tr>
+                <tr>
+                  <td style="font-weight:700; color:#fff;">Gaganyaan Orbital Module</td>
+                  <td style="font-family:'JetBrains Mono',monospace; font-size:11.5px; color:#a78bfa;">HSFC-GY-01</td>
+                  <td style="font-size:12.5px;">400 km LEO (Target)</td>
+                  <td style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#a78bfa;">S-Band Telemetry</td>
+                  <td style="font-size:12px; color:#a78bfa;"><i class="fa-solid fa-shield-halved"></i> Pre-Flight HLVM3 Ready</td>
+                  <td style="font-size:12px;">HSFC Bengaluru</td>
+                  <td><span style="font-size:10px; font-family:'JetBrains Mono',monospace; background:rgba(167,139,250,0.15); border:1px solid rgba(167,139,250,0.4); color:#a78bfa; padding:2px 7px; border-radius:4px; font-weight:700;">DB6 READY</span></td>
+                </tr>
+                <tr>
+                  <td style="font-weight:700; color:#fff;">NISAR (NASA-ISRO SAR)</td>
+                  <td style="font-family:'JetBrains Mono',monospace; font-size:11.5px; color:#f59e0b;">NISAR-2025</td>
+                  <td style="font-size:12.5px;">747 km Sun-Synchronous LEO</td>
+                  <td style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#f59e0b;">X + L-Band Sweep</td>
+                  <td style="font-size:12px; color:#cbd5e1;"><i class="fa-solid fa-satellite"></i> Dual SAR Staging</td>
+                  <td style="font-size:12px;">ISTRAC Bengaluru</td>
+                  <td><span style="font-size:10px; font-family:'JetBrains Mono',monospace; background:rgba(245,158,11,0.15); border:1px solid rgba(245,158,11,0.4); color:#f59e0b; padding:2px 7px; border-radius:4px; font-weight:700;">INTEGRATION</span></td>
+                </tr>
+                <tr>
+                  <td style="font-weight:700; color:#fff;">NavIC IRNSS-1J</td>
+                  <td style="font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--accent);">IRNSS-1J</td>
+                  <td style="font-size:12.5px;">36,000 km Geosynchronous</td>
+                  <td style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#38bdf8;">L5 / S-Band Carrier</td>
+                  <td style="font-size:12px; color:var(--green);"><i class="fa-solid fa-circle-check"></i> Rubidium Clocks Synced</td>
+                  <td style="font-size:12px;">MCF Hassan Dish #1</td>
+                  <td><span style="font-size:10px; font-family:'JetBrains Mono',monospace; background:rgba(16,185,129,0.15); border:1px solid rgba(16,185,129,0.4); color:var(--green); padding:2px 7px; border-radius:4px; font-weight:700;">OPERATIONAL</span></td>
+                </tr>
+                <tr>
+                  <td style="font-weight:700; color:#fff;">Aditya-L1 Solar Observatory</td>
+                  <td style="font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--accent);">ADITYA-L1</td>
+                  <td style="font-size:12.5px;">Halo Orbit &bull; Sun-Earth L1 (1.5M km)</td>
+                  <td style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#38bdf8;">X-Band Deep Space</td>
+                  <td style="font-size:12px; color:var(--green);"><i class="fa-solid fa-sun"></i> Primary Payloads Active</td>
+                  <td style="font-size:12px;">IDSN Byalalu (32m)</td>
+                  <td><span style="font-size:10px; font-family:'JetBrains Mono',monospace; background:rgba(16,185,129,0.15); border:1px solid rgba(16,185,129,0.4); color:var(--green); padding:2px 7px; border-radius:4px; font-weight:700;">SUN-LOCKED</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
 
         <!-- AUTONOMOUS AGENT MISSION VECTORS (Compact, Sleek, Professional Runner) -->
@@ -2335,7 +2353,7 @@ body.mode-redacted .datablock {
     <div class="page" id="page-mission-log">
       <div class="inner">
         <div class="page-badge" style="background:rgba(245,158,11,.14);border:1px solid rgba(245,158,11,.35);color:#f59e0b;">MISSION LOG &amp; REGISTRY</div>
-        <div class="page-title">Mission Dashboard</div>
+        <h1 class="page-title" tabindex="-1">Mission Dashboard</h1>
         <div class="page-sub">Cross-site intelligence sync target — public ISRO launch data logged here, zero bytes redacted (public data flows freely).</div>
 
         <!-- Privacy Contrast Banner -->
@@ -2374,29 +2392,32 @@ body.mode-redacted .datablock {
             <div style="font-size:13px; font-weight:800; color:#fff; font-family:'Space Grotesk',sans-serif; letter-spacing:0.5px;">MISSION REGISTRY</div>
             <span id="sync-badge" style="display:none; font-size:10.5px; font-family:'JetBrains Mono',monospace; font-weight:800; color:#f59e0b; background:rgba(245,158,11,0.12); border:1px solid rgba(245,158,11,0.35); padding:3px 10px; border-radius:4px; letter-spacing:0.8px;"><i class="fa-solid fa-satellite fa-spin"></i> SYNCHRONIZED FROM ISRO.GOV.IN</span>
           </div>
-          <table class="sat-table" id="mission-log-table">
-            <thead>
-              <tr>
-                <th>Satellite</th>
-                <th>Mission ID</th>
-                <th>Launch Date</th>
-                <th>Vehicle</th>
-                <th>Orbit</th>
-                <th>Status</th>
-                <th>Source</th>
-              </tr>
-            </thead>
-            <tbody id="mission-log-tbody">
-              <tr style="opacity:0.45; font-style:italic;">
-                <td colspan="7" style="text-align:center; padding:20px; color:var(--muted);">No missions logged yet. Paste the Cross-Site Sync prompt to auto-populate from ISRO.gov.in.</td>
-              </tr>
-            </tbody>
-          </table>
+          <div class="workspace-table" role="region" aria-label="Mission log" tabindex="0">
+            <table class="sat-table" id="mission-log-table">
+              <thead>
+                <tr>
+                  <th>Satellite</th>
+                  <th>Mission ID</th>
+                  <th>Launch Date</th>
+                  <th>Vehicle</th>
+                  <th>Orbit</th>
+                  <th>Status</th>
+                  <th>Source</th>
+                </tr>
+              </thead>
+              <tbody id="mission-log-tbody">
+                <tr style="opacity:0.45; font-style:italic;">
+                  <td colspan="7" style="text-align:center; padding:20px; color:var(--muted);">No missions logged yet. Paste the Cross-Site Sync prompt to auto-populate from ISRO.gov.in.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
 
     <div class="page" id="page-messages">
+      <div class="workspace-chat-title"><h1 class="page-title" tabindex="-1">Mission communications</h1></div>
       <div class="chat-layout">
         <div class="contact-list-wrap">
           <div style="padding:14px 16px 8px;font-size:11px;font-weight:800;letter-spacing:1px;color:var(--muted);text-transform:uppercase;font-family:'JetBrains Mono',monospace;">Encrypted Channels</div>
@@ -2446,8 +2467,8 @@ body.mode-redacted .datablock {
           <div class="enc-banner"><i class="fa-solid fa-lock"></i> End-to-end encrypted channel. All payloads decrypted locally on-device.</div>
           <div class="messages" id="emp-messages"></div>
           <div class="composer">
-            <input type="text" id="emp-msg-input" placeholder="Type encrypted response message…"/>
-            <button class="send-btn" onclick="empSend()"><i class="fa-solid fa-paper-plane"></i></button>
+            <input type="text" id="emp-msg-input" aria-label="Message to mission operations" placeholder="Type encrypted response message…"/>
+            <button class="send-btn" type="button" aria-label="Send message" onclick="empSend()"><i class="fa-solid fa-paper-plane"></i></button>
           </div>
         </div>
       </div>
@@ -2457,7 +2478,7 @@ body.mode-redacted .datablock {
     <div class="page" id="page-form-hr">
       <div class="inner">
         <div class="page-badge" style="background:rgba(0,180,216,.14);border:1px solid rgba(0,180,216,.35);color:var(--accent);">DATABASE 1 OF 6 — HR SYSTEM</div>
-        <div class="page-title">Personal Records Database</div>
+        <h1 class="page-title" tabindex="-1">Personal Records Database</h1>
         <div class="page-sub">Employee Master Record Database — HR-ESS-01</div>
 
         <div class="fsection" style="color:var(--accent);">Personnel Credentials</div>
@@ -2497,7 +2518,7 @@ body.mode-redacted .datablock {
     <div class="page" id="page-form-payroll">
       <div class="inner">
         <div class="page-badge" style="background:rgba(6,214,160,.14);border:1px solid rgba(6,214,160,.35);color:var(--green);">DATABASE 2 OF 6 — ISRO MISSION PAYROLL</div>
-        <div class="page-title">Mission Payroll &amp; Banking Database</div>
+        <h1 class="page-title" tabindex="-1">Mission Payroll &amp; Banking Database</h1>
         <div class="page-sub">Finance &amp; Accounts Directorate — PAY-SS-04</div>
 
         <div class="aerospace-hud-card" style="border-color: rgba(6, 214, 160, 0.35); background: rgba(6, 214, 160, 0.05);">
@@ -2546,7 +2567,7 @@ body.mode-redacted .datablock {
     <div class="page" id="page-form-it">
       <div class="inner">
         <div class="page-badge" style="background:rgba(255,209,102,.14);border:1px solid rgba(255,209,102,.35);color:var(--yellow);">DATABASE 3 OF 6 — ISRO MISSION SYSTEMS</div>
-        <div class="page-title">Mission Systems &amp; Security Database</div>
+        <h1 class="page-title" tabindex="-1">Mission Systems &amp; Security Database</h1>
         <div class="page-sub">ISRO Mission Operations Technology — ITAM-12 / SEC-04</div>
 
         <div class="aerospace-hud-card" style="border-color: rgba(255, 209, 102, 0.35); background: rgba(255, 209, 102, 0.05);">
@@ -2602,7 +2623,7 @@ body.mode-redacted .datablock {
     <div class="page" id="page-form-housing">
       <div class="inner">
         <div class="page-badge" style="background:rgba(167,139,250,.14);border:1px solid rgba(167,139,250,.35);color:var(--violet);">DATABASE 4 OF 6 — ISRO STAFF QUARTERS</div>
-        <div class="page-title">Staff Quarters &amp; Estate Database</div>
+        <h1 class="page-title" tabindex="-1">Staff Quarters &amp; Estate Database</h1>
         <div class="page-sub">ISRO Estate Management Cell — HSG-07</div>
 
         <div class="card">
@@ -2643,7 +2664,7 @@ body.mode-redacted .datablock {
     <div class="page" id="page-form-medical">
       <div class="inner">
         <div class="page-badge" style="background:rgba(239,71,111,.14);border:1px solid rgba(239,71,111,.35);color:var(--red);">DATABASE 5 OF 6 — HEALTHCARE &amp; WELFARE</div>
-        <div class="page-title">Healthcare, Dependents &amp; Insurance Database</div>
+        <h1 class="page-title" tabindex="-1">Healthcare, Dependents &amp; Insurance Database</h1>
         <div class="page-sub">ISRO Health &amp; Welfare Cell — MED-03</div>
 
         <div class="fsection" style="color:var(--red);">Employee Details</div>
@@ -2674,7 +2695,7 @@ body.mode-redacted .datablock {
     <div class="page" id="page-form-gaganyaan">
       <div class="inner">
         <div class="page-badge" style="background:rgba(167,139,250,.14);border:1px solid rgba(167,139,250,.35);color:#a78bfa;">DATABASE 6 OF 6 — GAGANYAAN HUMAN SPACEFLIGHT</div>
-        <div class="page-title">Gaganyaan Mission Intelligence Database</div>
+        <h1 class="page-title" tabindex="-1">Gaganyaan Mission Intelligence Database</h1>
         <div class="page-sub">HSFC — Human Space Flight Centre, Bengaluru</div>
 
         <!-- Source sync banner -->
@@ -2976,6 +2997,7 @@ function navigateToPage(pageId) {
   });
   if (pageId === "messages") loadEmpMessages();
   if (pageId === "mission-log") renderMissionLog();
+  document.dispatchEvent(new Event("workspacechange"));
 }
 
 // Mission Log Data

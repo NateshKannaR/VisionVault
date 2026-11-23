@@ -31,6 +31,10 @@ Open [the local site](http://127.0.0.1:8080/), switch between samples in the red
 | `downloads/visionvault-firefox.zip` | Experimental Firefox package |
 | `downloads/SHA256SUMS` | SHA-256 digests for both archives |
 
+### Try the public demos
+
+The homepage links to the redaction lab, interactive workflow, sample privacy audit, and browser-specific setup guide. Open the employee, HR, or intranet demo from the portal links. On a narrow screen, tap the workspace menu to move between sections. The employee and HR shortcuts link directly to common tasks, and the HR directory shows database sync status as cards on phones.
+
 ### Install the extension
 
 1. Open `chrome://extensions`, turn on **Developer mode**, and choose **Load unpacked**.
@@ -39,6 +43,8 @@ Open [the local site](http://127.0.0.1:8080/), switch between samples in the red
 4. Enter a task and select **Scan active tab**. Inspect the preview and choose **Run reviewed task**. **Run automatically after redacting** is an opt-in setting.
 
 To try a local signup fixture, run `python -m http.server 8081 --bind 127.0.0.1 --directory eval` and open [the sample signup page](http://127.0.0.1:8081/pages/signup-form.html). To try messaging and mission forms, start the [local fixture portal](isro-panel/README.md).
+
+The side panel also provides **Vault** for saved fields, **History** for reopening recent tasks, **Privacy** for reviewing planner requests, and **Shield** for scrubbing prompt text. Use **Diagnostics** for the local self-check and **Settings** for scan and planner options.
 
 For Firefox development, run `npm run build:firefox` and load `extension-firefox/manifest.json` in `about:debugging#/runtime/this-firefox`. The Firefox package is unsigned and has different browser capabilities. Chromium is the browser covered by CI runtime tests.
 
@@ -117,7 +123,7 @@ The sample Docker Compose setup publishes only a loopback port and requires a pl
 | Command | Coverage |
 | --- | --- |
 | `npm test` | Extension contracts, planning, prompt and document masking, vault, MCP, and local fixture portal API |
-| `npm run build && npm run test:browser` | Real Chromium smoke test for the built site, ZIP downloads, narrow layouts, panel navigation, diagnostics, and scanning |
+| `npm run build && npm run test:browser` | Real Chromium smoke test for the built site, ZIP downloads, narrow layouts, portal deep links, keyboard navigation, task history, diagnostics, and scanning |
 | `python eval/test-fallback-chain.py` | Production planner dispatch and cooldown behavior using deterministic provider doubles |
 | `python eval/test-planner-http.py` | Auth, explicit CORS, request bounds, zero-pixel validation, and streaming parity over HTTP |
 | `python eval/test-server-contract.py` | Planner response contract with the default rules server running on port 8000 |

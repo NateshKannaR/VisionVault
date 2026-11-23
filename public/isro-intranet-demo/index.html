@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<base href="../">
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>ISRO Intranet — Employee Self-Service</title>
@@ -116,8 +117,11 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent);}
 .toast.show{display:flex;}
 .icon{width:14px;height:14px;flex-shrink:0;}
 </style>
+  <link rel="stylesheet" href="assets/workspace.css">
+  <script src="assets/workspace.js" defer></script>
 </head>
-<body>
+<body class="workspace" data-workspace="isro-intranet-demo" data-start-page="messages">
+<a class="workspace-skip" href="#workspace-content">Skip to content</a>
 
 <div class="topbar">
   <div class="logo"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#03121c" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg></div>
@@ -125,44 +129,52 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent);}
     <div class="topbar-title">ISRO INTRANET — EMPLOYEE SELF-SERVICE</div>
     <div class="topbar-sub">Unified access across HR, Payroll, IT, Housing &amp; Medical systems — SIH PS 26171 Demo</div>
   </div>
-  <div class="status-pill"><div class="sdot"></div><span>SECURE SESSION</span></div>
+  <div class="status-pill"><div class="sdot"></div><span>DEMO SESSION</span></div>
 </div>
 
 <div class="layout">
 
-  <nav class="sidebar">
-    <div class="nav-section">Communication</div>
-    <div class="nav-item active" data-page="messages">
-      <span class="ni"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
-      Secure Messages <span class="nav-badge">1</span>
-    </div>
+  <div class="workspace-rail">
+    <button class="workspace-menu" type="button" aria-expanded="false" aria-controls="workspace-navigation">
+      <span>Intranet demo</span>
+      <strong data-current-section>Secure messages</strong>
+    </button>
+    <nav class="sidebar" id="workspace-navigation" aria-label="Intranet demo">
+      <div class="workspace-nav-title">Intranet demo</div>
+      <div class="nav-section">Communication</div>
+      <button type="button" class="nav-item active" data-page="messages" aria-controls="page-messages" aria-current="page">
+        <span class="ni"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
+        <span class="workspace-link-label">Secure Messages</span> <span class="nav-badge">1</span>
+      </button>
 
-    <div class="nav-section">Update My Details</div>
-    <div class="nav-item" data-page="form-hr">
-      <span class="ni"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg></span>
-      HR — Personal Details
-    </div>
-    <div class="nav-item" data-page="form-payroll">
-      <span class="ni"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg></span>
-      Payroll — Banking
-    </div>
-    <div class="nav-item" data-page="form-it">
-      <span class="ni"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="12" rx="1"/><path d="M8 21h8M12 16v5"/></svg></span>
-      IT — Asset &amp; Access
-    </div>
-    <div class="nav-item" data-page="form-housing">
-      <span class="ni"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l9-9 9 9"/><path d="M5 10v10h14V10"/></svg></span>
-      Housing — Quarters
-    </div>
-    <div class="nav-item" data-page="form-medical">
-      <span class="ni"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8Z"/></svg></span>
-      Medical — Dependents
-    </div>
-  </nav>
+      <div class="nav-section">Update My Details</div>
+      <button type="button" class="nav-item" data-page="form-hr" aria-controls="page-form-hr">
+        <span class="ni"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg></span>
+        <span class="workspace-link-label">HR — Personal Details</span>
+      </button>
+      <button type="button" class="nav-item" data-page="form-payroll" aria-controls="page-form-payroll">
+        <span class="ni"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg></span>
+        <span class="workspace-link-label">Payroll — Banking</span>
+      </button>
+      <button type="button" class="nav-item" data-page="form-it" aria-controls="page-form-it">
+        <span class="ni"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="12" rx="1"/><path d="M8 21h8M12 16v5"/></svg></span>
+        <span class="workspace-link-label">IT — Asset &amp; Access</span>
+      </button>
+      <button type="button" class="nav-item" data-page="form-housing" aria-controls="page-form-housing">
+        <span class="ni"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l9-9 9 9"/><path d="M5 10v10h14V10"/></svg></span>
+        <span class="workspace-link-label">Housing — Quarters</span>
+      </button>
+      <button type="button" class="nav-item" data-page="form-medical" aria-controls="page-form-medical">
+        <span class="ni"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8Z"/></svg></span>
+        <span class="workspace-link-label">Medical — Dependents</span>
+      </button>
+    </nav>
+  </div>
 
-  <main class="main">
+  <main class="main" id="workspace-content" tabindex="-1">
 
     <div class="page active" id="page-messages">
+      <div class="workspace-chat-title"><h1 class="page-title" tabindex="-1">Secure messages</h1></div>
       <div class="chat-layout">
         <div class="contact-list-wrap">
           <div class="contact active">
@@ -189,8 +201,8 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent);}
             <div class="msg-row out"><div class="bubble out">Got it, updating now across all four systems.<div class="meta">09:15</div></div></div>
           </div>
           <div class="composer">
-            <input type="text" id="msgInput" placeholder="Type a secure message…" />
-            <button class="send-btn" id="sendBtn"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#03121c" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4Z"/></svg></button>
+            <input type="text" id="msgInput" aria-label="Message to HR" placeholder="Type a secure message…" />
+            <button class="send-btn" type="button" aria-label="Send message" id="sendBtn"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#03121c" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4Z"/></svg></button>
           </div>
         </div>
       </div>
@@ -199,7 +211,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent);}
     <div class="page" id="page-form-hr">
       <div class="form-page-inner" id="form-hr">
         <div class="page-badge">HR SYSTEM</div>
-        <div class="page-title">Personal Details Update</div>
+        <h1 class="page-title" tabindex="-1">Personal Details Update</h1>
         <div class="page-sub">Employee Master Data — HR-ESS-01</div>
         <div class="fsection">Contact Information</div>
         <div class="fg"><label>Full Name</label><input type="text" name="fullname" /></div>
@@ -217,7 +229,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent);}
     <div class="page" id="page-form-payroll">
       <div class="form-page-inner" id="form-payroll">
         <div class="page-badge">PAYROLL SYSTEM</div>
-        <div class="page-title">Banking &amp; Salary Details</div>
+        <h1 class="page-title" tabindex="-1">Banking &amp; Salary Details</h1>
         <div class="page-sub">Finance &amp; Accounts — PAY-SS-04</div>
         <div class="pcard">
           <div class="pcard-title">Correspondence Address</div>
@@ -239,7 +251,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent);}
     <div class="page" id="page-form-it">
       <div class="form-page-inner" id="form-it">
         <div class="page-badge">IT ASSET MANAGEMENT</div>
-        <div class="page-title">Asset &amp; Access Registry</div>
+        <h1 class="page-title" tabindex="-1">Asset &amp; Access Registry</h1>
         <div class="page-sub">Update your registered contact for asset delivery — ITAM-12</div>
         <table class="it-table">
           <tr><td>Employee Name</td><td><input type="text" name="it_name" /></td></tr>
@@ -257,7 +269,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent);}
     <div class="page" id="page-form-housing">
       <div class="form-page-inner" id="form-housing">
         <div class="page-badge">HOUSING &amp; QUARTERS</div>
-        <div class="page-title">Residential Allotment Update</div>
+        <h1 class="page-title" tabindex="-1">Residential Allotment Update</h1>
         <div class="page-sub">Estate Management Cell — HSG-07</div>
         <div class="hstep">
           <div class="hstep-num">1</div>
@@ -288,7 +300,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent);}
     <div class="page" id="page-form-medical">
       <div class="form-page-inner" id="form-medical">
         <div class="page-badge">MEDICAL &amp; INSURANCE</div>
-        <div class="page-title">Dependent &amp; Insurance Details</div>
+        <h1 class="page-title" tabindex="-1">Dependent &amp; Insurance Details</h1>
         <div class="page-sub">Health &amp; Welfare Cell — MED-03</div>
         <div class="fg"><label>Employee Full Name</label><input type="text" name="med_name" /></div>
         <div class="fg"><label>Registered Address</label><textarea name="med_address" rows="2"></textarea></div>
@@ -308,13 +320,18 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent);}
 </div>
 
 <script>
-document.querySelectorAll(".nav-item").forEach(item => {
-  item.addEventListener("click", () => {
-    document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
-    document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
-    item.classList.add("active");
-    document.getElementById("page-" + item.dataset.page).classList.add("active");
+function navigateToPage(pageId) {
+  document.querySelectorAll(".nav-item").forEach(item => {
+    item.classList.toggle("active", item.dataset.page === pageId);
   });
+  document.querySelectorAll(".page").forEach(page => {
+    page.classList.toggle("active", page.id === "page-" + pageId);
+  });
+  document.dispatchEvent(new Event("workspacechange"));
+}
+
+document.querySelectorAll(".nav-item").forEach(item => {
+  item.addEventListener("click", () => navigateToPage(item.dataset.page));
 });
 
 function showToast(id) {

@@ -867,8 +867,11 @@ textarea { resize: vertical; min-height: 65px; }
   .pcard { padding: 14px; }
 }
 </style>
+  <link rel="stylesheet" href="assets/workspace.css">
+  <script src="assets/workspace.js" defer></script>
 </head>
-<body>
+<body class="workspace" data-workspace="hr-portal" data-start-page="missions">
+<a class="workspace-skip" href="#workspace-content">Skip to content</a>
 
 <!-- Header Top Bar -->
 <div class="topbar">
@@ -878,7 +881,7 @@ textarea { resize: vertical; min-height: 65px; }
   <div class="topbar-branding">
     <div class="brand-row">
       <div class="topbar-title">ISRO VISION VAULT</div>
-      <div class="role-badge-hr"><span class="pulse-dot"></span> HR COMMAND</div>
+      <div class="role-badge-hr"><span class="pulse-dot"></span> HR DEMO</div>
     </div>
     <div class="operator-chip">
       <i class="fa-solid fa-user-shield op-icon"></i>
@@ -913,41 +916,54 @@ textarea { resize: vertical; min-height: 65px; }
 
 <div class="layout">
   <!-- Sidebar Navigation -->
-  <nav class="sidebar">
-    <div class="nav-section">Operations Database</div>
-    <div class="nav-item active" data-page="missions">
-      <span class="ni"><i class="fa-solid fa-satellite"></i></span>
-      Active Mission Database
-    </div>
-    <div class="nav-item" data-page="add-mission">
-      <span class="ni"><i class="fa-solid fa-plus-circle"></i></span>
-      Register New Mission
-    </div>
-    <div class="nav-item" data-page="messages">
-      <span class="ni"><i class="fa-solid fa-comments"></i></span>
-      Encrypted Comms Hub
-    </div>
+  <div class="workspace-rail">
+    <button class="workspace-menu" type="button" aria-expanded="false" aria-controls="workspace-navigation">
+      <span>HR workspace</span>
+      <strong data-current-section>Mission registry</strong>
+    </button>
+    <nav class="sidebar" id="workspace-navigation" aria-label="HR workspace">
+      <div class="workspace-nav-title">HR workspace</div>
+      <div class="nav-section">Operations Database</div>
+      <button type="button" class="nav-item active" data-page="missions" aria-controls="page-missions" aria-current="page">
+        <span class="ni"><i class="fa-solid fa-satellite"></i></span>
+        <span class="workspace-link-label">Active Mission Database</span>
+      </button>
+      <button type="button" class="nav-item" data-page="add-mission" aria-controls="page-add-mission">
+        <span class="ni"><i class="fa-solid fa-plus-circle"></i></span>
+        <span class="workspace-link-label">Register New Mission</span>
+      </button>
+      <button type="button" class="nav-item" data-page="messages" aria-controls="page-messages">
+        <span class="ni"><i class="fa-solid fa-comments"></i></span>
+        <span class="workspace-link-label">Encrypted Comms Hub</span>
+      </button>
 
-    <div class="nav-section">Personnel Records</div>
-    <div class="nav-item" data-page="emp-list">
-      <span class="ni"><i class="fa-solid fa-users"></i></span>
-      Personnel Database Records
-    </div>
-    <div class="nav-item" data-page="security">
-      <span class="ni"><i class="fa-solid fa-shield-halved"></i></span>
-      HSM Security &amp; Audit
-    </div>
-  </nav>
+      <div class="nav-section">Personnel Records</div>
+      <button type="button" class="nav-item" data-page="emp-list" aria-controls="page-emp-list">
+        <span class="ni"><i class="fa-solid fa-users"></i></span>
+        <span class="workspace-link-label">Personnel Database Records</span>
+      </button>
+      <button type="button" class="nav-item" data-page="security" aria-controls="page-security">
+        <span class="ni"><i class="fa-solid fa-shield-halved"></i></span>
+        <span class="workspace-link-label">HSM Security &amp; Audit</span>
+      </button>
+    </nav>
+  </div>
 
   <!-- Main Content -->
-  <main class="main">
+  <main class="main" id="workspace-content" tabindex="-1">
 
     <!-- Active Missions Registry -->
     <div class="page active" id="page-missions">
       <div class="inner">
         <div class="page-badge" style="background:rgba(0,180,216,.14);border:1px solid rgba(0,180,216,.35);color:var(--accent);">SATELLITE MISSIONS</div>
-        <div class="page-title">Active Mission Registry (6 Satellite Missions)</div>
+        <h1 class="page-title" tabindex="-1">Active mission registry</h1>
         <div class="page-sub">Telemetry &amp; personnel records mapped per ISRO satellite mission. Dispatch encrypted vaults to assigned scientists.</div>
+
+        <div class="workspace-shortcuts" role="group" aria-label="HR shortcuts">
+          <button type="button" data-open-page="add-mission"><i class="fa-solid fa-plus" aria-hidden="true"></i> Register a mission <span aria-hidden="true">→</span></button>
+          <button type="button" data-open-page="emp-list"><i class="fa-solid fa-users" aria-hidden="true"></i> Browse personnel <span aria-hidden="true">→</span></button>
+          <button type="button" data-open-page="security"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i> View audit log <span aria-hidden="true">→</span></button>
+        </div>
 
         <div class="telemetry-overview-grid">
           <div class="telemetry-stat-card">
@@ -980,7 +996,7 @@ textarea { resize: vertical; min-height: 65px; }
     <div class="page" id="page-add-mission">
       <div class="inner">
         <div class="page-badge" style="background:rgba(6,214,160,.14);border:1px solid rgba(6,214,160,.35);color:var(--green);">ADD MISSION</div>
-        <div class="page-title">Register New Satellite Mission</div>
+        <h1 class="page-title" tabindex="-1">Register New Satellite Mission</h1>
         <div class="page-sub">All fields map directly to cryptographic vault keys used by the VisionVault agent.</div>
 
         <div class="fsection">Satellite &amp; Telemetry Data</div>
@@ -1050,6 +1066,7 @@ textarea { resize: vertical; min-height: 65px; }
 
     <!-- Messages / Encrypted Comms Hub -->
     <div class="page" id="page-messages">
+      <div class="workspace-chat-title"><h1 class="page-title" tabindex="-1">Personnel communications</h1></div>
       <div class="chat-layout">
         <div class="contact-list-wrap" id="hr-contacts-list">
           <!-- Dynamically populated contacts for all 6 employees -->
@@ -1065,8 +1082,8 @@ textarea { resize: vertical; min-height: 65px; }
           <div class="enc-banner"><i class="fa-solid fa-lock"></i> End-to-end encrypted channel. Mission vault payloads sent here are decrypted by the employee's extension.</div>
           <div class="messages" id="hr-messages"></div>
           <div class="composer">
-            <input type="text" id="hr-msg-input" placeholder="Type encrypted message or vault directive…"/>
-            <button class="send-btn" onclick="hrSend()"><i class="fa-solid fa-paper-plane"></i></button>
+            <input type="text" id="hr-msg-input" aria-label="Message to personnel" placeholder="Type encrypted message or vault directive…"/>
+            <button class="send-btn" type="button" aria-label="Send message" onclick="hrSend()"><i class="fa-solid fa-paper-plane"></i></button>
           </div>
         </div>
       </div>
@@ -1076,29 +1093,33 @@ textarea { resize: vertical; min-height: 65px; }
     <div class="page" id="page-emp-list">
       <div class="inner">
         <div class="page-badge" style="background:rgba(167,139,250,.14);border:1px solid rgba(167,139,250,.35);color:var(--violet);">PERSONNEL DATABASE</div>
-        <div class="page-title">ISRO Personnel &amp; Multi-Database Synchronization</div>
+        <h1 class="page-title" tabindex="-1">ISRO Personnel &amp; Multi-Database Synchronization</h1>
         <div class="page-sub">Monitor live database synchronizations across ISRO Directorate nodes for all 6 scientists.</div>
 
         <div class="filter-bar">
-          <input type="text" class="filter-input" id="emp-search" placeholder="Search by name, employee ID, department, or station…" oninput="renderEmployeeTable()"/>
+          <label for="emp-search">Search personnel</label>
+          <input type="search" class="filter-input" id="emp-search" placeholder="Name, ID, department, or station" oninput="renderEmployeeTable()"/>
         </div>
+        <p id="personnel-results" role="status"></p>
 
-        <table class="sat-table">
-          <thead>
-            <tr>
-              <th>Employee</th>
-              <th>ID &amp; Base Station</th>
-              <th>Department</th>
-              <th>DB 1 (HR)</th>
-              <th>DB 2 (Payroll)</th>
-              <th>DB 3 (IT)</th>
-              <th>DB 4 (Housing)</th>
-              <th>DB 5 (Medical)</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody id="emp-tbody"></tbody>
-        </table>
+        <div class="workspace-table personnel-table" role="region" aria-label="Personnel records">
+          <table class="sat-table" role="table" aria-label="Personnel database status">
+            <thead role="rowgroup">
+              <tr role="row">
+                <th scope="col" role="columnheader">Employee</th>
+                <th scope="col" role="columnheader">ID &amp; Base Station</th>
+                <th scope="col" role="columnheader">Department</th>
+                <th scope="col" role="columnheader">DB 1 (HR)</th>
+                <th scope="col" role="columnheader">DB 2 (Payroll)</th>
+                <th scope="col" role="columnheader">DB 3 (IT)</th>
+                <th scope="col" role="columnheader">DB 4 (Housing)</th>
+                <th scope="col" role="columnheader">DB 5 (Medical)</th>
+                <th scope="col" role="columnheader">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="emp-tbody" role="rowgroup"></tbody>
+          </table>
+        </div>
       </div>
     </div>
 
@@ -1106,7 +1127,7 @@ textarea { resize: vertical; min-height: 65px; }
     <div class="page" id="page-security">
       <div class="inner">
         <div class="page-badge" style="background:rgba(16,185,129,.14);border:1px solid rgba(16,185,129,.35);color:var(--green);">SECURITY ENCLAVE</div>
-        <div class="page-title">Hardware Security Module (HSM) &amp; Zero-Knowledge Audit</div>
+        <h1 class="page-title" tabindex="-1">Hardware Security Module (HSM) &amp; Zero-Knowledge Audit</h1>
         <div class="page-sub">Cryptographic isolation verification and local-only token dispatch ledger.</div>
 
         <div class="telemetry-stat-card" style="margin-bottom:20px;">
@@ -1244,6 +1265,7 @@ function navigateToPage(pageId) {
   });
   if (pageId === "messages") loadHrMessages();
   if (pageId === "emp-list") renderEmployeeTable();
+  document.dispatchEvent(new Event("workspacechange"));
 }
 
 document.querySelectorAll(".nav-item").forEach(item => {
@@ -1483,7 +1505,7 @@ async function clearHrForms(){
 
 // Employee Table Rendering
 function renderEmployeeTable() {
-  const query = (document.getElementById("emp-search")?.value || "").toLowerCase();
+  const query = (document.getElementById("emp-search")?.value || "").trim().toLowerCase();
   const tbody = document.getElementById("emp-tbody");
   tbody.innerHTML = "";
 
@@ -1492,6 +1514,7 @@ function renderEmployeeTable() {
       return;
     }
     const tr = document.createElement("tr");
+    tr.setAttribute("role", "row");
     const d1 = localStorage.getItem(`isro_form_${emp.initials}_hr`);
     const d2 = localStorage.getItem(`isro_form_${emp.initials}_payroll`);
     const d3 = localStorage.getItem(`isro_form_${emp.initials}_it`);
@@ -1499,7 +1522,7 @@ function renderEmployeeTable() {
     const d5 = localStorage.getItem(`isro_form_${emp.initials}_medical`);
 
     tr.innerHTML = `
-      <td>
+      <td role="cell" data-label="Employee">
         <div style="display:flex;align-items:center;gap:12px;">
           <img src="${emp.image}" class="emp-table-photo" alt="${emp.name}"/>
           <div>
@@ -1508,19 +1531,23 @@ function renderEmployeeTable() {
           </div>
         </div>
       </td>
-      <td><span style="font-family:monospace;font-size:12px;color:var(--accent);font-weight:700;">${emp.id}</span><br><span style="font-size:12px;color:var(--muted);">${emp.station}</span></td>
-      <td style="font-size:13px;font-weight:500;">${emp.dept}</td>
-      <td><span class="sync-badge ${d1 ? 'sync-yes' : 'sync-no'}">${d1 ? '✓ Synced' : '○ Pending'}</span></td>
-      <td><span class="sync-badge ${d2 ? 'sync-yes' : 'sync-no'}">${d2 ? '✓ Synced' : '○ Pending'}</span></td>
-      <td><span class="sync-badge ${d3 ? 'sync-yes' : 'sync-no'}">${d3 ? '✓ Synced' : '○ Pending'}</span></td>
-      <td><span class="sync-badge ${d4 ? 'sync-yes' : 'sync-no'}">${d4 ? '✓ Synced' : '○ Pending'}</span></td>
-      <td><span class="sync-badge ${d5 ? 'sync-yes' : 'sync-no'}">${d5 ? '✓ Synced' : '○ Pending'}</span></td>
-      <td>
+      <td role="cell" data-label="ID and station"><span style="font-family:monospace;font-size:12px;color:var(--accent);font-weight:700;">${emp.id}</span><br><span style="font-size:12px;color:var(--muted);">${emp.station}</span></td>
+      <td role="cell" data-label="Department" style="font-size:13px;font-weight:500;">${emp.dept}</td>
+      <td role="cell" data-label="HR"><span class="sync-badge ${d1 ? 'sync-yes' : 'sync-no'}">${d1 ? '✓ Synced' : '○ Pending'}</span></td>
+      <td role="cell" data-label="Payroll"><span class="sync-badge ${d2 ? 'sync-yes' : 'sync-no'}">${d2 ? '✓ Synced' : '○ Pending'}</span></td>
+      <td role="cell" data-label="IT"><span class="sync-badge ${d3 ? 'sync-yes' : 'sync-no'}">${d3 ? '✓ Synced' : '○ Pending'}</span></td>
+      <td role="cell" data-label="Housing"><span class="sync-badge ${d4 ? 'sync-yes' : 'sync-no'}">${d4 ? '✓ Synced' : '○ Pending'}</span></td>
+      <td role="cell" data-label="Medical"><span class="sync-badge ${d5 ? 'sync-yes' : 'sync-no'}">${d5 ? '✓ Synced' : '○ Pending'}</span></td>
+      <td role="cell" data-label="Actions">
         <button class="topbar-action" style="padding:6px 10px;font-size:12px;" onclick="openCommsFor('${emp.initials}')"><i class="fa-solid fa-comments"></i> Chat</button>
       </td>
     `;
     tbody.appendChild(tr);
   });
+  const count = tbody.rows.length;
+  document.getElementById("personnel-results").textContent = count
+    ? count + (count === 1 ? " person" : " people")
+    : "No matching personnel. Try a different search.";
 }
 
 function openCommsFor(initials) {
@@ -1528,6 +1555,7 @@ function openCommsFor(initials) {
   if (emp) {
     selectContact(emp);
     navigateToPage("messages");
+    document.querySelector("#page-messages h1").focus();
   }
 }
 

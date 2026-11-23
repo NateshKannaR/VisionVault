@@ -1969,6 +1969,7 @@ body.mode-redacted .datablock {
 </style>
 </head>
 <body>
+<aside style="position:relative;z-index:10;padding:6px 12px;background:#17261f;color:#c9efa5;font:600 12px system-ui;text-align:center">VisionVault local fixture · Use synthetic data · <button type="button" id="fixture-logout">Sign out</button></aside>
 
 <!-- Header Top Bar -->
 <div class="topbar">
@@ -3059,6 +3060,16 @@ function switchContact(type) {
   }
 }
 
+function escapeMessageHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, char => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  })[char]);
+}
+document.getElementById("fixture-logout").addEventListener("click", async () => {
+  await fetch("/api/logout", { method: "POST" });
+  location.assign("/login.html");
+});
+
 // Messages Loading & Rendering
 let lastEmpMsgsJson = "";
 async function loadEmpMessages(){
@@ -3102,7 +3113,7 @@ async function loadEmpMessages(){
   if (box) box.innerHTML = "";
   for (const m of msgs) {
     const plain = m.text || await decryptMsg(m.enc);
-    let content = plain;
+    let content = escapeMessageHtml(plain);
     try {
       const obj = JSON.parse(plain);
       if (obj.type === "VAULT_MISSION") {
@@ -3110,38 +3121,38 @@ async function loadEmpMessages(){
         for (const [k, val] of Object.entries(fallback)) {
           if (!v[k] || !String(v[k]).trim()) v[k] = val;
         }
-        const rawJsonAttr = JSON.stringify(v).replace(/"/g, '&quot;');
+        const rawJsonAttr = escapeMessageHtml(JSON.stringify(v));
         content = `<div style="font-family:'Space Grotesk',sans-serif;font-weight:800;font-size:16px;color:var(--accent);display:flex;align-items:center;gap:8px;margin-bottom:8px;">
 <i class="fa-solid fa-shield-halved"></i> SECURE ISRO MISSION VAULT TRANSMISSION
 </div>
 <div class="datablock" data-vault-source="verified" data-vault-payload="${rawJsonAttr}">
   <div class="db-grid">
-    <div class="db-field"><span class="db-lbl">Satellite:</span> <span class="db-val" data-pii="satellite">${v.satellite_name}</span></div>
-    <div class="db-field"><span class="db-lbl">Mission ID:</span> <span class="db-val" data-pii="mission_id">${v.mission_id}</span></div>
-    <div class="db-field"><span class="db-lbl">Operator:</span> <span class="db-val" data-pii="operator">${v.operator}</span></div>
-    <div class="db-field"><span class="db-lbl">Launch Date:</span> <span class="db-val" data-pii="launch_date">${v.launch_date}</span></div>
-    <div class="db-field"><span class="db-lbl">Orbit:</span> <span class="db-val" data-pii="orbit">${v.orbit_type}</span></div>
-    <div class="db-field"><span class="db-lbl">Inclination:</span> <span class="db-val" data-pii="inclination">${v.orbital_inclination}</span></div>
-    <div class="db-field"><span class="db-lbl">Apogee:</span> <span class="db-val" data-pii="apogee">${v.apogee}</span></div>
-    <div class="db-field"><span class="db-lbl">Perigee:</span> <span class="db-val" data-pii="perigee">${v.perigee}</span></div>
-    <div class="db-field full-width"><span class="db-lbl">Downlink Freq:</span> <span class="db-val highlight" data-pii="ground_station_freq">${v.ground_station_freq}</span></div>
-    <div class="db-field full-width"><span class="db-lbl">Encryption Key Ref:</span> <span class="db-val warning" data-pii="encryption_key_ref">${v.encryption_key_ref}</span></div>
+    <div class="db-field"><span class="db-lbl">Satellite:</span> <span class="db-val" data-pii="satellite">${escapeMessageHtml(v.satellite_name)}</span></div>
+    <div class="db-field"><span class="db-lbl">Mission ID:</span> <span class="db-val" data-pii="mission_id">${escapeMessageHtml(v.mission_id)}</span></div>
+    <div class="db-field"><span class="db-lbl">Operator:</span> <span class="db-val" data-pii="operator">${escapeMessageHtml(v.operator)}</span></div>
+    <div class="db-field"><span class="db-lbl">Launch Date:</span> <span class="db-val" data-pii="launch_date">${escapeMessageHtml(v.launch_date)}</span></div>
+    <div class="db-field"><span class="db-lbl">Orbit:</span> <span class="db-val" data-pii="orbit">${escapeMessageHtml(v.orbit_type)}</span></div>
+    <div class="db-field"><span class="db-lbl">Inclination:</span> <span class="db-val" data-pii="inclination">${escapeMessageHtml(v.orbital_inclination)}</span></div>
+    <div class="db-field"><span class="db-lbl">Apogee:</span> <span class="db-val" data-pii="apogee">${escapeMessageHtml(v.apogee)}</span></div>
+    <div class="db-field"><span class="db-lbl">Perigee:</span> <span class="db-val" data-pii="perigee">${escapeMessageHtml(v.perigee)}</span></div>
+    <div class="db-field full-width"><span class="db-lbl">Downlink Freq:</span> <span class="db-val highlight" data-pii="ground_station_freq">${escapeMessageHtml(v.ground_station_freq)}</span></div>
+    <div class="db-field full-width"><span class="db-lbl">Encryption Key Ref:</span> <span class="db-val warning" data-pii="encryption_key_ref">${escapeMessageHtml(v.encryption_key_ref)}</span></div>
   </div>
   <div class="db-tle-box">
     <div class="tle-title"><i class="fa-solid fa-satellite-dish" style="color:var(--accent)"></i> TLE LINE 1:</div>
-    <div class="tle-val" data-pii="tle_line_1">${v.tle_line_1}</div>
+    <div class="tle-val" data-pii="tle_line_1">${escapeMessageHtml(v.tle_line_1)}</div>
     <div class="tle-title" style="margin-top:8px;"><i class="fa-solid fa-satellite-dish" style="color:var(--accent)"></i> TLE LINE 2:</div>
-    <div class="tle-val" data-pii="tle_line_2">${v.tle_line_2}</div>
+    <div class="tle-val" data-pii="tle_line_2">${escapeMessageHtml(v.tle_line_2)}</div>
   </div>
   <div class="db-divider">────────────────────────────────────────────────────────────</div>
   <div class="db-grid">
-    <div class="db-field"><span class="db-lbl">Full Name:</span> <span class="db-val" data-pii="name">${v.name}</span></div>
-    <div class="db-field"><span class="db-lbl">Username:</span> <span class="db-val" data-pii="username">${v.username}</span></div>
-    <div class="db-field"><span class="db-lbl">Email:</span> <span class="db-val" data-pii="email">${v.email}</span></div>
-    <div class="db-field"><span class="db-lbl">Phone:</span> <span class="db-val" data-pii="phone">${v.phone}</span></div>
-    <div class="db-field"><span class="db-lbl">Organisation:</span> <span class="db-val" data-pii="company">${v.company}</span></div>
-    <div class="db-field"><span class="db-lbl">PIN:</span> <span class="db-val" data-pii="zip">${v.zip}</span></div>
-    <div class="db-field full-width"><span class="db-lbl">Address:</span> <span class="db-val" data-pii="address">${v.address}</span></div>
+    <div class="db-field"><span class="db-lbl">Full Name:</span> <span class="db-val" data-pii="name">${escapeMessageHtml(v.name)}</span></div>
+    <div class="db-field"><span class="db-lbl">Username:</span> <span class="db-val" data-pii="username">${escapeMessageHtml(v.username)}</span></div>
+    <div class="db-field"><span class="db-lbl">Email:</span> <span class="db-val" data-pii="email">${escapeMessageHtml(v.email)}</span></div>
+    <div class="db-field"><span class="db-lbl">Phone:</span> <span class="db-val" data-pii="phone">${escapeMessageHtml(v.phone)}</span></div>
+    <div class="db-field"><span class="db-lbl">Organisation:</span> <span class="db-val" data-pii="company">${escapeMessageHtml(v.company)}</span></div>
+    <div class="db-field"><span class="db-lbl">PIN:</span> <span class="db-val" data-pii="zip">${escapeMessageHtml(v.zip)}</span></div>
+    <div class="db-field full-width"><span class="db-lbl">Address:</span> <span class="db-val" data-pii="address">${escapeMessageHtml(v.address)}</span></div>
   </div>
 </div>`;
       }
@@ -3150,7 +3161,7 @@ async function loadEmpMessages(){
     const isOut = m.from === "EMP";
     row.className = "msg-row" + (isOut ? " out" : "");
     row.innerHTML = `<div class="bubble ${isOut ? "out" : "in"}">${content}
-<div class="meta">${m.time}<span class="enc-tag">AES-256-GCM</span></div></div>`;
+<div class="meta">${escapeMessageHtml(m.time)}<span class="enc-tag">AES-256-GCM</span></div></div>`;
     box.appendChild(row);
   }
   box.scrollTop = box.scrollHeight;

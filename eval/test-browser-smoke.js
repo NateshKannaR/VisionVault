@@ -1,0 +1,121 @@
+"use strict";
+
+const assert = require("node:assert/strict");
+const { spawn } = require("node:child_process");
+const { once } = require("node:events");
+const http = require("node:http");
+const { randomBytes } = require("node:crypto");
+const { unzipSync } = require("fflate");
+const { launchWithExtension, startFixtureServer } = require("./lib/harness");
+
+async function main() {
+  const preview = spawn(process.execPath, ["scripts/preview-site.js"], {
+    env: { ...process.env, PORT: "0" },
+    stdio: ["ignore", "pipe", "inherit"],
+  });
+  const token = randomBytes(32).toString("hex");
+  const plannerRequests = [];
+  const planner = http.createServer(async (request, response) => {
+    let body = "";
+    for await (const chunk of request) body += chunk;
+    plannerRequests.push({ url: request.url, auth: request.headers.authorization, body });
+    if (request.headers.authorization !== "Bearer " + token) {
+      response.writeHead(401).end();
+      return;
+    }
+    response.writeHead(200, { "Content-Type": "text/event-stream" });
+    const event = { tier: "mock", action: { type: "done" }, partial: false };
+    response.end("data: " + JSON.stringify(event) + "\n\ndata: [DONE]\n\n");
+  });
+  planner.listen(0, "127.0.0.1");
+  await once(planner, "listening");
+  let fixture;
+  let h;
+  try {
+    const [line] = await once(preview.stdout, "data");
+    const base = line.toString().match(/http:\/\/127\.0\.0\.1:\d+/)?.[0];
+    assert.ok(base, "preview reported its URL");
+    fixture = await startFixtureServer();
+    h = await launchWithExtension({ headless: true });
+    const page = await h.browser.newPage();
+    const errors = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    await page.setViewport({ width: 1350, height: 960 });
+    await page.goto(base, { waitUntil: "networkidle0" });
+    assert.match(await page.$eval("#preview", (node) => node.textContent), /\[EMAIL_1\]/);
+    await page.click('[data-example="config"]');
+    assert.match(await page.$eval("#preview", (node) => node.textContent), /\[EMAIL_1\]/);
+    await page.$eval("#source", (node) => {
+      node.value = "<b>fixture</b> jordan@example.test";
+      node.dispatchEvent(new Event("input"));
+    });
+    assert.match(await page.$eval("#preview", (node) => node.textContent), /<b>fixture<\/b> \[EMAIL_1\]/);
+    assert.equal(await page.$("#preview b"), null);
+    await page.click('[data-example="support"]');
+    if (process.env.VV_SCREENSHOT) await page.screenshot({ path: process.env.VV_SCREENSHOT, fullPage: false });
+
+    await page.setViewport({ width: 360, height: 800 });
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+    assert.equal((await fetch(base + "/data/prototype-state.json")).status, 404);
+    for (const browser of ["chromium", "firefox"]) {
+      const response = await fetch(base + `/downloads/visionvault-${browser}.zip`);
+      assert.equal(response.status, 200);
+      const files = unzipSync(new Uint8Array(await response.arrayBuffer()));
+      const manifest = JSON.parse(Buffer.from(files["manifest.json"]).toString());
+      assert.equal(manifest.manifest_version, 3);
+      assert.ok(files["popup.html"] && files["planner/connection.js"]);
+      assert.equal(Boolean(manifest.background.service_worker), browser === "chromium");
+    }
+
+    const panel = await h.browser.newPage();
+    panel.on("pageerror", (error) => errors.push(error.message));
+    await panel.setViewport({ width: 325, height: 850 });
+    await panel.goto(`chrome-extension://${h.extensionId}/popup.html`);
+    await panel.waitForFunction(() => document.getElementById("backendBadge").textContent === "On-device");
+    assert.equal(await panel.$eval("#s-autoAgent", (node) => node.checked), false);
+    assert.equal(await panel.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+    await panel.focus("#tab-run");
+    await panel.keyboard.press("ArrowRight");
+    assert.equal(await panel.$eval("#tab-vault", (node) => node.getAttribute("aria-selected")), "true");
+    await panel.click("#tab-benchmarks");
+    await panel.click("#btnRunLiveVerification");
+    assert.match(await panel.$eval("#benchVerificationResult", (node) => node.textContent), /^Passed/);
+
+    const sample = await h.browser.newPage();
+    await sample.goto(fixture.baseUrl + "/pages/signup-form.html");
+    await sample.bringToFront();
+    const [fixtureTab] = await h.worker.evaluate(() => chrome.tabs.query({ active: true }));
+    const scanned = await h.worker.evaluate((tabId) => phaseScan("Fill the form", tabId, false), fixtureTab.id);
+    assert.ok(scanned.piiCount > 0, "scan detects regions on the signup fixture");
+    assert.ok(scanned.markCount > 0, "scan detects interactive controls");
+    assert.match(scanned.preview, /^data:image\/png/);
+    const plannerUrl = "http://127.0.0.1:" + planner.address().port;
+    const response = await h.worker.evaluate(
+      (url, key) => callServer({ task: "Find the address field", privacy_budget: { level: 0 } }, url, key),
+      plannerUrl, token,
+    );
+    assert.equal(response.action, "done");
+    assert.equal(plannerRequests[0].url, "/api/agent/step/stream");
+    assert.equal(plannerRequests[0].auth, "Bearer " + token);
+    assert.ok(!plannerRequests[0].body.includes(token));
+    await assert.rejects(
+      h.worker.evaluate((url, key) => callServer({
+        task: "Contact fixture@example.test", privacy_budget: { level: 0 },
+      }, url, key), plannerUrl, token),
+      /blocked sensitive text/,
+    );
+    assert.equal(plannerRequests.length, 1, "blocked prompts never reach the planner");
+    assert.deepEqual(errors, []);
+    console.log("Chromium smoke passed for the built site, package downloads, panel, and local scan.");
+  } finally {
+    if (h) await h.close();
+    fixture?.server.close();
+    planner.close();
+    preview.kill();
+  }
+}
+
+main().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});

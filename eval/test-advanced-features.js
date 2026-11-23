@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * test-advanced-features.js — Tests Zero-Knowledge Vault AES-256-GCM Crypto,
- * DPDP Act 2023 Compliance Certificate Generator, and Obstacle / CAPTCHA Healing.
+ * local scan summary Compliance Certificate Generator, and Obstacle / CAPTCHA Healing.
  */
 
 const assert = require('assert');
@@ -50,24 +50,18 @@ async function runTests() {
   assert.ok(failedAsExpected, 'Decryption with wrong password must throw error');
   console.log('  ok   Zero-knowledge PBKDF2 + AES-256-GCM encrypted backup is verified.');
 
-  // Test 2: DPDP Act 2023 & GDPR Compliance Certificate Generator
-  console.log('\nTest 2: DPDP Act 2023 Compliance Certificate Generator');
-  const certificateResult = await VaultCrypto.generateDpdpComplianceCertificate({
-    url: 'https://isro.gov.in/portal/login',
-    piiRedactedCount: 4,
-    facesRedactedCount: 1,
-    executionEngine: 'WASM SIMD (Multi-threaded)'
+  console.log('\nTest 2: Local scan summary');
+  const report = await VaultCrypto.generateSessionReport({
+    piiCount: 5, marksCount: 12, timings: { total: 86 }, task: 'private input',
   });
-
-  assert.ok(certificateResult, 'Certificate result generated');
-  assert.ok(certificateResult.json, 'JSON certificate audit present');
-  assert.ok(certificateResult.html, 'Printable HTML certificate present');
-  assert.ok(certificateResult.integrityChecksum, 'SHA-256 integrity checksum present');
-  assert.strictEqual(certificateResult.json.runtimeMetrics.plaintextBytesTransmittedAcrossNetwork, 0, '0 plaintext bytes across network');
-  assert.strictEqual(certificateResult.json.runtimeMetrics.totalEntitiesProtected, 5, '5 total entities protected');
-  assert.ok(certificateResult.html.includes('DPDP Act 2023'), 'HTML certificate references DPDP Act 2023');
-  assert.ok(certificateResult.html.includes('0 Bytes'), 'HTML certificate certifies 0 bytes PII transmitted');
-  console.log('  ok   DPDP Act 2023 & GDPR compliance certificate generation verified.');
+  const { integrityChecksum, ...counters } = report.json;
+  assert.strictEqual(counters.detectedRegions, 5);
+  assert.strictEqual(counters.interactiveElements, 12);
+  assert.strictEqual(counters.scanDurationMs, 86);
+  assert.strictEqual(integrityChecksum, await VaultCrypto.sha256(JSON.stringify(counters)));
+  assert.ok(report.html.includes(integrityChecksum));
+  assert.ok(!JSON.stringify(report).includes('private input'));
+  console.log('  ok   Scan counters and checksum exported without task data.');
 
   // Test 3: Obstacle & CAPTCHA Detection
   console.log('\nTest 3: Obstacle & CAPTCHA Healing Detection');
@@ -76,7 +70,7 @@ async function runTests() {
   assert.ok(obstacleCheck !== undefined, 'detectObstacleOrCaptcha returns status');
   console.log('  ok   Self-healing obstacle & CAPTCHA detector is intact.');
 
-  console.log('\n🎉 ALL ADVANCED PROTOTYPE & COMPLIANCE TESTS PASSED!\n');
+  console.log('\n🎉 ALL ADVANCED FEATURE TESTS PASSED!\n');
 }
 
 runTests().catch((err) => {

@@ -154,6 +154,22 @@
     });
   }
 
+  async function captureTargetTab(tabId, windowId) {
+    const tabs = safeGetChrome()?.tabs;
+    const activeTab = () => new Promise(resolve => {
+      tabs.query({ active: true, windowId }, (results) => resolve(results?.[0]));
+    });
+    if (!tabs?.query || !tabId) return captureScreenshot(windowId);
+    const before = await activeTab();
+    if (before?.id !== tabId) throw new Error("Keep the scanned tab active while capturing.");
+    const screenshot = await captureScreenshot(windowId);
+    const after = await activeTab();
+    if (after?.id !== tabId || before.url !== after.url) {
+      throw new Error("The active page changed during capture. Scan again.");
+    }
+    return screenshot;
+  }
+
   async function captureScreenshot(windowId) {
     const tabs = getTabsApi();
     if (!tabs || !tabs.captureVisibleTab) return "";
@@ -704,7 +720,7 @@
       // redaction never ran - which sends the reader looking in the wrong file.
       let captureError = null;
       const [rawScreenshot, domResult] = await Promise.all([
-        captureScreenshot(windowId).catch((err) => {
+        captureTargetTab(tabId, windowId).catch((err) => {
           captureError = err && err.message || String(err);
           console.warn("[vision] Screenshot capture failed:", captureError);
           return "";

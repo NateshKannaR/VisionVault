@@ -93,13 +93,14 @@
    */
   async function record(e) {
     const body = e.body || "";
+    const encoder = new TextEncoder();
 
     const entry = {
       at: nowIso(),
       url: safeUrl(e.url),
       task: String(e.task || "").slice(0, 240),
       step: e.step || null,
-      bytes: body.length,
+      bytes: encoder.encode(body).byteLength,
       imageBytes: (e.image || "").length,
       marks: e.marks || 0,
       durationMs: e.durationMs || null,
@@ -159,7 +160,7 @@
     const items = await read();
     return JSON.stringify({
       exportedAt: nowIso(),
-      note: "Every network request VisionVault made. Recorded on this device; never transmitted.",
+      note: "Recent planner requests recorded in this browser profile.",
       entries: items,
     }, null, 2);
   }

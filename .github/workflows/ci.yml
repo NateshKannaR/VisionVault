@@ -2,38 +2,62 @@ name: VisionVault CI
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [main, master]
   pull_request:
-    branches: [ main, master ]
+    branches: [main, master]
+
+permissions:
+  contents: read
 
 jobs:
-  test:
+  browser:
     runs-on: ubuntu-latest
-
+    timeout-minutes: 12
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
           node-version: '22'
-
-      - name: Install Node dependencies
-        run: npm install
-
-      - name: Run Extension & Evaluator Tests
-        run: npm test
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install Python dependencies
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - name: Install Chrome for Testing
         run: |
-          python -m pip install --upgrade pip
-          pip install -r server/requirements.txt
+          npm exec -- browsers install chrome@stable --path "$RUNNER_TEMP/chrome"
+          printf 'VV_CHROME=%s\n' "$(find "$RUNNER_TEMP/chrome" -type f -name chrome -print -quit)" >> "$GITHUB_ENV"
+      - run: npm run test:browser
+      - run: VV_HEADLESS=1 npm run verify
+      - uses: actions/upload-artifact@v7
+        with:
+          name: visionvault-browser-packages
+          path: dist/site/downloads/
 
-      - name: Test Server Fallback Chain
-        run: python eval/test-fallback-chain.py
+  planner:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      OLLAMA_HOST: ''
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: server/requirements.txt
+      - run: python -m pip install -r server/requirements.txt
+      - run: python eval/test-fallback-chain.py
+      - run: python eval/test-planner-http.py
+      - name: Run the HTTP response contract
+        run: |
+          python -m uvicorn main:app --app-dir server --host 127.0.0.1 --port 8000 &
+          planner_pid=$!
+          trap 'kill "$planner_pid"' EXIT
+          curl --fail --retry 10 --retry-connrefused --silent http://127.0.0.1:8000/livez
+          python eval/test-server-contract.py
+      - run: docker build -t visionvault-planner:ci server
+      - name: Verify the production container
+        run: |
+          container_id=$(docker run -d --read-only -e OLLAMA_HOST= -p 127.0.0.1:18000:8000 visionvault-planner:ci)
+          trap 'docker rm -f "$container_id" >/dev/null' EXIT
+          curl --fail --retry 10 --retry-connrefused --silent http://127.0.0.1:18000/livez

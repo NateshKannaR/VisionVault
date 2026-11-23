@@ -1,35 +1,18 @@
-# ISRO Mission Portal Prototype
+# Local portal fixture
 
-A local full-stack prototype for the ISRO mission registry, HR messaging, and employee forms.
-
-## Run
-
-Requires Node.js 18 or newer.
+Two ISRO-themed demo roles exercise message exchange and form handling with synthetic records. The Node server binds to the local loopback interface. It uses short-lived in-process sessions and a local JSON state file. Accounts and the compatibility encryption key are shared demo fixtures.
 
 ```sh
-npm start
+npm ci
+npm run build
+npm run demo:portal
 ```
 
-Open the login page:
+Open [the local portal sign-in](http://127.0.0.1:3000/login.html). The login page lists both demo accounts. Use separate browser profiles to keep an employee and an HR session open at the same time.
 
-- **Live Production URL**: [https://isrovisionvault.vercel.app/](https://isrovisionvault.vercel.app/)
-- **Local Dev Server**: http://localhost:3000/
+| Setting | Purpose |
+| --- | --- |
+| `PORT` | Demo server port, default `3000` |
+| `VISIONVAULT_DEMO_DATA` | Override the default ignored state directory at `isro-panel/data/` |
 
-Demo accounts:
-
-- HR: `hr.admin` / `ISRO-HR-DEMO-2026`
-- Employee: `rsharma_mcc` / `ISRO-EMP-DEMO-2026`
-
-## Prototype behavior
-
-- Missions, messages, and form completion are stored by the server in `data/prototype-state.json`.
-- Messages are encrypted in the browser before transmission and stored as ciphertext with AES-256-GCM. The generated server key in `data/.message-key` protects legacy/server-created records.
-- The browser UI calls the server API and retains browser storage only as an offline fallback.
-- The current prototype contains one employee: Rajesh Kumar.
-- API routes require an `HttpOnly` session cookie and enforce HR/employee permissions.
-- Use **Sign Out** in the top-right to end the session.
-- In DevTools → Network, `POST /api/messages` now shows an `enc` field instead of the message text.
-
-## Important
-
-This is a local prototype, not a production security system. Before deployment, replace demo credentials with a real identity provider, use HTTPS, a managed database, a KMS-backed key, CSRF protection, rate limiting, audit logging, backups, and security testing. Use synthetic mission data until those controls are implemented.
+The demo accepts only loopback connections and serves a fixed set of pages and assets. Use the [main README](../README.md) for the public site and optional planner deployment.

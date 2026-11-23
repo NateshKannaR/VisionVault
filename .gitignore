@@ -1,8 +1,11 @@
 # Node
 node_modules/
-package-lock.json
+dist/
 
 # Python
+.venv/
+server/.venv/
+server/venv/
 __pycache__/
 *.pyc
 
@@ -23,3 +26,11 @@ eval/results/*.png
 scratch/
 extension-firefox/
 
+
+# Generated demo state and package archives
+/data/
+/public/data/
+/isro-panel/data/
+/visionvault-extension.zip
+/public/visionvault-extension.zip
+/isro-panel/visionvault-extension.zip

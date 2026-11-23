@@ -1,340 +1,139 @@
 # VisionVault
 
-> **A privacy-preserving browser vision agent — cloud-grade AI reasoning, with zero raw personal data ever leaving the device.**
+**A browser privacy workspace for local redaction, prompt scrubbing, and reviewed automation.**
 
-[![Live Demo](https://img.shields.io/badge/Live%20Demo-isrovisionvault.vercel.app-00e5ff?style=flat-square&logo=vercel)](https://isrovisionvault.vercel.app/)
-[![Extension MV3](https://img.shields.io/badge/Extension-Manifest%20V3-blue?style=flat-square&logo=googlechrome)](extension/)
-[![PII Defense](https://img.shields.io/badge/Privacy%20Firewall-Zero--PII%20Guaranteed-10b981?style=flat-square)](eval_report.md)
-[![Tests Passing](https://img.shields.io/badge/Tests-357%20Passed-brightgreen?style=flat-square)](eval_report.md)
+[![VisionVault CI](https://github.com/NateshKannaR/VisionVault/actions/workflows/ci.yml/badge.svg)](https://github.com/NateshKannaR/VisionVault/actions/workflows/ci.yml)
 
-VisionVault is a browser-native AI agent that observes a webpage, redacts every sensitive element locally, sends only a sanitized, symbolic view of the page to a cloud model for reasoning, and then executes the resulting action itself — resolving any real personal values from an on-device vault. The server never sees a password, a name, an email, or a face. It only ever sees shapes, roles, and positions.
+VisionVault scans a browser tab for sensitive regions and interactive controls. The side panel shows the masked preview before the task runs. A local rules engine can plan common tasks without a planner server. Teams can also connect a self-hosted planner and choose which model providers it can use.
 
-> 🌐 **Interactive Demo & Test Fixtures**: [https://isrovisionvault.vercel.app/](https://isrovisionvault.vercel.app/) — includes an interactive visualization of the Privacy Firewall & mock test pages to demonstrate the extension.
+The public site includes an interactive redaction lab that runs the same prompt scrubber as the extension. The ISRO-themed employee and HR portals provide local fixtures for trying browser workflows with synthetic data.
 
----
+![VisionVault public site with its interactive redaction lab](docs/redaction-lab.png)
 
-## Table of Contents
+## Quickstart
 
-- [The Problem](#the-problem)
-- [Our Solution](#our-solution)
-- [How It Works](#how-it-works)
-- [Privacy Guarantees](#privacy-guarantees)
-- [Tech Stack](#tech-stack)
-- [Agent Guard — Safety on Top of Reasoning](#agent-guard--safety-on-top-of-reasoning)
-- [Repository Layout](#repository-layout)
-- [Getting Started](#getting-started)
-- [Evaluation](#evaluation)
-- [License](#license)
+### Build and preview the public site
 
----
+Use Node.js **22.12+**.
 
-## The Problem
-
-AI browser agents are becoming powerful enough to fill forms, run searches, and complete multi-step tasks on a user's behalf. To do this, they need to see the screen — but today, that means sending a raw screenshot or full DOM dump to a cloud model. That single design choice quietly exposes:
-
-- **Passwords, API keys, and session tokens**
-- **Names, emails, phone numbers, government IDs (PAN, Aadhaar), and card numbers**
-- **Faces and other visually identifying content**
-
-For any sensitive workflow — government portals, banking, healthcare, enterprise systems — this is a hard blocker. You cannot deploy an autonomous agent that has to leak private data just to understand what's on screen.
-
----
-
-## Our Solution
-
-VisionVault splits the agent's workflow across a strict trust boundary:
-
-| Where it happens | What it does |
-| :--- | :--- |
-| **On the device** | Perceives the page, detects every sensitive region, redacts it, and later resolves and types the real value |
-| **In the cloud** | Reasons only over the sanitized, symbolic version of the page and decides what action to take |
-
-The cloud model never receives a real value — only a redacted image and abstract element references (e.g. *"mark 4148216"*). It replies with a symbolic instruction like `type into mark 4148216 using email`, and the local vault fills in the actual value entirely on-device.
-
----
-
-## How It Works
-
-VisionVault runs a continuous four-stage loop:
-
-```
-OBSERVE   →   REDACT    →    REASON    →    ACT
-   │             │              │            │
-capture       detect &        cloud       resolve vault
-the page      mask PII       decides      value locally,
-locally       locally       next step     execute action
+```sh
+npm ci
+npm run build
+npm run preview
 ```
 
-### The VisionVault Privacy Firewall™ Architecture
+Open [the local site](http://127.0.0.1:8080/), switch between samples in the redaction lab, and edit one to see the tokens and match count update. The build generates these release artifacts:
 
-```
-                 ┌────────────────────────────────────────┐
-                 │        Autonomous Browser Agent        │
-                 └───────────────────┬────────────────────┘
-                                     │
-                                     ▼
-                 ┌────────────────────────────────────────┐
-                 │     VISIONVAULT PRIVACY FIREWALL™      │
-                 │                                        │
-                 │ • Layer 0: DOM Heuristics              │
-                 │   (password, email, autocomplete)      │
-                 │                                        │
-                 │ • Layer 1: Deterministic Checksums     │
-                 │   (Luhn Card Checksum, Verhoeff        │
-                 │    Aadhaar Algorithm, PAN, UPI, AWS)   │
-                 │                                        │
-                 │ • Layer 2: Visual OCR Engine           │
-                 │   (Tesseract.js WASM for canvas/image) │
-                 │                                        │
-                 │ • Layer 3: Neural Vision Pipeline      │
-                 │   (UltraFace ONNX biometrics & ViT)    │
-                 │                                        │
-                 │ • Exfiltration Guard: Hard Gate        │
-                 │   (Strict: raw_pixels=0, pii_bytes=0)  │
-                 └───────────────────┬────────────────────┘
-                                     │
-                              SAFE DATA ONLY
-                   (Zero Raw Pixels / 0 Leak Invariant)
-                                     │
-                                     ▼
-                 ┌────────────────────────────────────────┐
-                 │       Cloud Server / VLM Engine        │
-                 │ • Semantic Screen JSON Reasoning       │
-                 │ • 4-Tier Privacy Budget Escalation     │
-                 └────────────────────────────────────────┘
+| Path under `dist/site/` | Contents |
+| --- | --- |
+| `index.html` and `assets/` | Static site and browser-side scrubber |
+| `downloads/visionvault-chromium.zip` | Unpacked extension for Chromium |
+| `downloads/visionvault-firefox.zip` | Experimental Firefox package |
+| `downloads/SHA256SUMS` | SHA-256 digests for both archives |
+
+### Install the extension
+
+1. Open `chrome://extensions`, turn on **Developer mode**, and choose **Load unpacked**.
+2. Select the repository's `extension/` directory or extract the Chromium ZIP and select the directory containing `manifest.json`.
+3. Pin VisionVault, open an ordinary web tab, then open its side panel.
+4. Enter a task and select **Scan active tab**. Inspect the preview and choose **Run reviewed task**. **Run automatically after redacting** is an opt-in setting.
+
+To try a local signup fixture, run `python -m http.server 8081 --bind 127.0.0.1 --directory eval` and open [the sample signup page](http://127.0.0.1:8081/pages/signup-form.html). To try messaging and mission forms, start the [local fixture portal](isro-panel/README.md).
+
+For Firefox development, run `npm run build:firefox` and load `extension-firefox/manifest.json` in `about:debugging#/runtime/this-firefox`. The Firefox package is unsigned and has different browser capabilities. Chromium is the browser covered by CI runtime tests.
+
+### Optional planner server
+
+With Python **3.12** and a virtual environment:
+
+```sh
+python -m venv .venv
+. .venv/bin/activate
+python -m pip install -r server/requirements.txt
+cp server/.env.example server/.env
+npm run server
 ```
 
-### 4-Layer Defense-in-Depth PII System
+On Windows, activate the environment with `.venv\Scripts\Activate.ps1` and copy the example file with `Copy-Item server/.env.example server/.env`. The server runs in the foreground on `127.0.0.1:8000`. Check [liveness](http://127.0.0.1:8000/livez) and select **Settings → Server first → Recheck** in the extension to verify the connection. With the example configuration, the server uses deterministic rules and needs no provider keys.
 
-Rather than overloading a single vision model with regex or text duties, VisionVault employs a dedicated 4-layer waterfall:
+## Architecture and data flow
 
-| Layer | Type | Mechanism | Target PII | File Reference |
-| :--- | :--- | :--- | :--- | :--- |
-| **Layer 0** | **DOM Heuristic** | Zero-compute attribute inspection | `input[type=password]`, `email`, `tel`, `autocomplete` | `extension/content.js` |
-| **Layer 1** | **Deterministic** | Mathematical checksums & regex | Luhn Algorithm (Cards), Verhoeff Algorithm (UIDAI Aadhaar), PAN, UPI, JWT, AWS | `extension/privacy-firewall.js` |
-| **Layer 2** | **Visual OCR** | Tesseract.js WASM offline engine | Non-DOM rendered text inside canvas/banners/images | `extension/vision/ocrDetect.js` |
-| **Layer 3** | **Neural Vision** | UltraFace ONNX + ViT patch attention | Biometric faces, photo IDs, spatial element clustering | `extension/vision/vitScreenDetector.js` |
-
-### 4-Tier Privacy Budget Escalation Engine
-
-VisionVault practices minimal data disclosure: tasks only escalate to higher information tiers when strictly necessary:
-
-- **Level 0 (`ZERO_PIXEL_DOM`)**: The agent reasons entirely over a lightweight `semantic_screen` JSON structure. Zero screenshots are captured or dispatched, reducing cloud latency by 85% and saving 90% of token costs.
-- **Level 1 (`SEMANTIC_LAYOUT`)**: Dispatches the semantic tree with normalized bounding boxes without raw or redacted images.
-- **Level 2 (`STRUCTURAL_WIREFRAME`)**: Geometry wireframe representation.
-- **Level 3 (`REDACTED_VISION`)**: Fail-closed redacted screenshot fallback invoked only when visual grounding (e.g. canvas elements, icon clicks, visual ambiguities) is required.
-
-### Semantic Screen Representation
-
-Instead of transmitting full-resolution un-tokenized screenshots, the cloud receives an ultra-efficient semantic screen:
-
-```json
-{
-  "viewport": { "width": 1440, "height": 900, "devicePixelRatio": 1 },
-  "elements": [
-    {
-      "id": "e17",
-      "type": "input",
-      "role": "textbox",
-      "label": "Official Email",
-      "bbox": [410, 220, 300, 45],
-      "sensitive": true,
-      "vaultKey": "email",
-      "value": "VAULT:EMAIL"
-    },
-    {
-      "id": "e18",
-      "type": "button",
-      "role": "button",
-      "label": "Continue",
-      "bbox": [410, 290, 150, 45],
-      "sensitive": false
-    }
-  ]
-}
+```mermaid
+flowchart LR
+    A[Browser tab] --> B[Local scan and masking]
+    B --> C[Review in side panel]
+    C --> D[Local rules planner]
+    C -. configured planner mode .-> E[Authenticated planner API]
+    E --> F[Ollama or configured hosted model]
+    E --> G[Deterministic fallback]
+    D --> H[Validate and review actions]
+    F --> H
+    G --> H
+    H --> I[Resolve vault values locally]
+    I --> A
+    E -. recorded in browser .-> J[Planner request audit]
 ```
 
-1. **Observe** — The extension evaluates the Privacy Budget; in Level 0, it reads DOM structure without capturing pixels.
-2. **Redact** — Multi-layer PII detection masks sensitive regions with fail-closed guarantees.
-3. **Reason** — Only the semantic screen JSON and/or verified redacted frame are dispatched to the planner.
-4. **Act** — The client resolves any real value from the local vault (`chrome.storage.local`) and executes the action directly in the browser.
+| Surface | Implementation |
+| --- | --- |
+| Tab scanning | DOM attributes and text patterns, bundled UltraFace for faces, and optional Tesseract OCR |
+| Planning | On-device rules by default. Hybrid and server-first modes can use the configured API |
+| Action controls | Scan preview, stop control, and configurable confirmation for actions the extension classifies as consequential |
+| Prompt Shield | Local masking of supported patterns in pasted text, supported chat inputs, and supported text-based documents |
+| Vault | Browser-local values, optional PIN locking, and password-protected AES-GCM exports |
+| Diagnostics | Runtime capability checks, a synthetic redaction self-check, and a scan summary export with a SHA-256 checksum |
+| IDE integration | Local stdio MCP for prompt/file sanitization and token restoration |
 
-This loop repeats for every step of a multi-step task, so privacy holds continuously, not just on the first screen.
+### Privacy boundaries
 
----
+- **Local planner mode** disables planner requests. Websites still receive the data intentionally entered or submitted to them. Chrome's optional speech recognition uses the browser's transcription service.
+- **Server modes** can send instructions, page context, element labels, and geometry. Visual requests can include a masked image when solid redaction is selected. The browser blocks unverified images and checks outgoing metadata for supported patterns. Detectors can miss content.
+- **The Privacy tab** stores bounded request records in the browser profile for inspection or export. Those records may include task text, page context, and masked frames. The planner records no task strings, screenshots, or action contents in its server logs by default.
+- **Scan summaries** describe the available local counters. The checksum verifies consistency of the exported JSON. It conveys no independent certification.
+- **MCP integrations** should use a trusted local client. Token maps returned for restoration can contain the original values, and the local file tool reads files the MCP process can access.
 
-## Privacy Guarantees
+See [known limits and the evaluation methodology](LIMITATIONS.md) and the [archived evaluation report](eval_report.md) for fixture coverage.
 
-Every guarantee below is enforced in code, not just claimed — see the file/function reference for where:
+## Deployment
 
-| Guarantee | Where it's enforced |
-| :--- | :--- |
-| **The service worker never holds a raw screenshot** | Capture and redaction happen together inside `scanAndRedact()`; only the redacted image is ever returned |
-| **Redaction failure aborts the request** | `redactImage()` throws `RedactionError` and never returns the input; `scanAndRedact()` returns `redactionOk: false` with no image |
-| **Nothing is sent without verified redaction** | `callServer()` refuses to fetch unless the payload carries `redactionVerified: true` |
-| **Real personal values never leave the device** | The server only ever receives `use_vault_field: "email"`; `vault.js` resolves the actual value from `chrome.storage.local` on-device |
-| **The right value goes to the right field** | The field's own label overrules the planner's guess; an identifier the vault has no equivalent for (Aadhaar, PAN, passport, CVV) is set aside and asked of the user, rather than filled with the nearest match |
-| **Element labels can't smuggle PII** | `safeLabel()` never uses an input's value and drops any candidate matching a PII pattern — including plain names with no fixed shape |
-| **Page context can't smuggle PII** | `page_info` carries only origin + path — no query string, no fragment, no page text |
-| **Consequential actions require a human** | Risk-gated click confirmation (see below) |
-| **Every claim is independently checkable** | `extension/audit-log.js` records the exact bytes sent — the redacted image and the vault field name requested — visible in the panel's Privacy tab |
-| **Redaction is adversarially tested** | `eval/attack-redaction.js` attempts to recover the masked content via upscaling, contrast stretch, extreme gain, inversion, and PNG metadata inspection |
-| **Non-Latin identifiers are still caught** | Indic digits are normalized to ASCII before matching; Devanagari OCR runs as a second recognition pass, since an English-only OCR model returns nothing for it |
+### Static web build
 
----
+Deploy `dist/site` using `npm ci` and `npm run build`. The repository includes [Vercel configuration](vercel.json) for the output directory, security headers, and historical download redirects. The build allowlist publishes the site assets and extension packages. The fixture portal and its runtime state stay outside the build.
 
-## Tech Stack
+### Planner service
 
-### Client — Browser Extension (Manifest V3)
-
-| Component | Technology | File Reference |
-| :--- | :--- | :--- |
-| **Extension runtime** | Chrome/Firefox, Manifest V3, JavaScript | `extension/manifest.json` |
-| **Vision Transformer (ViT)** | Patch16 Spatial Feature Extractor & Attention (WebGPU / WASM) | `extension/vision/vitScreenDetector.js` |
-| **Face Detection Model** | UltraFace RFB-320 (1.27 MB quantized ONNX via ONNX Runtime Web) | `extension/vision/faceDetect.js` + `models/version-RFB-320.onnx` |
-| **Offline Pixel OCR** | Tesseract.js v5 (WASM SIMD, multi-language incl. Devanagari) | `extension/vision/ocrDetect.js` + `lib/tesseract/` |
-| **Hardware Acceleration** | WebGPU + WASM SIMD execution providers | `extension/lib/ort/` |
-| **Zero-PII Local Vault** | `chrome.storage.local` with AES-256 / PBKDF2 encryption | `extension/vault.js` |
-| **Action Execution** | Native synthetic browser DOM events | `extension/action-executor.js` |
-
-### Server — Planning Backend (Multi-VLM)
-
-| Tier | Engine / Model | Role |
-| :--- | :--- | :--- |
-| **Tier 1 (Local)** | **Qwen2.5-VL 7B / 1.5B (Ollama / vLLM)** | Air-gapped local visual reasoning engine |
-| **Tier 2 (Cloud)** | **Google Gemini 2.0 Flash / 2.5 Flash** | Sub-second high-reasoning hosted VLM |
-| **Tier 3 (Cloud)** | **OpenRouter (Multi-VLM)** | High-availability cloud failover |
-| **Tier 4 (Edge)** | **Deterministic Rule Engine** | Offline zero-dependency rule planner |
-
-### Evaluation & Verification
-
-| Component | Technology | Measured Output |
-| :--- | :--- | :--- |
-| **Browser harness** | Puppeteer-core + live unpacked extension | 7 realistic benchmark fixtures |
-| **Scoring** | Automated pixel-level ink leak verification | **100% PII Recall, 0 Pixel Leaks, 94.7% IoU** |
-| **Enterprise Showcase** | ISRO Master Control Facility (6 Databases) | Real-world telemetry & cross-site Gaganyaan sync |
-
-> All model weights, WASM cores, and runtime assets are bundled locally with the extension — nothing is fetched from an external CDN at runtime.
-
----
-
-## Agent Guard — Safety on Top of Reasoning
-
-`extension/agent-guard.js` sits between the planner and the DOM. It can veto or substitute an action, but never invents a target — and when it intervenes, it states why.
-
-| Situation | Guard behavior |
-| :--- | :--- |
-| **Planner claims "done" too early** | Overruled unless the on-device check confirms the task actually completed (e.g. search ran, fields are filled) |
-| **Same action repeated, or no visible change across steps** | Run ends — repetition is treated as a bug, not persistence |
-| **A "scroll" instruction tries to click** | Blocked — a scroll instruction may not click |
-| **Submit clicked while fields are still empty** | Redirected to the next empty field instead of submitting |
-| **Field label vs. vault key mismatch** | The field's label overrules the planner's guess at which vault value to use |
-| **More work proposed after the task was already finished** | Ignored — a finished task stays finished |
-| **A real value is supplied alongside a use_vault_field instruction** | The literal value is dropped; only the symbolic field reference is honored |
-| **CAPTCHA / verification wall encountered** | Run stops with an explanation — nothing here attempts to solve or evade one |
-| **Page stops responding** | Run ends after four steps with no visible change |
-
-**Click confirmation policy**: by default, clicks execute autonomously unless the target's label or role matches a risky-action pattern (payment, deletion, authentication, sharing, submission) — in which case the agent halts and waits for explicit approval. Unlabeled controls (icon-only buttons, unlabeled submit inputs) are always gated, since risk can't be assessed without a label. A stricter mode requiring approval on every click is also available.
-
----
-
-## Repository Layout
+Use the [planner deployment guide](server/README.md) for Docker, TLS termination, token configuration, request limits, and smoke tests. The server falls back in this order when providers are configured and available:
 
 ```text
-extension/
-  manifest.json              MV3 config (requires 'wasm-unsafe-eval' CSP for local models)
-  content.js                 DOM PII scan, element tagging, per-frame API
-  action-executor.js         Single action executor: click, type, scroll, select, etc.
-  agent-guard.js             Supervises the planner — loop detection, goal verification
-  task-planner.js            Parses instructions; plans on-device when no server responds
-  background.js              Service worker — agent loop, vault resolution, click risk gate
-  detection-orchestrator.js  Capture + multi-frame merge + fail-closed redaction
-  vault.js                   On-device vault — symbolic field → real value
-  popup.html/.css/.js        Side panel — preview, live stats, approvals, settings
-  vision/                    faceDetect.js, ocrDetect.js, mergeRegions.js
-  models/                    Bundled ONNX + Tesseract model files
-server/
-  main.py                    FastAPI planning backend with model fallback chain
-eval/
-  pages/                     Fixture pages with ground-truth annotations
-  run-full-eval.js           Live evaluation against the shipped extension
-  workflows.js               Nine realistic multi-step task workflows
-  attack-redaction.js        Adversarial redaction-recovery tests
-mock-apps/
-  demo-page.html             Hand-built demo page with PII fields and an avatar
+Ollama → OpenRouter → Gemini → deterministic rules
 ```
 
----
+The sample Docker Compose setup publishes only a loopback port and requires a planner token. For team access, put the planner behind a TLS reverse proxy, keep Uvicorn internal, and apply authentication and rate limits at ingress as appropriate for your deployment.
 
-## Getting Started
+## Verification
 
-### 1. Server (optional — the extension falls back to on-device planning without it)
+| Command | Coverage |
+| --- | --- |
+| `npm test` | Extension contracts, planning, prompt and document masking, vault, MCP, and local fixture portal API |
+| `npm run build && npm run test:browser` | Real Chromium smoke test for the built site, ZIP downloads, narrow layouts, panel navigation, diagnostics, and scanning |
+| `python eval/test-fallback-chain.py` | Production planner dispatch and cooldown behavior using deterministic provider doubles |
+| `python eval/test-planner-http.py` | Auth, explicit CORS, request bounds, zero-pixel validation, and streaming parity over HTTP |
+| `python eval/test-server-contract.py` | Planner response contract with the default rules server running on port 8000 |
+| `VV_HEADLESS=1 npm run verify` | Extended Chromium checks against local fixtures |
+| `npm audit --audit-level=high` | Node dependency advisories |
 
-```bash
-cd server
-pip install -r requirements.txt
-cp .env.example .env # add GEMINI_API_KEY and/or GROQ_API_KEY, or leave empty
-python main.py       # runs on http://127.0.0.1:8000
-curl http://127.0.0.1:8000/health
+The Chromium harness needs a browser that permits testing unpacked extensions. Point `VV_CHROME` at a recent Chrome for Testing binary if the default browser is managed. Hosted model quality, browser-store review, and release signing require their respective infrastructure.
+
+## Repository map
+
+```text
+extension/       Manifest V3 extension, side panel, vision assets, local planners
+server/          FastAPI planner and local stdio MCP integration
+public/          Public site source and historical static fixture copies
+isro-panel/      Local-only employee and HR fixtures
+eval/            Automated checks, synthetic pages, and archived measurements
+scripts/         Static site build, browser packaging, and local preview
+.github/         Pull request checks and browser build artifacts
 ```
 
-For a fully local, no-API-key setup:
-
-```bash
-ollama pull qwen2.5:1.5b-instruct # ~1 GB, ~0.6s per plan on CPU
-```
-
-### 2. Extension
-
-1. Open `chrome://extensions`
-2. Enable **Developer mode**
-3. Click **Load unpacked** → select the `extension/` directory
-4. Open the side panel from the toolbar icon
-5. In **Settings**, set the server URL and choose redaction mode, vision depth, and click policy
-6. In **Vault**, enter the values the agent may use — stored in `chrome.storage.local`, never transmitted
-
-### 3. Try it
-
-1. Open `mock-apps/demo-page.html` locally, or test against the live fixture pages hosted at [https://isrovisionvault.vercel.app/](https://isrovisionvault.vercel.app/).
-2. Type a task like *"fill the signup form with my details"*, then click **Scan & Redact Screen**. The panel shows exactly the redacted frame that would be uploaded before anything is sent.
-3. Click **Execute Safe Automation** to run the full loop.
-
-> **To verify nothing sensitive leaves the device**: open DevTools → Network on the service worker, run a step, and inspect the `/api/agent/step` payload — the redacted image matches the preview, and no vault value appears anywhere in the request body.
-
----
-
-## Evaluation
-
-```bash
-npm install --no-save puppeteer-core
-node eval/run-full-eval.js --repeats 3
-node eval/generate-report.js # writes eval_report.md
-```
-
-This launches a real Chrome window, loads the unpacked extension, and drives it through fixture pages with ground-truth PII annotations — so results come from the shipped pipeline, not a re-implementation.
-
-### Headline results (see `eval_report.md` for full figures):
-- **100% PII recall** on the fixture suite
-- **100% precision** on sensitive-region masking
-- **0 pixel leaks** in measured checks
-- **Real browser task execution** with local redaction verified before every upload
-
----
-
-## Mapping to Problem Statement Evaluation Criteria
-
-| Evaluation Metric | How VisionVault Implements It | Verified Benchmark & File Reference |
-| :--- | :--- | :--- |
-| **1. Visual Context Accuracy** | **On-Device Vision Transformer (ViT)** (`extension/vision/vitScreenDetector.js`) extracts patch-level attention embeddings. Coupled with **UltraFace RFB-320 ONNX** (`faceDetect.js`) and **Set-of-Marks visual grounding** (`planner/visual-grounding.js`), the agent maps 100% of interactive widgets with 98.5% box IoU without leaking pixels. | `100.0%` Visual Recall<br>`98.5%` Mark IoU (`eval_report.md`) |
-| **2. PII Detection Recall & Precision** | Multi-modal union detector fuses Computer Vision, Offline OCR (`tesseract.js` v5, English + Devanagari Hindi/Marathi), and DOM heuristics. Catches PII even in raw rendered canvas pixels, PDFs, and raster receipts. | `100.0%` PII Recall<br>`100.0%` PII Precision (`eval_report.md`) |
-| **3. Redaction Integrity** | Destructive black-fill and Gaussian blur executed directly on an offscreen HTML5 canvas buffer before serialization. The local vault (`extension/vault.js`) substitutes real values on-device — the server only ever receives symbolic schema tokens (`«PERSON_1»`, `«EMAIL_1»`). | **0 Pixel Leaks**<br>**0.00%** Surviving Ink<br>`eval/attack-redaction.js` |
-| **4. Latency & Resource Utilization** | Quantized on-device models execute in browser hardware via WebGPU / WASM SIMD. Fast scan profile executes in **147 ms**; ViT inference in **~31 ms**. Offscreen memory footprint is **7.5 MB**, running completely off the main UI thread. | `< 32 ms` ViT Latency<br>`7.5 MB` Heap Usage (`eval_report.md`) |
-| **5. End-to-End Task Automation** | Complete autonomous agent pipeline controlling real-world multi-database systems (ISRO Master Control Facility: Payroll, Systems, Quarters, KMS Security, Public Telemetry Ingestion, and verbatim Gaganyaan ingestion from `isro.gov.in`). | **6 / 6 Databases**<br>**345 Automated Checks** (`npm test`) |
-
----
-
-## License
-
-MIT.
-
-Third-party models and libraries: UltraFace RFB-320 (MIT, Linzaer) · Tesseract.js / Tesseract (Apache 2.0) · ONNX Runtime Web (MIT, Microsoft). All bundled — nothing is fetched from a CDN at runtime.
+This project originated as a Smart India Hackathon prototype for PS 26171. The local portal uses fictional fixture data for demonstrations.

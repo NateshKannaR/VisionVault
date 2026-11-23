@@ -3,13 +3,10 @@
 // Owns the agent loop: scan -> plan (server) -> execute (content frames) -> re-scan.
 //
 // Privacy invariants enforced here:
-//   • The service worker never handles a raw screenshot. Capture + redaction happen together
-//     inside detection-orchestrator.js, which fails closed; only a redacted image is returned.
+//   • The scan masks regions before planner dispatch. The raw X-ray preview is local to the extension.
 //   • callServer() refuses to transmit unless the payload carries a verified redacted image.
 //   • Vault values are resolved locally and substituted into the page; the server only ever
 //     receives the symbolic field name (e.g. "use_vault_field": "email").
-
-const DEFAULT_SERVER_URL = "http://127.0.0.1:8000/api/agent/step";
 
 // vault.js       -> local credential resolution (no DOM needed)
 // detection-orchestrator.js -> capture + local ML + fail-closed redaction
@@ -17,7 +14,10 @@ const DEFAULT_SERVER_URL = "http://127.0.0.1:8000/api/agent/step";
 // (see manifest.json) because it needs a DOM; the service worker has none.
 importScripts(
   "./vault.js",
+  "./vault-crypto.js",
+  "./planner/connection.js",
   "./privacy-firewall.js",
+  "./prompt-scrubber.js",
   "./planner/task-parser.js",
   "./planner/task-checklist.js",
   "./planner/visual-grounding.js",
@@ -117,7 +117,7 @@ const RISKY_CLICK_RE = new RegExp([
   "cancel\\s+subscription", "close\\s+account", "unsubscribe",
   "revoke\\s+access", "ban\\b", "permanently\\s+delete",
   // identity / auth / consent — only explicit auth actions, not generic labels
-  "create\\s+account", "sign\\s*up\\s+now", "register\\s+now",
+  "create\\s+(?:\\w+\\s+){0,2}account", "sign\\s*up\\s+now", "register\\s+now",
   "log\\s*in\\s+now", "sign\\s*in\\s+now",
   "authorize\\s+payment", "grant\\s+access", "two-factor",
   "change\\s+password", "reset\\s+password",
@@ -211,7 +211,7 @@ async function getSettings() {
   return Object.assign(
     {
       redactMode: "black",
-      serverUrl: DEFAULT_SERVER_URL,
+      serverUrl: PlannerConnection.defaultUrl,
       confirmPolicy: "risky",
       plannerMode: "fast",
       // Latency / coverage trade-off, surfaced in the side panel.
@@ -519,6 +519,7 @@ async function scanTab(tabId, windowId, settings, retries = SCAN_ATTEMPT_DELAYS_
       previewRegions,
       redactionOk: result.redactionOk !== false,
       redactionError: result.redactionError || null,
+      failedStage: result.failedStage || null,
       safeMarks,
       markFrames,
       piiCount: result.sourceBreakdown?.merged ?? result.regions?.length ?? 0,
@@ -546,14 +547,7 @@ async function scanTab(tabId, windowId, settings, retries = SCAN_ATTEMPT_DELAYS_
 }
 
 // ── Server call (SSE streaming) ──────────────────────────────────────────────
-async function callServer(payload, serverUrl) {
-  // HARD PRIVACY GATE: VisionVault Privacy Firewall™ & Exfiltration Guard
-  if (typeof VisionVaultPrivacyFirewall !== "undefined") {
-    VisionVaultPrivacyFirewall.assertSafeTransmission(payload);
-  } else if (!payload.redactionVerified && payload.image) {
-    throw new Error("Refusing to contact server: redaction was not verified for this frame.");
-  }
-
+async function callServer(payload, serverUrl, serverToken) {
   const ctrl = new AbortController();
   inFlightPlanRequest = ctrl;
   const tid = setTimeout(() => ctrl.abort(), 30000);
@@ -561,9 +555,7 @@ async function callServer(payload, serverUrl) {
   // anything, so the log records transmissions and not intentions.
   let auditContext = null;
   try {
-    const targetUrl = serverUrl.includes("/plan-action") || serverUrl.includes("/api/agent/step")
-      ? serverUrl
-      : serverUrl.replace(/\/+$/, "") + "/api/agent/step";
+    const connection = PlannerConnection.resolve(serverUrl, serverToken);
 
     const bodyData = {
       task: payload.task,
@@ -577,8 +569,6 @@ async function callServer(payload, serverUrl) {
       progress: payload.progress || null,
       privacy_budget: payload.privacy_budget || { level: 0, id: "ZERO_PIXEL_DOM" },
       semantic_screen: payload.semantic_screen || payload.semanticScreen || null,
-      redactedImage: payload.image || "",
-      image: payload.image || "",
       marks: payload.marks || [],
       filled_mark_ids: payload.filled_mark_ids || [],
       checklist: payload.checklist || session?.checklist || [],
@@ -588,7 +578,18 @@ async function callServer(payload, serverUrl) {
       screen_evaluation: payload.screen_evaluation || null
     };
 
-    const streamUrl = targetUrl.replace(/\/api\/agent\/step\/?$/, "/api/agent/step/stream");
+    const verifiedBody = {
+      ...bodyData,
+      redactionVerified: payload.redactionVerified === true,
+      redactedImage: payload.image || "",
+    };
+    VisionVaultPrivacyFirewall.assertSafeTransmission(verifiedBody);
+    const { redactionVerified, redactedImage, ...metadata } = verifiedBody;
+    if (PromptScrubber.scrub(JSON.stringify(metadata)).matches.length) {
+      throw new Error("Pattern detection blocked sensitive text in the planner request.");
+    }
+    bodyData.redactedImage = redactedImage;
+    const streamUrl = connection.step;
     // Serialised once and reused, so what the audit log records is literally the string that
     // was transmitted rather than a re-serialisation that could differ from it.
     const serialisedBody = JSON.stringify(bodyData);
@@ -603,7 +604,13 @@ async function callServer(payload, serverUrl) {
     };
     const res = await fetch(streamUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "Accept": "text/event-stream" },
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "text/event-stream, application/json",
+        ...connection.authorization,
+      },
+      credentials: "omit",
+      redirect: "error",
       body: serialisedBody,
       signal: ctrl.signal,
     });
@@ -705,11 +712,13 @@ function assessClickRisk(resp, sess) {
   const mark = (sess?.marks || []).find(m => String(m.id) === String(resp.mark_id));
   const label = (mark?.label || resp.label || "").toString();
   const role = (mark?.role || "").toString();
-  const reasoning = (resp.reasoning || "").toString();
 
   // Only gate on the element's own label — that is what the user sees and what the action
   // actually targets. The model's reasoning is prose and fires too many false positives
   // ("proceed with filling", "save the date", "verify the city") to be a reliable signal.
+  if (role === "input:submit") {
+    return { needsConfirm: true, reason: "This control submits a form." };
+  }
   if (label && RISKY_CLICK_RE.test(label)) {
     return { needsConfirm: true, reason: `Target labelled "${label}" matches the high-risk action list.` };
   }
@@ -759,7 +768,7 @@ async function getTargetTab(preferredTabId = null) {
 }
 
 // ── PHASE 1: Initial scan (just preview, nothing sent) ────────────────────────
-async function phaseScan(task, preferredTabId = null) {
+async function phaseScan(task, preferredTabId = null, navigateBeforeScan = true) {
   const t0 = performance.now();
   const settings = await getSettings();
   const parsedTask = TaskPlanner.parseTask(task);
@@ -774,7 +783,7 @@ async function phaseScan(task, preferredTabId = null) {
   // and the current tab is not already on that site, navigate immediately to the target URL before scanning.
   const isLocalPortal = /localhost|127\.0\.0\.1|hr-portal|isro-intranet|isro-panel|employee-portal|isrovisionvault/i.test(tab.url || "");
   const portalOriginUrl = isLocalPortal ? tab.url : null;
-  if (parsedTask?.siteUrl && !TaskPlanner.alreadyOnSite(tab.url || "", parsedTask.siteUrl)) {
+  if (navigateBeforeScan && parsedTask?.siteUrl && !TaskPlanner.alreadyOnSite(tab.url || "", parsedTask.siteUrl)) {
     notifyPopup({ type: "step", step: 0, status: `Navigating to ${parsedTask.site || parsedTask.siteUrl}…` });
     try {
       await chrome.tabs.update(tab.id, { url: parsedTask.siteUrl, active: true });
@@ -845,6 +854,9 @@ async function phaseScan(task, preferredTabId = null) {
     windowId: tab.windowId,
     redacted: scan.redacted,
     redactionOk: true,
+    piiCount: scan.piiCount,
+    semanticScreen: scan.semanticScreen,
+    privacyBudget: scan.privacyBudget,
     marks: scan.safeMarks,
     markFrames: scan.markFrames,
     pageInfo: scan.pageInfo,
@@ -1370,22 +1382,11 @@ async function phaseRun() {
       const isAirGapped = !!settings.airGapped || mode === "air_gapped";
       const forceServer = mode === "server" && !isAirGapped;
 
-      // 100% Air-Gapped Mode: Zero bytes leave the client browser RAM
-      if (isAirGapped) {
-        if (deterministic && deterministic.action) {
-          resp = deterministic;
-        } else if (typeof TaskPlanner !== "undefined" && TaskPlanner.planNextAction) {
-          resp = TaskPlanner.planNextAction(session.task, session.marks, session.progress, session.filledIds, session.parsedTask, session.pageInfo);
-        } else {
-          resp = { action: "done", reasoning: "Air-gapped on-device task finished." };
-        }
-        plannerSource = "on-device (air-gapped)";
-      } else if (!forceServer && deterministic && deterministic.action && deterministic.action !== "done") {
-        // Ultra-Fast On-Device Routing:
-        // If fast/auto mode is active and the on-device planner has an action, execute immediately (<50ms)
-        resp = deterministic;
+      if (isAirGapped || mode === "fast") {
+        resp = deterministic || { action: "done", reasoning: "No local action is available." };
         plannerSource = "on-device";
-      } else if (mode === "fast" && deterministic) {
+      } else if (deterministic?.action === "navigate" ||
+                 (!forceServer && deterministic?.action && deterministic.action !== "done")) {
         resp = deterministic;
         plannerSource = "on-device";
       } else {
@@ -1423,7 +1424,7 @@ async function phaseRun() {
             progress: session.progress,
             privacy_budget: session.privacyBudget || (typeof VisionVaultPrivacyFirewall !== "undefined" ? VisionVaultPrivacyFirewall.evaluateBudgetForTask(session.task) : { level: 0, id: "ZERO_PIXEL_DOM" }),
             semantic_screen: session.semanticScreen || null,
-            image: session.redacted || "",
+            image: settings.redactMode === "black" ? session.redacted || "" : "",
             redactionVerified: session.redactionOk === true,
             marks: session.marks,
             filled_mark_ids: session.filledIds,
@@ -1432,7 +1433,7 @@ async function phaseRun() {
             page_info: session.pageInfo || {},
             screen_evaluation: session.screenEvaluation || null,
             step: session.stepCount,
-          }, session.serverUrl);
+          }, session.serverUrl, settings.serverToken);
         } catch (e) {
           if (stopRequested) {
             stopRequested = false;
@@ -2092,6 +2093,9 @@ async function rescanCurrentTab(resetFilled = false, reason = "agent") {
 
     session.redacted = scan.redacted;
     session.redactionOk = true;
+    session.piiCount = scan.piiCount;
+    session.semanticScreen = scan.semanticScreen;
+    session.privacyBudget = scan.privacyBudget;
     session.marks = scan.safeMarks;
     session.markFrames = scan.markFrames;
     if (scan.screenEvaluation) session.screenEvaluation = scan.screenEvaluation;
@@ -2216,7 +2220,11 @@ async function provideInput({ value, saveToVault, fieldKey, mark_id } = {}) {
   // been doing.
   const isVaultField = !!fieldKey && !String(fieldKey).startsWith("field:");
 
-  if (saveToVault && value) {
+  if (!session) {
+    return { ok: false, error: "The session expired while waiting. Scan the page again." };
+  }
+
+  if (saveToVault && value && isVaultField) {
     const rawKey = String(fieldKey || "custom_field").replace(/^field:/, "").trim();
     if (rawKey) {
       const vault = await getVault();
@@ -2228,10 +2236,6 @@ async function provideInput({ value, saveToVault, fieldKey, mark_id } = {}) {
         await chrome.storage.local.set({ vault });
       }
     }
-  }
-
-  if (!session) {
-    return { ok: false, error: "The session expired while waiting. Scan the page again." };
   }
 
   session.answeredAsks = session.answeredAsks || [];
@@ -2416,7 +2420,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
   if (msg.type === "SCAN") {
-    phaseScan(msg.task, msg.tabId)
+    phaseScan(msg.task, msg.tabId, false)
       .then(r => sendResponse({ ok: true, result: r }))
       .catch(e => sendResponse({ ok: false, error: e.message }));
     return true;
@@ -2667,32 +2671,19 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 
-  // ── Sovereign DPDP Act 2023 & GDPR Audit Certificate ─────────────────────
   if (msg.type === "OPEN_DPDP_CERTIFICATE") {
     (async () => {
       try {
-        const auditEntries = (typeof AuditLog !== "undefined" && AuditLog.list) ? await AuditLog.list() : [];
-        const summary = (typeof AuditLog !== "undefined" && AuditLog.summary) ? await AuditLog.summary() : {};
-        const cryptoMod = typeof VaultCrypto !== "undefined" ? VaultCrypto : null;
-        let html = "";
-        if (cryptoMod && cryptoMod.generateDpdpComplianceCertificate) {
-          const cert = await cryptoMod.generateDpdpComplianceCertificate({
-            task: session?.task || "Autonomous Web Agent Session",
-            url: session?.pageInfo?.url || "N/A",
-            piiCount: summary?.redactedRegionsTotal || 0,
-            marksCount: session?.marks?.length || 0,
-            timings: { clientScan: 0, ocrMs: 0 },
-            actions: session?.actionLog || []
-          });
-          html = cert.htmlCertificate;
-        } else {
-          html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>DPDP Act 2023 Compliance Certificate</title><style>body{font-family:system-ui,-apple-system,sans-serif;padding:36px;background:#0f172a;color:#f8fafc;max-width:820px;margin:0 auto;line-height:1.5;} .card{background:#1e293b;border:1px solid #334155;border-radius:12px;padding:24px;margin-top:20px;} h1{color:#38bdf8;margin:0 0 8px;font-size:24px;} pre{background:#0b0f19;padding:12px;border-radius:8px;overflow-x:auto;font-size:12px;color:#a5f3fc;} .badge{background:#059669;color:#fff;padding:4px 9px;border-radius:6px;font-size:12px;font-weight:700;display:inline-block;}</style></head><body><h1>🛡️ Sovereign DPDP Act 2023 Compliance Certificate</h1><p><span class="badge">VERIFIED SOVEREIGN SEAL</span> Issued by VisionVault Client-Side Enclave.</p><div class="card"><h3>Certificate Details</h3><p><strong>Standard:</strong> Digital Personal Data Protection Act 2023 (DPDP) &amp; GDPR Article 25</p><p><strong>Zero-Trust Guarantee:</strong> 100% of sensitive visuals redacted prior to transmission.</p><p><strong>Total Redacted Regions:</strong> ${summary?.redactedRegionsTotal || 0}</p><p><strong>Session ID:</strong> ${session?.sessionId || "sess_" + Date.now()}</p></div><div class="card"><h3>Audit Manifest</h3><pre>${JSON.stringify(auditEntries.slice(-10), null, 2)}</pre></div><script>window.print();</script></body></html>`;
-        }
-        const dataUrl = "data:text/html;charset=utf-8," + encodeURIComponent(html);
-        await chrome.tabs.create({ url: dataUrl });
+        const report = await VaultCrypto.generateSessionReport({
+          piiCount: session?.piiCount,
+          marksCount: session?.marks?.length,
+        });
+        await chrome.tabs.create({
+          url: "data:text/html;charset=utf-8," + encodeURIComponent(report.html),
+        });
         sendResponse({ ok: true });
-      } catch (e) {
-        sendResponse({ ok: false, error: String(e) });
+      } catch {
+        sendResponse({ ok: false, error: "Unable to open the session report." });
       }
     })();
     return true;

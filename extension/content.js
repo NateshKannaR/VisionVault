@@ -75,8 +75,8 @@ const SSN_RE      = /\b\d{3}[-\s]?\d{2}[-\s]?\d{4}\b/g;
 // the same page by different routes - this one walks the DOM, that one reads the flattened
 // pixels - so a shape recognised by only one of them is a hole that opens the moment a site
 // renders the value as an image instead of text.
-// UIDAI Aadhaar pattern with support for standard demo numbers starting with 1
-const AADHAAR_RE  = /\b[1-9]\d{3}[\s-]{0,2}\d{4}[\s-]{0,2}\d{4}\b/g;
+// Aadhaar has 12 digits and starts with 2–9.
+const AADHAAR_RE  = /\b[2-9]\d{3}[\s-]{0,2}\d{4}[\s-]{0,2}\d{4}\b/g;
 const PAN_RE      = /\b[A-Z]{5}[0-9]{4}[A-Z]{1}\b/g;
 const PASSPORT_RE = /\b[A-Z][0-9]{7}\b/g;
 const IFSC_RE     = /\b[A-Z]{4}0[A-Z0-9]{6}\b/g;

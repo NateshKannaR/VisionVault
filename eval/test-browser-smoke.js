@@ -95,6 +95,18 @@ async function main() {
         document.querySelector('[data-seek="12"]').getAttribute("aria-current") === "true";
     });
     await page.$eval("#demoVideoPlayer", (node) => node.pause());
+    assert.equal(await page.$('a[href="login.html"]'), null);
+    const hostedDemo = await h.browser.newPage();
+    for (const route of ["login.html", "login/index.html"]) {
+      await hostedDemo.goto(fixture.baseUrl + "/isro-panel/" + route);
+      await hostedDemo.waitForFunction(() => location.pathname === "/employee-portal.html");
+      assert.equal(await hostedDemo.$("#login-form"), null);
+    }
+    for (const portal of ["employee-portal.html", "hr-portal.html"]) {
+      await hostedDemo.goto(fixture.baseUrl + "/isro-panel/" + portal);
+      assert.equal(await hostedDemo.$eval("#local-session-bar", (node) => getComputedStyle(node).display), "none");
+    }
+    await hostedDemo.close();
     assert.equal((await fetch(base + "/data/prototype-state.json")).status, 404);
     for (const browser of ["chromium", "firefox"]) {
       const response = await fetch(base + `/downloads/visionvault-${browser}.zip`);

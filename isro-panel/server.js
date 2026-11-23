@@ -7,6 +7,7 @@ const PORT = Number(process.env.PORT ?? 3000);
 const ROOT = __dirname;
 const DATA_DIR = path.resolve(process.env.VISIONVAULT_DEMO_DATA || path.join(ROOT, "data"));
 const DATA_FILE = path.join(DATA_DIR, "prototype-state.json");
+const LOCAL_SIGN_IN = path.resolve(ROOT, "../eval/pages/portal-sign-in.html");
 
 const EMPLOYEES = [
   { name: "Natesh Kanna R", id: "ISRO-10101", dept: "Flight Software & Spacecraft Control", initials: "NK", station: "MCF Hassan", email: "natesh.kanna@isro.gov.in", role: "Lead Flight Software Architect", phone: "+91 94440 12890", image: "images/emp-natesh.jpeg" },
@@ -46,8 +47,8 @@ const MIME = {
 const PAGES = new Map([
   ["/", "index.html"],
   ["/index.html", "index.html"],
-  ["/login", "login.html"],
-  ["/login.html", "login.html"],
+  ["/login", LOCAL_SIGN_IN],
+  ["/login.html", LOCAL_SIGN_IN],
   ["/employee-portal", "employee-portal.html"],
   ["/employee-portal.html", "employee-portal.html"],
   ["/hr-portal", "hr-portal.html"],
@@ -257,7 +258,7 @@ function serveStatic(req, res, pathname) {
       return;
     }
   }
-  let file = page ? path.join(ROOT, page) : null;
+  let file = page ? path.resolve(ROOT, page) : null;
   if (pathname === "/visionvault-extension.zip") {
     file = path.join(ROOT, "downloads", "visionvault-chromium.zip");
   } else if (SITE_FILES.has(pathname)) {

@@ -99,7 +99,7 @@ console.log("Built static site and Chromium/Firefox packages in dist/site.");
 
 if (process.argv.includes("--update-public")) {
   fs.cpSync(dist, publicRoot, { recursive: true });
-  for (const name of ["index.html", "assets", "downloads"]) {
+  for (const name of ["index.html", "assets", "downloads", "login.html", "login"]) {
     fs.cpSync(path.join(dist, name), path.join(portalRoot, name), { recursive: true });
   }
   console.log("Updated the checked-in site in public and isro-panel.");

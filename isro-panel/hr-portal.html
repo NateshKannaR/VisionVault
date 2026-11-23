@@ -869,7 +869,7 @@ textarea { resize: vertical; min-height: 65px; }
 </style>
 </head>
 <body>
-<aside style="position:relative;z-index:10;padding:6px 12px;background:#17261f;color:#c9efa5;font:600 12px system-ui;text-align:center">VisionVault local fixture · Use synthetic data · <button type="button" id="fixture-logout">Sign out</button></aside>
+<aside id="local-session-bar" hidden style="position:relative;z-index:10;padding:6px 12px;background:#17261f;color:#c9efa5;font:600 12px system-ui;text-align:center">VisionVault local fixture · Use synthetic data · <button type="button" id="fixture-logout">Sign out</button></aside>
 
 <!-- Header Top Bar -->
 <div class="topbar">
@@ -1392,6 +1392,13 @@ function escapeMessageHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, char => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
   })[char]);
+}
+if (["localhost", "127.0.0.1"].includes(location.hostname)) {
+  fetch("/api/me").then((response) => {
+    if (response.ok && response.headers.get("content-type")?.startsWith("application/json")) {
+      document.getElementById("local-session-bar").hidden = false;
+    }
+  }).catch(() => {});
 }
 document.getElementById("fixture-logout").addEventListener("click", async () => {
   await fetch("/api/logout", { method: "POST" });

@@ -28,6 +28,8 @@ jobs:
           cmp dist/site/index.html isro-panel/index.html
           diff -qr dist/site/assets isro-panel/assets
           diff -qr dist/site/downloads isro-panel/downloads
+          cmp dist/site/login.html isro-panel/login.html
+          diff -qr dist/site/login isro-panel/login
           git diff --exit-code -- public isro-panel
           test -z "$(git ls-files --others --exclude-standard -- public isro-panel)"
       - name: Install Chrome for Testing

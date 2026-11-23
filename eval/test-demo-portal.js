@@ -38,7 +38,9 @@ async function main() {
       assert.equal(response.status, 200);
       assert.equal(response.headers.get("content-type"), type);
     }
-    assert.equal((await get("/login.html")).status, 200);
+    const signIn = await get("/login.html");
+    assert.equal(signIn.status, 200);
+    assert.match(await signIn.text(), /id="login-form"/);
     assert.equal((await get("/employee-portal.html")).status, 303);
     assert.equal((await get("/api/state")).status, 401);
     assert.equal((await get("/data/prototype-state.json")).status, 404);

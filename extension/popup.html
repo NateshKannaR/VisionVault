@@ -50,6 +50,7 @@
     <g id="i-layers"><path d="M12 3.6l8.4 4.2-8.4 4.2L3.6 7.8z"/><path d="M3.6 12.4L12 16.6l8.4-4.2M3.6 16.6L12 20.8l8.4-4.2"/></g>
     <g id="i-sparkle"><path d="M12 4.2l1.7 4.6 4.6 1.7-4.6 1.7L12 16.8l-1.7-4.6L5.7 10.5l4.6-1.7z"/><path d="M18.5 15.5l.7 1.9 1.9.7-1.9.7-.7 1.9-.7-1.9-1.9-.7 1.9-.7z"/></g>
     <g id="i-chevron"><path d="M9 5.5l6.5 6.5L9 18.5"/></g>
+    <g id="i-search"><circle cx="10.5" cy="10.5" r="5.5"/><path d="m15 15 4.5 4.5"/></g>
     <g id="i-file"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></g>
   </defs>
 </svg>
@@ -77,9 +78,14 @@
       <span class="brand-sub">Privacy workspace</span>
     </div>
   </div>
-  <div class="server-pill" id="backendBadgeContainer" title="Planning backend" role="status">
-    <span class="status-dot" id="serverDot"></span>
-    <span id="backendBadge">checking</span>
+  <div class="app-tools">
+    <div class="server-pill" id="backendBadgeContainer" title="Planning backend" role="status">
+      <span class="status-dot" id="serverDot"></span>
+      <span id="backendBadge">checking</span>
+    </div>
+    <button type="button" class="tool-switch" id="openToolSwitcher" aria-label="Find a tool" aria-haspopup="dialog" aria-keyshortcuts="Alt+Shift+V" title="Find a tool (Alt+Shift+V)">
+      <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-search"/></svg>
+    </button>
   </div>
 </header>
 
@@ -93,6 +99,19 @@
   <button class="tab" id="tab-settings" data-tab="settings" role="tab" aria-selected="false" aria-controls="panel-settings"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-sliders"/></svg><span>Settings</span></button>
 </nav>
 
+<dialog class="preview-dialog tool-switcher" id="toolSwitcher" aria-labelledby="toolSwitcherHeading">
+  <div class="panel-toolbar">
+    <h2 id="toolSwitcherHeading">Find a tool</h2>
+    <button type="button" class="btn btn-ghost btn-sm" id="closeToolSwitcher">Close</button>
+  </div>
+  <div class="field">
+    <label class="field-label" for="toolSearch">Search the workspace</label>
+    <input class="input" id="toolSearch" type="search" placeholder="Find scan review, vault, or settings" autocomplete="off">
+  </div>
+  <p id="toolSearchEmpty" class="hint" role="status" hidden>No tools match that search.</p>
+  <ul class="tool-results" id="toolResults" aria-label="Workspace tools"></ul>
+</dialog>
+
 <main>
   <!-- ── RUN ────────────────────────────────────────────────────────────── -->
   <section id="panel-run" class="panel active" role="tabpanel" tabindex="0">
@@ -102,7 +121,7 @@
         <span class="panel-emblem" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24"><use href="#i-scan"/></svg></span>
         <div>
           <h1>Scan &amp; review</h1>
-          <p class="hint">Inspect the masked page before starting a task.</p>
+          <p class="hint">Scan a page for sensitive regions or review it before starting a task.</p>
         </div>
       </div>
       <div class="protect-banner" id="protectBanner" role="status">
@@ -134,7 +153,7 @@
 
     <div class="field">
       <div class="field-head">
-        <label class="field-label" for="task">Task instruction</label>
+        <label class="field-label" for="task">Task instruction (optional)</label>
         <span class="counter"><span id="charCount">0</span>/240</span>
       </div>
       <div class="task-wrap">
@@ -172,7 +191,7 @@
         <button class="quick-chip" data-template="audit isro press page for exposed contact numbers and unredacted faces">ISRO Privacy Auditor</button>
         </div>
       </details>
-      <p class="kbd-hint"><kbd>Ctrl</kbd>+<kbd>Enter</kbd> to run · <kbd>Ctrl</kbd>+<kbd>M</kbd> to dictate</p>
+      <p class="kbd-hint"><kbd>Ctrl</kbd>+<kbd>Enter</kbd> to scan · <kbd>Ctrl</kbd>+<kbd>M</kbd> to dictate</p>
       <!--
         Automatic is the product. This exists so a demo can stop on the redacted frame and
         talk about it before anything moves, not because two-step is a supported way to work.
@@ -189,10 +208,6 @@
         <span>Scan active tab</span>
       </button>
       <div class="actions-row">
-        <button class="btn btn-accent" id="runBtn" hidden>
-          <svg class="ic" viewBox="0 0 24 24"><use href="#i-play"/></svg>
-          <span>Run reviewed task</span>
-        </button>
         <button class="btn btn-ghost btn-stop" id="stopBtn" hidden>
           <svg class="ic" viewBox="0 0 24 24"><use href="#i-stop"/></svg>
           <span>Stop</span>
@@ -227,122 +242,81 @@
       <div class="sk-metrics"><span></span><span></span><span></span><span></span></div>
     </div>
 
-    <!-- Redacted preview + what was masked -->
-    <figure class="preview" id="previewWrap" hidden>
-      <figcaption class="preview-head">
-        <span class="preview-title">
-          <svg class="ic" viewBox="0 0 24 24"><use href="#i-eye"/></svg>
-          Masked page preview
-        </span>
-        <div style="display:flex; gap:6px; align-items:center;">
-          <button class="toggle" id="xrayToggle" aria-pressed="false" title="Interactive Before vs After X-Ray Split Lens">
-            <svg class="ic" viewBox="0 0 24 24"><use href="#i-sparkle"/></svg>
-            <span>X-Ray Lens</span>
-          </button>
-          <button class="toggle" id="overlayToggle" aria-pressed="true" title="Outline the masked regions">
-            <svg class="ic" viewBox="0 0 24 24"><use href="#i-layers"/></svg>
-            <span>Regions</span>
-          </button>
+    <figure class="preview scan-review" id="previewWrap" hidden>
+      <figcaption class="review-heading">
+        <span class="panel-emblem" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24"><use href="#i-eye"/></svg></span>
+        <div>
+          <h2 id="previewHeading" tabindex="-1">Review masked page</h2>
+          <p class="preview-context" id="previewContext"></p>
         </div>
       </figcaption>
 
-      <p class="preview-context" id="previewContext"></p>
+      <div class="review-toolbar" role="group" aria-label="Preview controls">
+        <button type="button" class="toggle" id="openPreviewZoom" aria-haspopup="dialog">Enlarge</button>
+        <button type="button" class="toggle" id="overlayToggle" aria-pressed="true">Outlines</button>
+        <button type="button" class="toggle" id="xrayToggle" aria-pressed="false">Compare original</button>
+      </div>
 
-      <!-- X-Ray Lens Slider Control Bar -->
-      <div id="xrayControlBar" hidden style="margin-bottom: 6px; padding: 6px 8px; background: rgba(15,23,42,0.8); border: 1px solid rgba(56,189,248,0.3); border-radius: 6px; display: flex; align-items: center; justify-content: space-between; gap: 8px;">
-        <span style="font-size: 10px; font-weight: 600; color: #94a3b8; display: flex; align-items: center; gap: 4px;">
-          <span style="color: #ef4444;">Raw</span>
-          <input type="range" id="xraySlider" aria-label="Visible portion of the original screenshot" min="0" max="100" value="50" style="width: 80px; cursor: pointer;" />
-          <span style="color: #38bdf8;">Masked</span>
-        </span>
-        <span class="result-count">Local comparison</span>
+      <div class="review-compare" id="xrayControlBar" hidden>
+        <label for="xraySlider">Original view</label>
+        <input type="range" id="xraySlider" min="0" max="100" value="50">
+        <span>Masked</span>
       </div>
 
       <div class="preview-frame">
         <div class="preview-stage" id="previewStage">
-          <img id="preview" alt="Screenshot with detected regions masked" />
-          <canvas id="xrayCanvas" class="xray-canvas" hidden style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; border-radius: 6px;"></canvas>
+          <img id="preview" alt="Screenshot with detected regions masked">
+          <canvas id="xrayCanvas" class="xray-canvas" hidden></canvas>
           <svg class="overlay" id="regionOverlay" preserveAspectRatio="none" aria-hidden="true"></svg>
         </div>
       </div>
 
-      <div class="legend" id="regionLegend"></div>
-      <p class="preview-foot" id="regionHint">Outlines mark the areas the scan masked.</p>
+      <div class="region-review">
+        <div class="panel-toolbar">
+          <h3>Masked regions</h3>
+          <span class="result-count" id="regionCount"></span>
+        </div>
+        <div class="field">
+          <label class="field-label" for="regionSource">Filter by detector</label>
+          <select class="input" id="regionSource"><option value="all">All detectors</option></select>
+        </div>
+        <p class="hint" id="regionHint" role="status"></p>
+        <ul class="review-region-list" id="reviewRegionList" aria-label="Detected regions" hidden></ul>
+      </div>
+
+      <div class="review-actions">
+        <button class="btn btn-accent" id="runBtn" hidden>
+          <svg class="ic" viewBox="0 0 24 24"><use href="#i-play"/></svg>
+          <span>Run reviewed task</span>
+        </button>
+        <div class="review-downloads">
+          <button type="button" class="btn btn-secondary btn-sm" id="saveMaskedPreview"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-download"/></svg> Save masked image</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="scoreCertBtn">Export scan summary</button>
+        </div>
+        <div class="toast" id="reviewExportStatus" role="status"></div>
+      </div>
     </figure>
 
-    <!-- Active Models & Sensitivity Analysis Inspector -->
-    <div class="card" id="modelInspectorCard" hidden style="margin-top: 10px; border: 1px solid rgba(56, 189, 248, 0.35); background: rgba(15, 23, 42, 0.75);">
-      <div class="card-head" style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" id="modelInspectorToggle">
-        <div style="display:flex; align-items:center; gap:6px;">
-          <svg class="ic" viewBox="0 0 24 24"><use href="#i-sparkle"/></svg>
-          <span style="font-weight:600; color:#fff;">Active Models &amp; Sensitivity Analysis</span>
-        </div>
-        <span class="badge" id="modelInspectorBadge" style="background:rgba(56,189,248,0.15); color:var(--accent); font-size:10px; font-weight:700;">3 Models Active</span>
+    <dialog class="preview-dialog" id="previewZoomDialog" aria-labelledby="previewZoomTitle">
+      <div class="panel-toolbar">
+        <h2 id="previewZoomTitle">Masked image</h2>
+        <button type="button" class="btn btn-ghost btn-sm" id="closePreviewZoom">Close</button>
       </div>
-
-      <div id="modelInspectorBody" style="margin-top:8px;">
-        <!-- Active Model Badges -->
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-bottom:10px;">
-          <div style="background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:6px 8px;">
-            <div style="font-size:9.5px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.04em;">Biometric Vision</div>
-            <div style="font-size:11px; font-weight:600; color:#38bdf8; margin-top:2px;">UltraFace-RFB-320</div>
-            <div style="font-size:9px; color:var(--text-faint);">ONNX Runtime Web (WASM-SIMD)</div>
-          </div>
-          <div style="background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:6px 8px;">
-            <div style="font-size:9.5px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.04em;">Text / OCR Model</div>
-            <div style="font-size:11px; font-weight:600; color:#a78bfa; margin-top:2px;">Tesseract.js WASM</div>
-            <div style="font-size:9px; color:var(--text-faint);">Local Regex &amp; NER Pattern Engine</div>
-          </div>
-          <div style="background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:6px 8px;">
-            <div style="font-size:9.5px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.04em;">Layout Classifier</div>
-            <div style="font-size:11px; font-weight:600; color:#34d399; margin-top:2px;" id="inspectorScreenType">DOM Structural Heuristic</div>
-            <div style="font-size:9px; color:var(--text-faint);">Screen State &amp; ARIA Context</div>
-          </div>
-          <div style="background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:6px 8px;">
-            <div style="font-size:9.5px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.04em;">Decision Agent</div>
-            <div style="font-size:11px; font-weight:600; color:#f59e0b; margin-top:2px;">VLM Task Planner</div>
-            <div style="font-size:9px; color:#10b981; font-weight:600;">🔒 Receives 0 PII Bytes</div>
-          </div>
-        </div>
-
-        <!-- Sensitivity Breakdown List -->
-        <div style="font-size:10.5px; font-weight:700; color:var(--text-muted); margin-bottom:6px; text-transform:uppercase; letter-spacing:0.04em; display:flex; justify-content:space-between; align-items:center;">
-          <span>Detected Items Breakdown</span>
-          <span id="inspectorCountSummary" style="font-size:9.5px; font-weight:500; color:var(--text-faint);">0 items</span>
-        </div>
-        <div id="sensitivityTable" style="max-height:160px; overflow-y:auto; display:flex; flex-direction:column; gap:4px;">
-          <!-- Populated dynamically with each detected region & element classification -->
+      <div class="zoom-options">
+        <label for="previewZoomLevel">Zoom</label>
+        <select class="input" id="previewZoomLevel">
+          <option value="100">Fit to panel</option>
+          <option value="150">150%</option>
+          <option value="200">200%</option>
+        </select>
+      </div>
+      <div class="preview-viewport" id="previewViewport" tabindex="0" aria-label="Scrollable masked image">
+        <div class="preview-stage" id="zoomStage">
+          <img id="zoomPreview" alt="Enlarged masked screenshot">
+          <svg class="overlay" id="zoomOverlay" preserveAspectRatio="none" aria-hidden="true"></svg>
         </div>
       </div>
-    </div>
-
-    <div class="scorecard" id="scoreCard" hidden>
-      <div class="score-head">
-        <svg class="ic" viewBox="0 0 24 24"><use href="#i-shield"/></svg>
-        <span>Privacy on this screen</span>
-        <span class="score-badge" id="scoreBadge">Ready</span>
-      </div>
-      <div class="score-rows">
-        <div class="score-row">
-          <span class="score-k">Sensitive regions found</span>
-          <span class="score-v" id="score-found">0</span>
-        </div>
-        <div class="score-row">
-          <span class="score-k">Masked regions</span>
-          <span class="score-v ok" id="score-masked">0</span>
-        </div>
-        <div class="score-row">
-          <span class="score-k">Preview</span>
-          <span class="score-v ok" id="score-sent">Pending</span>
-        </div>
-      </div>
-      <div class="score-sources" id="scoreSources"></div>
-      <p class="score-note" id="scoreNote"></p>
-      <button class="btn btn-ghost btn-sm" id="scoreCertBtn" style="margin-top: 8px; width: 100%; border: 1px solid rgba(56,189,248,0.3);">
-        <svg class="ic" viewBox="0 0 24 24"><use href="#i-shield"/></svg>
-        <span>Download scan summary</span>
-      </button>
-    </div>
+    </dialog>
 
     <div class="metrics" id="statsGrid" hidden>
       <div class="metric">
@@ -1001,8 +975,15 @@
       <div class="card shield-card shield-result" id="scrubFindingsWrap" hidden>
         <div class="panel-toolbar"><h2><label for="scrubbedPromptOutput">Masked output</label></h2><span class="result-count" id="scrubFindingsCount"></span></div>
         <ul class="findings-list" id="scrubFindingsList" aria-label="Detected categories"></ul>
-        <textarea id="scrubbedPromptOutput" readonly class="input shield-editor masked-output" rows="5" spellcheck="false"></textarea>
-        <p class="hint">Review the result for anything the pattern scan missed.</p>
+        <textarea id="scrubbedPromptOutput" readonly class="input shield-editor masked-output" rows="5" spellcheck="false" aria-describedby="manualMaskHelp"></textarea>
+        <div class="shield-mask-tools">
+          <p class="hint" id="manualMaskHelp">Select any text the scan missed to mask it before copying or saving.</p>
+          <div class="shield-actions">
+            <button type="button" class="btn btn-secondary btn-sm" id="maskPromptSelection" disabled>Mask selection</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="undoPromptMask" disabled>Undo last mask</button>
+          </div>
+          <p class="list-count" id="manualMaskCount" role="status"></p>
+        </div>
         <div class="shield-actions">
           <button type="button" class="btn btn-primary" id="copyCleanPromptBtn">Copy masked text</button>
           <button type="button" class="btn btn-ghost" id="saveCleanPromptBtn">Save text</button>
@@ -1073,6 +1054,7 @@
 <script src="privacy-firewall.js"></script>
 <script src="planner/connection.js"></script>
 <script src="popup.js"></script>
+<script src="scan-review.js"></script>
 <script src="shield-panel.js"></script>
 </body>
 </html>

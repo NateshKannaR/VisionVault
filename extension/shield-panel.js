@@ -2,15 +2,21 @@
   bindTabs($("shieldTabs"));
 
   const prompt = $("rawPromptInput");
+  const promptOutput = $("scrubbedPromptOutput");
+  const PLACEHOLDER = /\[[A-Z0-9_]+_\d+\]/g;
   const reply = $("llmResponseInput");
   const fileInput = $("pdfFileInput");
   const dropZone = $("pdfDropZone");
   const sources = new Map();
   let promptResult = null;
+  let promptSpans = [];
+  let manualMasks = 0;
+  let undoMask = null;
   let documentTokens = {};
   let fileJob = 0;
   let chatJob = 0;
   let chatRevision = 0;
+  let chatTarget = "";
 
   function renderFindings(result, list, counter) {
     const counts = new Map();
@@ -58,27 +64,86 @@
     $("scrubPromptBtn").disabled = !prompt.value.trim();
     $("clearPromptBtn").disabled = !prompt.value;
     $("scrubFindingsWrap").hidden = true;
-    $("scrubbedPromptOutput").value = "";
+    promptOutput.value = "";
     promptResult = null;
+    promptSpans = [];
+    manualMasks = 0;
+    undoMask = null;
+    syncMaskTools();
     setSource("text");
     hideStatus("shieldTextStatus");
     hideStatus("shieldCopyStatus");
   }
 
   function withPermanentMasks(text, tokenMap) {
-    return text.replace(/\[[A-Z0-9_]+_\d+\]/g, (token) => Object.hasOwn(tokenMap, token) ? "[REDACTED]" : token);
+    return text.replace(PLACEHOLDER, (token) => Object.hasOwn(tokenMap, token) ? "[REDACTED]" : token);
+  }
+
+  function syncMaskTools() {
+    const selection = promptOutput.value.slice(promptOutput.selectionStart, promptOutput.selectionEnd);
+    $("maskPromptSelection").disabled = !selection.trim() || selection === "[REDACTED]";
+    $("undoPromptMask").disabled = undoMask === null;
+    $("manualMaskCount").textContent = manualMasks
+      ? `${manualMasks} manual mask${manualMasks === 1 ? "" : "s"}`
+      : "";
   }
 
   function renderPromptOutput() {
     if (!promptResult) return;
     const { cleanText, tokenMap } = promptResult;
     const permanent = $("permanentMasks").checked;
-    $("scrubbedPromptOutput").value = permanent
-      ? withPermanentMasks(cleanText, tokenMap)
-      : cleanText;
-    setSource("text", "Masked prompt", permanent ? null : tokenMap);
+    const visibleMap = {};
+    promptSpans = [];
+    let shift = 0;
+    promptOutput.value = cleanText.replace(PLACEHOLDER, (token, offset) => {
+      if (!Object.hasOwn(tokenMap, token)) return token;
+      visibleMap[token] = tokenMap[token];
+      const shown = permanent ? "[REDACTED]" : token;
+      const start = offset + shift;
+      shift += shown.length - token.length;
+      promptSpans.push({ sourceStart: offset, sourceEnd: offset + token.length, start, end: start + shown.length });
+      return shown;
+    });
+    setSource("text", "Masked prompt", permanent ? null : visibleMap);
     hideStatus("shieldCopyStatus");
+    syncMaskTools();
   }
+
+  function originalOffset(offset, edge) {
+    let shift = 0;
+    for (const span of promptSpans) {
+      if (offset <= span.start) break;
+      if (offset < span.end) return edge === "start" ? span.sourceStart : span.sourceEnd;
+      shift = span.sourceEnd - span.end;
+    }
+    return offset + shift;
+  }
+
+  promptOutput.addEventListener("select", syncMaskTools);
+  $("maskPromptSelection").addEventListener("click", () => {
+    if (!promptResult || $("maskPromptSelection").disabled) return;
+    const { selectionStart, selectionEnd } = promptOutput;
+    const start = originalOffset(selectionStart, "start");
+    const end = originalOffset(selectionEnd, "end");
+    const text = promptResult.cleanText;
+    undoMask = text;
+    promptResult.cleanText = text.slice(0, start) + "[REDACTED]" + text.slice(end);
+    manualMasks++;
+    renderPromptOutput();
+    promptOutput.focus();
+    promptOutput.setSelectionRange(0, 0);
+    syncMaskTools();
+    showStatus("shieldCopyStatus", "success", "Selected text replaced with [REDACTED].");
+  });
+  $("undoPromptMask").addEventListener("click", () => {
+    if (!promptResult || undoMask === null) return;
+    promptResult.cleanText = undoMask;
+    undoMask = null;
+    manualMasks--;
+    renderPromptOutput();
+    promptOutput.focus();
+    showStatus("shieldCopyStatus", "info", "Last manual mask undone.");
+  });
 
   async function copyMaskedText(output, status) {
     if (!output.value) return;
@@ -121,6 +186,8 @@
     if (!prompt.value.trim()) return;
     try {
       promptResult = PromptScrubber.scrub(prompt.value);
+      manualMasks = 0;
+      undoMask = null;
       renderFindings(promptResult, $("scrubFindingsList"), $("scrubFindingsCount"));
       renderPromptOutput();
       $("scrubFindingsWrap").hidden = false;
@@ -209,7 +276,7 @@
     const url = new URL(tab.url);
     const providers = { "chatgpt.com": "ChatGPT", "chat.openai.com": "ChatGPT", "claude.ai": "Claude", "gemini.google.com": "Gemini" };
     const provider = url.protocol === "https:" && Object.hasOwn(providers, url.hostname) && providers[url.hostname];
-    return provider ? { id: tab.id, provider } : null;
+    return provider ? { id: tab.id, provider, url: tab.url } : null;
   }
 
   async function refreshChat() {
@@ -219,7 +286,12 @@
     $("chatDetectedCard").hidden = !chat;
     $("sendDocToChatBtn").hidden = !chat;
     $("activeChatBadge").textContent = chat?.provider || "";
-    hideStatus("chatScrubStatus");
+    const target = chat ? `${chat.id}:${chat.url}` : "";
+    if (target !== chatTarget) {
+      chatTarget = target;
+      chatJob++;
+      hideStatus("chatScrubStatus");
+    }
   }
 
   async function updateChat(button, message, status) {

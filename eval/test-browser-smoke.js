@@ -169,8 +169,8 @@ async function main() {
       const files = unzipSync(new Uint8Array(await response.arrayBuffer()));
       const manifest = JSON.parse(Buffer.from(files["manifest.json"]).toString());
       assert.equal(manifest.manifest_version, 3);
-      assert.equal(manifest.version, "1.1.0");
-      assert.ok(files["popup.html"] && files["shield-panel.js"] && files["planner/connection.js"]);
+      assert.equal(manifest.version, "1.2.0");
+      assert.ok(files["popup.html"] && files["shield-panel.js"] && files["scan-review.js"] && files["planner/connection.js"]);
       for (const script of manifest.background.scripts || []) assert.ok(files[script], script);
       assert.equal(Boolean(manifest.background.service_worker), browser === "chromium");
     }
@@ -190,6 +190,23 @@ async function main() {
       await panel.waitForSelector("#panel-" + tab + ".active h1");
       assert.equal(await panel.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, tab);
     }
+    await panel.keyboard.down("Alt");
+    await panel.keyboard.down("Shift");
+    await panel.keyboard.press("KeyV");
+    await panel.keyboard.up("Shift");
+    await panel.keyboard.up("Alt");
+    await panel.waitForSelector("#toolSwitcher[open]");
+    await panel.type("#toolSearch", "PIN");
+    assert.equal((await panel.$$("#toolResults li:not([hidden])")).length, 1);
+    await panel.keyboard.press("ArrowDown");
+    await panel.keyboard.press("Enter");
+    assert.equal(await panel.$eval("#tab-vault", (node) => node.getAttribute("aria-selected")), "true");
+    await panel.click("#openToolSwitcher");
+    await panel.type("#toolSearch", "no matching fixture tool");
+    assert.equal(await panel.$eval("#toolSearchEmpty", (node) => node.hidden), false);
+    await panel.keyboard.press("Escape");
+    await panel.waitForFunction(() => !document.getElementById("toolSwitcher").open);
+
     await h.worker.evaluate(() => chrome.storage.local.set({
       taskHistory: [
         { task: "Find the sample form", ts: Date.now(), steps: 1, ok: true },
@@ -227,7 +244,21 @@ async function main() {
     await panel.click("#permanentMasks");
     assert.match(await panel.$eval("#scrubbedPromptOutput", (node) => node.value), /\[REDACTED\]/);
     assert.doesNotMatch(await panel.$eval("#scrubbedPromptOutput", (node) => node.value), /jordan@|\[EMAIL_1\]/);
+    await selectMaskedText(panel, "callback number");
+    await panel.click("#maskPromptSelection");
+    assert.doesNotMatch(await panel.$eval("#scrubbedPromptOutput", (node) => node.value), /callback number/);
+    assert.equal(await panel.$eval("#manualMaskCount", (node) => node.textContent), "1 manual mask");
     await panel.click("#permanentMasks");
+    assert.match(await panel.$eval("#scrubbedPromptOutput", (node) => node.value), /for \[EMAIL_1\]\. The \[REDACTED\] is \[PHONE_NUMBER_1\]/);
+    await panel.click("#undoPromptMask");
+    assert.match(await panel.$eval("#scrubbedPromptOutput", (node) => node.value), /callback number/);
+
+    // Selecting part of a token must replace the whole token.
+    await selectMaskedText(panel, "EMAIL");
+    await panel.click("#maskPromptSelection");
+    assert.match(await panel.$eval("#scrubbedPromptOutput", (node) => node.value), /for \[REDACTED\]/);
+    assert.doesNotMatch(await panel.$eval("#scrubbedPromptOutput", (node) => node.value), /EMAIL|REDACTED\]_1/);
+    await panel.click("#undoPromptMask");
 
     await panel.focus("#tool-text");
     await panel.keyboard.press("ArrowRight");
@@ -269,6 +300,15 @@ async function main() {
     // Open the workspace as an extension tab and leave the fixture foreground for capture.
     await panel.evaluate(() => {
       document.getElementById("tab-run").click();
+      document.getElementById("task").value = "";
+      document.getElementById("scanBtn").click();
+    });
+    await panel.waitForFunction(() => !document.getElementById("previewWrap").hidden, { polling: 100 });
+    assert.equal(await panel.evaluate(() => currentScanData.scanId), null);
+    assert.equal(await panel.$eval("#runBtn", (node) => node.hidden), true);
+
+    await panel.evaluate(() => {
+      document.getElementById("task").value = "Find the sample form";
       document.getElementById("scanBtn").click();
     });
     await panel.waitForFunction(() => !document.getElementById("runBtn").hidden ||
@@ -276,6 +316,8 @@ async function main() {
     assert.equal(await panel.$eval("#runBtn", (el) => el.hidden), false,
       await panel.$eval("#statusMsg", (el) => el.textContent));
     assert.match(await panel.$eval("#previewContext", (node) => node.textContent), /127\.0\.0\.1/);
+    await panel.bringToFront();
+    await testScanReview(h.browser, panel);
     const otherTab = await h.browser.newPage();
     await otherTab.goto(fixture.baseUrl + "/pages/signup-form.html");
     await otherTab.bringToFront();
@@ -347,7 +389,11 @@ async function testActiveChatMasking(browser, panel) {
       document.getElementById("tab-shield").click();
       document.getElementById("tool-text").click();
     });
-    await panel.waitForFunction(() => !document.getElementById("chatDetectedCard").hidden, { polling: 100 });
+    await panel.waitForFunction(async () => {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (!tab || document.getElementById("chatDetectedCard").hidden) return false;
+      return Boolean(await chrome.tabs.sendMessage(tab.id, { type: "GET_PAGE_INFO" }, { frameId: 0 }).catch(() => null));
+    }, { polling: 100 });
     await panel.evaluate(() => document.getElementById("scrubActiveChatBtn").click());
     await panel.waitForFunction(() => document.getElementById("chatScrubStatus").classList.contains("error"), { polling: 100 });
     assert.match(await panel.$eval("#chatScrubStatus", (node) => node.textContent), /empty/);
@@ -359,6 +405,78 @@ async function testActiveChatMasking(browser, panel) {
   } finally {
     await chat.close();
   }
+}
+
+async function selectMaskedText(panel, phrase) {
+  const found = await panel.$eval("#scrubbedPromptOutput", (output, target) => {
+    const index = output.value.indexOf(target);
+    if (index < 0) return false;
+    output.focus();
+    output.setSelectionRange(index, index + target.length);
+    return true;
+  }, phrase);
+  assert.ok(found, "mask selection fixture exists");
+  await panel.waitForFunction(() => !document.getElementById("maskPromptSelection").disabled);
+}
+
+async function getDownload(directory, extension) {
+  for (let attempt = 0; attempt < 30; attempt++) {
+    const filename = (await readdir(directory)).find((name) => name.endsWith(extension));
+    if (filename) return readFile(path.join(directory, filename));
+    await delay(150);
+  }
+  assert.fail("The browser did not finish the expected " + extension + " download");
+}
+
+async function testScanReview(browser, panel) {
+  const regionButton = "#reviewRegionList button:first-of-type";
+  await panel.waitForSelector(regionButton);
+  await panel.click("#overlayToggle");
+  assert.equal((await panel.$$("#regionOverlay rect")).length, 0);
+  await panel.click(regionButton);
+  assert.equal((await panel.$$("#regionOverlay rect.is-selected")).length, 1);
+  assert.equal(await panel.$eval(regionButton, (button) => button.getAttribute("aria-pressed")), "true");
+  const screenshot = await panel.$eval("#preview", (node) => node.src);
+  await panel.$eval("#openPreviewZoom", (button) => button.scrollIntoView({ block: "center" }));
+  await panel.click("#openPreviewZoom");
+  await panel.waitForSelector("#previewZoomDialog[open]");
+  assert.equal(await panel.$eval("#zoomPreview", (node) => node.src), screenshot);
+  await panel.select("#previewZoomLevel", "200");
+  assert.equal(await panel.$eval("#zoomStage", (node) => node.style.width), "200%");
+  assert.equal((await panel.$$("#zoomOverlay rect.is-selected")).length, 1);
+  await panel.keyboard.press("Escape");
+  await panel.waitForFunction(() => !document.getElementById("previewZoomDialog").open);
+
+  const directory = await mkdtemp(path.join(tmpdir(), "visionvault-test-preview-"));
+  try {
+    const cdp = await browser.target().createCDPSession();
+    await cdp.send("Browser.setDownloadBehavior", { behavior: "allow", downloadPath: directory });
+    await panel.$eval("#saveMaskedPreview", (button) => button.scrollIntoView({ block: "center" }));
+    await panel.click("#saveMaskedPreview");
+    await panel.waitForSelector("#reviewExportStatus.success");
+    assert.deepEqual(await getDownload(directory, ".png"), Buffer.from(screenshot.split(",")[1], "base64"));
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+
+  await panel.evaluate(() => {
+    const region = currentScanData.regions[0];
+    scanReview.update({
+      ...currentScanData,
+      regions: [
+        { ...region, sources: ["dom", "vision_ocr"] },
+        { ...region, sources: ["vision_face"] },
+      ],
+    });
+  });
+  await panel.select("#regionSource", "vision_ocr");
+  assert.equal(await panel.$eval("#regionCount", (node) => node.textContent), "1 of 2");
+  assert.equal((await panel.$$("#regionOverlay rect")).length, 1);
+  assert.match(await panel.$eval(regionButton, (node) => node.textContent), /Page elements.*Image text/);
+  await panel.evaluate(() => scanReview.update({ ...currentScanData, preview: "", regions: [] }));
+  assert.equal(await panel.$eval("#saveMaskedPreview", (node) => node.disabled), true);
+  assert.equal(await panel.$eval("#reviewRegionList", (node) => node.hidden), true);
+  await panel.evaluate(() => scanReview.update(currentScanData));
 }
 
 async function testVaultBackup(browser, panel) {
@@ -377,13 +495,7 @@ async function testVaultBackup(browser, panel) {
       document.getElementById("vaultBackupStatus").classList.contains("error"));
     assert.equal(await panel.$eval("#vaultBackupDialog", node => node.open), false,
       await panel.$eval("#vaultBackupStatus", node => node.textContent));
-    let filename;
-    for (let attempt = 0; attempt < 30 && !filename; attempt++) {
-      filename = (await readdir(directory)).find((name) => name.endsWith(".json"));
-      if (!filename) await delay(150);
-    }
-    assert.ok(filename, "encrypted backup reached the browser download directory");
-    const backup = await readFile(path.join(directory, filename), "utf8");
+    const backup = (await getDownload(directory, ".json")).toString();
     assert.equal(JSON.parse(backup).algorithm, "AES-256-GCM");
     assert.doesNotMatch(backup, /vault-fixture@example/);
 

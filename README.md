@@ -48,13 +48,15 @@ To try a local signup fixture, run `python -m http.server 8081 --bind 127.0.0.1 
 
 | Panel | What you can do |
 | --- | --- |
-| Run | Review the masked screenshot and its source page before starting. Rescan after changing tabs or reloading the page. |
-| Shield | Mask prompts or extract masked text from UTF-8 files and text-based PDFs. Copy the output or save a text file. |
+| Run | Scan with the task field empty for a standalone review. Filter masked regions by detector and select a region to see its outline. Enlarge the masked image up to 200% or save it locally. Start a reviewed task from the same panel. |
+| Shield | Mask prompts or extract masked text from UTF-8 files and text-based PDFs. In the text tool, use **Mask selection** to cover anything the scan missed before copying or saving. **Undo last mask** reverses the latest manual edit. |
 | Restore in Shield | Select the prompt, document, or chat draft that produced the placeholders. Clear Shield to discard the in-memory mappings and inputs. |
 | Vault | Manage saved fields, set a PIN, and import or export backups. |
 | History | Search finished tasks by instruction or filter by outcome. Open an entry to prefill Run. |
 | Privacy | Search logged requests by task or destination and filter by text or image payload. Export saves the full log. |
 | Diagnostics and Settings | Run the local self-check and configure redaction, vision depth, approval, and planner options. |
+
+Use the search button in the side panel header or press **Alt+Shift+V** inside the panel to jump to a tool.
 
 Shield scans for known patterns. Review the masked output before sharing it. Choose **Replace tokens with [REDACTED] in this output** to share a copy without reversible placeholders. For scanned PDFs, add a text layer before importing the file. The file tool exports text and discards PDF layout and images.
 

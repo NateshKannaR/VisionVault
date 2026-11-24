@@ -15,7 +15,7 @@ const path = require('path');
 
 const EXT = path.join(__dirname, '..', 'extension');
 const htmlRaw = fs.readFileSync(path.join(EXT, 'popup.html'), 'utf8');
-const panelScripts = ['popup.js', 'shield-panel.js'];
+const panelScripts = ['popup.js', 'scan-review.js', 'shield-panel.js'];
 const js = panelScripts.map((file) => fs.readFileSync(path.join(EXT, file), 'utf8')).join('\n');
 
 // Comments explain the conventions and quote example markup; they are documentation, not

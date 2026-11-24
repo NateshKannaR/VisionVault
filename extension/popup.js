@@ -51,6 +51,85 @@ $("openShield").addEventListener("click", () => {
   $("tab-shield").focus();
 });
 
+const toolSwitcher = $("toolSwitcher");
+const toolSearch = $("toolSearch");
+const toolResults = $("toolResults");
+const toolDescriptions = {
+  run: "Scan a tab and inspect the masked page",
+  vault: "Manage fields, PIN, and backups",
+  history: "Search recent tasks by outcome",
+  privacy: "Review what was sent to a planner",
+  benchmarks: "Check browser capabilities and redaction",
+  shield: "Mask text, chat drafts, and files",
+  settings: "Configure scanning, approvals, and the planner",
+};
+
+for (const tab of $("workspaceTabs").querySelectorAll("[data-tab]")) {
+  const item = document.createElement("li");
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "tool-result";
+  const title = document.createElement("strong");
+  title.textContent = tab.textContent.trim();
+  const description = document.createElement("span");
+  description.textContent = toolDescriptions[tab.dataset.tab];
+  button.append(title, description);
+  item.append(button);
+  toolResults.append(item);
+  button.addEventListener("click", () => {
+    toolSwitcher.close();
+    tab.click();
+    tab.focus();
+  });
+}
+
+function filterTools() {
+  const query = toolSearch.value.trim().toLowerCase();
+  let matches = 0;
+  for (const item of toolResults.children) {
+    item.hidden = !item.textContent.toLowerCase().includes(query);
+    if (!item.hidden) matches++;
+  }
+  $("toolSearchEmpty").hidden = matches > 0;
+}
+
+function openToolSwitcher() {
+  if (document.querySelector("dialog[open]")) return;
+  toolSearch.value = "";
+  filterTools();
+  toolSwitcher.showModal();
+  toolSearch.focus();
+}
+
+$("openToolSwitcher").addEventListener("click", openToolSwitcher);
+$("closeToolSwitcher").addEventListener("click", () => toolSwitcher.close());
+toolSearch.addEventListener("input", filterTools);
+toolSwitcher.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    event.preventDefault();
+    toolSwitcher.close();
+    return;
+  }
+  const buttons = [...toolResults.querySelectorAll("li:not([hidden]) button")];
+  const selected = buttons.indexOf(document.activeElement);
+  if (event.key === "ArrowDown" && buttons.length) {
+    event.preventDefault();
+    buttons[(selected + 1) % buttons.length].focus();
+  } else if (event.key === "ArrowUp" && selected >= 0) {
+    event.preventDefault();
+    (buttons[selected - 1] || toolSearch).focus();
+  } else if (event.key === "Enter" && document.activeElement === toolSearch && buttons.length) {
+    event.preventDefault();
+    buttons[0].click();
+  }
+});
+document.addEventListener("keydown", (event) => {
+  if (!event.repeat && event.altKey && event.shiftKey && !event.ctrlKey && !event.metaKey && event.code === "KeyV") {
+    event.preventDefault();
+    openToolSwitcher();
+  }
+});
+
 // ── Task box ──────────────────────────────────────────────────────────────────
 const taskEl = $("task");
 
@@ -666,7 +745,6 @@ const confirmWrap = $("confirmWrap");
 const inputPromptWrap = $("inputPromptWrap");
 const logWrap = $("logWrap");
 const logEntries = $("logEntries");
-const overlayEl = $("regionOverlay");
 
 let actionCount = 0;
 let renderedLogCount = 0;
@@ -691,228 +769,6 @@ function setRunning(on) {
   runBtn.disabled = on;
   scanBtn.disabled = on;
   if (!on) clearLiveStep();
-}
-
-// ── Redaction overlay ─────────────────────────────────────────────────────────
-const SOURCE_META = {
-  dom:         { label: "DOM",  css: "--src-dom",  cls: "r-dom" },
-  vision_face: { label: "Face", css: "--src-face", cls: "r-vision_face" },
-  vision_ocr:  { label: "OCR",  css: "--src-ocr",  cls: "r-vision_ocr" },
-};
-
-/**
- * Outlines each masked region on the preview.
- *
- * The SVG viewBox is the page's CSS viewport, and the SVG stretches over the image, so region
- * coordinates map correctly at whatever width the panel renders the screenshot.
- */
-function renderRegions(regions, viewport) {
-  const list = Array.isArray(regions) ? regions : [];
-  const vw = (viewport && viewport.w) || 0;
-  const vh = (viewport && viewport.h) || 0;
-
-  if (!list.length || !vw || !vh) {
-    overlayEl.innerHTML = "";
-    $("regionLegend").innerHTML = "";
-    $("regionHint").textContent = "No sensitive regions were detected on this screen.";
-    return;
-  }
-
-  overlayEl.setAttribute("viewBox", `0 0 ${vw} ${vh}`);
-  // Outline colour follows the most specific detector that found it: a face or OCR hit is more
-  // interesting to show than the DOM rule it also matched.
-  const outlineSource = (r) => {
-    const sources = (r.sources && r.sources.length ? r.sources : [r.source]).filter(Boolean);
-    if (sources.includes("vision_face")) return "vision_face";
-    if (sources.includes("vision_ocr")) return "vision_ocr";
-    return "dom";
-  };
-
-  overlayEl.innerHTML = list.map((r) => {
-    const meta = SOURCE_META[outlineSource(r)];
-    const found = (r.sources && r.sources.length ? r.sources : [r.source])
-      .map((x) => (SOURCE_META[x] || SOURCE_META.dom).label).join(" + ");
-    return `<rect class="${meta.cls}" x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" rx="2">` +
-           `<title>${esc(r.reason || "")}${r.label ? " · " + esc(r.label) : ""} — found by ${esc(found)}</title></rect>`;
-  }).join("");
-
-  // Count each region under EVERY detector that contributed to it, so a region found by both
-  // the DOM scan and OCR is credited to both. Totals can therefore exceed the region count.
-  const counts = {};
-  for (const r of list) {
-    const sources = (r.sources && r.sources.length ? r.sources : [r.source]).filter(Boolean);
-    for (const src of new Set(sources)) {
-      const key = SOURCE_META[src] ? src : "dom";
-      counts[key] = (counts[key] || 0) + 1;
-    }
-  }
-
-  $("regionLegend").innerHTML = Object.entries(counts).map(([src, n]) => {
-    const meta = SOURCE_META[src];
-    return `<span class="legend-item"><span class="legend-swatch" style="background:var(${meta.css})"></span>${meta.label} <strong>${n}</strong></span>`;
-  }).join("");
-
-  $("regionHint").textContent =
-    `${list.length} region${list.length === 1 ? "" : "s"} painted over before this image left the page.`;
-}
-
-$("overlayToggle").addEventListener("click", (e) => {
-  const on = e.currentTarget.getAttribute("aria-pressed") !== "true";
-  e.currentTarget.setAttribute("aria-pressed", String(on));
-  overlayEl.classList.toggle("dim", !on);
-});
-
-// ── Active Models & Sensitivity Analysis Inspector ───────────────────────────
-function renderModelInspector(d) {
-  const card = $("modelInspectorCard");
-  if (!card || !d) return;
-  card.hidden = false;
-
-  const screenTypeEl = $("inspectorScreenType");
-  if (screenTypeEl && d.screenEvaluation) {
-    const cat = d.screenEvaluation.category || "DOM Structural";
-    screenTypeEl.textContent = cat;
-  }
-
-  const table = $("sensitivityTable");
-  const countSummary = $("inspectorCountSummary");
-  if (!table) return;
-  table.innerHTML = "";
-
-  const regions = Array.isArray(d.regions) ? d.regions : [];
-  const marks = Array.isArray(d.marks) ? d.marks : [];
-
-  if (countSummary) {
-    countSummary.textContent = `${regions.length} sensitive, ${marks.length} public`;
-  }
-
-  const badgeEl = $("modelInspectorBadge");
-  if (badgeEl) {
-    const faceRan = regions.some(r => (r.sources || [r.source]).includes("vision_face"));
-    const ocrRan = regions.some(r => (r.sources || [r.source]).includes("vision_ocr"));
-    let activeCount = 2; // DOM + Decision Planner
-    if (faceRan) activeCount++;
-    if (ocrRan) activeCount++;
-    badgeEl.textContent = `${activeCount} Models Active`;
-  }
-
-  if (regions.length === 0 && marks.length === 0) {
-    table.innerHTML = `<div style="font-size:11px; color:var(--text-faint); padding:6px; font-style:italic;">No interactive elements or PII detected on this screen.</div>`;
-    return;
-  }
-
-  // 1. Sensitive Items (Classified as PII & Redacted locally with true sensitivity metrics)
-  regions.forEach((r) => {
-    const row = document.createElement("div");
-    row.style.cssText = "display:flex; justify-content:space-between; align-items:center; background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.22); border-radius:4px; padding:5px 8px; font-size:11px;";
-
-    const left = document.createElement("div");
-    left.style.cssText = "display:flex; align-items:center; gap:6px; overflow:hidden;";
-
-    const rawLabel = String(r.label || r.reason || "").toLowerCase();
-    const sev = r.severity || (
-      /aadhaar|card|password|pin|secret|token/i.test(rawLabel) ? "CRITICAL" :
-      /satellite|orbit|apogee|perigee|inclination|pan|passport|mission/i.test(rawLabel) ? "HIGH" :
-      /name|operator|email|phone|dob|salary/i.test(rawLabel) ? "MODERATE" :
-      /avatar|photo|media/i.test(rawLabel) ? "LOW" : "CONTEXTUAL"
-    );
-
-    let badgeBg = "rgba(239,68,68,0.25)";
-    let badgeColor = "#f87171";
-    if (sev === "CRITICAL") {
-      badgeBg = "rgba(220,38,38,0.35)";
-      badgeColor = "#fca5a5";
-    } else if (sev === "HIGH") {
-      badgeBg = "rgba(234,88,12,0.25)";
-      badgeColor = "#fdba74";
-    } else if (sev === "MODERATE") {
-      badgeBg = "rgba(202,138,4,0.25)";
-      badgeColor = "#fde047";
-    } else if (sev === "LOW" || sev === "CONTEXTUAL") {
-      badgeBg = "rgba(14,165,233,0.25)";
-      badgeColor = "#7dd3fc";
-    }
-
-    const badge = document.createElement("span");
-    badge.style.cssText = `background:${badgeBg}; color:${badgeColor}; font-size:9px; font-weight:700; padding:1px 5px; border-radius:3px; white-space:nowrap; letter-spacing:0.3px;`;
-    badge.textContent = sev;
-
-    const name = document.createElement("span");
-    name.style.cssText = "color:#fff; font-weight:500; text-overflow:ellipsis; overflow:hidden; white-space:nowrap; max-width:135px;";
-    name.textContent = r.label || r.reason || "Personal Credential";
-    name.title = `${name.textContent} • ${r.category || (sev + ' Severity Data')}`;
-
-    left.appendChild(badge);
-    left.appendChild(name);
-
-    const right = document.createElement("div");
-    right.style.cssText = "font-size:10px; color:var(--text-muted); text-align:right; white-space:nowrap;";
-
-    const sources = (r.sources && r.sources.length ? r.sources : [r.source]).filter(Boolean);
-    let modelName = r.model || "DOM Rules";
-    if (sources.includes("vision_face")) modelName = "UltraFace ONNX";
-    else if (sources.includes("vision_ocr")) modelName = "Tesseract OCR";
-    else if (!r.model) {
-      if (/apogee|perigee|inclination|orbit|satellite|mission/i.test(rawLabel)) modelName = "Telemetry Scanner";
-      else if (/aadhaar/i.test(rawLabel)) modelName = "Verhoeff Checksum";
-      else if (/card/i.test(rawLabel)) modelName = "Luhn Algorithm";
-      else if (r.reason === "pii_text_match") modelName = "Regex Scanner";
-      else if (r.reason === "sensitive_input" || r.reason === "nearby_label_pii") modelName = "Context Classifier";
-    }
-
-    let rawConf = r.confidence;
-    if (typeof rawConf !== "number") {
-      if (sev === "CRITICAL") rawConf = 0.99;
-      else if (sev === "HIGH") rawConf = /apogee|perigee|inclination/i.test(rawLabel) ? 0.96 : 0.93;
-      else if (sev === "MODERATE") rawConf = 0.86;
-      else rawConf = 0.78;
-    }
-    const conf = Math.round(rawConf * 100);
-    right.innerHTML = `<span style="color:#38bdf8; font-weight:600;">${modelName}</span> <span style="color:var(--text-faint);">(${conf}%)</span>`;
-
-    row.appendChild(left);
-    row.appendChild(right);
-    table.appendChild(row);
-  });
-
-  // 2. Sample Non-Sensitive Items (Classified as Safe & Public for VLM context)
-  const safeMarks = marks.slice(0, 5);
-  safeMarks.forEach((m) => {
-    const row = document.createElement("div");
-    row.style.cssText = "display:flex; justify-content:space-between; align-items:center; background:rgba(16,185,129,0.06); border:1px solid rgba(16,185,129,0.18); border-radius:4px; padding:5px 8px; font-size:11px;";
-
-    const left = document.createElement("div");
-    left.style.cssText = "display:flex; align-items:center; gap:6px; overflow:hidden;";
-
-    const badge = document.createElement("span");
-    badge.style.cssText = "background:rgba(16,185,129,0.2); color:#34d399; font-size:9px; font-weight:700; padding:1px 5px; border-radius:3px; white-space:nowrap;";
-    badge.textContent = "SAFE / PUBLIC";
-
-    const name = document.createElement("span");
-    name.style.cssText = "color:#e2e8f0; text-overflow:ellipsis; overflow:hidden; white-space:nowrap; max-width:135px;";
-    name.textContent = `${m.label || m.role} [${m.id}]`;
-    name.title = name.textContent;
-
-    left.appendChild(badge);
-    left.appendChild(name);
-
-    const right = document.createElement("div");
-    right.style.cssText = "font-size:10px; color:var(--text-muted); text-align:right; white-space:nowrap;";
-    right.innerHTML = `<span style="color:#10b981; font-weight:600;">SoM Grounding</span> <span style="color:var(--text-faint);">(Public)</span>`;
-
-    row.appendChild(left);
-    row.appendChild(right);
-    table.appendChild(row);
-  });
-}
-
-if ($("modelInspectorToggle")) {
-  $("modelInspectorToggle").addEventListener("click", () => {
-    const body = $("modelInspectorBody");
-    if (body) {
-      body.hidden = !body.hidden;
-    }
-  });
 }
 
 // ── Visual Privacy X-Ray Split Lens ──────────────────────────────────────────
@@ -1110,7 +966,7 @@ async function downloadScanSummary(statusId) {
 }
 
 $("generateDpdpBtn").addEventListener("click", () => downloadScanSummary("sessionReportStatus"));
-$("scoreCertBtn").addEventListener("click", () => downloadScanSummary("statusMsg"));
+$("scoreCertBtn").addEventListener("click", () => downloadScanSummary("reviewExportStatus"));
 
 // The backup is encrypted with a separate passphrase. Restores go through the same
 // encrypted browser storage path as a normal save.
@@ -1278,12 +1134,6 @@ const VAULT_FILL_RE  = /\b(fill|populate|autofill|use|apply).{0,30}(vault|stored
 
 scanBtn.addEventListener("click", async () => {
   const task = taskEl.value.trim();
-  if (!task) {
-    showStatus("statusMsg", "error", "Please describe what the agent should do.");
-    taskEl.focus();
-    return;
-  }
-
   busy(scanBtn, "Finding the active tab…");
   const [currentTab] = await chrome.tabs.query({ active: true, currentWindow: true }).catch(() => []);
   if (!currentTab?.id || !/^(https?:|file:)/i.test(currentTab.url || "")) {
@@ -1374,8 +1224,6 @@ scanBtn.addEventListener("click", async () => {
   runBtn.hidden = true;
   previewWrap.hidden = true;
   statsGrid.hidden = true;
-  if ($("scoreCard")) $("scoreCard").hidden = true;
-  if ($("modelInspectorCard")) $("modelInspectorCard").hidden = true;
   timingWrap.hidden = true;
   confirmWrap.hidden = true;
   inputPromptWrap.hidden = true;
@@ -1416,45 +1264,11 @@ function autoAgentMode() {
   return !el || el.checked;
 }
 
-function renderScorecard(d) {
-  const card = $("scoreCard");
-  if (!card) return;
-  card.hidden = false;
-
-  const found = d.piiCount || 0;
-  const blocked = d.redactionOk === false;
-
-  const badge = $("scoreBadge");
-  badge.classList.toggle("is-blocked", blocked);
-  badge.textContent = blocked ? "Blocked" : "Scan complete";
-
-  $("score-found").textContent = found;
-  $("score-masked").textContent = blocked ? "Unavailable" : (d.preview ? found : "—");
-  $("score-sent").textContent = d.preview && !blocked ? "Available" : "Unavailable";
-
-  // Which detector found what. Worth showing because the three disagree usefully: OCR finding
-  // regions the DOM did not is the case for its cost, and a face count of zero on a page full
-  // of photographs is a signal the model did not run.
-  const b = d.sourceBreakdown || {};
-  const chips = [
-    { cls: "dom",  n: b.dom || 0,         label: "from the page text" },
-    { cls: "face", n: b.vision_face || 0, label: "faces" },
-    { cls: "ocr",  n: b.vision_ocr || 0,  label: "read from pixels" },
-  ].filter((c) => c.n > 0);
-  $("scoreSources").innerHTML = chips.length
-    ? chips.map((c) => `<span class="score-src ${c.cls}"><b>${c.n}</b> ${esc(c.label)}</span>`).join("")
-    : '<span class="score-src">No matches from active detectors</span>';
-
-  $("scoreNote").textContent = blocked
-    ? "This frame is blocked because redaction could not be verified."
-    : "Detection coverage depends on the page and the selected vision depth.";
-
-}
-
 function paintPreview(d) {
   currentScanData = d;
-  $("xrayToggle").hidden = !d.rawImage;
-  if (!d.rawImage && isXRayActive) $("xrayToggle").click();
+  const canCompare = Boolean(d.rawImage && d.preview);
+  $("xrayToggle").hidden = !canCompare;
+  if (!canCompare && isXRayActive) $("xrayToggle").click();
   let site = "";
   try { site = new URL(d.pageUrl).hostname; } catch (_) {}
   $("previewContext").textContent = [d.pageTitle, site].filter(Boolean).join(" · ");
@@ -1464,9 +1278,7 @@ function paintPreview(d) {
   idleState.hidden = true;
 
   if (isXRayActive) updateXRaySplit();
-  if (d.regions) renderRegions(d.regions, d.viewport);
-  renderModelInspector(d);
-  renderScorecard(d);
+  scanReview.update(d);
   setStat("s-pii", d.piiCount);
   setStat("s-marks", d.markCount);
   setStat("s-total", (d.timings?.total || 0) + "ms");
@@ -1479,10 +1291,10 @@ function renderScan(d, announce, task) {
   setStat("s-actions", 0);
   const matchesInstruction = task === taskEl.value.trim();
   scannedTask = matchesInstruction ? task : null;
-  reviewedScanId = matchesInstruction ? d.scanId : null;
+  reviewedScanId = matchesInstruction && task ? d.scanId : null;
   runBtn.hidden = autoAgentMode() || !reviewedScanId;
   runBtn.innerHTML = RUN_LABEL;
-  if (announce && !runBtn.hidden) runBtn.focus();
+  if (announce) $("previewHeading").focus();
 
   if (!announce) return;
   if (!matchesInstruction) {
@@ -1494,7 +1306,8 @@ function renderScan(d, announce, task) {
   showStatus(
     "statusMsg",
     "success",
-    `${d.piiCount} sensitive region${d.piiCount === 1 ? "" : "s"} detected${frameNote}. Review the masked preview before continuing.`
+    `${d.piiCount} sensitive region${d.piiCount === 1 ? "" : "s"} detected${frameNote}. ` +
+      (task ? "Review the scan before running the task." : "Review the scan or export the result.")
   );
 }
 

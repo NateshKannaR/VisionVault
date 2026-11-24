@@ -837,7 +837,7 @@ async function phaseScan(task, preferredTabId = null, navigateBeforeScan = true)
     : [];
 
   session = {
-    scanId: crypto.randomUUID(),
+    scanId: parsedTask.raw ? crypto.randomUUID() : null,
     scanUrl: tab.url,
     task,
     parsedTask,
